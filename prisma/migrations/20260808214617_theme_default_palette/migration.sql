@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Branding" ALTER COLUMN "primaryHex" SET DEFAULT '#E41F07',
+ALTER COLUMN "secondaryHex" SET DEFAULT '#0A0C0C',
+ALTER COLUMN "accentHex" SET DEFAULT '#FFA201',
+ALTER COLUMN "radius" SET DEFAULT '8px';

@@ -1,0 +1,172 @@
+import type { AppContext } from '@/server/context'
+import { prisma } from '@/server/db/prisma'
+import { emailProvider, smsProvider, whatsappProvider } from '@/server/providers'
+
+export type NotificationChannelValue = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
+
+export type NotifyInput = {
+  userIds: string[]
+  eventKey: string
+  title: string
+  body: string
+  linkUrl?: string
+  data?: Record<string, unknown>
+  /** Defaults to in-app only; other channels are queued for the worker. */
+  channels?: NotificationChannelValue[]
+}
+
+/**
+ * Notification engine.
+ *
+ * In-app notifications are written synchronously so the bell count is correct
+ * the moment an action completes. Everything that leaves the building (email,
+ * SMS, WhatsApp, push) is queued as a durable Job instead, because a fee
+ * collection must not fail or hang because an SMS vendor is slow.
+ *
+ * Delivery rows are created up front in QUEUED state, so an undelivered
+ * notification is visible rather than silently lost.
+ */
+export async function notify(ctx: AppContext, input: NotifyInput): Promise<void> {
+  const recipients = [...new Set(input.userIds)].filter(Boolean)
+  if (recipients.length === 0) return
+
+  const channels = input.channels ?? ['IN_APP']
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const userId of recipients) {
+        const notification = await tx.notification.create({
+          data: {
+            tenantId: ctx.tenant.id,
+            userId,
+            eventKey: input.eventKey,
+            title: input.title,
+            body: input.body,
+            linkUrl: input.linkUrl ?? null,
+            data: (input.data ?? null) as never,
+          },
+        })
+
+        const external = channels.filter((c) => c !== 'IN_APP')
+        if (external.length === 0) continue
+
+        await tx.notificationDelivery.createMany({
+          data: external.map((channel) => ({
+            tenantId: ctx.tenant.id,
+            notificationId: notification.id,
+            channel,
+          })),
+        })
+
+        await tx.job.create({
+          data: {
+            tenantId: ctx.tenant.id,
+            queue: 'notifications',
+            name: 'notification.send',
+            payload: { notificationId: notification.id, channels: external } as never,
+          },
+        })
+      }
+    })
+  } catch (err) {
+    // A failed notification must never roll back the action that caused it.
+    console.error('[notifications] failed to enqueue', { eventKey: input.eventKey, err })
+  }
+}
+
+/**
+ * Processes one queued notification job. Called by the worker; exported here so
+ * the dispatch logic lives with the rest of the engine rather than in the
+ * worker script.
+ */
+export async function deliverNotification(notificationId: string): Promise<void> {
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+    include: {
+      user: { select: { email: true, phone: true, firstName: true } },
+      deliveries: { where: { status: 'QUEUED' } },
+    },
+  })
+  if (!notification) return
+
+  for (const delivery of notification.deliveries) {
+    let result = { ok: false, providerMessageId: undefined as string | undefined, error: 'Unsupported channel' as string | undefined }
+
+    try {
+      if (delivery.channel === 'EMAIL' && notification.user.email) {
+        const r = await emailProvider().send({
+          to: notification.user.email,
+          subject: notification.title,
+          html: `<p>${escapeHtml(notification.body)}</p>`,
+          text: notification.body,
+        })
+        result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
+      } else if (delivery.channel === 'SMS' && notification.user.phone) {
+        const r = await smsProvider().send({
+          to: notification.user.phone,
+          body: `${notification.title}: ${notification.body}`,
+        })
+        result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
+      } else if (delivery.channel === 'WHATSAPP' && notification.user.phone) {
+        const r = await whatsappProvider().send({
+          to: notification.user.phone,
+          body: `${notification.title}\n\n${notification.body}`,
+        })
+        result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
+      } else {
+        result = { ok: false, providerMessageId: undefined, error: 'No address for this channel' }
+      }
+    } catch (err) {
+      result = { ok: false, providerMessageId: undefined, error: String(err) }
+    }
+
+    await prisma.notificationDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        status: result.ok ? 'SENT' : 'FAILED',
+        provider: result.providerMessageId ? delivery.channel.toLowerCase() : null,
+        providerMessageId: result.providerMessageId ?? null,
+        attempts: { increment: 1 },
+        lastError: result.ok ? null : (result.error ?? 'Unknown error'),
+        sentAt: result.ok ? new Date() : null,
+      },
+    })
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+export async function markNotificationsRead(ctx: AppContext, ids?: string[]): Promise<number> {
+  const result = await ctx.db.notification.updateMany({
+    where: {
+      userId: ctx.user.userId,
+      readAt: null,
+      ...(ids && ids.length > 0 ? { id: { in: ids } } : {}),
+    },
+    data: { readAt: new Date() },
+  })
+  return result.count
+}
+
+export async function listNotifications(ctx: AppContext, limit = 30) {
+  return ctx.db.notification.findMany({
+    where: { userId: ctx.user.userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      eventKey: true,
+      title: true,
+      body: true,
+      linkUrl: true,
+      readAt: true,
+      createdAt: true,
+    },
+  })
+}

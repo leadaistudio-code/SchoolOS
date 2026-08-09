@@ -1,0 +1,60 @@
+import type { Metadata, Viewport } from 'next'
+import { Golos_Text } from 'next/font/google'
+import '@/styles/globals.css'
+import { resolveTenant } from '@/server/tenant'
+import { BrandStyle } from '@/components/brand-provider'
+import { ThemeScript } from '@/components/theme-toggle'
+import { env } from '@/lib/env'
+
+/**
+ * Loaded through next/font so the file is self-hosted and there is no
+ * render-blocking request to a third-party font CDN.
+ */
+const golos = Golos_Text({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-golos',
+  display: 'swap',
+})
+
+export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await resolveTenant()
+  const name = tenant?.school?.name ?? tenant?.name ?? env().APP_NAME
+  return {
+    title: { default: name, template: `%s · ${name}` },
+    description: `${name} school management portal`,
+    manifest: '/manifest.webmanifest',
+    icons: tenant?.school?.faviconUrl ? { icon: tenant.school.faviconUrl } : undefined,
+    appleWebApp: { capable: true, title: name, statusBarStyle: 'default' },
+  }
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0f17' },
+  ],
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const tenant = await resolveTenant()
+  const palette = {
+    primaryHex: tenant?.school?.primaryHex ?? '#E41F07',
+    secondaryHex: tenant?.school?.secondaryHex ?? '#0A0C0C',
+    accentHex: tenant?.school?.accentHex ?? '#FFA201',
+    radius: tenant?.school?.radius ?? '8px',
+  }
+
+  return (
+    <html lang="en" className={golos.variable} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+        <BrandStyle palette={palette} />
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+}

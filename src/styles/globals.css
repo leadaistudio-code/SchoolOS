@@ -1,0 +1,258 @@
+@import 'tailwindcss';
+
+/*
+ * Theme engine.
+ *
+ * The palette below is the platform default. Each tenant stores its own brand
+ * colours and the server emits them as custom properties on :root at request
+ * time (see BrandProvider), so the same component tree renders in every
+ * school's identity. Nothing here is hardcoded into a component.
+ */
+:root {
+  /* Brand ---------------------------------------------------------------- */
+  --brand-500: #e41f07;
+  --brand-600: #c11a06;
+  --brand-700: #9d1505;
+  --brand-100: #fac9c2;
+  --brand-50: #fce9e6;
+  --brand-contrast: #ffffff;
+  --brand-rgb: 228, 31, 7;
+
+  --accent-500: #ffa201;
+  --accent-600: #e08f01;
+  --accent-50: #fff6e6;
+
+  /* Semantic ------------------------------------------------------------- */
+  --success: #1abe17;
+  --success-bg: #e8f9e8;
+  --warning: #f9b801;
+  --warning-bg: #fef8e6;
+  --danger: #ef1e1e;
+  --danger-bg: #fde9e9;
+  --info: #2f80ed;
+  --info-bg: #eaf2fd;
+  --indigo: #3538cd;
+  --indigo-bg: #eaedf7;
+  --purple: #800080;
+  --purple-bg: #f1ebf7;
+  --pink: #dd2590;
+  --pink-bg: #fdedf8;
+  --teal: #0e9384;
+  --teal-bg: #ebf2f1;
+  --orange: #ef5e25;
+  --orange-bg: #fff0eb;
+
+  /* Neutrals ------------------------------------------------------------- */
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --surface-2: #f7f8f9;
+  --surface-3: #f3f6f9;
+  --border: #e2e8f0;
+  --border-strong: #e8e8e8;
+
+  --text: #1f2020;
+  --text-muted: #707070;
+  --text-subtle: #9d9d9d;
+
+  /* Shell ---------------------------------------------------------------- */
+  --sidebar-w: 240px;
+  --sidebar-w-sm: 70px;
+  --topbar-h: 56px;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e8e8e8;
+  --menu-icon-bg: #f7f8f9;
+  --menu-item-color: #707070;
+  --topbar-bg: #ffffff;
+  --topbar-item-bg: #f7f8f9;
+  --topbar-item-border: #e8e8e8;
+
+  /* Elevation and shape -------------------------------------------------- */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --shadow-card: 0 4px 4px 0 rgba(219, 219, 219, 0.25);
+  --shadow-pop: 0 4px 74px 0 rgba(208, 208, 208, 0.28);
+  --shadow-lift: 0 4.4px 12px -1px rgba(222, 222, 222, 0.36);
+
+  /* Tile gradients ------------------------------------------------------- */
+  --grad-brand: linear-gradient(180deg, var(--brand-500) 0%, #ff5641 100%);
+  --grad-indigo: linear-gradient(180deg, #3538cd 0%, #575aff 100%);
+  --grad-pink: linear-gradient(180deg, #dd2590 0%, #fe57b8 100%);
+  --grad-warning: linear-gradient(180deg, #ffa201 0%, #ea9d19 100%);
+  --grad-success: linear-gradient(180deg, #27ae60 0%, #104828 100%);
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b0f17;
+  --surface: #131926;
+  --surface-2: #182031;
+  --surface-3: #1d2639;
+  --border: #26304a;
+  --border-strong: #2e3950;
+
+  --text: #eaeef7;
+  --text-muted: #99a4bd;
+  --text-subtle: #6b7794;
+
+  --sidebar-bg: #131926;
+  --sidebar-border: #26304a;
+  --menu-icon-bg: #1d2639;
+  --topbar-bg: #131926;
+  --topbar-item-bg: #1d2639;
+  --topbar-item-border: #26304a;
+
+  --success-bg: #0a2e1a;
+  --warning-bg: #2e2205;
+  --danger-bg: #2e0f0c;
+  --info-bg: #0a1f3d;
+  --indigo-bg: #171a3d;
+  --purple-bg: #260a26;
+  --pink-bg: #2e0a1f;
+  --teal-bg: #052622;
+  --orange-bg: #2e1408;
+
+  --shadow-card: 0 4px 4px 0 rgba(0, 0, 0, 0.25);
+  --shadow-pop: 0 4px 40px 0 rgba(0, 0, 0, 0.45);
+  --shadow-lift: 0 4px 12px -1px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  --color-brand: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-100: var(--brand-100);
+  --color-brand-50: var(--brand-50);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-accent: var(--accent-500);
+  --color-accent-50: var(--accent-50);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-subtle: var(--text-subtle);
+
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-indigo: var(--indigo);
+  --color-indigo-bg: var(--indigo-bg);
+  --color-purple: var(--purple);
+  --color-purple-bg: var(--purple-bg);
+  --color-pink: var(--pink);
+  --color-pink-bg: var(--pink-bg);
+  --color-teal: var(--teal);
+  --color-teal-bg: var(--teal-bg);
+  --color-orange: var(--orange);
+  --color-orange-bg: var(--orange-bg);
+
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow-card);
+
+  --font-sans: var(--font-golos), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings carry the darker ink; body copy stays grey. This split is what
+   gives the reference its calm, low-contrast reading surface. */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text);
+  font-weight: 600;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Soft badge with a coloured underline — the reference's signature chip. */
+.badge-soft {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--surface) 70%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
