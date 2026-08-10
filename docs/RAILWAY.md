@@ -75,6 +75,18 @@ The `${{Postgres.DATABASE_URL}}` syntax is a Railway reference: it resolves to
 the private connection string and follows the database if it is ever moved or
 rotated. Do not paste the literal URL.
 
+### Why NODE_ENV matters more than it looks
+
+Setting `NODE_ENV=production` does two things at once. At runtime it is
+required — it puts the `secure` flag on the session cookie. At install time npm
+reads the same variable and skips `devDependencies` entirely.
+
+So every build tool has to live in `dependencies`, which is where
+`tailwindcss`, `@tailwindcss/postcss`, `typescript`, `prisma` and `tsx` now
+are. If a future dependency is needed by `npm run build`, it belongs there too,
+not in `devDependencies`, or the deploy will fail with `Cannot find module`
+after the install appears to succeed.
+
 Generate the secret with:
 
 ```bash

@@ -14,6 +14,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Linting is a development and CI concern, not a deployment one. Running it
+  // during the production build means a style rule can stop a release, and it
+  // forces the linter into the deployed dependency tree for no runtime benefit.
+  eslint: { ignoreDuringBuilds: true },
   // Pin the trace root: an unrelated lockfile higher up the tree would
   // otherwise be inferred as the workspace root.
   outputFileTracingRoot: process.cwd(),
