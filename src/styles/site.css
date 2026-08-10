@@ -1,0 +1,149 @@
+/*
+ * Public website tokens.
+ *
+ * Scoped to `.site` rather than :root so the marketing palette can be more
+ * expressive than the application's without leaking into it. The two share an
+ * indigo, deliberately: a visitor who books a demo should recognise the
+ * product when they see it.
+ */
+
+.site {
+  --ink: #0b1220;
+  --navy: #111a32;
+  --navy-soft: #1b2647;
+  --indigo: #4f46e5;
+  --indigo-bright: #635bff;
+  --blue: #2563eb;
+  --emerald: #0f9d76;
+  --amber: #d97706;
+  --coral: #e05a5a;
+
+  --paper: #ffffff;
+  --page: #f7f8fc;
+  --cream: #fbfaf7;
+  --rule: #e3e7f0;
+  --rule-strong: #cfd6e6;
+
+  --text: #0b1220;
+  --text-muted: #48546b;
+  --text-subtle: #6b7791;
+  --on-dark: #eef1f8;
+  --on-dark-muted: #9aa6c2;
+
+  --measure: 68ch;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --page-max: 1200px;
+  --wide-max: 1360px;
+
+  color: var(--text);
+  background: var(--paper);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* Display face. Reserved for headlines: at body sizes a high-contrast serif
+   costs legibility and buys nothing. */
+.site .display {
+  font-family: var(--font-display), 'Iowan Old Style', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.site h1,
+.site h2,
+.site h3 {
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.site p {
+  text-wrap: pretty;
+}
+
+/* Dark passages. Two of them on the homepage, both earning it: the section
+   that follows one record through the school, and transport. */
+.site .on-navy {
+  background: var(--navy);
+  color: var(--on-dark);
+}
+.site .on-navy h1,
+.site .on-navy h2,
+.site .on-navy h3 {
+  color: #fff;
+}
+.site .on-navy .muted {
+  color: var(--on-dark-muted);
+}
+
+.site .muted {
+  color: var(--text-muted);
+}
+.site .subtle {
+  color: var(--text-subtle);
+}
+
+/* The one label style on the site. */
+.site .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.site .on-navy .eyebrow {
+  color: #8f9dc0;
+}
+
+/* Rules do the dividing. Cards are reserved for things that are genuinely
+   objects — a school type, a service — never for laying out a section. */
+.site .rule {
+  border-top: 1px solid var(--rule);
+}
+
+/*
+ * Product surfaces.
+ *
+ * Real application components are rendered inside these, so they need the
+ * application's own frame: a hairline and a modest radius, not a floating
+ * glass panel tilted in space.
+ */
+.site .screen {
+  background: var(--page);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.site .screen-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff;
+  border-bottom: 1px solid var(--rule);
+}
+
+.site .shadow-lift {
+  box-shadow:
+    0 1px 2px rgba(11, 18, 32, 0.04),
+    0 12px 32px -12px rgba(11, 18, 32, 0.18);
+}
+
+/* Entrance. One transform, one duration, applied to whole compositions rather
+   than to every element in them. */
+@keyframes site-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.site .reveal {
+  animation: site-rise 480ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site .reveal {
+    animation: none;
+  }
+}
