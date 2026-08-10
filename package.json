@@ -19,6 +19,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "setup:school": "tsx scripts/create-school.ts",
+    "map:domain": "tsx scripts/map-domain.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest"
