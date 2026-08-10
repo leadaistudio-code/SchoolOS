@@ -151,6 +151,9 @@ async function main() {
   const email = required('email').toLowerCase()
   const password = required('password')
   const rootDomain = arg('domain') ?? process.env.APP_ROOT_DOMAIN ?? null
+  // An exact host, for reaching the school somewhere that has no room for a
+  // subdomain — a Railway preview URL, or a school on its own domain.
+  const exactHost = arg('host')?.replace(/^https?:\/\//, '').split('/')[0]?.toLowerCase()
 
   if (password.length < 10) {
     console.error('\nThe password must be at least 10 characters.\n')
@@ -201,11 +204,15 @@ async function main() {
     update: { name: schoolName },
   })
 
-  if (rootDomain) {
-    const host = `${slug}.${rootDomain}`
+  // Tenants resolve by exact host first and by subdomain second, so
+  // registering the host makes the school reachable at an address that has no
+  // subdomain to spare.
+  for (const host of [exactHost, rootDomain ? `${slug}.${rootDomain}` : null].filter(
+    (value): value is string => !!value,
+  )) {
     await prisma.tenantDomain.upsert({
       where: { host },
-      create: { tenantId: tenant.id, host, isPrimary: true, verified: true },
+      create: { tenantId: tenant.id, host, isPrimary: host === exactHost, verified: true },
       update: { verified: true },
     })
   }
@@ -257,7 +264,9 @@ async function main() {
   }
 
   console.log('\nDone.\n')
-  if (rootDomain) {
+  if (exactHost) {
+    console.log(`  Sign in at  https://${exactHost}/login`)
+  } else if (rootDomain) {
     console.log(`  Sign in at  https://${slug}.${rootDomain}/login`)
   } else {
     console.log(`  Sign in at  https://<your-domain>/login  (subdomain: ${slug})`)
