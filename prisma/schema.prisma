@@ -6,6 +6,12 @@
 
 generator client {
   provider = "prisma-client-js"
+  // The build machine and the runtime are different Linux distributions on
+  // most serverless hosts: Netlify builds on Debian and runs the functions on
+  // Amazon Linux. Without the second target the client builds cleanly and then
+  // fails on the first query in production, looking for an engine that was
+  // never downloaded.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

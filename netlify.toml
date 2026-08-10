@@ -1,0 +1,40 @@
+# Netlify deployment.
+#
+# The Next.js runtime plugin turns the App Router build into Netlify Functions,
+# so every page in this product is server-rendered on demand — which is what a
+# multi-tenant ERP needs: the same route renders differently per school.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # The project requires >= 20.11 (see package.json engines).
+  NODE_VERSION = "20.11.1"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Prisma needs the Lambda engine, not just the build machine's.
+  PRISMA_CLI_BINARY_TARGETS = "native,rhel-openssl-3.0.x"
+
+# Migrations run only for the real site.
+#
+# Deploy previews and branch builds share the same database in most setups, so
+# migrating from a preview would apply an unreviewed schema change to
+# production. Only the production context is allowed to touch it.
+[context.production]
+  command = "npx prisma migrate deploy && npm run build"
+
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Uploaded files are served through an authenticated route, never as static
+# assets, so nothing here should be cached by the edge.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
