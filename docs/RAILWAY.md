@@ -85,7 +85,20 @@ So every build tool has to live in `dependencies`, which is where
 `tailwindcss`, `@tailwindcss/postcss`, `typescript`, `prisma` and `tsx` now
 are. If a future dependency is needed by `npm run build`, it belongs there too,
 not in `devDependencies`, or the deploy will fail with `Cannot find module`
-after the install appears to succeed.
+after the install appears to succeed. The same applies to `@types/*` packages
+for anything `src/` imports: the build type-checks the application, and a
+missing type declaration stops it as surely as a missing module.
+
+Two consequences worth knowing:
+
+- `package-lock.json` records which packages are dev-only, so moving one
+  between the two sections in `package.json` is not enough on its own — run
+  `npm install --package-lock-only` afterwards or the lock file will still say
+  dev and the install will still skip it.
+- The production build type-checks against `tsconfig.build.json`, which leaves
+  out `prisma/`, `scripts/`, `tests/` and `vitest.config.ts`. Those import
+  devDependencies that a production install correctly omits, and none of them
+  is deployed. `npm run typecheck` still covers the whole repository.
 
 Generate the secret with:
 
