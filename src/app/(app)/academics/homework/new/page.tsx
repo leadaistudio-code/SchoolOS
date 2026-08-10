@@ -29,7 +29,6 @@ export default async function NewHomeworkPage() {
     <div className="max-w-2xl">
       <PageHeader
         title="Set homework"
-        description="Publishing notifies the class and their parents straight away."
       />
       <HomeworkForm
         subjects={subjects.map((s) => ({

@@ -64,7 +64,7 @@ export function TimetableGrid({
   return (
     <div>
       {!editable && readOnlyReason ? (
-        <p className="px-4 py-2.5 text-[13px] text-ink-muted border-b border-line">
+        <p className="px-4 py-2.5 text-sm text-ink-muted border-b border-line">
           {readOnlyReason}
         </p>
       ) : null}
@@ -73,13 +73,13 @@ export function TimetableGrid({
         <table className="w-full border-collapse min-w-[760px]">
           <thead>
             <tr>
-              <th className="w-32 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-wide text-ink-subtle border-b border-line">
+              <th className="w-32 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-subtle border-b border-line">
                 Period
               </th>
               {grid.days.map((d) => (
                 <th
                   key={d.value}
-                  className="px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-wide text-ink-subtle border-b border-line"
+                  className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-subtle border-b border-line"
                 >
                   {d.short}
                 </th>
@@ -90,8 +90,8 @@ export function TimetableGrid({
             {grid.periods.map((period) => (
               <tr key={period.id} className={cn(period.isBreak && 'bg-surface-2')}>
                 <td className="px-3 py-2 align-top">
-                  <span className="block text-[13px] font-medium text-ink">{period.name}</span>
-                  <span className="block text-[11.5px] text-ink-subtle tnum">
+                  <span className="block text-sm font-medium text-ink">{period.name}</span>
+                  <span className="block text-xs text-ink-subtle tnum">
                     {period.startTime}–{period.endTime}
                   </span>
                 </td>
@@ -106,7 +106,7 @@ export function TimetableGrid({
                     return (
                       <td
                         key={day.value}
-                        className="px-3 py-2 text-[12px] text-ink-subtle italic align-top"
+                        className="px-3 py-2 text-xs text-ink-subtle italic align-top"
                       >
                         Break
                       </td>
@@ -120,7 +120,7 @@ export function TimetableGrid({
                           <Select
                             autoFocus
                             defaultValue={cell?.classSubjectId ?? ''}
-                            className="h-8 text-[12px] min-w-36"
+                            className="h-8 text-xs min-w-36"
                             onChange={(e) => save(period.id, day.value, e.target.value)}
                             aria-label="Choose a subject"
                           >
@@ -134,10 +134,10 @@ export function TimetableGrid({
                           </Select>
                           <button
                             onClick={() => setEditing(null)}
-                            className="size-7 grid place-items-center rounded text-ink-subtle hover:text-ink"
+                            className="size-7 grid place-items-center rounded-[var(--radius-sm)] text-ink-subtle hover:text-ink"
                             aria-label="Cancel"
                           >
-                            <X className="size-4" aria-hidden />
+                            <X aria-hidden />
                           </button>
                         </div>
                       ) : saving === key ? (
@@ -149,20 +149,20 @@ export function TimetableGrid({
                           disabled={!editable}
                           onClick={() => setEditing({ periodId: period.id, day: day.value })}
                           className={cn(
-                            'w-full text-left rounded-lg border border-line bg-surface px-2.5 py-1.5 min-h-14',
+                            'w-full text-left rounded-[var(--radius-sm)] border border-line bg-surface px-2.5 py-1.5 min-h-14',
                             editable && 'hover:border-[var(--brand-500)] hover:bg-[var(--brand-50)]',
                           )}
                         >
-                          <span className="block text-[12.5px] font-medium text-ink truncate">
+                          <span className="block text-xs font-medium text-ink truncate">
                             {cell.subject}
                           </span>
                           {cell.teacher ? (
-                            <span className="block text-[11px] text-ink-subtle truncate">
+                            <span className="block text-xs text-ink-subtle truncate">
                               {cell.teacher}
                             </span>
                           ) : null}
                           {cell.roomName ? (
-                            <span className="block text-[11px] text-ink-subtle">
+                            <span className="block text-xs text-ink-subtle">
                               {cell.roomName}
                             </span>
                           ) : null}
@@ -170,13 +170,13 @@ export function TimetableGrid({
                       ) : editable ? (
                         <button
                           onClick={() => setEditing({ periodId: period.id, day: day.value })}
-                          className="w-full min-h-14 rounded-lg border border-dashed border-line text-ink-subtle hover:text-[var(--brand-600)] hover:border-[var(--brand-500)] grid place-items-center"
+                          className="w-full min-h-14 rounded-[var(--radius-sm)] border border-dashed border-line text-ink-subtle hover:text-[var(--brand-600)] hover:border-[var(--brand-500)] grid place-items-center"
                           aria-label={`Add a lesson on ${day.label} in ${period.name}`}
                         >
-                          <Plus className="size-4" aria-hidden />
+                          <Plus aria-hidden />
                         </button>
                       ) : (
-                        <div className="min-h-14 grid place-items-center text-[12px] text-ink-subtle">
+                        <div className="min-h-14 grid place-items-center text-xs text-ink-subtle">
                           —
                         </div>
                       )}
@@ -190,7 +190,7 @@ export function TimetableGrid({
       </div>
 
       {editable ? (
-        <p className="px-4 py-3 text-[12px] text-ink-subtle border-t border-line">
+        <p className="px-4 py-3 text-xs text-ink-subtle border-t border-line">
           Click a slot to set or clear it. A teacher already taking another class in that period
           is refused, so the grid cannot double-book anyone.
         </p>

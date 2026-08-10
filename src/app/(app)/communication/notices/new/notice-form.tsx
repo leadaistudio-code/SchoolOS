@@ -39,7 +39,7 @@ export function NoticeForm({ classes }: { classes: ClassNode[] }) {
               className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
             >
               <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-              <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
+              <p className="text-sm text-[var(--danger)]">{state.error}</p>
             </div>
           ) : null}
 
@@ -135,28 +135,28 @@ export function NoticeForm({ classes }: { classes: ClassNode[] }) {
           </div>
 
           <div className="space-y-2 pt-1">
-            <label className="flex items-center gap-2 text-[13px] text-ink">
+            <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
                 name="isPublished"
                 defaultChecked
-                className="size-4 rounded border-line"
+                className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]"
               />
               Publish immediately
             </label>
-            <label className="flex items-center gap-2 text-[13px] text-ink">
-              <input type="checkbox" name="pinned" className="size-4 rounded border-line" />
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input type="checkbox" name="pinned" className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]" />
               Pin to the top of the board
             </label>
-            <label className="flex items-center gap-2 text-[13px] text-ink">
-              <input type="checkbox" name="notifyNow" className="size-4 rounded border-line" />
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input type="checkbox" name="notifyNow" className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]" />
               Send a notification to the audience
             </label>
           </div>
 
           <div className="flex items-center gap-2 pt-1">
             <Button type="submit" loading={pending}>
-              <Send className="size-4" aria-hidden />
+              <Send aria-hidden />
               Post notice
             </Button>
             <Link href="/communication/notices" className={buttonVariants({ variant: 'ghost' })}>

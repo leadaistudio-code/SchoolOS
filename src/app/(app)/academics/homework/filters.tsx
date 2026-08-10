@@ -88,7 +88,7 @@ export function HomeworkFilters({
 
       {params.toString() ? (
         <Button variant="ghost" size="sm" onClick={() => router.push(pathname)}>
-          <X className="size-4" aria-hidden />
+          <X aria-hidden />
           Clear
         </Button>
       ) : null}

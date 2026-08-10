@@ -38,7 +38,7 @@ export default async function LeavePage({
         actions={
           ctx.can('leave.apply') ? (
             <Link href="/leave/apply" className={buttonVariants({ size: 'sm' })}>
-              <Plus className="size-4" aria-hidden />
+              <Plus aria-hidden />
               Apply for leave
             </Link>
           ) : null

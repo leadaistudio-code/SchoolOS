@@ -1641,11 +1641,16 @@ model ConversationParticipant {
   userId         String
   lastReadAt     DateTime?
   mutedAt        DateTime?
+  // Mailbox state is per participant, not per thread: archiving a conversation
+  // clears it from your own inbox without touching anyone else's.
+  archivedAt     DateTime?
+  starredAt      DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, conversationId, userId])
   @@index([tenantId, userId])
+  @@index([tenantId, userId, archivedAt])
 }
 
 model Message {

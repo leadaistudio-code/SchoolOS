@@ -5,7 +5,7 @@ import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
@@ -14,15 +14,6 @@ import { formatMoney } from '@/lib/utils'
 import { PaymentFilters } from './filters'
 
 export const metadata = { title: 'Payments' }
-
-const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
-  SUCCESS: 'success',
-  INITIATED: 'info',
-  PENDING: 'warning',
-  FAILED: 'danger',
-  REFUNDED: 'neutral',
-  PARTIALLY_REFUNDED: 'warning',
-}
 
 export default async function PaymentsPage({
   searchParams,
@@ -74,10 +65,10 @@ export default async function PaymentsPage({
                 <TBody>
                   {rows.map((p) => (
                     <TR key={p.id}>
-                      <TD className="text-[13px] tnum text-ink">
+                      <TD className="text-sm tnum text-ink">
                         {p.receiptNumber ?? <span className="text-ink-subtle">—</span>}
                         {p.reference ? (
-                          <span className="block text-[11.5px] text-ink-subtle">
+                          <span className="block text-xs text-ink-subtle">
                             {p.reference}
                           </span>
                         ) : null}
@@ -85,42 +76,43 @@ export default async function PaymentsPage({
                       <TD>
                         <Link
                           href={`/students/${p.studentId}`}
-                          className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                          className="text-sm text-ink hover:text-[var(--brand-600)]"
                         >
                           {p.studentName}
                         </Link>
-                        <span className="block text-[12px] text-ink-subtle tnum">
+                        <span className="block text-xs text-ink-subtle tnum">
                           {p.admissionNo}
                         </span>
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted first-letter:uppercase">
                         {p.mode.toLowerCase().replace('_', ' ')}
                         {p.provider && p.provider !== 'manual' ? (
-                          <span className="block text-[11.5px] text-ink-subtle">{p.provider}</span>
+                          <span className="block text-xs text-ink-subtle">{p.provider}</span>
                         ) : null}
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {p.paidAt
                           ? formatDay(p.paidAt, 'd MMM yyyy')
                           : formatDay(p.createdAt, 'd MMM yyyy')}
                       </TD>
-                      <TD align="right" className="text-[13px] font-medium">
+                      <TD align="right" className="text-sm font-medium">
                         {formatMoney(p.amountMinor, currency)}
                         {p.refundedMinor > 0 ? (
-                          <span className="block text-[11.5px] text-[var(--danger)]">
+                          <span className="block text-xs text-[var(--danger)]">
                             −{formatMoney(p.refundedMinor, currency)} refunded
                           </span>
                         ) : null}
                       </TD>
                       <TD>
-                        <Badge tone={TONE[p.status] ?? 'neutral'}>
-                          {p.status.toLowerCase().replace('_', ' ')}
-                        </Badge>
+                        <StatusBadge
+                          status={p.status}
+                          tone={p.status === 'INITIATED' ? 'info' : undefined}
+                        />
                       </TD>
                       <TD align="right">
                         <Link
                           href={`/finance/payments/${p.id}`}
-                          className="text-[13px] text-[var(--brand-600)] hover:underline"
+                          className="text-sm text-[var(--brand-600)] hover:underline"
                         >
                           Receipt
                         </Link>

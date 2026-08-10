@@ -22,7 +22,7 @@ export function LoginForm({ next }: { next?: string }) {
           className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
         >
           <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-          <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
+          <p className="text-sm text-[var(--danger)]">{state.error}</p>
         </div>
       ) : null}
 
@@ -69,11 +69,11 @@ export function LoginForm({ next }: { next?: string }) {
       </Field>
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-[12.5px] text-ink-muted">
-          <input type="checkbox" name="remember" className="size-4 rounded border-line" defaultChecked />
+        <label className="flex items-center gap-2 text-xs text-ink-muted">
+          <input type="checkbox" name="remember" className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]" defaultChecked />
           Keep me signed in
         </label>
-        <a href="/forgot-password" className="text-[12.5px] font-semibold text-[var(--brand-500)] hover:underline">
+        <a href="/forgot-password" className="text-xs font-semibold text-[var(--brand-500)] hover:underline">
           Forgot password?
         </a>
       </div>

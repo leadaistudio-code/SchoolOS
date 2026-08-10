@@ -2,13 +2,17 @@
 
 import * as React from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { X } from 'lucide-react'
+import { SearchInput } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { TableToolbar } from '@/components/ui/table'
 
 /**
  * Debounced, URL-backed search for list pages. The query lives in the address
  * bar so the filtered view is shareable and the server does the searching.
+ *
+ * Extra filters are passed as children so every list page gets the same
+ * toolbar rather than drawing its own.
  */
 export function SearchBar({
   placeholder = 'Search',
@@ -36,28 +40,27 @@ export function SearchBar({
   }, [value, params, pathname, router])
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3 border-b border-line">
-      <div className="relative flex-1 min-w-52">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-subtle"
-          aria-hidden
-        />
-        <Input
-          type="search"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          className="pl-9"
-        />
-      </div>
+    <TableToolbar>
+      <SearchInput
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+      />
       {children}
       {params.toString() ? (
-        <Button variant="ghost" size="sm" onClick={() => { setValue(''); router.push(pathname) }}>
-          <X className="size-4" aria-hidden />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setValue('')
+            router.push(pathname)
+          }}
+        >
+          <X aria-hidden />
           Clear
         </Button>
       ) : null}
-    </div>
+    </TableToolbar>
   )
 }

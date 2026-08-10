@@ -16,7 +16,7 @@ export default async function SubjectsPage() {
     <div>
       <PageHeader
         title="Subjects"
-        description="Subjects offered across the school and how many classes teach each one."
+        description={`${subjects.length} subjects`}
       />
 
       <Card className="overflow-hidden">
@@ -36,14 +36,14 @@ export default async function SubjectsPage() {
               <TBody>
                 {subjects.map((s) => (
                   <TR key={s.id}>
-                    <TD className="text-[13px] text-ink-muted tnum">{s.code}</TD>
-                    <TD className="text-[13.5px] text-ink">{s.name}</TD>
+                    <TD className="text-sm text-ink-muted tnum">{s.code}</TD>
+                    <TD className="text-sm text-ink">{s.name}</TD>
                     <TD>
                       <Badge tone={s.isElective ? 'info' : 'neutral'}>
                         {s.isElective ? 'elective' : 'core'}
                       </Badge>
                     </TD>
-                    <TD align="right" className="text-[13px]">
+                    <TD align="right" className="text-sm">
                       {s._count.classes}
                     </TD>
                   </TR>

@@ -5,10 +5,10 @@ import { getClassTree } from '@/server/modules/academics/service'
 import { toDateInput } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { cn } from '@/lib/utils'
+import { Metric, MetricRow } from '@/components/ui/metric'
 import { ReportFilters } from './filters'
 
 export const metadata = { title: 'Attendance reports' }
@@ -49,35 +49,26 @@ export default async function AttendanceReportsPage({
         description={`${from} to ${to} · ${rows.length} students with recorded attendance`}
       />
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-4">
-        <StatCard
+      <MetricRow className="mb-4">
+        <Metric
           label="Overall attendance"
           value={overall === null ? 'No data' : `${overall}%`}
-          sub={`${totalMarked} day-records`}
-          icon="CalendarCheck"
-          tone={overall !== null && overall < 85 ? 'warning' : 'success'}
+          sub={`${totalMarked} day-records in range`}
+          emphasis={overall !== null && overall < 85 ? 'warning' : undefined}
         />
-        <StatCard
+        <Metric
           label="Below 75%"
           value={String(atRisk.length)}
-          sub="Students at risk of exam ineligibility"
-          icon="AlertTriangle"
-          tone={atRisk.length > 0 ? 'danger' : 'success'}
+          sub="At risk of exam ineligibility"
+          emphasis={atRisk.length > 0 ? 'danger' : undefined}
         />
-        <StatCard
+        <Metric
           label="Absences"
           value={String(totals.ABSENT ?? 0)}
           sub={`${totals.LATE ?? 0} late arrivals`}
-          icon="UserX"
-          tone="info"
         />
-        <StatCard
-          label="Approved leave"
-          value={String(totals.LEAVE ?? 0)}
-          sub="Days recorded as leave"
-          icon="CalendarOff"
-        />
-      </div>
+        <Metric label="Approved leave" value={String(totals.LEAVE ?? 0)} sub="Days recorded as leave" />
+      </MetricRow>
 
       <Card className="overflow-hidden">
         <ReportFilters classes={classes} from={from} to={to} />
@@ -105,35 +96,40 @@ export default async function AttendanceReportsPage({
                 {rows.map((r) => (
                   <TR key={r.studentId}>
                     <TD>
-                      <span className="block text-[13.5px] text-ink">{r.name}</span>
-                      <span className="block text-[12px] text-ink-subtle tnum">
-                        {r.admissionNo}
-                      </span>
+                      <span className="block text-sm text-ink">{r.name}</span>
+                      <span className="block text-xs text-ink-subtle tnum">{r.admissionNo}</span>
                     </TD>
-                    <TD className="text-[13px] text-ink-muted">
+                    <TD className="text-sm text-ink-muted">
                       {r.className ? `${r.className} ${r.sectionName ?? ''}` : '—'}
                     </TD>
-                    <TD align="right" className="text-[13px]">
+                    <TD align="right" className="text-sm">
                       {r.present}
                     </TD>
-                    <TD align="right" className="text-[13px]">
+                    <TD align="right" className="text-sm">
                       {r.absent}
                     </TD>
-                    <TD align="right" className="text-[13px]">
+                    <TD align="right" className="text-sm">
                       {r.late}
                     </TD>
-                    <TD align="right" className="text-[13px]">
+                    <TD align="right" className="text-sm">
                       {r.leave}
                     </TD>
                     <TD align="right">
                       {r.percent === null ? (
-                        <span className="text-[13px] text-ink-subtle">—</span>
+                        <span className="text-sm text-ink-subtle">—</span>
                       ) : (
-                        <Badge
-                          tone={r.percent < 75 ? 'danger' : r.percent < 85 ? 'warning' : 'success'}
+                        <span
+                          className={cn(
+                            'text-sm tnum font-medium',
+                            r.percent < 75
+                              ? 'text-[var(--danger)]'
+                              : r.percent < 85
+                                ? 'text-warning'
+                                : 'text-ink',
+                          )}
                         >
                           {r.percent}%
-                        </Badge>
+                        </span>
                       )}
                     </TD>
                   </TR>

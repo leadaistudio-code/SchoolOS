@@ -4,7 +4,7 @@ import { requireContext } from '@/server/context'
 import { calendarMonth, upcomingEvents } from '@/server/modules/academics/content-service'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
@@ -50,13 +50,12 @@ export default async function CalendarPage({
     <div>
       <PageHeader
         title="School calendar"
-        description="Holidays, exams, meetings and events for the whole school."
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px] items-start">
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between gap-3 p-3 border-b border-line">
-            <p className="text-[14px] font-semibold text-ink">{monthLabel}</p>
+            <p className="text-base font-semibold text-ink">{monthLabel}</p>
             <div className="flex items-center gap-1.5">
               <Link
                 href={`/academics/calendar?month=${prev}`}
@@ -85,7 +84,7 @@ export default async function CalendarPage({
             {WEEKDAYS.map((d) => (
               <div
                 key={d}
-                className="px-2 py-2 text-[11.5px] font-semibold uppercase tracking-wide text-ink-subtle text-center"
+                className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-ink-subtle text-center"
               >
                 {d}
               </div>
@@ -104,7 +103,7 @@ export default async function CalendarPage({
               >
                 <span
                   className={cn(
-                    'inline-grid place-items-center size-6 rounded-full text-[12px] tnum',
+                    'inline-grid place-items-center size-6 rounded-full text-xs tnum',
                     day.isToday
                       ? 'bg-[var(--brand-500)] text-[var(--brand-contrast)] font-semibold'
                       : day.inMonth
@@ -121,7 +120,7 @@ export default async function CalendarPage({
                       key={`${day.date}-${e.id}`}
                       title={e.title}
                       className={cn(
-                        'truncate rounded px-1.5 py-0.5 text-[11px] leading-4',
+                        'truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
                         KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
                       )}
                     >
@@ -129,7 +128,7 @@ export default async function CalendarPage({
                     </div>
                   ))}
                   {day.events.length > 3 ? (
-                    <p className="text-[11px] text-ink-subtle px-1.5">
+                    <p className="text-xs text-ink-subtle px-1.5">
                       +{day.events.length - 3} more
                     </p>
                   ) : null}
@@ -143,7 +142,7 @@ export default async function CalendarPage({
           <CardHeader>
             <CardTitle>Coming up</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             {upcoming.length === 0 ? (
               <EmptyState
                 title="Nothing scheduled"
@@ -155,8 +154,8 @@ export default async function CalendarPage({
                   <li key={e.id} className="py-2.5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-[13.5px] text-ink truncate">{e.title}</p>
-                        <p className="text-[12px] text-ink-subtle">
+                        <p className="text-sm text-ink truncate">{e.title}</p>
+                        <p className="text-xs text-ink-subtle">
                           {e.startsAt.toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
@@ -165,7 +164,7 @@ export default async function CalendarPage({
                           {e.location ? ` · ${e.location}` : ''}
                         </p>
                       </div>
-                      <Badge tone="neutral">{e.kind.toLowerCase()}</Badge>
+                      <Badge tone="neutral">{humanizeStatus(e.kind)}</Badge>
                     </div>
                   </li>
                 ))}

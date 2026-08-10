@@ -6,18 +6,11 @@ import { format } from 'date-fns'
 import { Check, MessageSquare, X } from 'lucide-react'
 import { cancelLeaveAction, decideLeaveAction } from './actions'
 import type { LeaveRow } from '@/server/modules/leave/service'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge, humanizeStatus } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
-
-const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  APPROVED: 'success',
-  PENDING: 'warning',
-  REJECTED: 'danger',
-  CANCELLED: 'neutral',
-}
 
 /**
  * The approval queue.
@@ -77,23 +70,23 @@ export function LeaveList({ rows, canApprove }: { rows: LeaveRow[]; canApprove: 
         <li key={r.id} className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[14px] font-medium text-ink">
+              <p className="text-base font-medium text-ink">
                 {r.applicantName}
-                <span className="ml-2 text-[12px] font-normal text-ink-subtle uppercase tracking-wide">
-                  {r.applicantType.toLowerCase()}
+                <span className="ml-2 text-xs font-normal text-ink-subtle uppercase tracking-wide">
+                  {humanizeStatus(r.applicantType)}
                 </span>
               </p>
               {r.applicantDetail ? (
-                <p className="text-[12.5px] text-ink-subtle">{r.applicantDetail}</p>
+                <p className="text-xs text-ink-subtle">{r.applicantDetail}</p>
               ) : null}
-              <p className="text-[13px] text-ink-muted mt-1.5">
+              <p className="text-sm text-ink-muted mt-1.5">
                 {formatDay(r.fromDate, 'd MMM yyyy')} – {formatDay(r.toDate, 'd MMM yyyy')}
                 <span className="text-ink-subtle"> · {r.days} day{r.days === 1 ? '' : 's'}</span>
                 {r.leaveType ? <span className="text-ink-subtle"> · {r.leaveType}</span> : null}
               </p>
-              <p className="text-[13px] text-ink mt-1.5 max-w-2xl">{r.reason}</p>
+              <p className="text-sm text-ink mt-1.5 max-w-2xl">{r.reason}</p>
               {r.decisionNote ? (
-                <p className="text-[12.5px] text-ink-muted mt-1.5 flex items-start gap-1.5">
+                <p className="text-xs text-ink-muted mt-1.5 flex items-start gap-1.5">
                   <MessageSquare className="size-3.5 mt-0.5 shrink-0" aria-hidden />
                   {r.decisionNote}
                 </p>
@@ -101,8 +94,8 @@ export function LeaveList({ rows, canApprove }: { rows: LeaveRow[]; canApprove: 
             </div>
 
             <div className="flex flex-col items-end gap-2 shrink-0">
-              <Badge tone={TONE[r.status] ?? 'neutral'}>{r.status.toLowerCase()}</Badge>
-              <span className="text-[12px] text-ink-subtle">
+              <StatusBadge status={r.status} />
+              <span className="text-xs text-ink-subtle">
                 applied {format(r.createdAt, 'd MMM')}
               </span>
             </div>
@@ -125,7 +118,7 @@ export function LeaveList({ rows, canApprove }: { rows: LeaveRow[]; canApprove: 
                   loading={pendingId === r.id}
                   onClick={() => decide(r.id, 'APPROVED')}
                 >
-                  <Check className="size-4" aria-hidden />
+                  <Check aria-hidden />
                   Approve
                 </Button>
                 <Button
@@ -134,7 +127,7 @@ export function LeaveList({ rows, canApprove }: { rows: LeaveRow[]; canApprove: 
                   loading={pendingId === r.id}
                   onClick={() => decide(r.id, 'REJECTED')}
                 >
-                  <X className="size-4" aria-hidden />
+                  <X aria-hidden />
                   Reject
                 </Button>
                 {noteFor !== r.id ? (
@@ -143,7 +136,7 @@ export function LeaveList({ rows, canApprove }: { rows: LeaveRow[]; canApprove: 
                   </Button>
                 ) : null}
               </div>
-              <p className="text-[12px] text-ink-subtle mt-2">
+              <p className="text-xs text-ink-subtle mt-2">
                 Approving marks these days as leave in the attendance register.
               </p>
             </div>

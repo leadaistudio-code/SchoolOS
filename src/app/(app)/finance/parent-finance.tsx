@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
+import { Metric } from '@/components/ui/metric'
 import { formatMoney } from '@/lib/utils'
 import { PayNow } from './pay-now'
 
@@ -75,26 +76,26 @@ export async function ParentFinance() {
         description={
           totalDue > 0
             ? `${formatMoney(totalDue, currency)} outstanding`
-            : 'Everything is paid up — thank you'
+            : 'Nothing outstanding'
         }
       />
 
       {totalDue > 0 ? (
         <Card>
-          <CardContent className="pt-5 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-[13px] text-ink-muted">Total outstanding</p>
-              <p className="text-[28px] font-semibold text-ink tnum leading-tight">
-                {formatMoney(totalDue, currency)}
-              </p>
-              <p className="text-[12.5px] text-ink-subtle mt-0.5">
-                {overdue.length > 0
+          <CardContent className="flex flex-wrap items-center justify-between gap-4">
+            <Metric
+              className="px-0 py-0"
+              label="Total outstanding"
+              value={formatMoney(totalDue, currency)}
+              emphasis={overdue.length > 0 ? 'danger' : undefined}
+              sub={
+                overdue.length > 0
                   ? `${overdue.length} invoice${overdue.length === 1 ? '' : 's'} past due`
                   : nextDue
                     ? `Next due ${formatDay(nextDue.dueOn, 'd MMMM yyyy')}`
-                    : ''}
-              </p>
-            </div>
+                    : undefined
+              }
+            />
 
             <PayNow
               students={children.map((c) => ({
@@ -114,7 +115,7 @@ export async function ParentFinance() {
         <CardHeader>
           <CardTitle>Invoices</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {invoices.length === 0 ? (
             <EmptyState
               title="No invoices yet"
@@ -128,16 +129,16 @@ export async function ParentFinance() {
                     <div className="min-w-0">
                       <Link
                         href={`/finance/invoices/${i.id}`}
-                        className="text-[14px] font-medium text-ink hover:text-[var(--brand-600)]"
+                        className="text-base font-medium text-ink hover:text-[var(--brand-600)]"
                       >
                         {i.title}
                       </Link>
-                      <p className="text-[12px] text-ink-subtle">
+                      <p className="text-xs text-ink-subtle">
                         {i.number}
                         {children.length > 1 ? ` · ${i.student.firstName}` : ''} · due{' '}
                         {formatDay(i.dueOn, 'd MMM yyyy')}
                       </p>
-                      <p className="text-[12px] text-ink-muted mt-1">
+                      <p className="text-xs text-ink-muted mt-1">
                         {i.lines
                           .slice(0, 3)
                           .map((l) => l.label)
@@ -147,10 +148,10 @@ export async function ParentFinance() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="text-[14px] font-medium tnum text-ink">
+                      <p className="text-base font-medium tnum text-ink">
                         {formatMoney(i.balanceMinor, currency)}
                       </p>
-                      <p className="text-[11.5px] text-ink-subtle">
+                      <p className="text-xs text-ink-subtle">
                         of {formatMoney(i.totalMinor, currency)}
                       </p>
                       <Badge tone={STATUS_TONE[i.status] ?? 'neutral'} className="mt-1">
@@ -169,27 +170,27 @@ export async function ParentFinance() {
         <CardHeader>
           <CardTitle>Payment history</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {receipts.length === 0 ? (
             <EmptyState title="No payments yet" description="Your receipts will be listed here." />
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {receipts.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                <li key={p.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0">
                     <Link
                       href={`/finance/payments/${p.id}`}
-                      className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                      className="text-sm text-ink hover:text-[var(--brand-600)]"
                     >
                       {p.receipt?.number ?? 'Receipt pending'}
                     </Link>
-                    <p className="text-[12px] text-ink-subtle">
+                    <p className="text-xs text-ink-subtle">
                       {p.paidAt ? formatDay(p.paidAt, 'd MMM yyyy') : ''} ·{' '}
                       {p.mode.toLowerCase().replace('_', ' ')}
                       {children.length > 1 ? ` · ${p.student.firstName}` : ''}
                     </p>
                   </div>
-                  <span className="text-[13.5px] font-medium tnum text-success shrink-0">
+                  <span className="text-base font-medium tnum text-success shrink-0">
                     {formatMoney(p.amountMinor, currency)}
                   </span>
                 </li>

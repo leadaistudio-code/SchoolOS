@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X } from 'lucide-react'
-import { Input, Select } from '@/components/ui/input'
+import { X } from 'lucide-react'
+import { SearchInput, Select } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { TableToolbar } from '@/components/ui/table'
 
 export type ClassOption = {
   id: string
@@ -56,26 +57,18 @@ export function StudentFilters({ classes }: { classes: ClassOption[] }) {
   )
 
   return (
-    <div className="p-3 border-b border-line flex flex-wrap items-center gap-2">
-      <div className="relative flex-1 min-w-52">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-subtle"
-          aria-hidden
-        />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, admission no. or guardian"
-          className="pl-9"
-          aria-label="Search students"
-          type="search"
-        />
-      </div>
+    <TableToolbar>
+      <SearchInput
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name, admission no. or guardian"
+        aria-label="Search students"
+      />
 
       <Select
         value={classId}
         aria-label="Filter by class"
-        className="w-40"
+        className="w-36"
         onChange={(e) =>
           push((next) => {
             if (e.target.value) next.set('classLevelId', e.target.value)
@@ -157,10 +150,10 @@ export function StudentFilters({ classes }: { classes: ClassOption[] }) {
             startTransition(() => router.push(pathname))
           }}
         >
-          <X className="size-4" aria-hidden />
+          <X aria-hidden />
           Clear
         </Button>
       ) : null}
-    </div>
+    </TableToolbar>
   )
 }

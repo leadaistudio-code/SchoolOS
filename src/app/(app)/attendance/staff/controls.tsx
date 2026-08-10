@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PencilLine } from 'lucide-react'
 import { overrideStaffAttendanceAction } from '../actions'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Input, Select, Textarea, Field } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 
@@ -80,69 +81,57 @@ export function StaffAttendanceControls({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-[13px] text-[var(--brand-600)] hover:underline inline-flex items-center gap-1"
+        className="text-sm text-[var(--brand-600)] hover:underline inline-flex items-center gap-1"
       >
         <PencilLine className="size-3.5" aria-hidden />
         Correct
       </button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-60 grid place-items-center p-4 bg-black/45"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Correct attendance for ${override.name}`}
-          onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-        >
-          <div className="w-full max-w-md bg-surface border border-line rounded-[var(--radius)] shadow-2xl p-5 text-left">
-            <h2 className="text-[15px] font-semibold text-ink">Correct attendance</h2>
-            <p className="text-[13px] text-ink-muted mt-0.5">
-              {override.name} · {onDate}
-            </p>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Correct attendance"
+        size="sm"
+        description={`${override.name} · ${onDate}`}
+        footer={
+          <>
+            <Button onClick={submit} loading={pending} disabled={reason.trim().length < 3}>
+              Save correction
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-left">
+          <Field label="Status" htmlFor="override-status" required>
+            <Select id="override-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LATE">Late</option>
+              <option value="HALF_DAY">Half day</option>
+              <option value="LEAVE">Leave</option>
+              <option value="HOLIDAY">Holiday</option>
+            </Select>
+          </Field>
 
-            <div className="space-y-4 mt-4">
-              <Field label="Status" htmlFor="override-status" required>
-                <Select
-                  id="override-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  <option value="PRESENT">Present</option>
-                  <option value="ABSENT">Absent</option>
-                  <option value="LATE">Late</option>
-                  <option value="HALF_DAY">Half day</option>
-                  <option value="LEAVE">Leave</option>
-                  <option value="HOLIDAY">Holiday</option>
-                </Select>
-              </Field>
-
-              <Field
-                label="Reason for the correction"
-                htmlFor="override-reason"
-                required
-                hint="Recorded in the audit log alongside your name"
-              >
-                <Textarea
-                  id="override-reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={3}
-                  placeholder="e.g. Was on campus but phone had no signal"
-                />
-              </Field>
-            </div>
-
-            <div className="flex items-center gap-2 mt-5">
-              <Button onClick={submit} loading={pending} disabled={reason.trim().length < 3}>
-                Save correction
-              </Button>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <Field
+            label="Reason for the correction"
+            htmlFor="override-reason"
+            required
+            hint="Recorded in the audit log alongside your name"
+          >
+            <Textarea
+              id="override-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder="Was on campus but the phone had no signal"
+            />
+          </Field>
         </div>
-      ) : null}
+      </Dialog>
     </>
   )
 }

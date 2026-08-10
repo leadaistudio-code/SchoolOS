@@ -100,19 +100,54 @@ export function isTenantScoped(model: string | undefined): boolean {
 }
 
 /**
- * Models that carry an optional tenantId (platform rows may have none) and are
- * therefore filtered but not force-created with a tenant.
+ * Models that carry an OPTIONAL tenantId, because a platform-owned row may
+ * legitimately have none.
+ *
+ * They are filtered on read but never stamped on create: a caller that makes
+ * one of these has to say which tenant it belongs to, and some of them are
+ * deliberately created with no tenant at all.
+ *
+ * They split by what a tenant is allowed to see.
  */
-export const TENANT_OPTIONAL_MODELS = new Set<string>([
+
+/**
+ * Strictly the tenant's own rows. A platform row here is not "shared", it is
+ * simply none of a school's business — nobody at one school may read another
+ * school's users, sessions, audit trail or queued jobs, and nor may they read
+ * the platform's.
+ */
+export const TENANT_OWNED_OPTIONAL_MODELS = new Set<string>([
   'User',
-  'Role',
   'Session',
   'LoginEvent',
   'AuditLog',
-  'NotificationTemplate',
   'Job',
   'PaymentEvent',
 ])
+
+/**
+ * The tenant's own rows plus the platform's defaults. System roles and stock
+ * notification templates are created with a null tenantId and every school
+ * reads them; a school may also define its own alongside.
+ */
+export const TENANT_SHARED_OPTIONAL_MODELS = new Set<string>([
+  'Role',
+  'NotificationTemplate',
+])
+
+/** Every model with an optional tenantId, whichever way it is filtered. */
+export const TENANT_OPTIONAL_MODELS = new Set<string>([
+  ...TENANT_OWNED_OPTIONAL_MODELS,
+  ...TENANT_SHARED_OPTIONAL_MODELS,
+])
+
+export function isTenantOwnedOptional(model: string | undefined): boolean {
+  return !!model && TENANT_OWNED_OPTIONAL_MODELS.has(model)
+}
+
+export function isTenantSharedOptional(model: string | undefined): boolean {
+  return !!model && TENANT_SHARED_OPTIONAL_MODELS.has(model)
+}
 
 /**
  * SaaS control-plane models. They carry a tenantId but are deliberately NOT

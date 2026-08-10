@@ -1,141 +1,122 @@
 import * as React from 'react'
 import Link from 'next/link'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Icon } from '@/components/shell/icon'
+import { Sparkline, type SeriesKey } from './charts'
 import { cn } from '@/lib/utils'
 
-export type Trend = { value: number; label: string; goodWhenUp?: boolean }
-
-export type StatTone = 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'indigo' | 'purple' | 'teal'
-
-const TONE_CHIP: Record<StatTone, string> = {
-  brand: 'bg-[var(--brand-50)] text-[var(--brand-500)]',
-  success: 'bg-success-bg text-success',
-  warning: 'bg-warning-bg text-warning',
-  danger: 'bg-danger-bg text-[var(--danger)]',
-  info: 'bg-info-bg text-info',
-  indigo: 'bg-indigo-bg text-indigo',
-  purple: 'bg-purple-bg text-purple',
-  teal: 'bg-teal-bg text-teal',
+const TONE: Record<SeriesKey, string> = {
+  students: 'bg-[var(--chart-students)]/12 text-[var(--chart-students)]',
+  staff: 'bg-[var(--chart-staff)]/12 text-[var(--chart-staff)]',
+  parents: 'bg-[var(--chart-parents)]/12 text-[var(--chart-parents)]',
+  attendance: 'bg-[var(--chart-attendance)]/12 text-[var(--chart-attendance)]',
+  fees: 'bg-[var(--chart-fees)]/12 text-[var(--chart-fees)]',
+  pending: 'bg-[var(--chart-pending)]/12 text-[var(--chart-pending)]',
+  overdue: 'bg-[var(--chart-overdue)]/12 text-[var(--chart-overdue)]',
+  admissions: 'bg-[var(--chart-admissions)]/12 text-[var(--chart-admissions)]',
+  transport: 'bg-[var(--chart-transport)]/12 text-[var(--chart-transport)]',
+  late: 'bg-[var(--chart-late)]/12 text-[var(--chart-late)]',
+  leave: 'bg-[var(--chart-leave)]/12 text-[var(--chart-leave)]',
 }
 
-const TONE_BAR: Record<StatTone, string> = {
-  brand: 'bg-[var(--brand-500)]',
-  success: 'bg-[var(--success)]',
-  warning: 'bg-[var(--warning)]',
-  danger: 'bg-[var(--danger)]',
-  info: 'bg-[var(--info)]',
-  indigo: 'bg-[var(--indigo)]',
-  purple: 'bg-[var(--purple)]',
-  teal: 'bg-[var(--teal)]',
+export type StatCardProps = {
+  label: string
+  value: string
+  icon: string
+  tone: SeriesKey
+  href?: string
+  /** Supporting line under the figure. Facts, not a description of the card. */
+  sub?: React.ReactNode
+  /**
+   * Percentage change over the comparison period. Null means the history to
+   * compute it does not exist — the card then shows no delta rather than a
+   * plausible-looking invention.
+   */
+  changePercent?: number | null
+  changeLabel?: string
+  /** Down is not always bad: outstanding fees falling is good news. */
+  goodWhenUp?: boolean
+  series?: { label: string; value: number }[]
+  delayMs?: number
 }
 
 /**
- * Dashboard metric tile.
+ * A headline figure with its context.
  *
- * Layout follows the reference: a soft-tinted icon chip on the left, the
- * figure as the hero, a trend pill beneath, and a thin accent rule down the
- * leading edge to colour-code the metric without shouting. The number is the
- * only thing at full contrast — everything else is deliberately quieter.
+ * The number is the only element at full contrast. The icon is tinted, not
+ * filled, so four cards in a row read as one band of data rather than four
+ * competing badges — and the sparkline sits behind the text at low weight
+ * because direction is secondary to the value itself.
  */
 export function StatCard({
   label,
   value,
-  sub,
   icon,
+  tone,
   href,
-  trend,
-  tone = 'brand',
-  gradient = false,
-}: {
-  label: string
-  value: string
-  sub?: string
-  icon: string
-  href?: string
-  trend?: Trend
-  tone?: StatTone
-  /** Filled treatment, used sparingly for the single headline metric. */
-  gradient?: boolean
-}) {
-  const up = (trend?.value ?? 0) >= 0
-  const good = trend ? (trend.goodWhenUp === false ? !up : up) : true
+  sub,
+  changePercent,
+  changeLabel = 'since last month',
+  goodWhenUp = true,
+  series,
+  delayMs,
+}: StatCardProps) {
+  const up = (changePercent ?? 0) >= 0
+  const good = goodWhenUp ? up : !up
 
-  const body = gradient ? (
-    <div
-      className="relative overflow-hidden rounded-[var(--radius)] p-4 h-full text-white shadow-[var(--shadow-card)]"
-      style={{ background: 'var(--grad-brand)' }}
-    >
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[12.5px] font-medium text-white/85">{label}</p>
-        <span className="size-9 rounded-[var(--radius-sm)] grid place-items-center bg-white/20 shrink-0">
-          <Icon name={icon} className="size-4.5" />
-        </span>
-      </div>
-      <p className="text-[26px] font-bold mt-2.5 tnum leading-none">{value}</p>
-      <div className="flex items-center gap-2 mt-2.5 min-h-5">
-        {trend ? (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[11.5px] font-semibold">
-            {up ? (
-              <ArrowUpRight className="size-3" aria-hidden />
-            ) : (
-              <ArrowDownRight className="size-3" aria-hidden />
-            )}
-            {Math.abs(trend.value)}%
-          </span>
-        ) : null}
-        {sub ?? trend?.label ? (
-          <span className="text-[11.5px] text-white/80 truncate">{sub ?? trend?.label}</span>
-        ) : null}
-      </div>
-    </div>
-  ) : (
-    <div className="relative overflow-hidden bg-surface border border-line rounded-[var(--radius)] p-4 h-full shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-lift)]">
-      {/* Leading accent rule: colour-codes the metric at a glance. */}
-      <span className={cn('absolute inset-y-0 left-0 w-1', TONE_BAR[tone])} aria-hidden />
-
-      <div className="flex items-start justify-between gap-3 pl-1.5">
-        <p className="text-[12.5px] font-medium text-ink-muted">{label}</p>
-        <span
-          className={cn(
-            'size-9 rounded-[var(--radius-sm)] grid place-items-center shrink-0',
-            TONE_CHIP[tone],
-          )}
-        >
-          <Icon name={icon} className="size-4.5" />
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-ink-muted">{label}</p>
+          <p className="mt-1.5 text-3xl font-semibold tnum leading-none text-ink">{value}</p>
+        </div>
+        <span className={cn('grid size-10 shrink-0 place-items-center rounded-[12px]', TONE[tone])}>
+          <Icon name={icon} className="size-5" />
         </span>
       </div>
 
-      <p className="text-[26px] font-bold text-ink mt-2.5 tnum leading-none pl-1.5">{value}</p>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          {changePercent !== null && changePercent !== undefined ? (
+            <p
+              className={cn(
+                'flex items-center gap-1 text-xs font-semibold tnum',
+                good ? 'text-success' : 'text-[var(--danger)]',
+              )}
+            >
+              {up ? (
+                <TrendingUp className="size-3.5" aria-hidden />
+              ) : (
+                <TrendingDown className="size-3.5" aria-hidden />
+              )}
+              {up ? '+' : '−'}
+              {Math.abs(changePercent)}%
+              <span className="font-normal text-ink-subtle">{changeLabel}</span>
+            </p>
+          ) : null}
+          {sub ? <p className="mt-0.5 truncate text-xs text-ink-subtle">{sub}</p> : null}
+        </div>
 
-      <div className="flex items-center gap-2 mt-2.5 min-h-5 pl-1.5">
-        {trend ? (
-          <span
-            className={cn(
-              'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11.5px] font-semibold',
-              good ? 'bg-success-bg text-success' : 'bg-danger-bg text-[var(--danger)]',
-            )}
-          >
-            {up ? (
-              <ArrowUpRight className="size-3" aria-hidden />
-            ) : (
-              <ArrowDownRight className="size-3" aria-hidden />
-            )}
-            {Math.abs(trend.value)}%
-          </span>
-        ) : null}
-        {sub ?? trend?.label ? (
-          <span className="text-[11.5px] text-ink-subtle truncate">{sub ?? trend?.label}</span>
+        {series && series.length > 1 ? (
+          <div className="w-24 shrink-0 sm:w-28">
+            <Sparkline data={series} tone={tone} height={36} />
+          </div>
         ) : null}
       </div>
-    </div>
+    </>
   )
 
+  const className = 'widget rise-in lift block p-4'
+  const style = delayMs ? { animationDelay: `${delayMs}ms` } : undefined
+
   return href ? (
-    <Link href={href} className="block h-full">
+    <Link href={href} className={className} style={style}>
       {body}
     </Link>
   ) : (
-    body
+    <div className={className} style={style}>
+      {body}
+    </div>
   )
 }

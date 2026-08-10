@@ -3,12 +3,12 @@
 import * as React from 'react'
 import { useActionState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, Save } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { emptyFormState, type FormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, Input, Select, Textarea } from '@/components/ui/input'
+import { Field, FormSection, Input, Select, Textarea } from '@/components/ui/input'
+import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import type { ClassOption } from './student-filters'
 
@@ -76,22 +76,10 @@ export function StudentForm({
   const err = (field: string) => state.fieldErrors[field]
 
   return (
-    <form action={formAction} className="space-y-4" noValidate>
-      {state.error ? (
-        <div
-          role="alert"
-          className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
-        >
-          <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-          <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
-        </div>
-      ) : null}
+    <form action={formAction} className="space-y-6 max-w-4xl" noValidate>
+      {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Student details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <FormSection title="Student" description="Identity and admission record.">
           <Field label="Admission number" htmlFor="admissionNo" required error={err('admissionNo')}>
             <Input
               id="admissionNo"
@@ -145,14 +133,9 @@ export function StudentForm({
           <Field label="Previous school" htmlFor="previousSchool">
             <Input id="previousSchool" name="previousSchool" defaultValue={values?.previousSchool} />
           </Field>
-        </CardContent>
-      </Card>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Class placement</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+      <FormSection title="Class placement" description="Where the student sits this session.">
           <Field label="Class" htmlFor="classLevelId" required error={err('classLevelId')}>
             <Select
               id="classLevelId"
@@ -206,21 +189,13 @@ export function StudentForm({
               defaultValue={values?.rollNumber ?? undefined}
             />
           </Field>
-        </CardContent>
-      </Card>
+      </FormSection>
 
       {mode === 'create' ? (
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Primary guardian</CardTitle>
-              <p className="text-[13px] text-ink-muted mt-0.5">
-                Optional now, but a guardian is needed before fee notices and the parent app can
-                be used.
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <FormSection
+          title="Primary guardian"
+          description="Needed before fee notices and the parent portal can be used."
+        >
             <Field label="Guardian first name" htmlFor="guardian.firstName">
               <Input id="guardian.firstName" name="guardian.firstName" />
             </Field>
@@ -244,15 +219,10 @@ export function StudentForm({
             <Field label="Occupation" htmlFor="guardian.occupation">
               <Input id="guardian.occupation" name="guardian.occupation" />
             </Field>
-          </CardContent>
-        </Card>
+        </FormSection>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact and medical</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <FormSection title="Contact and medical" description="Where the family lives, and what staff must know.">
           <Field label="Address line 1" htmlFor="addressLine1" className="sm:col-span-2">
             <Input id="addressLine1" name="addressLine1" defaultValue={values?.addressLine1} />
           </Field>
@@ -291,19 +261,14 @@ export function StudentForm({
           >
             <Input id="allergies" name="allergies" defaultValue={values?.allergies} />
           </Field>
-          <Field label="Medical notes" htmlFor="medicalNotes" className="sm:col-span-2 lg:col-span-3">
+          <Field label="Medical notes" htmlFor="medicalNotes" className="sm:col-span-2">
             <Textarea id="medicalNotes" name="medicalNotes" defaultValue={values?.medicalNotes} />
           </Field>
-        </CardContent>
-      </Card>
+      </FormSection>
 
       {mode === 'edit' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Field label="Enrolment status" htmlFor="status" className="max-w-xs">
+        <FormSection title="Enrolment" description="Changing this affects roll counts and reports.">
+            <Field label="Enrolment status" htmlFor="status">
               <Select id="status" name="status" defaultValue={values?.status ?? 'ACTIVE'}>
                 <option value="ACTIVE">Active</option>
                 <option value="ALUMNI">Alumni</option>
@@ -312,13 +277,12 @@ export function StudentForm({
                 <option value="SUSPENDED">Suspended</option>
               </Select>
             </Field>
-          </CardContent>
-        </Card>
+        </FormSection>
       ) : null}
 
-      <div className="flex items-center gap-2 sticky bottom-16 lg:bottom-4 bg-surface/90 backdrop-blur border border-line rounded-[var(--radius)] px-4 py-3">
+      <div className="flex items-center gap-2 border-t border-line pt-4">
         <Button type="submit" loading={pending}>
-          <Save className="size-4" aria-hidden />
+          <Save aria-hidden />
           {mode === 'create' ? 'Admit student' : 'Save changes'}
         </Button>
         <Link href={cancelHref} className={buttonVariants({ variant: 'ghost' })}>

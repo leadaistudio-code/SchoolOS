@@ -283,14 +283,15 @@ async function seedTenant(spec: TenantSpec, planId: string, passwordHash: string
       schoolId: school.id,
       primaryHex: spec.primaryHex,
       accentHex: spec.accentHex,
-      secondaryHex: '#0A0C0C',
+      secondaryHex: '#101828',
+      radius: '12px',
       loginHeadline: `Welcome to ${spec.schoolName}`,
       loginSubtext: 'Sign in to view attendance, homework, fees and results.',
       footerText: `${spec.schoolName} · ${location.city}, ${location.state}`,
       pwaName: spec.schoolName,
       pwaShortName: spec.code,
     },
-    update: { primaryHex: spec.primaryHex, accentHex: spec.accentHex },
+    update: { primaryHex: spec.primaryHex, accentHex: spec.accentHex, radius: '12px' },
   })
 
   const session = await prisma.academicSession.upsert({
@@ -473,6 +474,8 @@ async function seedStaff(
       },
     })
 
+    const joinedOn = subDays(new Date(), intBetween(rand, 120, 2600))
+
     const staff = await prisma.staff.create({
       data: {
         tenantId,
@@ -488,7 +491,8 @@ async function seedStaff(
         gender: female ? 'FEMALE' : 'MALE',
         phone: user.phone,
         email,
-        joinedOn: subDays(new Date(), intBetween(rand, 120, 2600)),
+        joinedOn,
+        createdAt: joinedOn,
         salaryMinor: intBetween(rand, 32000, 88000) * 100,
       },
     })
@@ -578,6 +582,8 @@ async function seedStudents(
       },
     })
 
+    const admissionDate = subDays(new Date(), intBetween(rand, 30, 900))
+
     const student = await prisma.student.create({
       data: {
         tenantId,
@@ -589,7 +595,11 @@ async function seedStudents(
         dateOfBirth: subYears(subDays(new Date(), intBetween(rand, 0, 360)), intBetween(rand, 6, 16)),
         bloodGroup: pick(rand, BLOOD_GROUPS),
         category: pick(rand, ['General', 'OBC', 'SC', 'ST', 'EWS']),
-        admissionDate: subDays(new Date(), intBetween(rand, 30, 900)),
+        admissionDate,
+        // Records are stamped with the day the child was actually admitted.
+        // Seeding them all at "now" would leave the dashboard with a single
+        // vertical step instead of a year of growth to chart.
+        createdAt: admissionDate,
         addressLine1: `House ${intBetween(rand, 1, 400)}, Sector ${intBetween(rand, 1, 60)}`,
         city: location.city,
         state: location.state,
@@ -658,6 +668,7 @@ async function seedStudents(
       data: {
         tenantId,
         userId: parentUser.id,
+        createdAt: admissionDate,
         firstName: parentFirst,
         lastName,
         phone: parentUser.phone,
@@ -1102,7 +1113,215 @@ async function seedExams(
   await prisma.result.createMany({ data: results, skipDuplicates: true })
 }
 
+
+/* ---------------------------------------------------------------- mailbox */
+
+/**
+ * A few internal threads, so the mailbox opens on something real.
+ *
+ * Staff-to-staff notes about the working day, plus one parent asking a
+ * question, which is the pair of cases the folder rules have to get right:
+ * a colleague thread anyone at the school could have started, and a parent
+ * thread that may only involve staff.
+ */
+const MAIL_THREADS: { subject: string; body: string; reply?: string }[] = [
+  {
+    subject: 'Cover needed for period 3 tomorrow',
+    body: 'I have a dental appointment at 11. Could someone take my Class 7 maths lesson? The worksheet is already photocopied and on my desk.',
+    reply: 'I can take it. Leave the register out and I will mark it with them.',
+  },
+  {
+    subject: 'Annual day rehearsal timings',
+    body: 'Rehearsals will run 2pm to 4pm on Thursday and Friday in the main hall. Please release the children in your class ten minutes early on both days.',
+  },
+  {
+    subject: 'Fee reminder letters for this term',
+    body: 'The outstanding list has been generated. Twenty-two families are more than thirty days late. Shall I send the standard reminder or would you like to review the wording first?',
+    reply: 'Send the standard one to everyone under sixty days. I will call the rest myself.',
+  },
+  {
+    subject: 'Bus route 2 running late this week',
+    body: 'Roadworks on the Sohna Road stretch are adding about fifteen minutes. I have told the driver to start ten minutes earlier from Monday.',
+  },
+  {
+    subject: 'Science lab stock check',
+    body: 'We are low on litmus paper and there are only four working thermometers. Could you raise a purchase request before the practicals start?',
+    reply: 'Raised this morning. The order should arrive by the end of next week.',
+  },
+]
+
+async function seedMailbox(tenantId: string, rand: Random) {
+  if ((await prisma.conversation.count({ where: { tenantId } })) > 0) return
+
+  const staffUsers = await prisma.staff.findMany({
+    where: { tenantId, userId: { not: null } },
+    select: { userId: true },
+    take: 12,
+  })
+  const userIds = staffUsers.map((s) => s.userId).filter((id): id is string => !!id)
+  if (userIds.length < 2) return
+
+  for (const [index, thread] of MAIL_THREADS.entries()) {
+    const sender = userIds[index % userIds.length]!
+    const recipient = userIds[(index + 1 + intBetween(rand, 0, 2)) % userIds.length]!
+    if (sender === recipient) continue
+
+    const startedAt = subDays(new Date(), intBetween(rand, 0, 6))
+    const repliedAt = addDays(startedAt, 0)
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        tenantId,
+        subject: thread.subject,
+        kind: 'DIRECT',
+        createdById: sender,
+        createdAt: startedAt,
+        lastMessageAt: thread.reply ? repliedAt : startedAt,
+        participants: {
+          create: [
+            { tenantId, userId: sender, lastReadAt: repliedAt },
+            // The recipient has not opened it: an inbox that starts with
+            // everything read exercises none of the unread styling.
+            { tenantId, userId: recipient, lastReadAt: null },
+          ],
+        },
+      },
+    })
+
+    await prisma.message.create({
+      data: {
+        tenantId,
+        conversationId: conversation.id,
+        senderId: sender,
+        body: thread.body,
+        createdAt: startedAt,
+      },
+    })
+
+    if (thread.reply) {
+      await prisma.message.create({
+        data: {
+          tenantId,
+          conversationId: conversation.id,
+          senderId: recipient,
+          body: thread.reply,
+          createdAt: repliedAt,
+        },
+      })
+    }
+  }
+}
+
 /* ------------------------------------------------------------- operations */
+
+/** The school sits at these coordinates; routes are laid out around it. */
+const SCHOOL_LAT = 28.4595
+const SCHOOL_LNG = 77.0266
+
+const STOP_NAMES = [
+  'Green Park',
+  'Rose Garden',
+  'Metro Gate',
+  'Civil Lines',
+  'Market Square',
+  'Ashoka Crossing',
+  'Lake View',
+  'Old Post Office',
+]
+
+/**
+ * Trip history and a bus that is out on the road right now.
+ *
+ * Without this the live map opens on a fleet of parked buses and looks broken,
+ * which is exactly the screen a demo should not start on. One bus is put
+ * mid-route with a trail of pings behind it and the stops it has already made
+ * marked in the boarding log; the rest get a completed morning run so the
+ * trip history on each vehicle is not empty either.
+ */
+async function seedTransportTrips(tenantId: string, rand: Random) {
+  if ((await prisma.busTrip.count({ where: { tenantId } })) > 0) return
+
+  const routes = await prisma.route.findMany({
+    where: { tenantId, deletedAt: null },
+    include: { stops: { orderBy: { sortOrder: 'asc' } } },
+  })
+
+  const today = attendanceDate(new Date())
+  const runnable = routes.filter((route) => route.busId && route.stops.length >= 3)
+  if (runnable.length === 0) return
+
+  for (const [index, route] of runnable.entries()) {
+    const busId = route.busId!
+    const live = index === 0
+
+    const trip = await prisma.busTrip.create({
+      data: {
+        tenantId,
+        busId,
+        routeId: route.id,
+        direction: 'PICKUP',
+        onDate: today,
+        status: live ? 'RUNNING' : 'COMPLETED',
+        startedAt: new Date(Date.now() - (live ? 22 : 180) * 60_000),
+        endedAt: live ? null : new Date(Date.now() - 120 * 60_000),
+      },
+    })
+
+    const stops = [...route.stops].sort((a, b) => a.sortOrder - b.sortOrder)
+    const plotted = stops.filter(
+      (stop): stop is typeof stop & { latitude: number; longitude: number } =>
+        stop.latitude !== null && stop.longitude !== null,
+    )
+    if (plotted.length < 2) continue
+
+    // A running bus is two stops in; a finished one has served them all.
+    const servedCount = live ? 2 : plotted.length
+    const riders = await prisma.transportAssignment.findMany({
+      where: { tenantId, routeId: route.id, isActive: true },
+      select: { studentId: true, stopId: true },
+    })
+    const servedStopIds = new Set(plotted.slice(0, servedCount).map((stop) => stop.id))
+
+    await prisma.transportBoardingLog.createMany({
+      data: riders
+        .filter((rider) => servedStopIds.has(rider.stopId))
+        .map((rider) => ({
+          tenantId,
+          tripId: trip.id,
+          studentId: rider.studentId,
+          stopId: rider.stopId,
+          event: chance(rand, 0.94) ? 'BOARDED' : 'ABSENT',
+        })),
+      skipDuplicates: true,
+    })
+
+    if (!live) continue
+
+    // A trail of pings from the first stop to somewhere between the served
+    // stop and the next one, so the marker sits on the road rather than on
+    // top of a stop.
+    const from = plotted[servedCount - 1]!
+    const to = plotted[servedCount] ?? plotted[plotted.length - 1]!
+    const pings = 14
+
+    for (let p = 0; p < pings; p++) {
+      const along = (p / (pings - 1)) * 0.45
+      await prisma.busLocation.create({
+        data: {
+          tenantId,
+          busId,
+          tripId: trip.id,
+          latitude: from.latitude + (to.latitude - from.latitude) * along,
+          longitude: from.longitude + (to.longitude - from.longitude) * along,
+          speedKph: intBetween(rand, 12, 38),
+          headingDeg: intBetween(rand, 0, 359),
+          accuracyM: intBetween(rand, 5, 18),
+          recordedAt: new Date(Date.now() - (pings - 1 - p) * 45_000),
+        },
+      })
+    }
+  }
+}
 
 async function seedOperations(
   tenantId: string,
@@ -1205,27 +1424,42 @@ async function seedOperations(
         },
       })
 
-      for (let s = 1; s <= intBetween(rand, 3, 6); s++) {
+      // Stops walk in from a corner of the city towards the school, so the
+      // live map draws a route that looks like a journey rather than a
+      // diagonal line through a field.
+      const stopCount = intBetween(rand, 4, 6)
+      const originLat = SCHOOL_LAT + (i % 2 === 0 ? 1 : -1) * 0.035
+      const originLng = SCHOOL_LNG + (i > 2 ? 1 : -1) * 0.038
+
+      for (let s = 1; s <= stopCount; s++) {
+        const along = (s - 1) / stopCount
         await prisma.busStop.create({
           data: {
             tenantId,
             routeId: route.id,
-            name: `Stop ${i}-${s}`,
+            name: `${pick(rand, STOP_NAMES)} ${i}-${s}`,
             sortOrder: s,
             pickupTime: `07:${String(10 + s * 5).padStart(2, '0')}`,
             dropTime: `15:${String(10 + s * 5).padStart(2, '0')}`,
             fareMinor: 600000,
-            latitude: 28.45 + s * 0.004,
-            longitude: 77.02 + s * 0.004,
+            // A little jitter across the direct line keeps the drawn route
+            // from looking like a ruler.
+            latitude: originLat + (SCHOOL_LAT - originLat) * along + (rand() - 0.5) * 0.004,
+            longitude: originLng + (SCHOOL_LNG - originLng) * along + (rand() - 0.5) * 0.004,
           },
         })
       }
     }
 
-    const routes = await prisma.route.findMany({ where: { tenantId }, include: { stops: true } })
+    const routes = await prisma.route.findMany({
+      where: { tenantId },
+      include: { stops: { orderBy: { sortOrder: 'asc' } } },
+    })
     for (const student of students.filter(() => chance(rand, 0.3))) {
       const route = pick(rand, routes)
-      const stop = route.stops[0]
+      // Spread riders across the whole route; everyone boarding at stop one
+      // makes the boarding roster and the stop occupancy meaningless.
+      const stop = route.stops.length > 0 ? pick(rand, route.stops) : null
       if (!stop) continue
       await prisma.transportAssignment
         .create({
@@ -1240,6 +1474,10 @@ async function seedOperations(
         .catch(() => undefined)
     }
   }
+
+  await seedTransportTrips(tenantId, rand)
+
+  await seedMailbox(tenantId, rand)
 
   if ((await prisma.admissionLead.count({ where: { tenantId } })) === 0) {
     const stages = [
@@ -1602,8 +1840,8 @@ async function main() {
       schoolName: 'Demo International School',
       code: 'DIS',
       planCode: 'PRO',
-      primaryHex: '#E41F07',
-      accentHex: '#FFA201',
+      primaryHex: '#635BFF',
+      accentHex: '#F59E0B',
       studentCount: 120,
       classCount: 8,
       emailDomain: 'demo.schoolos.dev',
@@ -1617,8 +1855,8 @@ async function main() {
       schoolName: 'Greenwood Public School',
       code: 'GPS',
       planCode: 'STARTER',
-      primaryHex: '#059669',
-      accentHex: '#7c3aed',
+      primaryHex: '#0D9488',
+      accentHex: '#F59E0B',
       studentCount: 40,
       classCount: 5,
       emailDomain: 'greenwood.schoolos.dev',

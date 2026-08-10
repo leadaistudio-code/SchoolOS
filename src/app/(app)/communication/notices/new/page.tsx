@@ -13,7 +13,6 @@ export default async function NewNoticePage() {
     <div className="max-w-2xl">
       <PageHeader
         title="Post a notice"
-        description="Choose the audience carefully: a notice aimed at one class is not visible to anyone else."
       />
       <NoticeForm
         classes={classes.map((c) => ({

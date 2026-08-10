@@ -24,7 +24,6 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
     <div>
       <PageHeader
         title="Students"
-        description="Every student record, their class placement, guardian and fee position."
         actions={
           <>
             {ctx.can('students.import') ? (
@@ -32,13 +31,13 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
                 href="/students/import"
                 className={buttonVariants({ variant: 'secondary', size: 'sm' })}
               >
-                <Upload className="size-4" aria-hidden />
+                <Upload aria-hidden />
                 Import
               </Link>
             ) : null}
             {ctx.can('students.create') ? (
               <Link href="/students/new" className={buttonVariants({ size: 'sm' })}>
-                <Plus className="size-4" aria-hidden />
+                <Plus aria-hidden />
                 Add student
               </Link>
             ) : null}

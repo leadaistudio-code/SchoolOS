@@ -35,17 +35,17 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0f17' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b111f' },
   ],
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const tenant = await resolveTenant()
   const palette = {
-    primaryHex: tenant?.school?.primaryHex ?? '#E41F07',
-    secondaryHex: tenant?.school?.secondaryHex ?? '#0A0C0C',
-    accentHex: tenant?.school?.accentHex ?? '#FFA201',
-    radius: tenant?.school?.radius ?? '8px',
+    primaryHex: tenant?.school?.primaryHex ?? '#635BFF',
+    secondaryHex: tenant?.school?.secondaryHex ?? '#101828',
+    accentHex: tenant?.school?.accentHex ?? '#F59E0B',
+    radius: tenant?.school?.radius ?? '12px',
   }
 
   return (

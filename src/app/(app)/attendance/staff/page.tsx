@@ -66,8 +66,8 @@ export default async function StaffAttendancePage({
                 {rows.map((r) => (
                   <TR key={r.staffId}>
                     <TD>
-                      <span className="block text-[13.5px] text-ink">{r.name}</span>
-                      <span className="block text-[12px] text-ink-subtle">
+                      <span className="block text-sm text-ink">{r.name}</span>
+                      <span className="block text-xs text-ink-subtle">
                         {r.employeeCode}
                         {r.designation ? ` · ${r.designation}` : ''}
                       </span>
@@ -78,17 +78,17 @@ export default async function StaffAttendancePage({
                           {r.status.toLowerCase().replace('_', ' ')}
                         </Badge>
                       ) : (
-                        <span className="text-[13px] text-ink-subtle">Not marked</span>
+                        <span className="text-sm text-ink-subtle">Not marked</span>
                       )}
                       {r.overridden ? (
-                        <span className="block text-[11.5px] text-ink-subtle mt-0.5">corrected</span>
+                        <span className="block text-xs text-ink-subtle mt-0.5">corrected</span>
                       ) : null}
                     </TD>
-                    <TD className="text-[13px] text-ink-muted">
+                    <TD className="text-sm text-ink-muted">
                       {r.checkInAt ? format(r.checkInAt, 'HH:mm') : '—'}
                       {r.checkOutAt ? ` – ${format(r.checkOutAt, 'HH:mm')}` : ''}
                     </TD>
-                    <TD className="text-[12.5px] text-ink-subtle">
+                    <TD className="text-xs text-ink-subtle">
                       {r.source ? r.source.toLowerCase() : '—'}
                       {r.distanceM !== null ? ` · ${r.distanceM}m` : ''}
                     </TD>

@@ -2,9 +2,9 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { requirePlatformContext } from '@/server/context'
 import { PageHeader } from '@/components/page-header'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { Metric, MetricRow } from '@/components/ui/metric'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { formatMoney, formatNumber } from '@/lib/utils'
@@ -74,40 +74,30 @@ export default async function PlatformDashboard() {
   }, 0)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="Platform console"
-        description="Every school on the platform, their plan, usage and billing state."
+        description={`${tenants.length} tenants · ${activeCount} active`}
       />
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      <MetricRow>
+        <Metric
           label="Schools"
           value={formatNumber(tenants.length)}
           sub={`${activeCount} active · ${trialCount} on trial`}
-          icon="Building2"
         />
-        <StatCard
+        <Metric
           label="Students"
           value={formatNumber(studentTotal)}
           sub={`${formatNumber(staffTotal)} staff records`}
-          icon="GraduationCap"
-          tone="info"
         />
-        <StatCard
-          label="User accounts"
-          value={formatNumber(userTotal)}
-          sub="Across all tenants"
-          icon="Users"
-        />
-        <StatCard
+        <Metric label="User accounts" value={formatNumber(userTotal)} sub="Across all tenants" />
+        <Metric
           label="Annual run rate"
           value={formatMoney(arrMinor)}
           sub={`${formatMoney(processed._sum.amountMinor ?? 0)} fees processed`}
-          icon="TrendingUp"
-          tone="success"
         />
-      </div>
+      </MetricRow>
 
       <Card className="overflow-hidden">
         <CardHeader>
@@ -135,21 +125,21 @@ export default async function PlatformDashboard() {
                   {tenants.map((t) => (
                     <TR key={t.id}>
                       <TD>
-                        <span className="block text-[13.5px] text-ink">
+                        <span className="block text-sm text-ink">
                           {t.school?.name ?? t.name}
                         </span>
-                        <span className="block text-[12px] text-ink-subtle">
+                        <span className="block text-xs text-ink-subtle">
                           {t.slug}
                           {t.school?.city ? ` · ${t.school.city}` : ''}
                         </span>
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {t.subscription?.plan.name ?? 'No plan'}
                       </TD>
-                      <TD align="right" className="text-[13px]">
+                      <TD align="right" className="text-sm">
                         {formatNumber(studentCountFor.get(t.id) ?? 0)}
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {t.subscription ? format(t.subscription.currentEnd, 'd MMM yyyy') : '-'}
                       </TD>
                       <TD>
@@ -160,7 +150,7 @@ export default async function PlatformDashboard() {
                       <TD align="right">
                         <Link
                           href={`/platform/tenants/${t.id}`}
-                          className="text-[13px] text-[var(--brand-600)] hover:underline"
+                          className="text-sm text-[var(--brand-600)] hover:underline"
                         >
                           Manage
                         </Link>
@@ -179,20 +169,20 @@ export default async function PlatformDashboard() {
           <CardHeader>
             <CardTitle>Plans</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             <ul className="divide-y divide-[var(--border)]">
               {plans.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                <li key={p.id} className="flex items-center justify-between gap-3 py-2">
                   <div>
-                    <p className="text-[13.5px] text-ink">{p.name}</p>
-                    <p className="text-[12px] text-ink-subtle">
+                    <p className="text-sm text-ink">{p.name}</p>
+                    <p className="text-xs text-ink-subtle">
                       {p._count.subscriptions} school{p._count.subscriptions === 1 ? '' : 's'} ·{' '}
                       {p.trialDays}-day trial
                     </p>
                   </div>
-                  <span className="text-[13.5px] font-medium tnum text-ink">
+                  <span className="text-base font-medium tnum text-ink">
                     {formatMoney(p.priceMinor, p.currency)}
-                    <span className="text-[11.5px] text-ink-subtle">/{p.cycle.toLowerCase()}</span>
+                    <span className="text-xs text-ink-subtle">/{p.cycle.toLowerCase()}</span>
                   </span>
                 </li>
               ))}
@@ -204,7 +194,7 @@ export default async function PlatformDashboard() {
           <CardHeader>
             <CardTitle>Support tickets</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             {recentTickets.length === 0 ? (
               <EmptyState
                 title="No open tickets"
@@ -213,13 +203,13 @@ export default async function PlatformDashboard() {
             ) : (
               <ul className="divide-y divide-[var(--border)]">
                 {recentTickets.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <li key={t.id} className="flex items-center justify-between gap-3 py-2">
                     <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{t.subject}</p>
-                      <p className="text-[12px] text-ink-subtle">{t.tenant.name}</p>
+                      <p className="text-sm text-ink truncate">{t.subject}</p>
+                      <p className="text-xs text-ink-subtle">{t.tenant.name}</p>
                     </div>
                     <Badge tone={t.status === 'OPEN' ? 'warning' : 'neutral'}>
-                      {t.status.toLowerCase()}
+                      {humanizeStatus(t.status)}
                     </Badge>
                   </li>
                 ))}

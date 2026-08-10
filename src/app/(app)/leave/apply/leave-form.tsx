@@ -49,7 +49,7 @@ export function LeaveForm({
               className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
             >
               <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-              <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
+              <p className="text-sm text-[var(--danger)]">{state.error}</p>
             </div>
           ) : null}
 
@@ -129,7 +129,7 @@ export function LeaveForm({
 
           <div className="flex items-center gap-2 pt-1">
             <Button type="submit" loading={pending}>
-              <Send className="size-4" aria-hidden />
+              <Send aria-hidden />
               Submit request
             </Button>
             <Link href="/leave" className={buttonVariants({ variant: 'ghost' })}>

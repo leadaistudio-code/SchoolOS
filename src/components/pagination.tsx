@@ -5,16 +5,26 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
 
+/**
+ * List pagination.
+ *
+ * The page lives in the URL so a position is shareable and the back button
+ * behaves. The count is stated in full — an administrator reconciling a roll
+ * needs the total, not just the arrows.
+ */
 export function Pagination({
   total,
   page,
   pageSize,
   label,
+  onNavigate,
 }: {
   total: number
   page: number
   pageSize: number
   label: string
+  /** Overrides URL navigation where the caller owns the query state. */
+  onNavigate?: (page: number) => void
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -24,39 +34,40 @@ export function Pagination({
   if (total === 0) return null
 
   const goto = (next: number) => {
+    if (onNavigate) return onNavigate(next)
     const p = new URLSearchParams(params.toString())
     p.set('page', String(next))
     router.push(`${pathname}?${p.toString()}`)
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line">
-      <p className="text-[12.5px] text-ink-muted">
-        Showing <span className="tnum">{(page - 1) * pageSize + 1}</span>–
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-line">
+      <p className="text-xs text-ink-subtle">
+        <span className="tnum">{(page - 1) * pageSize + 1}</span>–
         <span className="tnum">{Math.min(page * pageSize, total)}</span> of{' '}
-        <span className="tnum">{total}</span> {label}
+        <span className="tnum text-ink-muted font-medium">{total}</span> {label}
       </p>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <button
           disabled={page <= 1}
           onClick={() => goto(page - 1)}
-          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'disabled:opacity-45')}
+          className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           aria-label="Previous page"
         >
-          <ChevronLeft className="size-4" aria-hidden />
+          <ChevronLeft aria-hidden />
           Previous
         </button>
-        <span className="text-[12.5px] text-ink-muted px-2 tnum">
+        <span className="text-xs text-ink-subtle px-2 tnum">
           {page} / {totalPages}
         </span>
         <button
           disabled={page >= totalPages}
           onClick={() => goto(page + 1)}
-          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'disabled:opacity-45')}
+          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
           aria-label="Next page"
         >
           Next
-          <ChevronRight className="size-4" aria-hidden />
+          <ChevronRight aria-hidden />
         </button>
       </div>
     </div>

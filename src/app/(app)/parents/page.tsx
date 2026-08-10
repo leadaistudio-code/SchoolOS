@@ -9,7 +9,7 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/tabl
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
-import { initials } from '@/lib/utils'
+import { PersonCell } from '@/components/ui/identity'
 
 export const metadata = { title: 'Parents' }
 
@@ -27,7 +27,7 @@ export default async function ParentsPage({
     <div>
       <PageHeader
         title="Parents"
-        description="One account per parent, linked to every one of their children."
+        description={`${total} parent accounts`}
       />
 
       <Card className="overflow-hidden">
@@ -61,39 +61,30 @@ export default async function ParentsPage({
                   {rows.map((p) => (
                     <TR key={p.id}>
                       <TD>
-                        <Link href={`/parents/${p.id}`} className="flex items-center gap-2.5 group">
-                          <span className="size-8 rounded-full bg-surface-2 border border-line grid place-items-center text-[11px] font-semibold text-ink-muted shrink-0">
-                            {initials(p.firstName, p.lastName)}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[13.5px] text-ink group-hover:text-[var(--brand-600)] truncate">
-                              {p.firstName} {p.lastName}
-                            </span>
-                            {p.occupation ? (
-                              <span className="block text-[12px] text-ink-subtle">
-                                {p.occupation}
-                              </span>
-                            ) : null}
-                          </span>
-                        </Link>
+                        <PersonCell
+                          firstName={p.firstName}
+                          lastName={p.lastName}
+                          secondary={p.occupation ?? undefined}
+                          href={`/parents/${p.id}`}
+                        />
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {p.phone ? <span className="block">{p.phone}</span> : null}
                         {p.email ? (
-                          <span className="block text-[12px] text-ink-subtle truncate max-w-56">
+                          <span className="block text-xs text-ink-subtle truncate max-w-56">
                             {p.email}
                           </span>
                         ) : null}
                         {!p.phone && !p.email ? '—' : null}
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {p.childCount === 0 ? (
                           <span className="text-ink-subtle">None linked</span>
                         ) : (
                           <>
                             <span className="block">{p.children.slice(0, 2).join(', ')}</span>
                             {p.childCount > 2 ? (
-                              <span className="block text-[12px] text-ink-subtle">
+                              <span className="block text-xs text-ink-subtle">
                                 +{p.childCount - 2} more
                               </span>
                             ) : null}
@@ -108,7 +99,7 @@ export default async function ParentsPage({
                       <TD align="right">
                         <Link
                           href={`/parents/${p.id}`}
-                          className="text-[13px] text-[var(--brand-600)] hover:underline"
+                          className="text-sm text-[var(--brand-600)] hover:underline"
                         >
                           View
                         </Link>

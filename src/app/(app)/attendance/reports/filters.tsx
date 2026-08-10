@@ -41,7 +41,7 @@ export function ReportFilters({
         className="w-40"
         onChange={(e) => push((n) => n.set('from', e.target.value))}
       />
-      <span className="text-[13px] text-ink-subtle">to</span>
+      <span className="text-sm text-ink-subtle">to</span>
       <Input
         type="date"
         value={to}

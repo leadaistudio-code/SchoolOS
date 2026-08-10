@@ -172,8 +172,8 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
           <div className="size-12 rounded-full bg-success-bg text-success grid place-items-center mx-auto mb-4">
             <CheckCircle2 className="size-6" aria-hidden />
           </div>
-          <p className="text-[17px] font-semibold text-ink">Payment recorded</p>
-          <p className="text-[13.5px] text-ink-muted mt-1">
+          <p className="text-xl font-semibold text-ink">Payment recorded</p>
+          <p className="text-base text-ink-muted mt-1">
             Receipt <span className="font-medium text-ink tnum">{receipt.number}</span>
             {receipt.advance > 0
               ? ` · ${formatMoney(receipt.advance, currency)} held as advance`
@@ -239,10 +239,10 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
                         className="w-full text-left px-3.5 py-2.5 hover:bg-surface-2 flex items-center justify-between gap-3"
                       >
                         <span className="min-w-0">
-                          <span className="block text-[13.5px] text-ink truncate">
+                          <span className="block text-sm text-ink truncate">
                             {h.firstName} {h.lastName}
                           </span>
-                          <span className="block text-[12px] text-ink-subtle">
+                          <span className="block text-xs text-ink-subtle">
                             {h.admissionNo}
                             {h.className ? ` · ${h.className} ${h.sectionName ?? ''}` : ''}
                           </span>
@@ -257,16 +257,16 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
                   ))}
                 </ul>
               ) : query.trim().length >= 2 && !searching ? (
-                <p className="text-[13px] text-ink-muted">No students match that search.</p>
+                <p className="text-sm text-ink-muted">No students match that search.</p>
               ) : null}
             </>
           ) : (
             <>
               <div className="rounded-[var(--radius)] bg-surface-2 border border-line px-3.5 py-3">
-                <p className="text-[14px] font-medium text-ink">
+                <p className="text-base font-medium text-ink">
                   {student.firstName} {student.lastName}
                 </p>
-                <p className="text-[12.5px] text-ink-subtle">
+                <p className="text-xs text-ink-subtle">
                   {student.admissionNo}
                   {student.className ? ` · ${student.className} ${student.sectionName ?? ''}` : ''}
                 </p>
@@ -321,7 +321,7 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
               </Field>
 
               {advance > 0 ? (
-                <p className="text-[12.5px] text-warning">
+                <p className="text-xs text-warning">
                   This is {formatMoney(advance, currency)} more than the outstanding balance. The
                   excess will be recorded as an advance.
                 </p>
@@ -344,28 +344,28 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
         <CardHeader>
           <div>
             <CardTitle>Outstanding</CardTitle>
-            <p className="text-[13px] text-ink-muted mt-0.5">
+            <p className="text-sm text-ink-muted mt-0.5">
               {student ? formatMoney(totalDue, currency) : 'Select a student'}
             </p>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {!student ? (
-            <p className="text-[13px] text-ink-subtle">
+            <p className="text-sm text-ink-subtle">
               The unpaid invoices will be listed here, oldest first — which is the order the
               payment settles them in.
             </p>
           ) : invoices.length === 0 ? (
-            <p className="text-[13px] text-success">Nothing outstanding for this student.</p>
+            <p className="text-sm text-success">Nothing outstanding for this student.</p>
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {invoices.map((i) => (
                 <li key={i.id} className="flex items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
-                    <p className="text-[13px] text-ink truncate">{i.title}</p>
-                    <p className="text-[11.5px] text-ink-subtle tnum">{i.number}</p>
+                    <p className="text-sm text-ink truncate">{i.title}</p>
+                    <p className="text-xs text-ink-subtle tnum">{i.number}</p>
                   </div>
-                  <span className="text-[13px] font-medium tnum text-ink shrink-0">
+                  <span className="text-sm font-medium tnum text-ink shrink-0">
                     {formatMoney(i.balanceMinor, currency)}
                   </span>
                 </li>

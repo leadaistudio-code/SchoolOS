@@ -5,7 +5,7 @@ import { listNotices } from '@/server/modules/notices/service'
 import { parseListQuery } from '@/lib/query'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
@@ -44,7 +44,7 @@ export default async function NoticesPage({
         actions={
           ctx.can('notices.create') ? (
             <Link href="/communication/notices/new" className={buttonVariants({ size: 'sm' })}>
-              <Plus className="size-4" aria-hidden />
+              <Plus aria-hidden />
               Post a notice
             </Link>
           ) : null
@@ -72,15 +72,15 @@ export default async function NoticesPage({
                     <div className="min-w-0">
                       <Link
                         href={`/communication/notices/${n.id}`}
-                        className="text-[14px] font-medium text-ink hover:text-[var(--brand-600)] inline-flex items-center gap-1.5"
+                        className="text-base font-medium text-ink hover:text-[var(--brand-600)] inline-flex items-center gap-1.5"
                       >
                         {n.pinned ? (
                           <Pin className="size-3.5 text-[var(--brand-600)]" aria-hidden />
                         ) : null}
                         {n.title}
                       </Link>
-                      <p className="text-[13px] text-ink-muted mt-1 line-clamp-2">{n.body}</p>
-                      <p className="text-[12px] text-ink-subtle mt-1.5">
+                      <p className="text-sm text-ink-muted mt-1 line-clamp-2">{n.body}</p>
+                      <p className="text-xs text-ink-subtle mt-1.5">
                         {n.publishOn.toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
@@ -102,7 +102,7 @@ export default async function NoticesPage({
                       {n.isExpired ? <Badge tone="neutral">expired</Badge> : null}
                       {n.priority !== 'NORMAL' ? (
                         <Badge tone={PRIORITY_TONE[n.priority] ?? 'neutral'}>
-                          {n.priority.toLowerCase()}
+                          {humanizeStatus(n.priority)}
                         </Badge>
                       ) : null}
                     </div>

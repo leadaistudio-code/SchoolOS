@@ -6,7 +6,7 @@ import { submitHomeworkAction } from '../actions'
 import type { ScopedStudent } from '@/server/scope'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { Field, Select, Textarea } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 
@@ -63,7 +63,7 @@ export function SubmissionPanel({
                     : 'info'
             }
           >
-            {mine.status.toLowerCase()}
+            {humanizeStatus(mine.status)}
           </Badge>
         ) : null}
       </CardHeader>
@@ -87,7 +87,7 @@ export function SubmissionPanel({
 
         {done ? (
           <div className="space-y-2">
-            <p className="flex items-center gap-2 text-[13.5px] text-success">
+            <p className="flex items-center gap-2 text-base text-success">
               <CheckCircle2 className="size-4.5" aria-hidden />
               Handed in
               {mine?.submittedAt
@@ -96,16 +96,16 @@ export function SubmissionPanel({
               {mine?.status === 'LATE' ? ' (after the due date)' : ''}
             </p>
             {mine?.note ? (
-              <p className="text-[13px] text-ink-muted">Your note: {mine.note}</p>
+              <p className="text-sm text-ink-muted">Your note: {mine.note}</p>
             ) : null}
             {mine?.score !== null && mine?.score !== undefined ? (
-              <p className="text-[13.5px] text-ink">
+              <p className="text-sm text-ink">
                 Score: <span className="font-medium tnum">{mine.score}</span>
                 {maxScore ? ` / ${maxScore}` : ''}
               </p>
             ) : null}
             {mine?.teacherComment ? (
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-sm text-ink-muted">
                 Teacher: &ldquo;{mine.teacherComment}&rdquo;
               </p>
             ) : null}
@@ -113,7 +113,7 @@ export function SubmissionPanel({
         ) : (
           <>
             {mine?.status === 'REDO' ? (
-              <p className="text-[13px] text-[var(--danger)]">
+              <p className="text-sm text-[var(--danger)]">
                 Your teacher has asked for this to be redone
                 {mine.teacherComment ? `: ${mine.teacherComment}` : '.'}
               </p>
@@ -143,7 +143,7 @@ export function SubmissionPanel({
                 })
               }
             >
-              <Send className="size-4" aria-hidden />
+              <Send aria-hidden />
               Hand in
             </Button>
           </>

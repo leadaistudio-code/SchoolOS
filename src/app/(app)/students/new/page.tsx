@@ -14,7 +14,6 @@ export default async function NewStudentPage() {
     <div className="max-w-5xl">
       <PageHeader
         title="Admit a student"
-        description="Create the student record, place them in a class and link a guardian."
       />
       <StudentForm
         action={createStudentAction}

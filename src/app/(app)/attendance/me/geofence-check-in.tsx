@@ -109,8 +109,8 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
         <div className="size-12 rounded-full bg-warning-bg text-warning grid place-items-center mx-auto mb-4">
           <ShieldAlert className="size-6" aria-hidden />
         </div>
-        <p className="text-[15px] font-semibold text-ink">School location not configured</p>
-        <p className="text-[13.5px] text-ink-muted mt-1.5 max-w-sm mx-auto">
+        <p className="text-lg font-semibold text-ink">School location not configured</p>
+        <p className="text-base text-ink-muted mt-1.5 max-w-sm mx-auto">
           An administrator needs to set the school coordinates and geofence radius in Settings
           before attendance can be marked from a device.
         </p>
@@ -155,7 +155,7 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
           )}
         </div>
 
-        <p className="mt-5 text-[17px] font-semibold text-ink">
+        <p className="mt-5 text-xl font-semibold text-ink">
           {alreadyIn
             ? 'Attendance already marked today'
             : insideByReadout
@@ -165,7 +165,7 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
                 : 'Checking your location...'}
         </p>
 
-        <p className="text-[13px] text-ink-muted mt-1">
+        <p className="text-sm text-ink-muted mt-1">
           {status.schoolName} · geofence radius {status.radiusM}m
           {live ? ` · accuracy ±${live.accuracyM}m` : ''}
         </p>
@@ -175,7 +175,7 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
             <Badge tone={status.today.status === 'LATE' ? 'warning' : 'success'}>
               {String(status.today.status ?? '').toLowerCase() || 'present'}
             </Badge>
-            <span className="text-[12.5px] text-ink-subtle">
+            <span className="text-xs text-ink-subtle">
               in at{' '}
               {new Date(status.today.checkInAt!).toLocaleTimeString('en-IN', {
                 hour: '2-digit',
@@ -189,13 +189,13 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
         ) : null}
 
         {geoError ? (
-          <p className="mt-3 text-[13px] text-[var(--danger)] max-w-sm" role="alert">
+          <p className="mt-3 text-sm text-[var(--danger)] max-w-sm" role="alert">
             {geoError}
           </p>
         ) : null}
 
         {result && !result.ok ? (
-          <p className="mt-3 text-[13px] text-[var(--danger)] max-w-sm" role="alert">
+          <p className="mt-3 text-sm text-[var(--danger)] max-w-sm" role="alert">
             {result.message}
           </p>
         ) : null}
@@ -217,11 +217,11 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
               Check out
             </Button>
           ) : (
-            <p className="text-[13.5px] text-ink-muted">Your day is recorded. See you tomorrow.</p>
+            <p className="text-base text-ink-muted">Your day is recorded. See you tomorrow.</p>
           )}
         </div>
 
-        <p className="mt-5 text-[12px] text-ink-subtle max-w-sm">
+        <p className="mt-5 text-xs text-ink-subtle max-w-sm">
           Your location is checked on the server and stored with this attendance record. It is used
           only to confirm you were on campus.
         </p>

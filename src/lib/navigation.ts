@@ -1,4 +1,28 @@
-import { FEATURE, type FeatureKey } from '@/server/entitlements'
+import { FEATURE, type FeatureKey } from '@/lib/features'
+
+export type NavSection =
+  | 'MAIN'
+  | 'PEOPLE'
+  | 'ACADEMICS'
+  | 'FINANCE'
+  | 'OPERATIONS'
+  | 'ENGAGEMENT'
+  | 'GROWTH'
+  | 'INSIGHTS'
+  | 'SYSTEM'
+
+/** Order the sidebar renders its captions in. */
+export const NAV_SECTIONS: NavSection[] = [
+  'MAIN',
+  'PEOPLE',
+  'ACADEMICS',
+  'FINANCE',
+  'OPERATIONS',
+  'ENGAGEMENT',
+  'GROWTH',
+  'INSIGHTS',
+  'SYSTEM',
+]
 
 export type NavItem = {
   label: string
@@ -7,8 +31,16 @@ export type NavItem = {
   permission?: string
   feature?: FeatureKey
   children?: NavItem[]
+  /** Which captioned block of the sidebar this belongs to. Top level only. */
+  section?: NavSection
   /** Show in the mobile bottom bar. */
   mobile?: boolean
+  /**
+   * The destination exists but the module behind it is not built yet: it
+   * renders a placeholder page. Marked here so the sidebar can say so rather
+   * than letting someone discover it by clicking.
+   */
+  soon?: boolean
 }
 
 /**
@@ -17,29 +49,31 @@ export type NavItem = {
  * they can never disagree about what exists or who may see it.
  */
 export const NAVIGATION: NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: 'LayoutDashboard', permission: 'dashboard.view', mobile: true },
+  { label: 'Dashboard', href: '/', icon: 'LayoutDashboard', section: 'MAIN' as const, permission: 'dashboard.view', mobile: true },
 
   {
     label: 'Students',
     href: '/students',
     icon: 'GraduationCap',
+    section: 'PEOPLE' as const,
     permission: 'students.view',
     mobile: true,
     children: [
       { label: 'All Students', href: '/students', icon: 'Users', permission: 'students.view' },
       { label: 'Add Student', href: '/students/new', icon: 'UserPlus', permission: 'students.create' },
-      { label: 'Bulk Import', href: '/students/import', icon: 'Upload', permission: 'students.import' },
-      { label: 'Promotions', href: '/students/promotions', icon: 'ArrowUpRight', permission: 'students.promote' },
-      { label: 'Documents', href: '/students/documents', icon: 'FolderOpen', permission: 'students.documents' },
+      { label: 'Bulk Import', href: '/students/import', soon: true, icon: 'Upload', permission: 'students.import' },
+      { label: 'Promotions', href: '/students/promotions', soon: true, icon: 'ArrowUpRight', permission: 'students.promote' },
+      { label: 'Documents', href: '/students/documents', soon: true, icon: 'FolderOpen', permission: 'students.documents' },
     ],
   },
-  { label: 'Parents', href: '/parents', icon: 'Users2', permission: 'parents.view' },
-  { label: 'Teachers & Staff', href: '/staff', icon: 'Briefcase', permission: 'staff.view' },
+  { label: 'Parents', href: '/parents', icon: 'Users2', section: 'PEOPLE' as const, permission: 'parents.view' },
+  { label: 'Teachers & Staff', href: '/staff', icon: 'Briefcase', section: 'PEOPLE' as const, permission: 'staff.view' },
 
   {
     label: 'Attendance',
     href: '/attendance',
     icon: 'CalendarCheck',
+    section: 'ACADEMICS' as const,
     permission: 'attendance.view',
     mobile: true,
     children: [
@@ -53,6 +87,7 @@ export const NAVIGATION: NavItem[] = [
     label: 'Academics',
     href: '/academics',
     icon: 'BookOpen',
+    section: 'ACADEMICS' as const,
     permission: 'academics.view',
     children: [
       { label: 'Classes & Sections', href: '/academics/classes', icon: 'Layers', permission: 'academics.view' },
@@ -67,15 +102,17 @@ export const NAVIGATION: NavItem[] = [
     label: 'Examination',
     href: '/exams',
     icon: 'FileCheck',
+    section: 'ACADEMICS' as const,
     permission: 'exams.view',
     children: [
       { label: 'Exams', href: '/exams', icon: 'FileCheck', permission: 'exams.view' },
-      { label: 'Marks Entry', href: '/exams/marks', icon: 'PencilRuler', permission: 'exams.marks' },
+      { label: 'Marks Entry', href: '/exams/marks', soon: true, icon: 'PencilRuler', permission: 'exams.marks' },
+      { label: 'Grading Scales', href: '/exams/grades', icon: 'Scale', permission: 'exams.manage' },
       { label: 'Results', href: '/exams/results', icon: 'Trophy', permission: 'results.view' },
       { label: 'Report Cards', href: '/exams/report-cards', icon: 'FileText', permission: 'results.view' },
       {
         label: 'Certificates',
-        href: '/exams/certificates',
+        href: '/exams/certificates', soon: true,
         icon: 'Award',
         permission: 'certificates.view',
         feature: FEATURE.MODULE_CERTIFICATES,
@@ -86,6 +123,7 @@ export const NAVIGATION: NavItem[] = [
     label: 'Finance',
     href: '/finance',
     icon: 'Wallet',
+    section: 'FINANCE' as const,
     permission: 'fees.view',
     mobile: true,
     children: [
@@ -95,13 +133,14 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Collect Payment', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
       { label: 'Payments', href: '/finance/payments', icon: 'CreditCard', permission: 'fees.view' },
       { label: 'Outstanding', href: '/finance/outstanding', icon: 'AlertCircle', permission: 'fees.view' },
-      { label: 'Concessions', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
+      { label: 'Concessions', href: '/finance/concessions', soon: true, icon: 'Percent', permission: 'fees.concession' },
     ],
   },
   {
     label: 'Leave',
     href: '/leave',
     icon: 'CalendarOff',
+    section: 'PEOPLE' as const,
     permission: 'leave.view',
     children: [
       { label: 'Leave Requests', href: '/leave', icon: 'CalendarOff', permission: 'leave.view' },
@@ -112,28 +151,31 @@ export const NAVIGATION: NavItem[] = [
     label: 'Communication',
     href: '/communication',
     icon: 'MessageSquare',
+    section: 'ENGAGEMENT' as const,
     permission: 'notices.view',
     children: [
       { label: 'Notices', href: '/communication/notices', icon: 'Megaphone', permission: 'notices.view' },
       { label: 'Messages', href: '/communication/messages', icon: 'MessageSquare', permission: 'messages.view' },
-      { label: 'Notifications', href: '/communication/notifications', icon: 'Bell' },
+      { label: 'Notifications', href: '/communication/notifications', soon: true, icon: 'Bell' },
     ],
   },
   {
     label: 'Admissions',
-    href: '/admissions',
+    href: '/admissions', soon: true,
     icon: 'UserRoundPlus',
+    section: 'GROWTH' as const,
     permission: 'admissions.view',
     feature: FEATURE.MODULE_ADMISSIONS_CRM,
     children: [
       { label: 'Lead Pipeline', href: '/admissions', icon: 'Kanban', permission: 'admissions.view' },
-      { label: 'Follow-ups', href: '/admissions/followups', icon: 'PhoneCall', permission: 'admissions.manage' },
+      { label: 'Follow-ups', href: '/admissions/followups', soon: true, icon: 'PhoneCall', permission: 'admissions.manage' },
     ],
   },
   {
     label: 'Front Office',
-    href: '/front-office',
+    href: '/front-office', soon: true,
     icon: 'ConciergeBell',
+    section: 'GROWTH' as const,
     permission: 'frontoffice.view',
     feature: FEATURE.MODULE_FRONT_OFFICE,
   },
@@ -141,6 +183,7 @@ export const NAVIGATION: NavItem[] = [
     label: 'Transport',
     href: '/transport',
     icon: 'Bus',
+    section: 'OPERATIONS' as const,
     permission: 'transport.view',
     feature: FEATURE.MODULE_TRANSPORT,
     children: [
@@ -150,22 +193,24 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Assignments', href: '/transport/assignments', icon: 'UserCheck', permission: 'transport.manage' },
     ],
   },
-  { label: 'Library', href: '/library', icon: 'Library', permission: 'library.view', feature: FEATURE.MODULE_LIBRARY },
-  { label: 'Inventory', href: '/inventory', icon: 'Package', permission: 'inventory.view', feature: FEATURE.MODULE_INVENTORY },
-  { label: 'Sports', href: '/sports', icon: 'Medal', permission: 'sports.view', feature: FEATURE.MODULE_SPORTS },
-  { label: 'Events', href: '/events', icon: 'PartyPopper', permission: 'events.view', feature: FEATURE.MODULE_EVENTS },
-  { label: 'School Website', href: '/website', icon: 'Globe', permission: 'website.view', feature: FEATURE.MODULE_WEBSITE },
-  { label: 'Reports', href: '/reports', icon: 'BarChart3', permission: 'reports.view' },
+  { label: 'Library', href: '/library', soon: true, icon: 'Library', section: 'OPERATIONS' as const, permission: 'library.view', feature: FEATURE.MODULE_LIBRARY },
+  { label: 'Inventory', href: '/inventory', soon: true, icon: 'Package', section: 'OPERATIONS' as const, permission: 'inventory.view', feature: FEATURE.MODULE_INVENTORY },
+  { label: 'Sports', href: '/sports', soon: true, icon: 'Medal', section: 'OPERATIONS' as const, permission: 'sports.view', feature: FEATURE.MODULE_SPORTS },
+  { label: 'Events', href: '/events', soon: true, icon: 'PartyPopper', section: 'OPERATIONS' as const, permission: 'events.view', feature: FEATURE.MODULE_EVENTS },
+  { label: 'School Website', href: '/website', soon: true, icon: 'Globe', section: 'ENGAGEMENT' as const, permission: 'website.view', feature: FEATURE.MODULE_WEBSITE },
+  { label: 'Reports', href: '/reports', soon: true, icon: 'BarChart3', section: 'INSIGHTS' as const, permission: 'reports.view' },
   {
     label: 'Settings',
     href: '/settings',
     icon: 'Settings',
+    section: 'SYSTEM' as const,
     permission: 'settings.view',
     // Only built destinations are listed. The settings landing page shows the
     // remaining areas as visibly not-yet-built rather than linking to a 404.
     children: [
       { label: 'School Profile', href: '/settings', icon: 'School', permission: 'settings.view' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
+      { label: 'Email', href: '/settings/email', icon: 'Mail', permission: 'settings.manage' },
     ],
   },
 ]

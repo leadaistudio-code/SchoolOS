@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
 import { StaffTypeFilter } from './type-filter'
-import { initials } from '@/lib/utils'
+import { PersonCell } from '@/components/ui/identity'
 
 export const metadata = { title: 'Teachers & staff' }
 
@@ -28,7 +28,7 @@ export default async function StaffPage({
     <div>
       <PageHeader
         title="Teachers & staff"
-        description="Everyone employed by the school, their assignments and portal access."
+        description={`${total} staff records`}
       />
 
       <Card className="overflow-hidden">
@@ -61,54 +61,47 @@ export default async function StaffPage({
                   {rows.map((s) => (
                     <TR key={s.id}>
                       <TD>
-                        <Link href={`/staff/${s.id}`} className="flex items-center gap-2.5 group">
-                          <span className="size-8 rounded-full bg-surface-2 border border-line grid place-items-center text-[11px] font-semibold text-ink-muted shrink-0">
-                            {initials(s.firstName, s.lastName)}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[13.5px] text-ink group-hover:text-[var(--brand-600)] truncate">
-                              {s.firstName} {s.lastName}
-                            </span>
-                            <span className="block text-[12px] text-ink-subtle tnum">
-                              {s.employeeCode}
-                            </span>
-                          </span>
-                        </Link>
+                        <PersonCell
+                          firstName={s.firstName}
+                          lastName={s.lastName}
+                          secondary={s.employeeCode}
+                          href={`/staff/${s.id}`}
+                        />
                       </TD>
                       <TD>
-                        <span className="block text-[13px] text-ink">
+                        <span className="block text-sm text-ink first-letter:uppercase">
                           {s.designation ?? s.staffType.toLowerCase()}
                         </span>
                         {s.department ? (
-                          <span className="block text-[12px] text-ink-subtle">{s.department}</span>
+                          <span className="block text-xs text-ink-subtle">{s.department}</span>
                         ) : null}
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {s.phone ? <span className="block">{s.phone}</span> : null}
                         {s.email ? (
-                          <span className="block text-[12px] text-ink-subtle truncate max-w-52">
+                          <span className="block text-xs text-ink-subtle truncate max-w-52">
                             {s.email}
                           </span>
                         ) : null}
                         {!s.phone && !s.email ? '—' : null}
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {s.isClassTeacherOf ? (
                           <span className="block">Class teacher · {s.isClassTeacherOf}</span>
                         ) : null}
-                        <span className="block text-[12px] text-ink-subtle">
+                        <span className="block text-xs text-ink-subtle">
                           {s.classCount} subject{s.classCount === 1 ? '' : 's'}
                         </span>
                       </TD>
                       <TD>
                         <Badge tone={s.hasLogin ? 'success' : 'neutral'}>
-                          {s.hasLogin ? 'active' : 'none'}
+                          {s.hasLogin ? 'Active' : 'No login'}
                         </Badge>
                       </TD>
                       <TD align="right">
                         <Link
                           href={`/staff/${s.id}`}
-                          className="text-[13px] text-[var(--brand-600)] hover:underline"
+                          className="text-sm text-[var(--brand-600)] hover:underline"
                         >
                           View
                         </Link>

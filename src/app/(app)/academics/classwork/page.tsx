@@ -36,7 +36,6 @@ export default async function ClassworkPage({
     <div>
       <PageHeader
         title="Classwork"
-        description="What was actually covered in each lesson, day by day."
       />
 
       <Card className="overflow-hidden">
@@ -52,7 +51,7 @@ export default async function ClassworkPage({
             <div className="divide-y divide-[var(--border)]">
               {[...byDate.entries()].map(([date, items]) => (
                 <div key={date} className="p-4">
-                  <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle mb-2">
                     {formatDay(items[0]!.onDate, 'EEEE, d MMMM yyyy')}
                   </p>
                   <ul className="space-y-3">
@@ -60,13 +59,13 @@ export default async function ClassworkPage({
                       <li key={c.id} className="flex gap-3">
                         <span className="w-1 rounded-full bg-[var(--brand-500)] shrink-0" aria-hidden />
                         <div className="min-w-0">
-                          <p className="text-[13.5px] font-medium text-ink">{c.topic}</p>
-                          <p className="text-[12px] text-ink-subtle">
+                          <p className="text-base font-medium text-ink">{c.topic}</p>
+                          <p className="text-xs text-ink-subtle">
                             {c.subject} · {c.className}
                             {c.sectionName ? ` ${c.sectionName}` : ''} · {c.teacher}
                           </p>
                           {c.notes ? (
-                            <p className="text-[13px] text-ink-muted mt-1 whitespace-pre-wrap">
+                            <p className="text-sm text-ink-muted mt-1 whitespace-pre-wrap">
                               {c.notes}
                             </p>
                           ) : null}

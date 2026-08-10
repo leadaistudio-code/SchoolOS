@@ -27,12 +27,12 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     <ToastProvider>
       <div className="min-h-dvh bg-bg">
         <header className="bg-surface border-b border-line sticky top-0 z-30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-4">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-[var(--topbar-h)] flex items-center gap-4">
             <Link href="/platform" className="flex items-center gap-2 shrink-0">
-              <span className="size-7 rounded-md bg-ink text-bg grid place-items-center">
+              <span className="size-7 rounded-[var(--radius-sm)] bg-ink text-bg grid place-items-center">
                 <Server className="size-4" aria-hidden />
               </span>
-              <span className="font-semibold text-[14px] text-ink">
+              <span className="font-semibold text-base text-ink">
                 {env().APP_NAME} <span className="text-ink-subtle font-normal">Platform</span>
               </span>
             </Link>
@@ -42,7 +42,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-3 py-1.5 rounded-lg text-[13.5px] text-ink-muted hover:bg-surface-2 hover:text-ink"
+                  className="px-2.5 py-1.5 rounded-[var(--radius-sm)] text-base text-ink-muted hover:bg-surface-2 hover:text-ink"
                 >
                   {item.label}
                 </Link>
@@ -51,12 +51,12 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
-              <span className="hidden sm:block text-[13px] text-ink-muted">
+              <span className="hidden sm:block text-sm text-ink-muted">
                 {ctx.user.firstName} {ctx.user.lastName}
               </span>
               <form action="/api/v1/auth/logout" method="post">
                 <button
-                  className="size-9 grid place-items-center rounded-lg text-ink-muted hover:bg-surface-2"
+                  className="size-9 grid place-items-center rounded-[var(--radius-sm)] text-ink-muted hover:bg-surface-2"
                   aria-label="Sign out"
                 >
                   <LogOut className="size-4.5" aria-hidden />
@@ -66,7 +66,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">{children}</main>
+        <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-5">{children}</main>
       </div>
     </ToastProvider>
   )

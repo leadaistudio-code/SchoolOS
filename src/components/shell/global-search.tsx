@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Search } from 'lucide-react'
+import { CornerDownLeft, Loader2, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type SearchHit = {
@@ -76,6 +76,22 @@ export function GlobalSearch() {
     }
   }, [query])
 
+  const groups = React.useMemo(() => {
+    const byType = new Map<string, SearchHit[]>()
+    for (const hit of hits) {
+      byType.set(hit.type, [...(byType.get(hit.type) ?? []), hit])
+    }
+    // The flat index the cursor walks has to match the render order, so it is
+    // rebuilt from the grouping rather than from the raw response.
+    let index = 0
+    return [...byType.entries()].map(([type, rows]) => ({
+      type,
+      rows: rows.map((hit) => ({ hit, index: index++ })),
+    }))
+  }, [hits])
+
+  const ordered = React.useMemo(() => groups.flatMap((g) => g.rows.map((r) => r.hit)), [groups])
+
   const go = (hit: SearchHit) => {
     setOpen(false)
     setQuery('')
@@ -83,9 +99,9 @@ export function GlobalSearch() {
   }
 
   return (
-    <div ref={boxRef} className="relative flex-1 max-w-md">
+    <div ref={boxRef} className="relative max-w-md flex-1">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-subtle" aria-hidden />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-ink-subtle pointer-events-none" aria-hidden />
         <input
           ref={inputRef}
           value={query}
@@ -97,22 +113,30 @@ export function GlobalSearch() {
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault()
-              setCursor((c) => Math.min(c + 1, hits.length - 1))
+              setCursor((c) => Math.min(c + 1, ordered.length - 1))
             }
             if (e.key === 'ArrowUp') {
               e.preventDefault()
               setCursor((c) => Math.max(c - 1, 0))
             }
-            if (e.key === 'Enter' && hits[cursor]) go(hits[cursor]!)
+            if (e.key === 'Enter' && ordered[cursor]) go(ordered[cursor]!)
+            if (e.key === 'Home') {
+              e.preventDefault()
+              setCursor(0)
+            }
+            if (e.key === 'End') {
+              e.preventDefault()
+              setCursor(Math.max(0, ordered.length - 1))
+            }
           }}
           type="search"
           role="combobox"
           aria-expanded={open}
           aria-controls="global-search-results"
-          placeholder="Search students, staff, invoices..."
-          className="w-full h-9 pl-9 pr-14 rounded-full bg-surface-2 border border-line text-sm text-ink placeholder:text-ink-subtle"
+          placeholder="Search students, staff, fees, admissions..."
+          className="h-9 w-full rounded-[10px] border border-line bg-surface-2 pl-8 pr-16 text-base text-ink transition-colors placeholder:text-ink-subtle focus:border-[var(--product-500)] focus:bg-surface"
         />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-ink-subtle border border-line rounded px-1.5 py-0.5 hidden sm:block">
+        <kbd className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-[4px] border border-line px-1 text-xs text-ink-subtle sm:block">
           Ctrl K
         </kbd>
       </div>
@@ -121,39 +145,44 @@ export function GlobalSearch() {
         <div
           id="global-search-results"
           role="listbox"
-          className="absolute z-50 mt-2 w-full max-h-96 overflow-y-auto scroll-thin rounded-[var(--radius)] border border-line bg-surface shadow-xl"
+          className="pop-in scroll-thin absolute z-50 mt-2 max-h-96 w-full overflow-y-auto rounded-[var(--radius)] border border-line bg-surface py-1 shadow-[var(--shadow-pop)]"
         >
           {loading ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-[13px] text-ink-muted">
-              <Loader2 className="size-4 animate-spin" aria-hidden /> Searching...
+            <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">
+              <Loader2 className="size-4 animate-spin" aria-hidden /> Searching
             </div>
           ) : hits.length === 0 ? (
-            <div className="px-4 py-6 text-center text-[13px] text-ink-muted">
+            <div className="px-3 py-6 text-center text-sm text-ink-muted">
               No matches for <span className="text-ink font-medium">{query}</span>
             </div>
           ) : (
-            hits.map((hit, i) => (
-              <button
-                key={`${hit.type}-${hit.id}`}
-                role="option"
-                aria-selected={i === cursor}
-                onMouseEnter={() => setCursor(i)}
-                onClick={() => go(hit)}
-                className={cn(
-                  'w-full text-left px-4 py-2.5 flex items-center gap-3 border-b border-line last:border-0',
-                  i === cursor && 'bg-surface-2',
-                )}
-              >
-                <span className="text-[11px] uppercase tracking-wide text-ink-subtle w-16 shrink-0">
-                  {hit.type}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm text-ink truncate">{hit.title}</span>
-                  {hit.subtitle ? (
-                    <span className="block text-[12px] text-ink-muted truncate">{hit.subtitle}</span>
-                  ) : null}
-                </span>
-              </button>
+            groups.map((group) => (
+              <div key={group.type} role="group" aria-label={group.type}>
+                <p className="caption sticky top-0 bg-surface px-3 py-1.5">{group.type}</p>
+                {group.rows.map(({ hit, index }) => (
+                  <button
+                    key={`${hit.type}-${hit.id}`}
+                    role="option"
+                    aria-selected={index === cursor}
+                    onMouseEnter={() => setCursor(index)}
+                    onClick={() => go(hit)}
+                    className={cn(
+                      'flex w-full items-center gap-2 px-3 py-2 text-left transition-colors',
+                      index === cursor ? 'bg-[var(--product-50)]' : 'hover:bg-surface-2',
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-ink">{hit.title}</span>
+                      {hit.subtitle ? (
+                        <span className="block truncate text-xs text-ink-subtle">{hit.subtitle}</span>
+                      ) : null}
+                    </span>
+                    {index === cursor ? (
+                      <CornerDownLeft className="size-3.5 shrink-0 text-ink-subtle" aria-hidden />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { startPaymentAction } from './actions'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { formatMoney } from '@/lib/utils'
@@ -54,82 +55,71 @@ export function PayNow({ students, currency }: { students: StudentDue[]; currenc
 
   return (
     <>
-      <Button size="lg" onClick={() => setOpen(true)}>
-        <CreditCard className="size-5" aria-hidden />
+      <Button onClick={() => setOpen(true)}>
+        <CreditCard aria-hidden />
         Pay now
       </Button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-60 grid place-items-center p-4 bg-black/45"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Pay fees"
-          onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-        >
-          <div className="w-full max-w-md bg-surface border border-line rounded-[var(--radius)] shadow-2xl p-5">
-            <h2 className="text-[15px] font-semibold text-ink">Pay fees</h2>
-            <p className="text-[13px] text-ink-muted mt-0.5">
-              You will be taken to a secure payment page.
-            </p>
-
-            <div className="space-y-4 mt-4">
-              {payable.length > 1 ? (
-                <Field label="Paying for" htmlFor="pay-student">
-                  <Select
-                    id="pay-student"
-                    value={studentId}
-                    onChange={(e) => {
-                      setStudentId(e.target.value)
-                      const next = payable.find((s) => s.id === e.target.value)
-                      if (next) setAmount(String(next.dueMinor / 100))
-                    }}
-                  >
-                    {payable.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — {formatMoney(s.dueMinor, currency)} due
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              ) : null}
-
-              <Field
-                label="Amount"
-                htmlFor="pay-amount"
-                hint={
-                  selected
-                    ? `${formatMoney(selected.dueMinor, currency)} outstanding. You may pay part of it.`
-                    : undefined
-                }
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Pay fees"
+        size="sm"
+        description="You will be taken to a secure payment page."
+        footer={
+          <>
+            <Button onClick={submit} loading={pending} disabled={!amount || Number(amount) <= 0}>
+              Continue to payment
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {payable.length > 1 ? (
+            <Field label="Paying for" htmlFor="pay-student">
+              <Select
+                id="pay-student"
+                value={studentId}
+                onChange={(e) => {
+                  setStudentId(e.target.value)
+                  const next = payable.find((s) => s.id === e.target.value)
+                  if (next) setAmount(String(next.dueMinor / 100))
+                }}
               >
-                <Input
-                  id="pay-amount"
-                  type="number"
-                  min={1}
-                  max={selected ? selected.dueMinor / 100 : undefined}
-                  step="1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </Field>
-            </div>
+                {payable.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {formatMoney(s.dueMinor, currency)} due
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : null}
 
-            <div className="flex items-center gap-2 mt-5">
-              <Button
-                onClick={submit}
-                loading={pending}
-                disabled={!amount || Number(amount) <= 0}
-              >
-                Continue to payment
-              </Button>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <Field
+            label="Amount"
+            htmlFor="pay-amount"
+            hint={
+              selected
+                ? `${formatMoney(selected.dueMinor, currency)} outstanding. Part payment is accepted.`
+                : undefined
+            }
+          >
+            <Input
+              id="pay-amount"
+              type="number"
+              min={1}
+              max={selected ? selected.dueMinor / 100 : undefined}
+              step="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="tnum"
+            />
+          </Field>
         </div>
-      ) : null}
+      </Dialog>
     </>
   )
 }

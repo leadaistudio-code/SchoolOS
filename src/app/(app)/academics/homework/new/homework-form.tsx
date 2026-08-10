@@ -37,7 +37,7 @@ export function HomeworkForm({ subjects }: { subjects: SubjectOption[] }) {
               className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
             >
               <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-              <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
+              <p className="text-sm text-[var(--danger)]">{state.error}</p>
             </div>
           ) : null}
 
@@ -123,19 +123,19 @@ export function HomeworkForm({ subjects }: { subjects: SubjectOption[] }) {
             </Field>
           </div>
 
-          <label className="flex items-center gap-2 text-[13px] text-ink">
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               name="isPublished"
               defaultChecked
-              className="size-4 rounded border-line"
+              className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]"
             />
             Publish now and notify the class
           </label>
 
           <div className="flex items-center gap-2 pt-1">
             <Button type="submit" loading={pending}>
-              <Save className="size-4" aria-hidden />
+              <Save aria-hidden />
               Set homework
             </Button>
             <Link href="/academics/homework" className={buttonVariants({ variant: 'ghost' })}>

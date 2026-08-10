@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              'pointer-events-auto flex items-start gap-3 rounded-[var(--radius)] border bg-surface shadow-lg px-4 py-3 sm:w-90',
+              'pop-in pointer-events-auto flex items-start gap-2.5 rounded-[var(--radius)] border bg-surface shadow-[var(--shadow-pop)] px-3 py-2.5 sm:w-88',
               t.tone === 'success' && 'border-[color-mix(in_srgb,var(--success)_35%,transparent)]',
               t.tone === 'error' && 'border-[color-mix(in_srgb,var(--danger)_35%,transparent)]',
               t.tone === 'info' && 'border-line',
@@ -57,17 +57,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               )}
             >
               {t.tone === 'success' ? (
-                <CheckCircle2 className="size-4.5" aria-hidden />
+                <CheckCircle2 className="size-4" aria-hidden />
               ) : t.tone === 'error' ? (
-                <XCircle className="size-4.5" aria-hidden />
+                <XCircle className="size-4" aria-hidden />
               ) : (
-                <Info className="size-4.5" aria-hidden />
+                <Info className="size-4" aria-hidden />
               )}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink">{t.title}</p>
+              <p className="text-base font-medium text-ink">{t.title}</p>
               {t.description ? (
-                <p className="text-[13px] text-ink-muted mt-0.5">{t.description}</p>
+                <p className="text-sm text-ink-muted mt-0.5">{t.description}</p>
               ) : null}
             </div>
             <button

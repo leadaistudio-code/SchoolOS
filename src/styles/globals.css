@@ -1,130 +1,169 @@
 @import 'tailwindcss';
 
 /*
- * Theme engine.
+ * Design tokens.
  *
- * The palette below is the platform default. Each tenant stores its own brand
- * colours and the server emits them as custom properties on :root at request
- * time (see BrandProvider), so the same component tree renders in every
- * school's identity. Nothing here is hardcoded into a component.
+ * One brand colour, one neutral ramp, four semantic colours. Everything a
+ * component needs is named here; components never reach for a raw hex or a
+ * one-off size. Each tenant stores its own brand colour and the server emits
+ * it as a custom property at request time (see BrandStyle), so the same
+ * component tree renders in every school's identity.
  */
 :root {
-  /* Brand ---------------------------------------------------------------- */
-  --brand-500: #e41f07;
-  --brand-600: #c11a06;
-  --brand-700: #9d1505;
-  --brand-100: #fac9c2;
-  --brand-50: #fce9e6;
+  /* Brand ----------------------------------------------------------------
+     Tenant-controlled. BrandStyle overwrites this ramp at request time, so a
+     school's own colour reaches every button and link in the product. */
+  --brand-500: #635bff;
+  --brand-600: #5348e8;
+  --brand-700: #4338ca;
+  --brand-100: #dcd9ff;
+  --brand-50: #f1f0ff;
   --brand-contrast: #ffffff;
-  --brand-rgb: 228, 31, 7;
 
-  --accent-500: #ffa201;
-  --accent-600: #e08f01;
-  --accent-50: #fff6e6;
+  /* Secondary series colour. Charts only — never used as decoration. */
+  --accent-500: #f59e0b;
+  --accent-600: #d97706;
+
+  /* Product identity ------------------------------------------------------
+     Deliberately NOT tenant-controlled. The navigation chrome and the
+     dashboard read these, so the application looks like one product whatever
+     colour a school picks for its own documents and buttons. */
+  --product-500: #635bff;
+  --product-600: #5348e8;
+  --product-700: #4338ca;
+  --product-100: #dcd9ff;
+  --product-50: #f1f0ff;
+  --product-grad: linear-gradient(135deg, #635bff 0%, #7c5cfc 100%);
+
+  /* Chart series ----------------------------------------------------------
+     Fixed across tenants on purpose: "students are purple" has to mean the
+     same thing on every school's screen, or a shared screenshot lies. */
+  --chart-students: #7c5cfc;
+  --chart-staff: #f59e0b;
+  --chart-parents: #14b8a6;
+  --chart-attendance: #10b981;
+  --chart-fees: #2563eb;
+  --chart-pending: #f59e0b;
+  --chart-overdue: #f43f5e;
+  --chart-admissions: #6366f1;
+  --chart-transport: #06b6d4;
+  --chart-late: #fb923c;
+  --chart-leave: #38bdf8;
 
   /* Semantic ------------------------------------------------------------- */
-  --success: #1abe17;
-  --success-bg: #e8f9e8;
-  --warning: #f9b801;
-  --warning-bg: #fef8e6;
-  --danger: #ef1e1e;
-  --danger-bg: #fde9e9;
-  --info: #2f80ed;
-  --info-bg: #eaf2fd;
-  --indigo: #3538cd;
-  --indigo-bg: #eaedf7;
-  --purple: #800080;
-  --purple-bg: #f1ebf7;
-  --pink: #dd2590;
-  --pink-bg: #fdedf8;
-  --teal: #0e9384;
-  --teal-bg: #ebf2f1;
-  --orange: #ef5e25;
-  --orange-bg: #fff0eb;
+  --success: #17734a;
+  --success-bg: #e9f4ee;
+  --warning: #93590a;
+  --warning-bg: #fbf2e3;
+  --danger: #b42318;
+  --danger-bg: #fdeceb;
+  --info: #175cd3;
+  --info-bg: #eaf1fd;
 
   /* Neutrals ------------------------------------------------------------- */
-  --bg: #f7f8f9;
+  /* A cool tint rather than grey: white cards need something to sit on. */
+  --bg: #f6f8fc;
   --surface: #ffffff;
-  --surface-2: #f7f8f9;
-  --surface-3: #f3f6f9;
-  --border: #e2e8f0;
-  --border-strong: #e8e8e8;
+  --surface-2: #f7f9fd;
+  --surface-3: #eef1f8;
+  --border: #e4e8f1;
+  --border-strong: #d2d8e6;
 
-  --text: #1f2020;
-  --text-muted: #707070;
-  --text-subtle: #9d9d9d;
+  --text: #101828;
+  --text-muted: #4a5568;
+  --text-subtle: #737f93;
 
-  /* Shell ---------------------------------------------------------------- */
-  --sidebar-w: 240px;
-  --sidebar-w-sm: 70px;
-  --topbar-h: 56px;
-  --sidebar-bg: #ffffff;
-  --sidebar-border: #e8e8e8;
-  --menu-icon-bg: #f7f8f9;
-  --menu-item-color: #707070;
+  /* Shell ----------------------------------------------------------------
+     The navigation is a dark surface in both themes. It is the one part of
+     the product that does not follow the page: a constant edge to orient
+     against while the content area changes all day. */
+  --sidebar-w: 252px;
+  --sidebar-w-collapsed: 68px;
+  --topbar-h: 60px;
+  --sidebar-bg: #10172a;
+  --sidebar-bg-deep: #0b1120;
+  --sidebar-border: #1e293b;
+  --sidebar-fg: #94a3b8;
+  --sidebar-fg-strong: #f1f5f9;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-caption: #64748b;
   --topbar-bg: #ffffff;
-  --topbar-item-bg: #f7f8f9;
-  --topbar-item-border: #e8e8e8;
 
-  /* Elevation and shape -------------------------------------------------- */
-  --radius: 8px;
-  --radius-sm: 6px;
-  --radius-lg: 12px;
-  --shadow-card: 0 4px 4px 0 rgba(219, 219, 219, 0.25);
-  --shadow-pop: 0 4px 74px 0 rgba(208, 208, 208, 0.28);
-  --shadow-lift: 0 4.4px 12px -1px rgba(222, 222, 222, 0.36);
+  /* Shape ---------------------------------------------------------------- */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
 
-  /* Tile gradients ------------------------------------------------------- */
-  --grad-brand: linear-gradient(180deg, var(--brand-500) 0%, #ff5641 100%);
-  --grad-indigo: linear-gradient(180deg, #3538cd 0%, #575aff 100%);
-  --grad-pink: linear-gradient(180deg, #dd2590 0%, #fe57b8 100%);
-  --grad-warning: linear-gradient(180deg, #ffa201 0%, #ea9d19 100%);
-  --grad-success: linear-gradient(180deg, #27ae60 0%, #104828 100%);
+  /* Elevation. Soft and low: cards are separated by a hairline, and the
+     shadow only says "this floats above the page". */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+  --shadow-card-hover: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 6px -2px rgba(16, 24, 40, 0.05);
+  --shadow-pop: 0 12px 28px -6px rgba(16, 24, 40, 0.16), 0 4px 10px -4px rgba(16, 24, 40, 0.08);
 }
 
 :root[data-theme='dark'] {
-  --bg: #0b0f17;
-  --surface: #131926;
-  --surface-2: #182031;
-  --surface-3: #1d2639;
-  --border: #26304a;
-  --border-strong: #2e3950;
+  --brand-50: color-mix(in srgb, var(--brand-500) 18%, #0e1420);
+  --brand-100: color-mix(in srgb, var(--brand-500) 32%, #0e1420);
 
-  --text: #eaeef7;
-  --text-muted: #99a4bd;
-  --text-subtle: #6b7794;
+  --product-50: color-mix(in srgb, var(--product-500) 20%, #0b111f);
+  --product-100: color-mix(in srgb, var(--product-500) 34%, #0b111f);
 
-  --sidebar-bg: #131926;
-  --sidebar-border: #26304a;
-  --menu-icon-bg: #1d2639;
-  --topbar-bg: #131926;
-  --topbar-item-bg: #1d2639;
-  --topbar-item-border: #26304a;
+  /* Series colours are lifted, not swapped: the same hue has to survive a
+     dark ground without going neon. */
+  --chart-students: #a78bfa;
+  --chart-staff: #fbbf24;
+  --chart-parents: #2dd4bf;
+  --chart-attendance: #34d399;
+  --chart-fees: #60a5fa;
+  --chart-pending: #fbbf24;
+  --chart-overdue: #fb7185;
+  --chart-admissions: #818cf8;
+  --chart-transport: #22d3ee;
+  --chart-late: #fdba74;
+  --chart-leave: #7dd3fc;
 
-  --success-bg: #0a2e1a;
-  --warning-bg: #2e2205;
-  --danger-bg: #2e0f0c;
-  --info-bg: #0a1f3d;
-  --indigo-bg: #171a3d;
-  --purple-bg: #260a26;
-  --pink-bg: #2e0a1f;
-  --teal-bg: #052622;
-  --orange-bg: #2e1408;
+  --success: #4ec38a;
+  --success-bg: #10261d;
+  --warning: #d9a441;
+  --warning-bg: #2a2110;
+  --danger: #f2827a;
+  --danger-bg: #2c1513;
+  --info: #6ea8f7;
+  --info-bg: #101f36;
 
-  --shadow-card: 0 4px 4px 0 rgba(0, 0, 0, 0.25);
-  --shadow-pop: 0 4px 40px 0 rgba(0, 0, 0, 0.45);
-  --shadow-lift: 0 4px 12px -1px rgba(0, 0, 0, 0.4);
+  --bg: #0b111f;
+  --surface: #131a2a;
+  --surface-2: #182034;
+  --surface-3: #1f293f;
+  --border: #263149;
+  --border-strong: #334158;
+
+  --text: #e9edf4;
+  --text-muted: #a2adbd;
+  --text-subtle: #7b8697;
+
+  --sidebar-bg: #0d1424;
+  --sidebar-bg-deep: #080d18;
+  --sidebar-border: #1c2740;
+  --topbar-bg: #131a2a;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 4px 14px -2px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 12px 28px -6px rgba(0, 0, 0, 0.55), 0 4px 10px -4px rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {
   --color-brand: var(--brand-500);
+  --color-product: var(--product-500);
+  --color-product-600: var(--product-600);
+  --color-product-50: var(--product-50);
+  --color-product-100: var(--product-100);
   --color-brand-600: var(--brand-600);
   --color-brand-700: var(--brand-700);
   --color-brand-100: var(--brand-100);
   --color-brand-50: var(--brand-50);
   --color-brand-contrast: var(--brand-contrast);
   --color-accent: var(--accent-500);
-  --color-accent-50: var(--accent-50);
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -144,19 +183,39 @@
   --color-danger-bg: var(--danger-bg);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
-  --color-indigo: var(--indigo);
-  --color-indigo-bg: var(--indigo-bg);
-  --color-purple: var(--purple);
-  --color-purple-bg: var(--purple-bg);
-  --color-pink: var(--pink);
-  --color-pink-bg: var(--pink-bg);
-  --color-teal: var(--teal);
-  --color-teal-bg: var(--teal-bg);
-  --color-orange: var(--orange);
-  --color-orange-bg: var(--orange-bg);
 
-  --radius-card: var(--radius);
+  /*
+   * Type scale. Deliberately narrow: an ERP needs four working sizes, not
+   * twelve. Anything outside this scale is a mistake, not a decision.
+   *
+   *   xs   12  metadata, table captions
+   *   sm   13  table cells, secondary text
+   *   base 14  body, form controls, default
+   *   lg   16  section titles
+   *   xl   18  panel titles on wide pages
+   *   2xl  22  page titles
+   *   3xl  26  metric figures
+   */
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 22px;
+  --text-xl: 18px;
+  --text-xl--line-height: 26px;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 28px;
+  --text-3xl: 26px;
+  --text-3xl--line-height: 30px;
+
+  --shadow-pop: var(--shadow-pop);
   --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+
+  --radius-lg: var(--radius-lg);
 
   --font-sans: var(--font-golos), ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
@@ -175,31 +234,43 @@ body {
   color: var(--text-muted);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 20px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Headings carry the darker ink; body copy stays grey. This split is what
-   gives the reference its calm, low-contrast reading surface. */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--text);
   font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
+/* A visible ring rather than a repainted border, so focus reads the same on
+   every control regardless of its own border colour. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-500);
-  outline-offset: 2px;
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
+/* Numeric columns line up only if the figures are tabular. */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* Soft badge with a coloured underline — the reference's signature chip. */
-.badge-soft {
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
+/* Section label: the small uppercase caption used for nav groups and form
+   section headings. Defined once so its tracking never drifts. */
+.caption {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
 }
 
 @keyframes shimmer {
@@ -228,6 +299,18 @@ h1, h2, h3, h4, h5, h6 {
   animation: shimmer 1.6s infinite;
 }
 
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+/* Motion is reserved for things that appear: menus, dialogs, toasts. */
+.pop-in {
+  animation: pop-in 110ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -242,7 +325,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 8px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--border) 90%, transparent);
+  background: color-mix(in srgb, var(--border-strong) 90%, transparent);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
@@ -255,4 +338,40 @@ h1, h2, h3, h4, h5, h6 {
   body {
     background: #fff;
   }
+}
+
+/* Card lift.
+   Applied to interactive panels only. A card that never responds to the
+   pointer should not carry a transition it will never run. */
+.lift {
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+.lift:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+/* Dashboard widget frame. One definition so twelve widgets cannot drift. */
+.widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Entrance for dashboard widgets. Staggered by inline delay at the call
+   site, capped low so the page never feels like it is loading twice. */
+.rise-in {
+  animation: rise-in 220ms ease-out both;
 }

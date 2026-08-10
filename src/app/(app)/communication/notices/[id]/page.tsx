@@ -4,7 +4,7 @@ import { getNotice } from '@/server/modules/notices/service'
 import { formatBytes } from '@/lib/format'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 
 export const metadata = { title: 'Notice' }
 
@@ -39,13 +39,13 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
             ) : null}
             {notice.priority !== 'NORMAL' ? (
               <Badge tone={notice.priority === 'URGENT' ? 'danger' : 'warning'}>
-                {notice.priority.toLowerCase()}
+                {humanizeStatus(notice.priority)}
               </Badge>
             ) : null}
             {!notice.isPublished ? <Badge tone="neutral">draft</Badge> : null}
           </div>
 
-          <p className="text-[14px] text-ink whitespace-pre-wrap leading-relaxed">{notice.body}</p>
+          <p className="text-base text-ink whitespace-pre-wrap leading-relaxed">{notice.body}</p>
 
           {notice.attachments.length > 0 ? (
             <ul className="mt-5 space-y-1.5 border-t border-line pt-4">
@@ -53,7 +53,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
                 <li key={a.id}>
                   <a
                     href={`/api/v1/files/${encodeURIComponent(a.storageKey)}`}
-                    className="inline-flex items-center gap-2 text-[13px] text-[var(--brand-600)] hover:underline"
+                    className="inline-flex items-center gap-2 text-sm text-[var(--brand-600)] hover:underline"
                   >
                     <Paperclip className="size-3.5" aria-hidden />
                     {a.fileName}
@@ -65,7 +65,7 @@ export default async function NoticeDetailPage({ params }: { params: Promise<{ i
           ) : null}
 
           {notice.expiresOn ? (
-            <p className="text-[12px] text-ink-subtle mt-5 border-t border-line pt-3">
+            <p className="text-xs text-ink-subtle mt-5 border-t border-line pt-3">
               Shown until{' '}
               {notice.expiresOn.toLocaleDateString('en-IN', {
                 day: 'numeric',

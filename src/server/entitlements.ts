@@ -1,35 +1,12 @@
 import { cache } from 'react'
 import { prisma } from '@/server/db/prisma'
 
-/**
- * Feature keys. Modules are toggled per plan, limits are numeric.
- * Nothing in the product may hardcode a limit - always ask this service.
- */
-export const FEATURE = {
-  MODULE_TRANSPORT: 'module.transport',
-  MODULE_LIBRARY: 'module.library',
-  MODULE_INVENTORY: 'module.inventory',
-  MODULE_SPORTS: 'module.sports',
-  MODULE_EVENTS: 'module.events',
-  MODULE_WEBSITE: 'module.website',
-  MODULE_ADMISSIONS_CRM: 'module.admissions_crm',
-  MODULE_CERTIFICATES: 'module.certificates',
-  MODULE_FRONT_OFFICE: 'module.front_office',
-  MODULE_ONLINE_PAYMENTS: 'module.online_payments',
-  MODULE_CUSTOM_DOMAIN: 'module.custom_domain',
-  MODULE_WHITE_LABEL_APP: 'module.white_label_app',
-  MODULE_AI_ASSIST: 'module.ai_assist',
+import { FEATURE, type FeatureKey } from '@/lib/features'
 
-  LIMIT_STUDENTS: 'limit.students',
-  LIMIT_STAFF: 'limit.staff',
-  LIMIT_ADMIN_USERS: 'limit.admin_users',
-  LIMIT_STORAGE_MB: 'limit.storage_mb',
-  LIMIT_SMS_PER_MONTH: 'limit.sms_per_month',
-  LIMIT_WHATSAPP_PER_MONTH: 'limit.whatsapp_per_month',
-  LIMIT_DOMAINS: 'limit.domains',
-} as const
+// Re-exported so existing server-side imports keep working. The definitions
+// live in lib/ because the browser reads them too — see the note there.
+export { FEATURE, type FeatureKey }
 
-export type FeatureKey = (typeof FEATURE)[keyof typeof FEATURE]
 
 export type Entitlement = { enabled: boolean; limit: number | null }
 

@@ -43,15 +43,15 @@ export default async function ClassesPage() {
                 <CardHeader>
                   <div>
                     <CardTitle>{c.name}</CardTitle>
-                    <p className="text-[13px] text-ink-muted mt-0.5">
+                    <p className="text-sm text-ink-muted mt-0.5">
                       {enrolled}/{capacity} seats · {c._count.subjects} subjects
                     </p>
                   </div>
                   {c.stream ? <Badge tone="neutral">{c.stream}</Badge> : null}
                 </CardHeader>
-                <CardContent className="pt-0">
+                <CardContent className="py-1">
                   {c.sections.length === 0 ? (
-                    <p className="text-[13px] text-ink-subtle">No sections</p>
+                    <p className="text-sm text-ink-subtle">No sections</p>
                   ) : (
                     <ul className="space-y-2">
                       {c.sections.map((s) => {
@@ -65,13 +65,13 @@ export default async function ClassesPage() {
                             <div className="flex items-center justify-between gap-2">
                               <Link
                                 href={`/students?classLevelId=${c.id}&sectionId=${s.id}`}
-                                className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                                className="text-sm text-ink hover:text-[var(--brand-600)]"
                               >
                                 Section {s.name}
                               </Link>
                               <span
                                 className={cn(
-                                  'text-[12.5px] tnum',
+                                  'text-xs tnum',
                                   full ? 'text-[var(--danger)] font-medium' : 'text-ink-muted',
                                 )}
                               >
@@ -93,7 +93,7 @@ export default async function ClassesPage() {
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <p className="text-[11.5px] text-ink-subtle mt-0.5">
+                            <p className="text-xs text-ink-subtle mt-0.5">
                               {s.classTeacher
                                 ? `${s.classTeacher.firstName} ${s.classTeacher.lastName}`
                                 : 'No class teacher'}

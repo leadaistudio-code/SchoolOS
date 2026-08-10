@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { tenantDb } from '../src/server/db/tenant-client'
+import { ROLE } from '../src/lib/rbac/roles'
 
 /**
  * Cross-tenant isolation.
@@ -193,6 +194,51 @@ describe('tenant isolation', () => {
     // the row it would create is stamped with the attacker own tenant.
     const found = await attacker.student.findFirst({ where: { id: victim!.id } })
     expect(found).toBeNull()
+  })
+
+  /**
+   * Models with a nullable tenantId.
+   *
+   * These were the hole: the column is optional because platform-owned rows
+   * exist, and the client used to skip them entirely rather than filtering
+   * them — so `ctx.db.user.findMany()` returned every school's users. The
+   * distinction is that a school may read the platform's *defaults* (system
+   * roles) but never the platform's or another school's *records*.
+   */
+  it('does not leak users from another tenant', async () => {
+    const users = await tenantDb(schoolA).user.findMany({ select: { tenantId: true } })
+
+    expect(users.length).toBeGreaterThan(0)
+    expect(users.every((user) => user.tenantId === schoolA)).toBe(true)
+  })
+
+  it('cannot read another tenant user by primary key', async () => {
+    const victim = await prisma.user.findFirst({
+      where: { tenantId: schoolB },
+      select: { id: true },
+    })
+    expect(victim).not.toBeNull()
+
+    const stolen = await tenantDb(schoolA).user.findUnique({ where: { id: victim!.id } })
+    expect(stolen).toBeNull()
+  })
+
+  it('does not leak another tenant audit trail', async () => {
+    const rows = await tenantDb(schoolA).auditLog.findMany({
+      select: { tenantId: true },
+      take: 500,
+    })
+    expect(rows.every((row) => row.tenantId === schoolA)).toBe(true)
+  })
+
+  it('still resolves platform-owned system roles', async () => {
+    // The counterpart to the rule above: narrowing must not hide the shared
+    // defaults, or creating a parent would silently produce a user with no
+    // role at all.
+    const role = await tenantDb(schoolA).role.findFirst({
+      where: { tenantId: null, key: ROLE.PARENT },
+    })
+    expect(role).not.toBeNull()
   })
 
   it('refuses to build a client with no tenant', () => {

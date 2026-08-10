@@ -38,15 +38,11 @@ export default async function HomeworkPage({
     <div>
       <PageHeader
         title="Homework"
-        description={
-          portalView
-            ? 'Everything set for your classes, and whether it has been handed in.'
-            : 'Homework you have set, with how much of the class has handed in.'
-        }
+        description={`${total} assignment${total === 1 ? '' : 's'}`}
         actions={
           ctx.can('homework.create') ? (
             <Link href="/academics/homework/new" className={buttonVariants({ size: 'sm' })}>
-              <Plus className="size-4" aria-hidden />
+              <Plus aria-hidden />
               Set homework
             </Link>
           ) : null
@@ -86,11 +82,11 @@ export default async function HomeworkPage({
                       <div className="min-w-0">
                         <Link
                           href={`/academics/homework/${h.id}`}
-                          className="text-[14px] font-medium text-ink hover:text-[var(--brand-600)]"
+                          className="text-base font-medium text-ink hover:text-[var(--brand-600)]"
                         >
                           {h.title}
                         </Link>
-                        <p className="text-[12.5px] text-ink-subtle mt-0.5">
+                        <p className="text-xs text-ink-subtle mt-0.5">
                           {h.subject} · {h.className}
                           {h.sectionName ? ` ${h.sectionName}` : ''} · {h.teacher}
                           {h.attachmentCount > 0 ? (
@@ -100,7 +96,7 @@ export default async function HomeworkPage({
                             </span>
                           ) : null}
                         </p>
-                        <p className="text-[12.5px] text-ink-muted mt-1">
+                        <p className="text-xs text-ink-muted mt-1">
                           Set {formatDay(h.assignedOn, 'd MMM')} · due{' '}
                           <span className={cn(h.isOverdue && 'text-[var(--danger)] font-medium')}>
                             {formatDay(h.dueOn, 'd MMM yyyy')}
@@ -121,7 +117,7 @@ export default async function HomeworkPage({
                           </Badge>
                         ) : (
                           <div className="text-right">
-                            <p className="text-[12.5px] text-ink-muted tnum">
+                            <p className="text-xs text-ink-muted tnum">
                               {h.submitted}/{h.expected} handed in
                             </p>
                             {/* Progress bar: the question a teacher is scanning

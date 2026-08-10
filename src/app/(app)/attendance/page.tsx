@@ -6,7 +6,6 @@ import { toDateInput } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
-import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { SectionPicker } from './section-picker'
 import { AttendanceRegister } from './register'
@@ -30,7 +29,7 @@ export default async function AttendancePage({
     <div>
       <PageHeader
         title="Student attendance"
-        description="Mark the daily register. Parents of newly absent students are notified automatically."
+        description={onDate === today ? 'Today’s register' : `Register for ${onDate}`}
         actions={
           ctx.can('attendance.report') ? (
             <Link
@@ -47,7 +46,7 @@ export default async function AttendancePage({
         <Card>
           <EmptyState
             title="No sections assigned to you"
-            description="You can mark attendance for sections where you are the class teacher or teach a subject. Ask an administrator if this looks wrong."
+            description="You can mark attendance for sections where you are the class teacher or teach a subject."
           />
         </Card>
       ) : (
@@ -81,27 +80,27 @@ async function PendingSections({ onDate }: { onDate: string }) {
   return (
     <Card>
       <CardHeader>
-        <div>
-          <CardTitle>Not yet marked</CardTitle>
-          <p className="text-[13px] text-ink-muted mt-0.5">{onDate}</p>
-        </div>
+        <CardTitle>Not yet marked</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="py-1">
         {pending.length === 0 ? (
           <EmptyState title="Every section is marked" description="Nothing outstanding for this date." />
         ) : (
           <ul className="divide-y divide-[var(--border)]">
             {pending.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 py-2.5">
+              <li key={s.id} className="flex items-center justify-between gap-3 py-2">
                 <Link
                   href={`/attendance?sectionId=${s.id}&onDate=${onDate}`}
-                  className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                  className="text-sm text-ink hover:text-[var(--brand-600)]"
                 >
                   {s.label}
                 </Link>
-                <Badge tone={s.marked === 0 ? 'danger' : 'warning'}>
-                  {s.marked}/{s.enrolled}
-                </Badge>
+                <span className="text-xs tnum text-ink-subtle">
+                  <span className={s.marked === 0 ? 'text-[var(--danger)] font-medium' : 'text-warning font-medium'}>
+                    {s.marked}
+                  </span>
+                  /{s.enrolled}
+                </span>
               </li>
             ))}
           </ul>

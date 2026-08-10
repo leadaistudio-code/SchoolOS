@@ -16,7 +16,7 @@ export default async function BrandingPage() {
     <div>
       <PageHeader
         title="Branding"
-        description="Your colours are applied across the portal, the parent app, receipts and report cards."
+        description="Applied across the portal, receipts and report cards"
       />
       <BrandingForm
         initial={{

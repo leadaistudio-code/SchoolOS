@@ -6,7 +6,7 @@ import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
@@ -16,15 +16,6 @@ import { InvoiceFilters } from './filters'
 import { GenerateInvoices } from './generate'
 
 export const metadata = { title: 'Invoices' }
-
-const TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  PAID: 'success',
-  ISSUED: 'warning',
-  PARTIALLY_PAID: 'warning',
-  OVERDUE: 'danger',
-  CANCELLED: 'neutral',
-  DRAFT: 'neutral',
-}
 
 export default async function InvoicesPage({
   searchParams,
@@ -103,34 +94,34 @@ export default async function InvoicesPage({
                       <TD>
                         <Link
                           href={`/finance/invoices/${i.id}`}
-                          className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                          className="text-sm text-ink hover:text-[var(--brand-600)]"
                         >
                           {i.title}
                         </Link>
-                        <span className="block text-[12px] text-ink-subtle tnum">{i.number}</span>
+                        <span className="block text-xs text-ink-subtle tnum">{i.number}</span>
                       </TD>
                       <TD>
-                        <span className="block text-[13px] text-ink">{i.studentName}</span>
-                        <span className="block text-[12px] text-ink-subtle">
+                        <span className="block text-sm text-ink">{i.studentName}</span>
+                        <span className="block text-xs text-ink-subtle">
                           {i.admissionNo}
                           {i.className ? ` · ${i.className}` : ''}
                         </span>
                       </TD>
-                      <TD className="text-[13px] text-ink-muted">
+                      <TD className="text-sm text-ink-muted">
                         {formatDay(i.dueOn, 'd MMM yyyy')}
                         {i.daysOverdue > 0 ? (
-                          <span className="block text-[11.5px] text-[var(--danger)]">
+                          <span className="block text-xs text-[var(--danger)]">
                             {i.daysOverdue} days overdue
                           </span>
                         ) : null}
                       </TD>
-                      <TD align="right" className="text-[13px] text-ink-muted">
+                      <TD align="right" className="text-sm text-ink-muted">
                         {formatMoney(i.totalMinor, currency)}
                       </TD>
                       <TD align="right">
                         <span
                           className={cn(
-                            'text-[13px] font-medium',
+                            'text-sm font-medium',
                             i.balanceMinor > 0 ? 'text-ink' : 'text-ink-subtle',
                           )}
                         >
@@ -138,9 +129,7 @@ export default async function InvoicesPage({
                         </span>
                       </TD>
                       <TD>
-                        <Badge tone={TONE[i.status] ?? 'neutral'}>
-                          {i.status.toLowerCase().replace('_', ' ')}
-                        </Badge>
+                        <StatusBadge status={i.status} />
                       </TD>
                     </TR>
                   ))}

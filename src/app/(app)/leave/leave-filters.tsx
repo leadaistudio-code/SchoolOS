@@ -55,7 +55,7 @@ export function LeaveFilters({ canApprove }: { canApprove: boolean }) {
 
       {hasFilters ? (
         <Button variant="ghost" size="sm" onClick={() => router.push(pathname)}>
-          <X className="size-4" aria-hidden />
+          <X aria-hidden />
           Clear
         </Button>
       ) : null}

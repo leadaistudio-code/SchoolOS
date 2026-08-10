@@ -25,7 +25,7 @@ export function TimetablePicker({
   return (
     <div className="flex flex-wrap items-center gap-2 p-3 border-b border-line">
       {/* Two ways of reading the same data: by class, or by teacher. */}
-      <div className="inline-flex rounded-lg border border-line p-0.5" role="tablist">
+      <div className="inline-flex rounded-[var(--radius-sm)] border border-line p-0.5" role="tablist">
         {[
           { key: 'class', label: 'By class' },
           { key: 'teacher', label: 'By teacher' },
@@ -43,7 +43,7 @@ export function TimetablePicker({
                 go(next)
               }}
               className={cn(
-                'px-3 h-7 rounded-md text-[12.5px] transition-colors',
+                'px-3 h-7 rounded-[var(--radius-sm)] text-xs transition-colors',
                 active
                   ? 'bg-[var(--brand-500)] text-[var(--brand-contrast)] font-medium'
                   : 'text-ink-muted hover:text-ink',

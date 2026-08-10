@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
-import { isTenantScoped } from './tenant-models'
+import { isTenantOwnedOptional, isTenantScoped, isTenantSharedOptional } from './tenant-models'
 
 export class TenantIsolationError extends Error {
   constructor(message: string) {
@@ -36,6 +36,22 @@ function narrow(where: unknown, tenantId: string): Record<string, unknown> {
   return { ...base, tenantId }
 }
 
+/**
+ * Narrows a model whose rows may belong to this tenant OR to the platform.
+ *
+ * The guard goes into `AND` rather than onto `OR` at the top level: callers
+ * legitimately use `OR` themselves (asking for a system role or their own),
+ * and overwriting that key would silently change which rows they asked for.
+ */
+function narrowShared(where: unknown, tenantId: string): Record<string, unknown> {
+  const base = (where ?? {}) as Record<string, unknown>
+  const existing = Array.isArray(base.AND) ? base.AND : base.AND ? [base.AND] : []
+  return {
+    ...base,
+    AND: [...existing, { OR: [{ tenantId }, { tenantId: null }] }],
+  }
+}
+
 function stamp(data: unknown, tenantId: string): unknown {
   if (Array.isArray(data)) return data.map((d) => ({ ...(d as object), tenantId }))
   return { ...(data as object), tenantId }
@@ -67,6 +83,22 @@ export function tenantDb(tenantId: string) {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
+          const owned = isTenantOwnedOptional(model)
+          const shared = isTenantSharedOptional(model)
+
+          // Models with an optional tenantId are filtered on read but never
+          // stamped on create: the column is nullable precisely because some
+          // rows belong to the platform rather than to a school.
+          if (owned || shared) {
+            const a = args as Record<string, unknown>
+            const apply = shared ? narrowShared : narrow
+
+            if (WHERE_OPS.has(operation)) a.where = apply(a.where, tenantId)
+            if (operation === 'upsert') a.where = apply(a.where, tenantId)
+
+            return query(a)
+          }
+
           if (!isTenantScoped(model)) return query(args)
 
           const a = args as Record<string, unknown>

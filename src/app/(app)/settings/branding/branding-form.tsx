@@ -85,7 +85,7 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-[12.5px] font-semibold text-ink mb-2">Presets</p>
+              <p className="text-xs font-semibold text-ink mb-2">Presets</p>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((preset) => (
                   <button
@@ -98,7 +98,7 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
                         accentHex: preset.accent,
                       }))
                     }
-                    className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-line-strong px-2.5 py-1.5 text-[12.5px] text-ink-muted hover:border-[var(--brand-500)] hover:text-ink transition-colors"
+                    className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-line-strong px-2.5 py-1.5 text-xs text-ink-muted hover:border-[var(--brand-500)] hover:text-ink transition-colors"
                   >
                     <span className="flex -space-x-1">
                       <span
@@ -191,10 +191,10 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
 
         <div className="flex items-center gap-2">
           <Button onClick={save} loading={pending}>
-            <Save className="size-4" aria-hidden />
+            <Save aria-hidden />
             Save branding
           </Button>
-          <p className="text-[12.5px] text-ink-subtle">
+          <p className="text-xs text-ink-subtle">
             Applies across the portal, the parent app and printed documents.
           </p>
         </div>
@@ -225,48 +225,37 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
               className="px-3 py-2.5 flex items-center gap-2"
               style={{ background: values.primaryHex, color: contrast }}
             >
-              <span className="size-6 rounded-[6px] bg-white/20 grid place-items-center text-[11px] font-bold">
+              <span className="size-6 rounded-[var(--radius-sm)] bg-white/20 grid place-items-center text-xs font-semibold">
                 S
               </span>
-              <span className="text-[12.5px] font-semibold">Your school</span>
+              <span className="text-xs font-semibold">Your school</span>
             </div>
 
             <div className="p-3 space-y-2.5 bg-surface">
               <div
-                className="rounded-[var(--radius-sm)] px-2.5 py-2 text-[12.5px] font-medium"
+                className="rounded-[var(--radius-sm)] px-2.5 py-2 text-xs font-medium"
                 style={{ background: tint, color: values.primaryHex }}
               >
                 Active menu item
               </div>
 
-              <div className="relative overflow-hidden rounded-[var(--radius)] border border-line p-3">
-                <span
-                  className="absolute inset-y-0 left-0 w-1"
-                  style={{ background: values.primaryHex }}
-                />
-                <div className="flex items-start justify-between pl-1.5">
-                  <p className="text-[11.5px] text-ink-muted">Total students</p>
-                  <span
-                    className="size-7 rounded-[6px] grid place-items-center text-[11px] font-bold"
-                    style={{ background: tint, color: values.primaryHex }}
-                  >
-                    120
-                  </span>
-                </div>
-                <p className="text-[20px] font-bold text-ink mt-1 pl-1.5 tnum">1,248</p>
+              <div className="rounded-[var(--radius)] border border-line px-3 py-2.5">
+                <p className="text-xs text-ink-muted">Students on roll</p>
+                <p className="text-2xl font-semibold text-ink mt-0.5 tnum">1,248</p>
+                <p className="text-xs text-ink-subtle mt-0.5">1,182 present · 66 absent</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="h-8 px-3 rounded-[var(--radius-sm)] text-[12.5px] font-medium"
+                  className="h-8 px-3 rounded-[var(--radius-sm)] text-xs font-medium"
                   style={{ background: values.primaryHex, color: contrast }}
                 >
                   Primary
                 </button>
                 <button
                   type="button"
-                  className="h-8 px-3 rounded-[var(--radius-sm)] text-[12.5px] font-medium border border-line-strong text-ink"
+                  className="h-8 px-3 rounded-[var(--radius-sm)] text-xs font-medium border border-line-strong text-ink"
                 >
                   Secondary
                 </button>
@@ -281,7 +270,7 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
             </div>
           </div>
 
-          <p className="text-[11.5px] text-ink-subtle">
+          <p className="text-xs text-ink-subtle">
             Button text is set automatically to whichever of black or white reads better on your
             primary colour, so a pale brand stays legible.
           </p>

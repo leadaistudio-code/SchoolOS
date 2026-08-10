@@ -2,21 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import type { StudentListRow } from '@/server/modules/students/service'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
+import { Pagination } from '@/components/pagination'
+import { ClassSection, DueAmount, PersonCell } from '@/components/ui/identity'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { cn, formatMoney, initials } from '@/lib/utils'
-
-const STATUS_TONE: Record<string, 'success' | 'neutral' | 'warning' | 'danger'> = {
-  ACTIVE: 'success',
-  ALUMNI: 'neutral',
-  TRANSFERRED: 'neutral',
-  WITHDRAWN: 'warning',
-  SUSPENDED: 'danger',
-}
+import { cn, formatMoney } from '@/lib/utils'
 
 export function StudentTable({
   rows,
@@ -42,6 +36,7 @@ export function StudentTable({
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
+  const filtered = params.toString().length > 0
 
   const setParam = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params.toString())
@@ -51,27 +46,23 @@ export function StudentTable({
 
   const toggleSort = (field: string) => {
     setParam((next) => {
-      const nextDir = sort === field && dir === 'asc' ? 'desc' : 'asc'
       next.set('sort', field)
-      next.set('dir', nextDir)
+      next.set('dir', sort === field && dir === 'asc' ? 'desc' : 'asc')
       next.delete('page')
     })
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
   if (rows.length === 0) {
     return (
       <EmptyState
-        icon={<UserPlus className="size-5" />}
-        title={params.toString() ? 'No students match these filters' : 'No students yet'}
+        title={filtered ? 'No students match these filters' : 'No students yet'}
         description={
-          params.toString()
-            ? 'Try widening or clearing the filters above.'
-            : 'Add your first student, or import your existing roll from a CSV file.'
+          filtered
+            ? 'Widen or clear the filters above to see more records.'
+            : 'Add a student, or import your existing roll from a CSV file.'
         }
         action={
-          canCreate && !params.toString() ? (
+          canCreate && !filtered ? (
             <Link href="/students/new" className={buttonVariants({ size: 'sm' })}>
               Add student
             </Link>
@@ -88,7 +79,13 @@ export function StudentTable({
           <THead>
             <tr>
               <SortableTH label="Student" field="firstName" sort={sort} dir={dir} onSort={toggleSort} />
-              <SortableTH label="Admission no." field="admissionNo" sort={sort} dir={dir} onSort={toggleSort} />
+              <SortableTH
+                label="Admission no."
+                field="admissionNo"
+                sort={sort}
+                dir={dir}
+                onSort={toggleSort}
+              />
               <TH>Class</TH>
               <TH>Guardian</TH>
               <TH align="right">Dues</TH>
@@ -102,46 +99,41 @@ export function StudentTable({
             {rows.map((s) => (
               <TR key={s.id}>
                 <TD>
-                  <Link href={`/students/${s.id}`} className="flex items-center gap-2.5 group">
-                    <span className="size-8 rounded-full bg-surface-2 border border-line grid place-items-center text-[11px] font-semibold text-ink-muted shrink-0">
-                      {initials(s.firstName, s.lastName)}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[13.5px] text-ink group-hover:text-[var(--brand-600)] truncate">
-                        {s.firstName} {s.lastName}
-                      </span>
-                      {s.rollNumber ? (
-                        <span className="block text-[12px] text-ink-subtle">Roll {s.rollNumber}</span>
-                      ) : null}
-                    </span>
-                  </Link>
+                  <PersonCell
+                    firstName={s.firstName}
+                    lastName={s.lastName}
+                    secondary={s.rollNumber ? `Roll ${s.rollNumber}` : undefined}
+                    href={`/students/${s.id}`}
+                  />
                 </TD>
-                <TD className="text-[13px] text-ink-muted tnum">{s.admissionNo}</TD>
-                <TD className="text-[13px] text-ink-muted">
-                  {s.className ? `${s.className}${s.sectionName ? ` · ${s.sectionName}` : ''}` : '-'}
+                <TD className="tnum">{s.admissionNo}</TD>
+                <TD>
+                  <ClassSection className={s.className} section={s.sectionName} />
                 </TD>
                 <TD>
                   {s.guardianName ? (
-                    <span className="block text-[13px] text-ink">{s.guardianName}</span>
+                    <>
+                      <span className="block text-sm text-ink truncate max-w-44">
+                        {s.guardianName}
+                      </span>
+                      {s.guardianPhone ? (
+                        <span className="block text-xs text-ink-subtle tnum">{s.guardianPhone}</span>
+                      ) : null}
+                    </>
                   ) : (
-                    <span className="text-[13px] text-ink-subtle">Not linked</span>
+                    <span className="text-ink-subtle">Not linked</span>
                   )}
-                  {s.guardianPhone ? (
-                    <span className="block text-[12px] text-ink-subtle">{s.guardianPhone}</span>
-                  ) : null}
                 </TD>
                 <TD align="right">
-                  <span className={cn('text-[13px]', s.dueMinor > 0 ? 'text-[var(--danger)] font-medium' : 'text-ink-subtle')}>
-                    {s.dueMinor > 0 ? formatMoney(s.dueMinor, currency) : '-'}
-                  </span>
+                  <DueAmount formatted={formatMoney(s.dueMinor, currency)} due={s.dueMinor > 0} />
                 </TD>
                 <TD>
-                  <Badge tone={STATUS_TONE[s.status] ?? 'neutral'}>{s.status.toLowerCase()}</Badge>
+                  <StatusBadge status={s.status} />
                 </TD>
                 <TD align="right">
                   <Link
                     href={canEdit ? `/students/${s.id}/edit` : `/students/${s.id}`}
-                    className="text-[13px] text-[var(--brand-600)] hover:underline"
+                    className="text-sm text-[var(--brand-600)] hover:underline"
                   >
                     {canEdit ? 'Edit' : 'View'}
                   </Link>
@@ -152,36 +144,7 @@ export function StudentTable({
         </Table>
       </TableWrap>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line">
-        <p className="text-[12.5px] text-ink-muted">
-          Showing <span className="tnum">{(page - 1) * pageSize + 1}</span>-
-          <span className="tnum">{Math.min(page * pageSize, total)}</span> of{' '}
-          <span className="tnum">{total}</span> students
-        </p>
-        <div className="flex items-center gap-1.5">
-          <button
-            disabled={page <= 1}
-            onClick={() => setParam((n) => n.set('page', String(page - 1)))}
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'disabled:opacity-45')}
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="size-4" aria-hidden />
-            Previous
-          </button>
-          <span className="text-[12.5px] text-ink-muted px-2 tnum">
-            {page} / {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setParam((n) => n.set('page', String(page + 1)))}
-            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'disabled:opacity-45')}
-            aria-label="Next page"
-          >
-            Next
-            <ChevronRight className="size-4" aria-hidden />
-          </button>
-        </div>
-      </div>
+      <Pagination total={total} page={page} pageSize={pageSize} label="students" />
     </>
   )
 }
@@ -204,7 +167,7 @@ function SortableTH({
     <TH aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button
         onClick={() => onSort(field)}
-        className="inline-flex items-center gap-1 hover:text-ink"
+        className={cn('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')}
       >
         {label}
         {active ? (

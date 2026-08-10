@@ -39,7 +39,10 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn('inline-flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5', className)}
+      className={cn(
+        'inline-flex items-center rounded-[var(--radius-sm)] border border-line bg-surface p-px',
+        className,
+      )}
       role="group"
       aria-label="Colour theme"
     >
@@ -51,9 +54,9 @@ export function ThemeToggle({ className }: { className?: string }) {
           aria-pressed={mode === o.value}
           title={o.label}
           className={cn(
-            'size-6.5 grid place-items-center rounded-full transition-colors',
+            'size-6.5 grid place-items-center rounded-[4px] transition-colors',
             mode === o.value
-              ? 'bg-[var(--brand-500)] text-[var(--brand-contrast)]'
+              ? 'bg-surface-3 text-ink'
               : 'text-ink-subtle hover:text-ink',
           )}
         >

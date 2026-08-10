@@ -6,7 +6,6 @@ import { saveAttendanceAction } from './actions'
 import type { Register } from '@/server/modules/attendance/service'
 import { MARKABLE_STATUSES, STATUS_LABEL, type AttendanceStatusValue } from '@/server/modules/attendance/schema'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -112,14 +111,14 @@ export function AttendanceRegister({ register }: { register: Register }) {
   return (
     <div>
       {!register.editable ? (
-        <div className="flex items-start gap-2.5 bg-warning-bg border-b border-[color-mix(in_srgb,var(--warning)_28%,transparent)] px-4 py-2.5">
+        <div className="flex items-start gap-2.5 bg-warning-bg border-b border-[color-mix(in_srgb,var(--warning)_25%,transparent)] px-3 py-2">
           <Lock className="size-4 text-warning mt-0.5 shrink-0" aria-hidden />
-          <p className="text-[13px] text-warning">{register.lockedReason}</p>
+          <p className="text-sm text-warning">{register.lockedReason}</p>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-line">
-        <div className="flex items-center gap-1.5 text-[12.5px] text-ink-muted mr-auto">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-line">
+        <div className="flex items-center gap-1.5 text-xs text-ink-muted mr-auto">
           {MARKABLE_STATUSES.map((s) => (
             <span key={s} className="inline-flex items-center gap-1">
               <span className={cn('inline-block size-2 rounded-full', dotFor(s))} aria-hidden />
@@ -131,11 +130,11 @@ export function AttendanceRegister({ register }: { register: Register }) {
         {register.editable ? (
           <>
             <Button variant="secondary" size="sm" onClick={() => setAll('PRESENT')}>
-              <Check className="size-4" aria-hidden />
+              <Check aria-hidden />
               All present
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setAll('ABSENT')}>
-              <UserX className="size-4" aria-hidden />
+              <UserX aria-hidden />
               All absent
             </Button>
           </>
@@ -148,26 +147,20 @@ export function AttendanceRegister({ register }: { register: Register }) {
           return (
             <li
               key={row.studentId}
-              className="flex flex-wrap items-center gap-3 px-4 py-2.5 hover:bg-surface-2"
+              className="flex flex-wrap items-center gap-3 px-3 py-1.5 hover:bg-surface-2"
             >
-              <span className="w-9 text-[12.5px] text-ink-subtle tnum shrink-0">
+              <span className="w-9 text-xs text-ink-subtle tnum shrink-0">
                 {row.rollNumber ?? '—'}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[13.5px] text-ink truncate">
+                <span className="block text-sm text-ink truncate">
                   {row.firstName} {row.lastName}
                 </span>
-                <span className="block text-[12px] text-ink-subtle">
+                <span className="block text-xs text-ink-subtle">
                   {row.admissionNo}
                   {row.onApprovedLeave ? ' · approved leave' : ''}
                 </span>
               </span>
-
-              {row.onApprovedLeave ? (
-                <Badge tone="info" className="shrink-0">
-                  on leave
-                </Badge>
-              ) : null}
 
               <div
                 className="flex gap-1 shrink-0"
@@ -186,7 +179,7 @@ export function AttendanceRegister({ register }: { register: Register }) {
                       onClick={() => setStatus(row.studentId, status)}
                       title={STATUS_LABEL[status]}
                       className={cn(
-                        'h-8 px-2.5 rounded-lg border text-[12px] font-medium transition-colors disabled:opacity-50',
+                        'h-7 w-8 rounded-[var(--radius-sm)] border text-xs font-medium transition-colors disabled:opacity-50',
                         active
                           ? TONE[status]
                           : 'border-line text-ink-subtle hover:bg-surface-2 hover:text-ink',
@@ -203,8 +196,8 @@ export function AttendanceRegister({ register }: { register: Register }) {
       </ul>
 
       {register.editable ? (
-        <div className="sticky bottom-16 lg:bottom-0 flex flex-wrap items-center gap-3 px-4 py-3 border-t border-line bg-surface/95 backdrop-blur">
-          <p className="text-[12.5px] text-ink-muted mr-auto">
+        <div className="sticky bottom-16 lg:bottom-0 flex flex-wrap items-center gap-3 px-3 py-2.5 border-t border-line bg-surface">
+          <p className="text-xs text-ink-muted mr-auto">
             {register.markedAt ? (
               <>
                 Last saved by {register.markedBy ?? 'staff'} ·{' '}
@@ -218,13 +211,13 @@ export function AttendanceRegister({ register }: { register: Register }) {
             )}
           </p>
           {dirty ? (
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-warning">
+            <span className="inline-flex items-center gap-1.5 text-xs text-warning">
               <Clock className="size-3.5" aria-hidden />
               Unsaved changes
             </span>
           ) : null}
           <Button onClick={save} loading={pending} disabled={!dirty && !!register.markedAt}>
-            <Save className="size-4" aria-hidden />
+            <Save aria-hidden />
             Save register
           </Button>
         </div>

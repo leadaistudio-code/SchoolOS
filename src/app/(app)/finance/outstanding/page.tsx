@@ -49,23 +49,23 @@ export default async function OutstandingPage({
           <CardHeader>
             <CardTitle>By class</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             {byClass.length === 0 ? (
               <EmptyState title="All settled" description="Nothing outstanding." />
             ) : (
               <ul className="divide-y divide-[var(--border)]">
                 {byClass.map((r) => (
-                  <li key={r.className} className="flex items-center justify-between gap-3 py-2.5">
+                  <li key={r.className} className="flex items-center justify-between gap-3 py-2">
                     <div>
-                      <p className="text-[13.5px] text-ink">{r.className}</p>
-                      <p className="text-[12px] text-ink-subtle">{Number(r.students)} students</p>
+                      <p className="text-sm text-ink">{r.className}</p>
+                      <p className="text-xs text-ink-subtle">{Number(r.students)} students</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[13px] tnum text-ink">
+                      <p className="text-sm tnum text-ink">
                         {formatMoney(Number(r.outstanding), currency)}
                       </p>
                       {Number(r.overdue) > 0 ? (
-                        <p className="text-[11.5px] text-[var(--danger)] tnum">
+                        <p className="text-xs text-[var(--danger)] tnum">
                           {formatMoney(Number(r.overdue), currency)} overdue
                         </p>
                       ) : null}
@@ -81,7 +81,7 @@ export default async function OutstandingPage({
           <CardHeader>
             <div>
               <CardTitle>Overdue invoices</CardTitle>
-              <p className="text-[13px] text-ink-muted mt-0.5">Oldest first</p>
+              <p className="text-sm text-ink-muted mt-0.5">Oldest first</p>
             </div>
           </CardHeader>
           <CardContent className="px-0 pb-0">
@@ -111,18 +111,18 @@ export default async function OutstandingPage({
                           <TD>
                             <Link
                               href={`/students/${i.studentId}`}
-                              className="text-[13.5px] text-ink hover:text-[var(--brand-600)]"
+                              className="text-sm text-ink hover:text-[var(--brand-600)]"
                             >
                               {i.studentName}
                             </Link>
-                            <span className="block text-[12px] text-ink-subtle">
+                            <span className="block text-xs text-ink-subtle">
                               {i.admissionNo}
                               {i.className ? ` · ${i.className}` : ''}
                             </span>
                           </TD>
                           <TD>
-                            <span className="block text-[13px] text-ink">{i.title}</span>
-                            <span className="block text-[12px] text-ink-subtle">
+                            <span className="block text-sm text-ink">{i.title}</span>
+                            <span className="block text-xs text-ink-subtle">
                               due {formatDay(i.dueOn, 'd MMM yyyy')}
                             </span>
                           </TD>
@@ -131,7 +131,7 @@ export default async function OutstandingPage({
                               {i.daysOverdue} days
                             </Badge>
                           </TD>
-                          <TD align="right" className="text-[13px] font-medium">
+                          <TD align="right" className="text-sm font-medium">
                             {formatMoney(i.balanceMinor, currency)}
                           </TD>
                           <TD align="right">

@@ -1,8 +1,8 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Select } from '@/components/ui/input'
-import { Input } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
+import { TableToolbar } from '@/components/ui/table'
 
 export type SectionOption = {
   id: string
@@ -37,7 +37,7 @@ export function SectionPicker({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3 border-b border-line">
+    <TableToolbar>
       <Select
         value={sectionId ?? ''}
         aria-label="Select section"
@@ -60,6 +60,6 @@ export function SectionPicker({
         className="w-44"
         onChange={(e) => push((n) => n.set('onDate', e.target.value))}
       />
-    </div>
+    </TableToolbar>
   )
 }

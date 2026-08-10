@@ -40,59 +40,40 @@ export default async function LoginPage({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={school.logoUrl} alt="" className="size-9 rounded object-contain" />
             ) : (
-              <span className="size-10 rounded-[var(--radius-sm)] bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center font-bold text-[17px]">
+              <span className="size-9 rounded-[var(--radius-sm)] bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center font-semibold text-lg">
                 {title.charAt(0)}
               </span>
             )}
-            <span className="font-bold text-[15px] text-ink">{title}</span>
+            <span className="font-semibold text-lg text-ink">{title}</span>
           </div>
 
-          <h1 className="text-[24px] font-bold text-ink tracking-tight">{headline}</h1>
-          <p className="text-[13.5px] text-ink-muted mt-1.5 mb-7">{subtext}</p>
+          <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
+          <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
 
           <LoginForm next={params.next} />
 
-          <p className="mt-8 text-[12px] text-ink-subtle flex items-center gap-1.5">
+          <p className="mt-8 text-xs text-ink-subtle flex items-center gap-1.5">
             <ShieldCheck className="size-3.5" aria-hidden />
             Sign-in attempts are rate limited and recorded.
           </p>
 
           {school?.footerText ? (
-            <p className="mt-6 text-[12px] text-ink-subtle border-t border-line pt-4">
+            <p className="mt-6 text-xs text-ink-subtle border-t border-line pt-4">
               {school.footerText}
             </p>
           ) : null}
         </div>
       </div>
 
-      {/* Right: brand panel, built from the tenant palette rather than an image
-          so every school gets a coherent login page with zero assets. */}
-      <div
-        className="hidden lg:block relative overflow-hidden"
-        style={{
-          background:
-            'linear-gradient(160deg, var(--brand-500) 0%, var(--brand-700) 55%, var(--accent-600) 100%)',
-        }}
-      >
-        <div className="absolute inset-0 opacity-[0.14]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-            backgroundSize: '28px 28px',
-          }}
-          aria-hidden
-        />
-        <div className="relative h-full flex flex-col justify-end p-12 text-white">
-          <blockquote className="max-w-md">
-            <p className="text-[22px] leading-snug font-semibold">
-              One place for attendance, fees, homework, results and transport - for staff,
-              students and parents alike.
-            </p>
-            <footer className="mt-4 text-white/75 text-[13.5px]">
-              {title} runs on {env().APP_NAME}
-            </footer>
-          </blockquote>
-        </div>
+      {/* Right: a plain brand field. No gradient, no pattern — the sign-in
+          page should look like the product it opens, not like a campaign. */}
+      <div className="hidden lg:flex flex-col justify-end p-12 bg-[var(--brand-700)] text-white">
+        <p className="text-xl leading-snug max-w-md">
+          Attendance, fees, homework, results and transport in one record system.
+        </p>
+        <p className="mt-3 text-base text-white/70">
+          {title} runs on {env().APP_NAME}
+        </p>
       </div>
     </div>
   )

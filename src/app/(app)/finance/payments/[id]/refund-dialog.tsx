@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Undo2 } from 'lucide-react'
 import { refundPaymentAction } from '../../actions'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Textarea } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { formatMoney } from '@/lib/utils'
@@ -53,69 +54,61 @@ export function RefundDialog({
   return (
     <>
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        <Undo2 className="size-4" aria-hidden />
+        <Undo2 aria-hidden />
         Refund
       </Button>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-60 grid place-items-center p-4 bg-black/45"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Refund this payment"
-          onClick={(e) => e.target === e.currentTarget && setOpen(false)}
-        >
-          <div className="w-full max-w-md bg-surface border border-line rounded-[var(--radius)] shadow-2xl p-5">
-            <h2 className="text-[15px] font-semibold text-ink">Refund payment</h2>
-            <p className="text-[13px] text-ink-muted mt-0.5">
-              Up to {formatMoney(maxMinor, currency)} can be refunded. The invoice balance is
-              restored automatically.
-            </p>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Refund payment"
+        size="sm"
+        description={`Up to ${formatMoney(maxMinor, currency)} can be refunded. The invoice balance is restored automatically.`}
+        footer={
+          <>
+            <Button
+              variant="danger"
+              onClick={submit}
+              loading={pending}
+              disabled={reason.trim().length < 5 || Number(amount) <= 0}
+            >
+              Refund {formatMoney(Math.round(Number(amount || 0) * 100), currency)}
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Amount" htmlFor="refund-amount" required>
+            <Input
+              id="refund-amount"
+              type="number"
+              min={1}
+              max={maxMinor / 100}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="tnum"
+            />
+          </Field>
 
-            <div className="space-y-4 mt-4">
-              <Field label="Amount" htmlFor="refund-amount" required>
-                <Input
-                  id="refund-amount"
-                  type="number"
-                  min={1}
-                  max={maxMinor / 100}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </Field>
-
-              <Field
-                label="Reason"
-                htmlFor="refund-reason"
-                required
-                hint="Recorded in the audit log with your name"
-              >
-                <Textarea
-                  id="refund-reason"
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Duplicate payment collected in error"
-                />
-              </Field>
-            </div>
-
-            <div className="flex items-center gap-2 mt-5">
-              <Button
-                variant="danger"
-                onClick={submit}
-                loading={pending}
-                disabled={reason.trim().length < 5 || Number(amount) <= 0}
-              >
-                Refund {formatMoney(Math.round(Number(amount || 0) * 100), currency)}
-              </Button>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <Field
+            label="Reason"
+            htmlFor="refund-reason"
+            required
+            hint="Recorded in the audit log with your name"
+          >
+            <Textarea
+              id="refund-reason"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Duplicate payment collected in error"
+            />
+          </Field>
         </div>
-      ) : null}
+      </Dialog>
     </>
   )
 }

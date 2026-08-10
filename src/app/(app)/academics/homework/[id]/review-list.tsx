@@ -80,8 +80,8 @@ export function ReviewList({
         <li key={s.id} className="px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[13.5px] text-ink">{s.studentName}</p>
-              <p className="text-[12px] text-ink-subtle tnum">
+              <p className="text-sm text-ink">{s.studentName}</p>
+              <p className="text-xs text-ink-subtle tnum">
                 {s.admissionNo}
                 {s.submittedAt
                   ? ` · handed in ${new Date(s.submittedAt).toLocaleDateString('en-IN', {
@@ -90,7 +90,7 @@ export function ReviewList({
                     })}`
                   : ''}
               </p>
-              {s.note ? <p className="text-[12.5px] text-ink-muted mt-1">“{s.note}”</p> : null}
+              {s.note ? <p className="text-xs text-ink-muted mt-1">“{s.note}”</p> : null}
 
               {s.attachments.length > 0 ? (
                 <ul className="mt-1.5 space-y-1">
@@ -98,7 +98,7 @@ export function ReviewList({
                     <li key={a.id}>
                       <a
                         href={`/api/v1/files/${encodeURIComponent(a.storageKey)}`}
-                        className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--brand-600)] hover:underline"
+                        className="inline-flex items-center gap-1.5 text-xs text-[var(--brand-600)] hover:underline"
                       >
                         <Paperclip className="size-3" aria-hidden />
                         {a.fileName}
@@ -117,7 +117,7 @@ export function ReviewList({
             {maxScore !== null ? (
               <div>
                 <label
-                  className="block text-[11.5px] text-ink-subtle mb-0.5"
+                  className="block text-xs text-ink-subtle mb-0.5"
                   htmlFor={`score-${s.id}`}
                 >
                   Score / {maxScore}
@@ -141,7 +141,7 @@ export function ReviewList({
 
             <div className="flex-1 min-w-48">
               <label
-                className="block text-[11.5px] text-ink-subtle mb-0.5"
+                className="block text-xs text-ink-subtle mb-0.5"
                 htmlFor={`comment-${s.id}`}
               >
                 Comment
@@ -161,7 +161,7 @@ export function ReviewList({
             </div>
 
             <Button size="sm" loading={pendingId === s.id} onClick={() => review(s.id, 'REVIEWED')}>
-              <Check className="size-4" aria-hidden />
+              <Check aria-hidden />
               Mark reviewed
             </Button>
             <Button

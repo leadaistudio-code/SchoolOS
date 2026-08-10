@@ -138,11 +138,22 @@ Library catalogue, circulation and fines; inventory and asset lifecycle; front
 office visitors and appointments; the admissions CRM as a Kanban pipeline with
 follow-up reminders and conversion analytics; events; sports.
 
-## Phase 7 — Transport
+## Phase 7 — Transport ✅ built
 
-Buses, routes and stops; driver assignment; the driver trip app (start/end trip,
-GPS ping ingestion, student boarding); the admin live map; parent tracking with
-estimated arrival; transport fee integration.
+Buses with driver, attendant and document-expiry tracking; routes with an
+ordered, geocoded stop list; student-to-stop assignments enforced against bus
+capacity; the driver console (start/end trip, GPS ping ingestion, boarding
+roster); the live map with route progress and arrival estimates; parent
+tracking scoped to their own children's bus, with driver contact details and
+approach notifications.
+
+The map is drawn from our own coordinates rather than a tile provider, so no
+pupil stop location leaves the deployment and the screen works on a filtered
+school network.
+
+Still open: transport fares are held on the stop and billed through the
+standard fee structure rather than being invoiced automatically from the
+assignment.
 
 ## Phase 8 — SaaS operations
 

@@ -26,3 +26,25 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ),
 )
 Button.displayName = 'Button'
+
+/**
+ * Icon-only control. The label is required, not optional — an unlabelled icon
+ * button is unusable with a screen reader and ambiguous with one.
+ */
+export const IconButton = React.forwardRef<
+  HTMLButtonElement,
+  Omit<ButtonProps, 'size' | 'children'> & { label: string; children: React.ReactNode; small?: boolean }
+>(({ className, variant = 'ghost', label, small, children, ...props }, ref) => (
+  <Button
+    ref={ref}
+    variant={variant}
+    size={small ? 'icon-sm' : 'icon'}
+    aria-label={label}
+    title={label}
+    className={className}
+    {...props}
+  >
+    {children}
+  </Button>
+))
+IconButton.displayName = 'IconButton'

@@ -29,7 +29,6 @@ export default async function ApplyLeavePage() {
     <div className="max-w-2xl">
       <PageHeader
         title="Apply for leave"
-        description="The request goes to the approvers for a decision. You will be notified either way."
       />
       <LeaveForm
         students={students}

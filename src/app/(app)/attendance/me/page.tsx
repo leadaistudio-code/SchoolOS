@@ -62,12 +62,12 @@ export default async function MyAttendancePage() {
         <CardHeader>
           <div>
             <CardTitle>Recent days</CardTitle>
-            <p className="text-[13px] text-ink-muted mt-0.5">
+            <p className="text-sm text-ink-muted mt-0.5">
               {percent === null ? 'No history yet' : `${percent}% attendance overall`}
             </p>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {history.length === 0 ? (
             <EmptyState
               title="No attendance history"
@@ -76,10 +76,10 @@ export default async function MyAttendancePage() {
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {history.map((h) => (
-                <li key={h.id} className="flex items-center justify-between gap-3 py-2.5">
+                <li key={h.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-[13.5px] text-ink">{formatDay(h.onDate, 'EEE, d MMM yyyy')}</p>
-                    <p className="text-[12px] text-ink-subtle">
+                    <p className="text-sm text-ink">{formatDay(h.onDate, 'EEE, d MMM yyyy')}</p>
+                    <p className="text-xs text-ink-subtle">
                       {h.checkInAt
                         ? `In ${format(h.checkInAt, 'HH:mm')}${h.checkOutAt ? ` · out ${format(h.checkOutAt, 'HH:mm')}` : ''}`
                         : 'No check-in'}

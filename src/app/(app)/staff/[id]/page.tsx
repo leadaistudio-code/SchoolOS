@@ -3,10 +3,18 @@ import { format } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { getStaff } from '@/server/modules/people/service'
 import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  DescriptionItem,
+  DescriptionList,
+} from '@/components/ui/card'
+import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
-import { formatMoney, initials } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
+import { Avatar } from '@/components/ui/identity'
 
 export const metadata = { title: 'Staff profile' }
 
@@ -24,61 +32,44 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
-          <CardContent className="pt-5">
-            <div className="flex items-center gap-3.5">
-              <span className="size-16 rounded-full bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center text-xl font-semibold shrink-0">
-                {initials(staff.firstName, staff.lastName)}
-              </span>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <Avatar firstName={staff.firstName} lastName={staff.lastName} />
               <div className="min-w-0">
-                <p className="text-[16px] font-semibold text-ink truncate">
+                <p className="text-base font-semibold text-ink truncate">
                   {staff.firstName} {staff.lastName}
                 </p>
-                <Badge tone="brand" className="mt-1">
+                <p className="text-sm text-ink-subtle first-letter:uppercase">
                   {staff.staffType.toLowerCase()}
-                </Badge>
+                </p>
               </div>
             </div>
 
-            <dl className="mt-5 space-y-2.5 text-[13px]">
-              <Row label="Department" value={staff.department ?? '—'} />
-              <Row label="Qualification" value={staff.qualification ?? '—'} />
-              <Row
-                label="Experience"
-                value={staff.experienceYears ? `${staff.experienceYears} years` : '—'}
-              />
-              <Row label="Phone" value={staff.phone ?? '—'} />
-              <Row label="Email" value={staff.email ?? '—'} />
-              <Row
-                label="Joined"
-                value={staff.joinedOn ? formatDay(staff.joinedOn, 'd MMM yyyy') : '—'}
-              />
+            <DescriptionList className="mt-4">
+              <DescriptionItem label="Department">{staff.department ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Qualification">{staff.qualification ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Experience">{staff.experienceYears ? `${staff.experienceYears} years` : '—'}</DescriptionItem>
+              <DescriptionItem label="Phone">{staff.phone ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Email">{staff.email ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Joined">{staff.joinedOn ? formatDay(staff.joinedOn, 'd MMM yyyy') : '—'}</DescriptionItem>
               {ctx.can('staff.payroll') ? (
-                <Row
-                  label="Salary"
-                  value={
+                <DescriptionItem label="Salary">{
                     staff.salaryMinor
                       ? formatMoney(staff.salaryMinor, ctx.tenant.currency)
                       : '—'
-                  }
-                />
+                  }</DescriptionItem>
               ) : null}
-              <Row
-                label="Portal login"
-                value={
+              <DescriptionItem label="Portal login">{
                   staff.user
                     ? `${staff.user.email ?? 'linked'} (${staff.user.status.toLowerCase()})`
                     : 'None'
-                }
-              />
-              <Row
-                label="Last sign-in"
-                value={
+                }</DescriptionItem>
+              <DescriptionItem label="Last sign-in">{
                   staff.user?.lastLoginAt
                     ? format(staff.user.lastLoginAt, 'd MMM yyyy, HH:mm')
                     : 'Never'
-                }
-              />
-            </dl>
+                }</DescriptionItem>
+            </DescriptionList>
           </CardContent>
         </Card>
 
@@ -87,7 +78,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
             <CardHeader>
               <CardTitle>Teaching assignments</CardTitle>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="py-1">
               {staff.classSubjects.length === 0 && staff.classTeacherOf.length === 0 ? (
                 <EmptyState
                   title="No assignments"
@@ -106,9 +97,9 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
                   ) : null}
                   <ul className="divide-y divide-[var(--border)]">
                     {staff.classSubjects.map((cs) => (
-                      <li key={cs.id} className="flex items-center justify-between gap-3 py-2.5">
-                        <span className="text-[13.5px] text-ink">{cs.subject.name}</span>
-                        <span className="text-[12.5px] text-ink-subtle">{cs.classLevel.name}</span>
+                      <li key={cs.id} className="flex items-center justify-between gap-3 py-2">
+                        <span className="text-sm text-ink">{cs.subject.name}</span>
+                        <span className="text-xs text-ink-subtle">{cs.classLevel.name}</span>
                       </li>
                     ))}
                   </ul>
@@ -121,7 +112,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
             <CardHeader>
               <CardTitle>Recent leave</CardTitle>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="py-1">
               {staff.leaveRequests.length === 0 ? (
                 <EmptyState
                   title="No leave requests"
@@ -130,12 +121,12 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
               ) : (
                 <ul className="divide-y divide-[var(--border)]">
                   {staff.leaveRequests.map((l) => (
-                    <li key={l.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <li key={l.id} className="flex items-center justify-between gap-3 py-2">
                       <div className="min-w-0">
-                        <p className="text-[13.5px] text-ink">
+                        <p className="text-sm text-ink">
                           {formatDay(l.fromDate, 'd MMM')} – {formatDay(l.toDate, 'd MMM yyyy')}
                         </p>
-                        <p className="text-[12px] text-ink-subtle truncate max-w-md">{l.reason}</p>
+                        <p className="text-xs text-ink-subtle truncate max-w-md">{l.reason}</p>
                       </div>
                       <Badge
                         tone={
@@ -146,7 +137,7 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
                               : 'neutral'
                         }
                       >
-                        {l.status.toLowerCase()}
+                        {humanizeStatus(l.status)}
                       </Badge>
                     </li>
                   ))}
@@ -160,11 +151,3 @@ export default async function StaffDetailPage({ params }: { params: Promise<{ id
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-ink-subtle shrink-0">{label}</dt>
-      <dd className="text-ink text-right break-words">{value}</dd>
-    </div>
-  )
-}

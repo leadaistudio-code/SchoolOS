@@ -21,7 +21,7 @@ export function PasswordForm({ minLength, forced }: { minLength: number; forced:
               className="flex items-start gap-2.5 rounded-[var(--radius)] bg-danger-bg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] px-3.5 py-2.5"
             >
               <AlertCircle className="size-4.5 text-[var(--danger)] mt-0.5 shrink-0" aria-hidden />
-              <p className="text-[13px] text-[var(--danger)]">{state.error}</p>
+              <p className="text-sm text-[var(--danger)]">{state.error}</p>
             </div>
           ) : null}
 
@@ -71,7 +71,7 @@ export function PasswordForm({ minLength, forced }: { minLength: number; forced:
             />
           </Field>
 
-          <p className="text-[12.5px] text-ink-subtle">
+          <p className="text-xs text-ink-subtle">
             Changing your password signs you out on every other device.
           </p>
 

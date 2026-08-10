@@ -46,7 +46,7 @@ export default async function HomeworkDetailPage({
         <CardHeader>
           <div>
             <CardTitle>Instructions</CardTitle>
-            <p className="text-[13px] text-ink-muted mt-0.5">
+            <p className="text-sm text-ink-muted mt-0.5">
               Set by {homework.teacher.firstName} {homework.teacher.lastName} on{' '}
               {formatDay(homework.assignedOn, 'd MMM yyyy')}
               {homework.maxScore ? ` · out of ${homework.maxScore}` : ''}
@@ -54,11 +54,11 @@ export default async function HomeworkDetailPage({
           </div>
           {!homework.isPublished ? <Badge tone="neutral">draft</Badge> : null}
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {homework.instructions ? (
-            <p className="text-[13.5px] text-ink whitespace-pre-wrap">{homework.instructions}</p>
+            <p className="text-base text-ink whitespace-pre-wrap">{homework.instructions}</p>
           ) : (
-            <p className="text-[13.5px] text-ink-subtle">No further instructions given.</p>
+            <p className="text-base text-ink-subtle">No further instructions given.</p>
           )}
 
           {homework.attachments.length > 0 ? (
@@ -67,7 +67,7 @@ export default async function HomeworkDetailPage({
                 <li key={a.id}>
                   <a
                     href={`/api/v1/files/${encodeURIComponent(a.storageKey)}`}
-                    className="inline-flex items-center gap-2 text-[13px] text-[var(--brand-600)] hover:underline"
+                    className="inline-flex items-center gap-2 text-sm text-[var(--brand-600)] hover:underline"
                   >
                     <Paperclip className="size-3.5" aria-hidden />
                     {a.fileName}
@@ -102,7 +102,7 @@ export default async function HomeworkDetailPage({
           <CardHeader>
             <div>
               <CardTitle>Submissions</CardTitle>
-              <p className="text-[13px] text-ink-muted mt-0.5">
+              <p className="text-sm text-ink-muted mt-0.5">
                 {submissions.length} handed in · {pending.length} outstanding
               </p>
             </div>
@@ -137,10 +137,10 @@ export default async function HomeworkDetailPage({
 
             {pending.length > 0 ? (
               <div className="px-4 py-3 border-t border-line">
-                <p className="text-[12.5px] font-medium text-ink mb-1.5">
+                <p className="text-xs font-medium text-ink mb-1.5">
                   Not handed in ({pending.length})
                 </p>
-                <p className="text-[12.5px] text-ink-muted">
+                <p className="text-xs text-ink-muted">
                   {pending
                     .slice(0, 12)
                     .map((p) => `${p.student.firstName} ${p.student.lastName}`)

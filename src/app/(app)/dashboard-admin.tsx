@@ -1,297 +1,344 @@
 import Link from 'next/link'
-import { formatDay } from '@/lib/dates'
 import { format } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { getAdminDashboard } from '@/server/modules/dashboard/service'
+import { transportDashboard } from '@/server/modules/transport/service'
+import { formatMoney, formatNumber } from '@/lib/utils'
+import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatCard } from '@/components/dashboard/stat-card'
-import { AttendanceTrendChart, CollectionChart } from '@/components/dashboard/charts'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { buttonVariants } from '@/components/ui/button-variants'
-import { EmptyState } from '@/components/ui/states'
-import { formatMoney, formatNumber, fullName } from '@/lib/utils'
+import { Widget, WidgetLink } from '@/components/dashboard/widget'
+import { WidgetBoundary } from '@/components/dashboard/widget-boundary'
+import { AcademicOverview } from '@/components/dashboard/academic-overview'
+import { AttendanceOverview } from '@/components/dashboard/attendance-overview'
+import { AdmissionsBanner } from '@/components/dashboard/admissions-banner'
+import { QuickActions, QUICK_ACTIONS } from '@/components/dashboard/quick-actions'
+import { DonutChart, SERIES } from '@/components/dashboard/charts'
+import {
+  FeeLegend,
+  InquiriesSnapshot,
+  RecentActivity,
+  StaffDirectory,
+  TransportSnapshot,
+  UpcomingEvents,
+  type UpcomingItem,
+} from '@/components/dashboard/panels'
+import { AttentionRow } from '@/components/dashboard/attention-row'
 
+/**
+ * The administrator's dashboard.
+ *
+ * Ordered by the questions a head teacher asks on the way in: how many
+ * children do we have, were they here, has the money arrived, what needs
+ * doing, and is anything on fire. Everything below that line is context.
+ *
+ * This file composes; it does not render. Each panel is its own component so
+ * the arrangement can be reordered — or varied by role later — without editing
+ * the widgets themselves.
+ */
 export async function AdminDashboard() {
   const ctx = await requireContext('dashboard.view')
   const data = await getAdminDashboard(ctx)
   const currency = ctx.tenant.currency
+  const schoolName = ctx.tenant.school?.name ?? ctx.tenant.name
 
-  const quickActions = [
-    { label: 'Add student', href: '/students/new', permission: 'students.create' },
-    { label: 'Mark attendance', href: '/attendance', permission: 'attendance.mark' },
-    { label: 'Collect fee', href: '/finance/collect', permission: 'fees.collect' },
-    { label: 'Post notice', href: '/communication/notices/new', permission: 'notices.create' },
-  ].filter((a) => ctx.can(a.permission))
+  // Transport is optional: not every school buys the module, and a school
+  // without it should not see an empty strip where a fleet would be.
+  const transport = ctx.can('transport.view') ? await transportDashboard(ctx) : null
+
+  const actions = QUICK_ACTIONS.filter((action) => ctx.can(action.permission))
+  const unmarked = Math.max(0, data.attendance.expected - data.attendance.marked)
+
+  const headline = data.attendance.marked
+    ? `Attendance is ${data.attendance.percent}% today and ${formatMoney(data.finance.collectedTodayMinor, currency)} has been collected.`
+    : `${formatNumber(data.attendance.expected)} students are expected today. No register has been submitted yet.`
+
+  const upcoming: UpcomingItem[] = [
+    ...data.upcomingExams
+      .filter((exam) => exam.startsOn)
+      .map((exam) => ({
+        id: exam.id,
+        title: exam.name,
+        kind: 'Examination',
+        at: exam.startsOn!,
+        href: '/exams',
+      })),
+    ...data.upcomingEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      kind: event.kind,
+      at: event.startsAt,
+      href: '/academics/calendar',
+    })),
+  ]
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .slice(0, 5)
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={`Good ${greeting()}, ${ctx.user.firstName}`}
-        description={`${ctx.tenant.school?.name ?? ctx.tenant.name} · ${format(new Date(), 'EEEE, d MMMM yyyy')}`}
-        actions={quickActions.map((a) => (
-          <Link key={a.href} href={a.href} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            {a.label}
-          </Link>
-        ))}
+    <div className="space-y-4">
+      <WelcomeBanner
+        firstName={ctx.user.firstName}
+        schoolName={schoolName}
+        headline={headline}
+        action={
+          unmarked > 0 && ctx.can('attendance.mark')
+            ? { label: 'Mark attendance', href: '/attendance' }
+            : undefined
+        }
       />
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Students"
+          label="Total students"
           value={formatNumber(data.people.students)}
-          sub={`${data.people.teachers} teachers · ${data.people.staff} staff`}
           icon="GraduationCap"
+          tone="students"
           href="/students"
+          changePercent={data.people.growth.students.changePercent}
+          sub={`${formatNumber(data.people.teachers)} teachers on staff`}
+          series={data.people.growth.students.series}
+          delayMs={0}
+        />
+        <StatCard
+          label="Total staff"
+          value={formatNumber(data.people.staff)}
+          icon="Briefcase"
+          tone="staff"
+          href="/staff"
+          changePercent={data.people.growth.staff.changePercent}
+          sub={`${formatNumber(data.people.staff - data.people.teachers)} non-teaching`}
+          series={data.people.growth.staff.series}
+          delayMs={40}
+        />
+        <StatCard
+          label="Total parents"
+          value={formatNumber(data.people.parents)}
+          icon="Users2"
+          tone="parents"
+          href="/parents"
+          changePercent={data.people.growth.parents.changePercent}
+          sub="Guardians with a portal account"
+          series={data.people.growth.parents.series}
+          delayMs={80}
         />
         <StatCard
           label="Attendance today"
-          value={data.attendance.marked ? `${data.attendance.percent}%` : 'Not marked'}
+          value={data.attendance.marked ? `${data.attendance.percent}%` : '—'}
+          icon="CalendarCheck"
+          tone="attendance"
+          href="/attendance"
           sub={
             data.attendance.marked
-              ? `${data.attendance.present} present · ${data.attendance.absent} absent · ${data.attendance.late} late`
-              : 'No attendance recorded yet today'
+              ? `${formatNumber(data.attendance.present)} present · ${formatNumber(data.attendance.absent)} absent`
+              : 'Register not submitted'
           }
-          icon="CalendarCheck"
-          tone={data.attendance.marked ? 'success' : 'warning'}
-          href="/attendance"
-        />
-        <StatCard
-          label="Collected today"
-          value={formatMoney(data.finance.collectedTodayMinor, currency)}
-          sub={`${data.finance.paymentsToday} payments · ${formatMoney(data.finance.collectedMonthMinor, currency)} this month`}
-          icon="BadgeIndianRupee"
-          tone="info"
-          href="/finance/payments"
-        />
-        <StatCard
-          label="Outstanding fees"
-          value={formatMoney(data.finance.outstandingMinor, currency)}
-          sub={`${data.finance.overdueInvoices} invoices past due`}
-          icon="AlertCircle"
-          tone={data.finance.overdueInvoices > 0 ? 'danger' : 'success'}
-          href="/finance/outstanding"
+          delayMs={120}
         />
       </div>
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <WidgetBoundary title="Academic overview">
+          <Widget
+            title="Academic overview"
+            subtitle="Head count and attendance by month"
+            action={<WidgetLink href="/attendance/reports">Reports</WidgetLink>}
+            delayMs={60}
+          >
+            <AcademicOverview data={data.academic} />
+          </Widget>
+        </WidgetBoundary>
+
+        <div className="flex flex-col gap-3">
+          <WidgetBoundary title="Fee collection">
+            <Widget
+              title="Fee collection"
+              subtitle="Across all issued invoices"
+              action={<WidgetLink href="/finance">Finance</WidgetLink>}
+              delayMs={100}
+            >
+              <div className="grid items-center gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                <DonutChart
+                  height={168}
+                  centerValue={formatMoney(data.finance.billing.collectedMinor, currency)}
+                  centerLabel="Collected"
+                  currency={currency}
+                  slices={[
+                    { key: 'collected', label: 'Collected', value: data.finance.billing.collectedMinor, color: SERIES.attendance },
+                    { key: 'pending', label: 'Pending', value: data.finance.billing.pendingMinor, color: SERIES.pending },
+                    { key: 'overdue', label: 'Overdue', value: data.finance.billing.overdueMinor, color: SERIES.overdue },
+                  ]}
+                />
+                <FeeLegend
+                  currency={currency}
+                  rows={[
+                    { label: 'Collected', amountMinor: data.finance.billing.collectedMinor, color: SERIES.attendance },
+                    { label: 'Pending', amountMinor: data.finance.billing.pendingMinor, color: SERIES.pending },
+                    { label: 'Overdue', amountMinor: data.finance.billing.overdueMinor, color: SERIES.overdue },
+                  ]}
+                />
+              </div>
+            </Widget>
+          </WidgetBoundary>
+
+          {ctx.can('admissions.view') ? (
+            <AdmissionsBanner
+              thisWeek={data.admissions.thisWeek}
+              openLeads={data.admissions.open}
+              sessionLabel={null}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      {actions.length > 0 ? (
+        <div>
+          <h2 className="caption mb-2">Quick actions</h2>
+          <QuickActions actions={actions} />
+        </div>
+      ) : null}
+
+      <AttentionRow
+        rows={[
+          { label: 'Students not marked today', value: unmarked, href: '/attendance', icon: 'CalendarCheck' },
+          { label: 'Invoices past due', value: data.finance.overdueInvoices, href: '/finance/outstanding', icon: 'ReceiptText' },
+          { label: 'Leave requests to approve', value: data.pendingLeave, href: '/leave', icon: 'CalendarOff' },
+          { label: 'Library books overdue', value: data.library.overdue, href: '/library', icon: 'Library' },
+        ]}
+      />
+
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        <WidgetBoundary title="Recent activity">
+          <Widget
+            title="Recent activity"
+            action={
+              ctx.can('audit.view') ? <WidgetLink href="/settings">Audit log</WidgetLink> : undefined
+            }
+            delayMs={40}
+          >
+            <RecentActivity rows={data.recentActivity} />
+          </Widget>
+        </WidgetBoundary>
+
+        <WidgetBoundary title="Attendance today">
+          <Widget
+            title="Attendance today"
+            subtitle={format(new Date(), 'EEEE d MMMM')}
+            action={<WidgetLink href="/attendance">Register</WidgetLink>}
+            delayMs={80}
+          >
+            <AttendanceOverview
+              data={{
+                present: data.attendance.present,
+                absent: data.attendance.absent,
+                late: data.attendance.late,
+                halfDay: data.attendance.halfDay,
+                leave: data.attendance.leave,
+                marked: data.attendance.marked,
+                expected: data.attendance.expected,
+                percent: data.attendance.percent,
+              }}
+              canMark={ctx.can('attendance.mark')}
+            />
+          </Widget>
+        </WidgetBoundary>
+
+        <WidgetBoundary title="Upcoming">
+          <Widget
+            title="Upcoming"
+            action={<WidgetLink href="/academics/calendar">Calendar</WidgetLink>}
+            delayMs={120}
+          >
+            <UpcomingEvents items={upcoming} />
+          </Widget>
+        </WidgetBoundary>
+      </div>
+
+      {ctx.can('staff.view') ? (
+        <WidgetBoundary title="Staff directory">
+          <Widget
+            title="Staff directory"
+            subtitle={`${formatNumber(data.people.staff)} people on the roll`}
+            action={<WidgetLink href="/staff">All staff</WidgetLink>}
+            delayMs={40}
+          >
+            <StaffDirectory rows={data.staffDirectory} />
+          </Widget>
+        </WidgetBoundary>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Attendance trend</CardTitle>
-              <p className="text-[13px] text-ink-muted mt-0.5">Last 7 school days</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {data.attendance.trend.length === 0 ? (
-              <EmptyState
-                title="No attendance recorded yet"
-                description="Once teachers start marking attendance, the weekly trend appears here."
-                action={
-                  ctx.can('attendance.mark') ? (
-                    <Link href="/attendance" className={buttonVariants({ size: 'sm' })}>
-                      Mark attendance
-                    </Link>
-                  ) : undefined
-                }
+        {transport ? (
+          <WidgetBoundary title="Transport">
+            <Widget
+              title="Transport"
+              subtitle="Live fleet status"
+              action={
+                ctx.can('transport.track') ? (
+                  <WidgetLink href="/transport/tracking">Live map</WidgetLink>
+                ) : (
+                  <WidgetLink href="/transport">Transport</WidgetLink>
+                )
+              }
+              delayMs={40}
+            >
+              <TransportSnapshot
+                rows={transport.rows}
+                running={transport.running}
+                noSignal={transport.noSignal}
+                riders={transport.riders}
               />
-            ) : (
-              <AttendanceTrendChart
-                data={data.attendance.trend.map((d) => ({
-                  label: format(d.day, 'EEE'),
-                  percent: d.percent,
-                }))}
-              />
-            )}
-          </CardContent>
-        </Card>
+            </Widget>
+          </WidgetBoundary>
+        ) : null}
 
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Fee collection</CardTitle>
-              <p className="text-[13px] text-ink-muted mt-0.5">Last 7 days</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {data.finance.trend.length === 0 ? (
-              <EmptyState
-                title="No payments yet this week"
-                description="Collected fees will be charted here as payments come in."
-              />
-            ) : (
-              <CollectionChart
-                currency={currency}
-                data={data.finance.trend.map((d) => ({
-                  label: format(d.day, 'd MMM'),
-                  amount: d.amountMinor / 100,
-                }))}
-              />
-            )}
-          </CardContent>
-        </Card>
+        {ctx.can('admissions.view') ? (
+          <WidgetBoundary title="Latest enquiries">
+            <Widget
+              title="Latest enquiries"
+              subtitle={`${formatNumber(data.admissions.open)} open`}
+              delayMs={80}
+            >
+              <InquiriesSnapshot rows={data.admissions.leads} />
+            </Widget>
+          </WidgetBoundary>
+        ) : null}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent payments</CardTitle>
-            <Link href="/finance/payments" className="text-[12.5px] text-[var(--brand-600)] hover:underline">
-              View all
-            </Link>
-          </CardHeader>
-          <CardContent className="pt-0">
+      {ctx.can('fees.view') ? (
+        <WidgetBoundary title="Recent payments">
+          <Widget
+            title="Recent payments"
+            subtitle={`${formatMoney(data.finance.collectedMonthMinor, currency)} collected this month`}
+            action={<WidgetLink href="/finance/payments">All payments</WidgetLink>}
+            delayMs={40}
+            bodyClassName="px-4 py-1"
+          >
             {data.recentPayments.length === 0 ? (
-              <EmptyState title="No payments recorded" description="Collected fees will appear here." />
+              <p className="py-8 text-center text-sm text-ink-muted">No payments recorded yet.</p>
             ) : (
               <ul className="divide-y divide-[var(--border)]">
-                {data.recentPayments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                {data.recentPayments.map((payment) => (
+                  <li key={payment.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{fullName(p.student)}</p>
-                      <p className="text-[12px] text-ink-subtle">
-                        {p.student.admissionNo} · {p.mode.replace('_', ' ').toLowerCase()}
+                      <Link
+                        href={`/students/${payment.student.id}`}
+                        className="block truncate text-sm text-ink hover:text-[var(--product-600)]"
+                      >
+                        {payment.student.firstName} {payment.student.lastName}
+                      </Link>
+                      <p className="text-xs text-ink-subtle">
+                        {payment.student.admissionNo} · {payment.mode.replaceAll('_', ' ').toLowerCase()}
                       </p>
                     </div>
-                    <span className="text-[13.5px] font-medium tnum text-ink shrink-0">
-                      {formatMoney(p.amountMinor, currency)}
+                    <span className="shrink-0 text-sm font-semibold tnum text-ink">
+                      {formatMoney(payment.amountMinor, currency)}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Needs attention</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-2.5">
-            <AttentionRow
-              label="Leave requests pending approval"
-              value={data.pendingLeave}
-              href="/leave"
-              tone={data.pendingLeave > 0 ? 'warning' : 'neutral'}
-            />
-            <AttentionRow
-              label="Invoices past due date"
-              value={data.finance.overdueInvoices}
-              href="/finance/outstanding"
-              tone={data.finance.overdueInvoices > 0 ? 'danger' : 'neutral'}
-            />
-            <AttentionRow
-              label="Library books overdue"
-              value={data.library.overdue}
-              href="/library"
-              tone={data.library.overdue > 0 ? 'warning' : 'neutral'}
-            />
-            <AttentionRow
-              label="Students not marked today"
-              value={Math.max(0, data.attendance.expected - data.attendance.marked)}
-              href="/attendance"
-              tone={data.attendance.marked < data.attendance.expected ? 'warning' : 'neutral'}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Coming up</CardTitle>
-            <Link href="/academics/calendar" className="text-[12.5px] text-[var(--brand-600)] hover:underline">
-              Calendar
-            </Link>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {data.upcomingExams.length === 0 && data.upcomingEvents.length === 0 ? (
-              <EmptyState title="Nothing scheduled" description="Exams and events will show up here." />
-            ) : (
-              <ul className="divide-y divide-[var(--border)]">
-                {data.upcomingExams.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{e.name}</p>
-                      <p className="text-[12px] text-ink-subtle">Exam</p>
-                    </div>
-                    <span className="text-[12px] text-ink-muted shrink-0">
-                      {e.startsOn ? formatDay(e.startsOn, 'd MMM') : '-'}
-                    </span>
-                  </li>
-                ))}
-                {data.upcomingEvents.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{e.title}</p>
-                      <p className="text-[12px] text-ink-subtle capitalize">
-                        {e.kind.toLowerCase().replace('_', ' ')}
-                      </p>
-                    </div>
-                    <span className="text-[12px] text-ink-muted shrink-0">
-                      {format(e.startsAt, 'd MMM')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {ctx.can('audit.view') ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent activity</CardTitle>
-            <Link href="/settings/audit" className="text-[12.5px] text-[var(--brand-600)] hover:underline">
-              Full audit log
-            </Link>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {data.recentActivity.length === 0 ? (
-              <EmptyState title="No activity yet" description="Changes made in the system are recorded here." />
-            ) : (
-              <ul className="divide-y divide-[var(--border)]">
-                {data.recentActivity.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{a.summary ?? a.action}</p>
-                      <p className="text-[12px] text-ink-subtle">{a.actorLabel ?? 'System'}</p>
-                    </div>
-                    <span className="text-[12px] text-ink-subtle shrink-0">
-                      {format(a.createdAt, 'd MMM, HH:mm')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+          </Widget>
+        </WidgetBoundary>
       ) : null}
     </div>
   )
-}
-
-function AttentionRow({
-  label,
-  value,
-  href,
-  tone,
-}: {
-  label: string
-  value: number
-  href: string
-  tone: 'neutral' | 'warning' | 'danger'
-}) {
-  return (
-    <Link href={href} className="flex items-center justify-between gap-3 group">
-      <span className="text-[13.5px] text-ink-muted group-hover:text-ink">{label}</span>
-      <Badge tone={tone}>{value}</Badge>
-    </Link>
-  )
-}
-
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 12) return 'morning'
-  if (h < 17) return 'afternoon'
-  return 'evening'
 }

@@ -107,7 +107,7 @@ async function TeacherView({ staffId }: { staffId: string }) {
   return (
     <>
       <div className="px-4 py-2.5 border-b border-line flex items-center gap-2">
-        <span className="text-[13.5px] text-ink">
+        <span className="text-sm text-ink">
           {grid.staff.firstName} {grid.staff.lastName}
         </span>
         <Badge tone={grid.periodsPerWeek > 30 ? 'warning' : 'neutral'}>

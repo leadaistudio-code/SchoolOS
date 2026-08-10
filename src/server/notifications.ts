@@ -1,6 +1,7 @@
 import type { AppContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
 import { emailProvider, smsProvider, whatsappProvider } from '@/server/providers'
+import { tenantEmailProvider } from '@/server/mail/smtp'
 
 export type NotificationChannelValue = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
 
@@ -31,6 +32,8 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
   if (recipients.length === 0) return
 
   const channels = input.channels ?? ['IN_APP']
+  const external = channels.filter((c) => c !== 'IN_APP')
+  const queued: string[] = []
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -47,8 +50,8 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
           },
         })
 
-        const external = channels.filter((c) => c !== 'IN_APP')
         if (external.length === 0) continue
+        queued.push(notification.id)
 
         await tx.notificationDelivery.createMany({
           data: external.map((channel) => ({
@@ -71,8 +74,23 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
   } catch (err) {
     // A failed notification must never roll back the action that caused it.
     console.error('[notifications] failed to enqueue', { eventKey: input.eventKey, err })
+    return
+  }
+
+  // Deliver small batches now rather than leaving them for a worker.
+  //
+  // The Job rows above are the durable record and the retry path, but nothing
+  // drains that queue yet. A leave approval or a message to one colleague
+  // should not wait for a worker that does not exist, so a handful of
+  // recipients are attempted inline; anything larger stays queued rather than
+  // holding a request open while a mail server works through a class list.
+  if (queued.length > 0 && queued.length <= INLINE_DELIVERY_LIMIT) {
+    await Promise.allSettled(queued.map((id) => deliverNotification(id)))
   }
 }
+
+/** Above this many recipients, delivery is left to the queue. */
+const INLINE_DELIVERY_LIMIT = 25
 
 /**
  * Processes one queued notification job. Called by the worker; exported here so
@@ -94,7 +112,13 @@ export async function deliverNotification(notificationId: string): Promise<void>
 
     try {
       if (delivery.channel === 'EMAIL' && notification.user.email) {
-        const r = await emailProvider().send({
+        // The school's own mail server when it has connected one, the
+        // platform sender otherwise. Resolved per notification because the
+        // answer belongs to the tenant, not to the process.
+        const provider = notification.tenantId
+          ? await tenantEmailProvider(notification.tenantId)
+          : emailProvider()
+        const r = await provider.send({
           to: notification.user.email,
           subject: notification.title,
           html: `<p>${escapeHtml(notification.body)}</p>`,

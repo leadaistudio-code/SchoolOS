@@ -20,7 +20,7 @@ export default async function StructuresPage() {
     <div className="space-y-4">
       <PageHeader
         title="Fee structure"
-        description="What each class is billed, and the heads those amounts are made of."
+        description={`${structures.length} structures · ${heads.length} fee heads`}
         actions={
           ctx.can('fees.invoice') ? (
             <Link
@@ -48,13 +48,13 @@ export default async function StructuresPage() {
                 <CardHeader>
                   <div>
                     <CardTitle>{s.name}</CardTitle>
-                    <p className="text-[12.5px] text-ink-muted mt-0.5">
+                    <p className="text-xs text-ink-muted mt-0.5">
                       {s.className} · {s.invoiceCount} invoices generated
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {s.isActive ? <Badge tone="success">active</Badge> : <Badge>inactive</Badge>}
-                    <span className="text-[15px] font-bold text-ink tnum">
+                    <span className="text-lg font-semibold text-ink tnum">
                       {formatMoney(s.totalMinor, currency)}
                     </span>
                   </div>
@@ -72,9 +72,9 @@ export default async function StructuresPage() {
                       <TBody>
                         {s.items.map((item) => (
                           <TR key={item.id}>
-                            <TD className="text-[13px] text-ink">{item.label}</TD>
-                            <TD className="text-[12.5px] tnum">{item.code}</TD>
-                            <TD align="right" className="text-[13px] font-medium text-ink">
+                            <TD className="text-sm text-ink">{item.label}</TD>
+                            <TD className="text-xs tnum">{item.code}</TD>
+                            <TD align="right" className="text-sm font-medium text-ink">
                               {formatMoney(item.amountMinor, currency)}
                             </TD>
                           </TR>
@@ -92,7 +92,7 @@ export default async function StructuresPage() {
           <CardHeader>
             <div>
               <CardTitle>Fee heads</CardTitle>
-              <p className="text-[12.5px] text-ink-muted mt-0.5">
+              <p className="text-xs text-ink-muted mt-0.5">
                 The building blocks every structure draws on
               </p>
             </div>
@@ -105,8 +105,8 @@ export default async function StructuresPage() {
                 {heads.map((h) => (
                   <li key={h.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-[13px] text-ink truncate">{h.name}</p>
-                      <p className="text-[11.5px] text-ink-subtle">
+                      <p className="text-sm text-ink truncate">{h.name}</p>
+                      <p className="text-xs text-ink-subtle">
                         {h.code} · {h.frequency.toLowerCase().replace('_', ' ')}
                         {h.isDeposit ? ' · refundable deposit' : ''}
                       </p>

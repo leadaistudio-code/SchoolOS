@@ -4,12 +4,13 @@ import { format, subDays } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { scopedStudents } from '@/server/scope'
 import { PageHeader } from '@/components/page-header'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { Metric, MetricRow } from '@/components/ui/metric'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { formatMoney, fullName, initials } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
+import { PersonCell } from '@/components/ui/identity'
 import { ChildSwitcher } from '@/components/dashboard/child-switcher'
 
 /**
@@ -99,30 +100,23 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
   ).length
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={`Hello, ${ctx.user.firstName}`}
-        description={format(today, 'EEEE, d MMMM yyyy')}
-      />
+    <div className="space-y-4">
+      <PageHeader title="Overview" description={format(today, 'EEEE d MMMM yyyy')} />
 
       {children.length > 1 ? <ChildSwitcher students={children} activeId={active.id} /> : null}
 
       <Card>
-        <CardContent className="pt-5 flex items-center gap-4">
-          <span className="size-14 rounded-full bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center text-lg font-semibold shrink-0">
-            {initials(active.firstName, active.lastName)}
+        <CardContent className="flex flex-wrap items-center gap-3 py-3">
+          <PersonCell
+            firstName={active.firstName}
+            lastName={active.lastName}
+            secondary={`Admission no. ${active.admissionNo}`}
+          />
+          <span className="text-sm text-ink-muted">
+            {active.className ?? 'Class not assigned'}
+            {active.sectionName ? ` · Section ${active.sectionName}` : ''}
+            {active.rollNumber ? ` · Roll ${active.rollNumber}` : ''}
           </span>
-          <div className="min-w-0">
-            <p className="text-[17px] font-semibold text-ink truncate">{fullName(active)}</p>
-            <p className="text-[13px] text-ink-muted">
-              {active.className ?? 'Class not assigned'}
-              {active.sectionName ? ` · Section ${active.sectionName}` : ''}
-              {active.rollNumber ? ` · Roll ${active.rollNumber}` : ''}
-            </p>
-            <p className="text-[12px] text-ink-subtle mt-0.5">
-              Admission no. {active.admissionNo}
-            </p>
-          </div>
           <Link
             href={`/students/${active.id}`}
             className={`${buttonVariants({ variant: 'secondary', size: 'sm' })} ml-auto shrink-0`}
@@ -132,52 +126,47 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Attendance (30 days)"
+      <MetricRow>
+        <Metric
+          label="Attendance, last 30 days"
           value={attendancePct === null ? 'No data' : `${attendancePct}%`}
           sub={totalMarked ? `${present} of ${totalMarked} days present` : 'Not marked yet'}
-          icon="CalendarCheck"
-          tone={attendancePct !== null && attendancePct < 75 ? 'warning' : 'success'}
+          emphasis={attendancePct !== null && attendancePct < 75 ? 'warning' : undefined}
           href="/attendance"
         />
-        <StatCard
+        <Metric
           label="Fees due"
           value={formatMoney(dueMinor, ctx.tenant.currency)}
           sub={nextDue ? `Next due ${formatDay(nextDue.dueOn, 'd MMM yyyy')}` : 'All cleared'}
-          icon="Wallet"
-          tone={dueMinor > 0 ? 'danger' : 'success'}
+          emphasis={dueMinor > 0 ? 'danger' : undefined}
           href="/finance"
         />
-        <StatCard
-          label="Homework due"
+        <Metric
+          label="Homework pending"
           value={String(pendingHomework)}
           sub={`${homework.length} assigned recently`}
-          icon="ClipboardList"
           href="/academics/homework"
         />
-        <StatCard
+        <Metric
           label="Latest result"
           value={results[0] ? `${Math.round(results[0].percentage)}%` : 'Awaited'}
           sub={results[0]?.exam.name ?? 'No published results yet'}
-          icon="Trophy"
-          tone="info"
           href="/exams/results"
         />
-      </div>
+      </MetricRow>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Homework</CardTitle>
             <Link
               href="/academics/homework"
-              className="text-[12.5px] text-[var(--brand-600)] hover:underline"
+              className="text-xs text-[var(--brand-600)] hover:underline"
             >
               View all
             </Link>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             {homework.length === 0 ? (
               <EmptyState
                 title="No homework right now"
@@ -189,14 +178,14 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
                   const status = h.submissions[0]?.status ?? 'PENDING'
                   const done = status === 'SUBMITTED' || status === 'REVIEWED'
                   return (
-                    <li key={h.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <li key={h.id} className="flex items-center justify-between gap-3 py-2">
                       <div className="min-w-0">
-                        <p className="text-[13.5px] text-ink truncate">{h.title}</p>
-                        <p className="text-[12px] text-ink-subtle">
+                        <p className="text-sm text-ink truncate">{h.title}</p>
+                        <p className="text-xs text-ink-subtle">
                           {h.classSubject.subject.name} {'·'} due {formatDay(h.dueOn, 'd MMM')}
                         </p>
                       </div>
-                      <Badge tone={done ? 'success' : 'warning'}>{status.toLowerCase()}</Badge>
+                      <StatusBadge status={done ? status : 'PENDING'} />
                     </li>
                   )
                 })}
@@ -208,11 +197,11 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
         <Card>
           <CardHeader>
             <CardTitle>Fees</CardTitle>
-            <Link href="/finance" className="text-[12.5px] text-[var(--brand-600)] hover:underline">
+            <Link href="/finance" className="text-xs text-[var(--brand-600)] hover:underline">
               View all
             </Link>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="py-1">
             {invoices.length === 0 ? (
               <EmptyState
                 title="No invoices yet"
@@ -221,18 +210,18 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
             ) : (
               <ul className="divide-y divide-[var(--border)]">
                 {invoices.map((i) => (
-                  <li key={i.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <li key={i.id} className="flex items-center justify-between gap-3 py-2">
                     <div className="min-w-0">
-                      <p className="text-[13.5px] text-ink truncate">{i.title}</p>
-                      <p className="text-[12px] text-ink-subtle">
+                      <p className="text-sm text-ink truncate">{i.title}</p>
+                      <p className="text-xs text-ink-subtle">
                         {i.number} {'·'} due {formatDay(i.dueOn, 'd MMM yyyy')}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[13.5px] font-medium tnum text-ink">
+                      <p className="text-sm font-medium tnum text-ink">
                         {formatMoney(i.balanceMinor, ctx.tenant.currency)}
                       </p>
-                      <p className="text-[11.5px] text-ink-subtle">
+                      <p className="text-xs text-ink-subtle">
                         of {formatMoney(i.totalMinor, ctx.tenant.currency)}
                       </p>
                     </div>
@@ -249,20 +238,20 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
           <CardTitle>Notices</CardTitle>
           <Link
             href="/communication/notices"
-            className="text-[12.5px] text-[var(--brand-600)] hover:underline"
+            className="text-xs text-[var(--brand-600)] hover:underline"
           >
             View all
           </Link>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="py-1">
           {notices.length === 0 ? (
             <EmptyState title="No notices" description="School announcements will appear here." />
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {notices.map((n) => (
-                <li key={n.id} className="flex items-center justify-between gap-3 py-2.5">
-                  <p className="text-[13.5px] text-ink truncate">{n.title}</p>
-                  <span className="text-[12px] text-ink-subtle shrink-0">
+                <li key={n.id} className="flex items-center justify-between gap-3 py-2">
+                  <p className="text-sm text-ink truncate">{n.title}</p>
+                  <span className="text-xs text-ink-subtle shrink-0">
                     {formatDay(n.publishOn, 'd MMM')}
                   </span>
                 </li>
