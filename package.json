@@ -18,6 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "setup:school": "tsx scripts/create-school.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest"
