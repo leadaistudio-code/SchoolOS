@@ -15,6 +15,14 @@ import { PrismaClient } from '@prisma/client'
  *   npx tsx scripts/map-domain.ts --slug=demo --host=myapp.up.railway.app
  *
  * Safe to run repeatedly, and to run for several hosts pointing at one school.
+ *
+ * Passing --remove instead of --slug unregisters the address:
+ *
+ *   npx tsx scripts/map-domain.ts --remove --host=myapp.up.railway.app
+ *
+ * That matters because a host which resolves to no school is how the platform
+ * console is reached — the login form decides between a school sign-in and a
+ * super-admin sign-in by whether the address belongs to a tenant.
  */
 
 const prisma = new PrismaClient()
@@ -24,16 +32,29 @@ function arg(name: string): string | undefined {
 }
 
 async function main() {
+  const remove = process.argv.includes('--remove')
   const slug = arg('slug')
   const host = arg('host')
     ?.replace(/^https?:\/\//, '')
     .split('/')[0]
     ?.toLowerCase()
 
-  if (!slug || !host) {
+  if (!host || (!slug && !remove)) {
     console.error('\nUsage:')
-    console.error('  npx tsx scripts/map-domain.ts --slug=demo --host=myapp.up.railway.app\n')
+    console.error('  npx tsx scripts/map-domain.ts --slug=demo --host=myapp.up.railway.app')
+    console.error('  npx tsx scripts/map-domain.ts --remove --host=myapp.up.railway.app\n')
     process.exit(1)
+  }
+
+  if (remove) {
+    const deleted = await prisma.tenantDomain.deleteMany({ where: { host } })
+    console.log(
+      deleted.count
+        ? `\n${host} no longer points at any school.\n\n  It now reaches the platform console at https://${host}/platform\n`
+        : `\n${host} was not pointed at a school anyway.\n`,
+    )
+    await prisma.$disconnect()
+    return
   }
 
   const tenant = await prisma.tenant.findUnique({
