@@ -138,8 +138,13 @@ Until you have a domain, set `APP_URL` and `APP_ROOT_DOMAIN` to the
 **Deployments → Deploy**, or push to the branch.
 
 The build runs `prisma generate && next build`; the pre-deploy step runs
-`prisma migrate deploy` against the new database; then the health check hits
-`/api/health`, which reports the database round trip. A deployment whose
+`prisma migrate deploy` and then `npm run rbac:sync`, which pushes the permission
+catalogue and re-grants the built-in roles. That second command is there because
+role grants live in the database: adding a permission in code otherwise leaves
+the feature it gates invisible to everybody, including the school admin, with no
+error anywhere. It is idempotent — on a deploy that changes nothing it prints
+`unchanged` for each role — and it leaves roles a school created itself alone.
+Then the health check hits `/api/health`, which reports the database round trip. A deployment whose
 database is unreachable answers 503 and Railway will not put it into service —
 so a broken deploy stays off the domain rather than replacing a working one.
 
@@ -262,6 +267,35 @@ would rather they moved independently, give them separate branches.
   that matters most.
 - **Observability → Logs** during all of the above: no `PrismaClientValidationError`,
   no unhandled rejections.
+
+## Running a one-off command against production
+
+`railway run` executes on **your machine** with the service's variables injected,
+so `DATABASE_URL` points at `postgres.railway.internal` — a private hostname that
+does not resolve outside Railway. It fails with *"Can't reach database server"*,
+which looks like the database is down and is not.
+
+Two ways round it. Inside the network, which is almost always what you want:
+
+```bash
+railway ssh --service <your web service>
+# then, in the container:
+npm run rbac:sync
+npm run assistant:enable -- <school-slug>
+```
+
+Or from your machine, over the public TCP proxy. Postgres exposes it as
+`DATABASE_PUBLIC_URL`:
+
+```powershell
+railway variables --service Postgres        # find DATABASE_PUBLIC_URL
+$env:DATABASE_URL = "<the DATABASE_PUBLIC_URL value>"
+npm run rbac:sync
+```
+
+The proxy is slower and bills egress, so prefer `railway ssh` for anything that
+touches many rows. `railway connect` opens `psql` the same way when you want SQL
+rather than a script.
 
 ## Step 8 — Backups
 
