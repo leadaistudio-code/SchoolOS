@@ -14,6 +14,13 @@ const serverSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_NAME: z.string().default('SchoolOS'),
   APP_ROOT_DOMAIN: z.string().default('lvh.me:3000'),
+  /**
+   * Which half of the product this deployment serves. `both` is one service
+   * answering for the website and every school; the other two exist so the two
+   * halves can run as separate services off the same repository. Read by
+   * middleware straight from process.env — the edge runtime has no zod parse.
+   */
+  APP_ROLE: z.enum(['both', 'app', 'marketing']).default('both'),
   APP_URL: z.string().default('http://lvh.me:3000'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

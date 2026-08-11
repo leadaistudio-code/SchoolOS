@@ -71,6 +71,22 @@ EMAIL_DRIVER=log
 STORAGE_DRIVER=local
 ```
 
+Add these only when you want the in-app assistant (`docs/ASSISTANT.md`). It stays
+switched off — no button, no cost — until `AI_DRIVER` and `AI_API_KEY` are both
+set, so leave them out of the first deploy:
+
+```
+AI_DRIVER=openai
+AI_API_KEY=<your OpenAI key>
+AI_MODEL=gpt-4.1
+```
+
+They go on the **web** service, in the same Variables editor. Do not put the key
+in `railway.json`, a Dockerfile, or any file in the repository: Railway variables
+are the only place it belongs, and it is the one secret here that bills you if it
+leaks. On the two-service layout below it goes on the **app** service only — the
+marketing site never calls a model.
+
 The `${{Postgres.DATABASE_URL}}` syntax is a Railway reference: it resolves to
 the private connection string and follows the database if it is ever moved or
 rotated. Do not paste the literal URL.
@@ -191,6 +207,49 @@ Schools are resolved from the host name, so this needs a wildcard.
 
 Then check: `https://<tenant-slug>.yourdomain.com` shows that school's name and
 colours, and the bare domain shows no tenant.
+
+## Step 6b — One service or two?
+
+The website and the application are one Next.js deployment separated by host:
+middleware sends the apex and `www` to the marketing pages and every other
+hostname to a school. **One service with two domains is the default and needs no
+code change** — that is what step 6 set up.
+
+Running them as two services is also supported, and is worth it for one reason
+above the others: the marketing site keeps answering while you deploy, migrate,
+or break the application. Marketing traffic is also unauthenticated and cacheable
+where a school's is neither, so they scale differently.
+
+To do it, deploy the same repository twice and set `APP_ROLE` on each:
+
+| | marketing service | app service |
+|---|---|---|
+| `APP_ROLE` | `marketing` | `app` |
+| Custom domain | `yourdomain.com`, `www.yourdomain.com` | `*.yourdomain.com` |
+| `APP_URL` | `https://yourdomain.com` | `https://yourdomain.com` |
+| `APP_ROOT_DOMAIN` | `yourdomain.com` | `yourdomain.com` |
+| `AI_*` | omit | set |
+| `DATABASE_URL`, `REDIS_URL` | same references | same references |
+
+`APP_ROLE` matters more than it looks. Both services still answer on their own
+`*.up.railway.app` hostname, and that hostname is not the apex — so without the
+role, the *marketing* service would happily serve the platform sign-in page and
+the application's API on it. With `APP_ROLE=marketing` that deployment serves the
+website on every hostname and redirects application paths to the front page;
+with `APP_ROLE=app` it refuses `/site/*`, so the same pages never answer on two
+domains. Both are covered by `tests/middleware.test.ts`.
+
+Two things people expect to be true and are not:
+
+- **The marketing service still needs the database.** Every request resolves the
+  tenant (there is none on the apex, but the lookup happens), and the demo form
+  writes an enquiry. Point it at the same Postgres.
+- **It is not half the cost twice.** The web container is the cheap part; Postgres
+  and Redis are the steady spend and are shared. Expect a few dollars more, not
+  double.
+
+Both services deploy from the same branch, so one push redeploys both. If you
+would rather they moved independently, give them separate branches.
 
 ## Step 7 — Verify before anyone else uses it
 
