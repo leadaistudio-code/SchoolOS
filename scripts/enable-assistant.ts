@@ -14,7 +14,31 @@ import { FEATURE } from '../src/lib/features'
  * Pass `--off` to withdraw it again.
  */
 
+/**
+ * Names the database this run will change, without printing the credential.
+ *
+ * These scripts mutate entitlements and role grants, and the only thing that
+ * decides which school they land on is a DATABASE_URL the caller cannot see. A
+ * host on one line removes the guesswork — and makes it obvious when a command
+ * meant for a laptop is pointed at production.
+ */
+function describeTarget(): string {
+  const url = process.env.DATABASE_URL
+  if (!url) return 'no DATABASE_URL set'
+  try {
+    const { hostname, port, pathname } = new URL(url)
+    const local = hostname === 'localhost' || hostname === '127.0.0.1'
+    const internal = hostname.endsWith('.railway.internal')
+    const where = local ? 'local' : internal ? 'inside Railway' : 'REMOTE'
+    return `${hostname}:${port || '5432'}${pathname} (${where})`
+  } catch {
+    // Prisma reports a malformed URL far better than this could.
+    return 'DATABASE_URL is not a valid URL'
+  }
+}
+
 async function main() {
+  console.log(`database: ${describeTarget()}`)
   const args = process.argv.slice(2)
   const slug = args.find((arg) => !arg.startsWith('-'))
   const enable = !args.includes('--off')

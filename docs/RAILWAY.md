@@ -275,27 +275,42 @@ so `DATABASE_URL` points at `postgres.railway.internal` — a private hostname t
 does not resolve outside Railway. It fails with *"Can't reach database server"*,
 which looks like the database is down and is not.
 
-Two ways round it. Inside the network, which is almost always what you want:
+**Use `railway ssh`.** It runs the command inside the container, where the
+private hostname resolves and no credential ever reaches your machine:
 
 ```bash
 railway ssh --service <your web service>
 # then, in the container:
 npm run rbac:sync
-npm run assistant:enable -- <school-slug>
+npm run assistant:enable            # with no slug, it lists the schools
 ```
 
-Or from your machine, over the public TCP proxy. Postgres exposes it as
-`DATABASE_PUBLIC_URL`:
+`railway connect` opens `psql` the same way when you want SQL rather than a
+script.
+
+### Do not copy the database URL onto your laptop
+
+Railway also exposes `DATABASE_PUBLIC_URL` for connecting over a TCP proxy, and
+it is tempting to paste it into a shell variable to run a script locally. Don't.
+That string is a full read-write credential for every school's records, and
+pasting it puts it in your shell history file, your terminal scrollback, and any
+screenshot or chat log of the session. There is no way to un-paste it — the only
+remedy is rotating the password.
+
+If a proxy connection is genuinely necessary — restoring a dump, or a tool that
+cannot run in the container — take the credential from an environment reference
+rather than by hand, and rotate it afterwards:
 
 ```powershell
-railway variables --service Postgres        # find DATABASE_PUBLIC_URL
-$env:DATABASE_URL = "<the DATABASE_PUBLIC_URL value>"
+# Reads the value into the process without printing or storing it
+$env:DATABASE_URL = (railway variables --service Postgres --kv |
+  Select-String '^DATABASE_PUBLIC_URL=' ).Line -replace '^DATABASE_PUBLIC_URL=', ''
 npm run rbac:sync
+Remove-Item Env:DATABASE_URL
 ```
 
-The proxy is slower and bills egress, so prefer `railway ssh` for anything that
-touches many rows. `railway connect` opens `psql` the same way when you want SQL
-rather than a script.
+Even then the value is in the process environment for the life of that shell.
+`railway ssh` avoids the whole problem.
 
 ## Step 8 — Backups
 
