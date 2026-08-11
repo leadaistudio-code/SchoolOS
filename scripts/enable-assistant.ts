@@ -19,12 +19,44 @@ async function main() {
   const slug = args.find((arg) => !arg.startsWith('-'))
   const enable = !args.includes('--off')
 
-  if (!slug) {
-    console.error('Usage: npx tsx scripts/enable-assistant.ts <school-slug> [--off]')
+  const prisma = new PrismaClient()
+
+  // A bare usage line is a dead end: the thing you are missing is the slug, and
+  // only the database knows it. So list them.
+  if (!slug || slug.startsWith('<')) {
+    if (slug?.startsWith('<')) {
+      console.error(
+        'That looks like a placeholder. Pass a real slug — and note PowerShell treats < and > as operators.\n',
+      )
+    }
+
+    const schools = await prisma.tenant.findMany({
+      select: {
+        slug: true,
+        name: true,
+        subscription: { select: { plan: { select: { code: true } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (schools.length === 0) {
+      console.error('There are no schools in this database yet. Create one first.')
+    } else {
+      console.error('Usage: npm run assistant:enable -- <slug>        (--off to withdraw)\n')
+      console.error('Schools in this database:')
+      for (const school of schools) {
+        console.error(
+          `  ${school.slug.padEnd(20)} ${school.name} (plan ${
+            school.subscription?.plan.code ?? 'none'
+          })`,
+        )
+      }
+      console.error(`\ne.g. npm run assistant:enable -- ${schools[0]!.slug}`)
+    }
+
+    await prisma.$disconnect()
     process.exit(1)
   }
-
-  const prisma = new PrismaClient()
 
   try {
     const tenant = await prisma.tenant.findUnique({
@@ -59,7 +91,7 @@ async function main() {
 
     if (enable) {
       console.log('\nStill required before the button appears:')
-      console.log('  1. AI_DRIVER=anthropic and AI_API_KEY set in .env, then restart the server.')
+      console.log('  1. AI_DRIVER (openai or anthropic) and AI_API_KEY set, then restart the server.')
       console.log('  2. Sign in as a role holding assistant.use — School Admin, Principal or Accountant.')
     }
   } finally {
