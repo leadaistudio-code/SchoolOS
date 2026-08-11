@@ -22,6 +22,7 @@
     "map:domain": "tsx scripts/map-domain.ts",
     "assistant:enable": "tsx scripts/enable-assistant.ts",
     "rbac:sync": "tsx scripts/sync-permissions.ts",
+    "assistant:doctor": "tsx scripts/assistant-doctor.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest"
