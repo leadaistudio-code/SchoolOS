@@ -51,6 +51,7 @@ export function Topbar({
   collapsed,
   onToggleCollapse,
   onOpenMenu,
+  assistant,
 }: {
   user: TopbarUser
   unreadCount: number
@@ -59,6 +60,12 @@ export function Topbar({
   collapsed: boolean
   onToggleCollapse: () => void
   onOpenMenu: () => void
+  /**
+   * The assistant launcher, or null when the school's plan or this user's role
+   * does not include it. Passed in rather than imported so the shell does not
+   * need to know about entitlements.
+   */
+  assistant?: React.ReactNode
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
@@ -115,6 +122,8 @@ export function Topbar({
         </button>
 
         <GlobalSearch />
+
+        {assistant ? <div className="ml-2 hidden sm:block">{assistant}</div> : null}
 
         <div className="ml-auto flex items-center gap-1">
           {sessionName ? (

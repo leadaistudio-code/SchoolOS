@@ -53,6 +53,17 @@ const serverSchema = z.object({
 
   AI_DRIVER: z.enum(['none', 'anthropic', 'openai']).default('none'),
   AI_API_KEY: z.string().optional(),
+  // The model the assistant runs on, pinned rather than latest-tracking: an
+  // assistant that answers fee questions should not change behaviour because a
+  // new model shipped on a Tuesday. Each driver has a default (see
+  // server/assistant/providers); set this to whatever your key can reach.
+  AI_MODEL: z.string().optional(),
+  // For Azure OpenAI, a gateway, or a self-hosted OpenAI-compatible endpoint.
+  AI_BASE_URL: z.string().url().optional(),
+  // How hard the assistant is allowed to think per question. Answering "what is
+  // outstanding in Class 9" from tool results does not need deep reasoning, and
+  // a principal is waiting for the reply.
+  AI_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
 
   RATE_LIMIT_DRIVER: z.enum(['memory', 'redis']).default('memory'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

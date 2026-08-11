@@ -33,6 +33,7 @@ export function AppShell({
   unreadCount,
   unreadMessages,
   sessionName,
+  assistant,
   children,
 }: {
   navigation: NavItem[]
@@ -42,6 +43,7 @@ export function AppShell({
   unreadCount: number
   unreadMessages: number
   sessionName: string | null
+  assistant?: React.ReactNode
   children: React.ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = React.useState(false)
@@ -126,6 +128,7 @@ export function AppShell({
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onOpenMenu={() => setDrawerOpen(true)}
+            assistant={assistant}
           />
           {/* One page container: every screen gets the same gutters and the
               same maximum measure, so nothing has to set its own. */}

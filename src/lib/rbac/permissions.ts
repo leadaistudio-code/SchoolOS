@@ -135,6 +135,11 @@ export const PERMISSIONS: PermissionDef[] = [
   ...mod('documents', [['view', 'View documents'], ['manage', 'Upload and delete documents']]),
   ...mod('audit', [['view', 'View audit log']]),
 
+  // The in-app assistant. A separate right from the records it reads: holding
+  // it grants no data access on its own, because every assistant tool re-checks
+  // the permission for the module it reads (see server/assistant/tools.ts).
+  ...mod('assistant', [['use', 'Ask the school assistant']]),
+
   ...mod('settings', [
     ['view', 'View settings'],
     ['manage', 'Change school settings'],

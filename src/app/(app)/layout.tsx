@@ -5,6 +5,9 @@ import { NAVIGATION, visibleNavigation } from '@/lib/navigation'
 import { AppShell } from '@/components/shell/app-shell'
 import { ROLE_BY_KEY } from '@/lib/rbac/roles'
 import { unreadThreadCount } from '@/server/modules/messages/service'
+import { AssistantLauncher } from '@/components/assistant/panel'
+import { assistantConfigured } from '@/server/assistant/agent'
+import { FEATURE } from '@/lib/features'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -39,6 +42,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       unreadCount={unreadCount}
       unreadMessages={unreadMessages}
       sessionName={session?.name ?? null}
+      // Three gates, all server-side: the deployment has a model configured,
+      // the school's plan includes the module, and this user's role allows it.
+      // The API route checks the last two again — the shell deciding not to
+      // render a button is a UI convenience, never the security boundary. The
+      // config check is here so an unconfigured deployment shows no button at
+      // all, rather than one that returns 503 on every question.
+      assistant={
+        assistantConfigured() &&
+        entitlements[FEATURE.MODULE_AI_ASSIST]?.enabled &&
+        ctx.can('assistant.use') ? (
+          <AssistantLauncher schoolName={ctx.tenant.school?.name ?? ctx.tenant.name} />
+        ) : null
+      }
       user={{
         firstName: ctx.user.firstName,
         lastName: ctx.user.lastName,
