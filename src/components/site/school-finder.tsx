@@ -32,7 +32,7 @@ export function SchoolFinder() {
         Your school&rsquo;s short name
       </label>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <div className="flex flex-1 items-center rounded-lg border border-[var(--rule-strong)] bg-white pr-3 focus-within:border-[var(--indigo)]">
+        <div className="flex flex-1 items-center rounded-lg border border-[var(--rule-strong)] bg-white pr-3 focus-within:border-[var(--blue)]">
           <input
             id="school-slug"
             value={slug}

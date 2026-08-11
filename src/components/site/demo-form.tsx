@@ -230,7 +230,7 @@ export function DemoForm() {
               value={values.message}
               onChange={(event) => set('message', event.target.value)}
               rows={4}
-              className="w-full rounded-lg border border-[var(--rule-strong)] bg-white px-3 py-2.5 text-[16px] text-[var(--text)] outline-none transition-colors focus:border-[var(--indigo)]"
+              className="w-full rounded-lg border border-[var(--rule-strong)] bg-white px-3 py-2.5 text-[16px] text-[var(--text)] outline-none transition-colors focus:border-[var(--blue)]"
             />
           </Field>
         </div>
@@ -253,7 +253,7 @@ export function DemoForm() {
           type="checkbox"
           checked={values.consent}
           onChange={(event) => set('consent', event.target.checked)}
-          className="mt-1 size-4 rounded border-[var(--rule-strong)] accent-[var(--indigo)]"
+          className="mt-1 size-4 rounded border-[var(--rule-strong)] accent-[var(--blue)]"
         />
         <span>
           You may contact me about SchoolOS. We will not add you to a mailing list.
@@ -306,7 +306,7 @@ function Field({
 }
 
 const CONTROL =
-  'w-full rounded-lg border border-[var(--rule-strong)] bg-white px-3 py-2.5 text-[16px] text-[var(--text)] outline-none transition-colors focus:border-[var(--indigo)]'
+  'w-full rounded-lg border border-[var(--rule-strong)] bg-white px-3 py-2.5 text-[16px] text-[var(--text)] outline-none transition-colors focus:border-[var(--blue)]'
 
 function Input({
   id,

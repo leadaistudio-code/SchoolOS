@@ -19,20 +19,22 @@ will actually buy this. International-school pages can be visibly more mixed.
 
 ## Where photography goes
 
-### 1. Homepage — hero right edge (optional)
+### 1. Homepage hero — no photograph
 
-| | |
-|---|---|
-| Page | `/` |
-| Section | `Hero`, `src/components/site/home/hero.tsx` |
-| Dimensions | 1600 × 1200, served at 720px wide max |
-| Format | AVIF with WebP fallback |
-| Subject | A school corridor or courtyard in the morning, shot from a distance, no faces identifiable |
-| Style | Natural light, muted, slightly desaturated. Architectural rather than human — the product is the subject of this fold |
-| Composition | Strong horizontal lines. Left third must be quiet enough to sit behind nothing; the product panel overlaps its left edge |
-| Prompt | *Wide photograph of a modern Indian school corridor early in the morning, natural light from tall windows, empty, warm concrete and pale walls, architectural photography, muted colour, no people in focus, 3:2* |
-| Alt | `""` — decorative; the hero is described by its heading |
-| Mobile | Hidden below 1024px. The product panel takes the full width |
+The hero has **no image slot**, and this is a decision rather than an omission.
+The right half of the fold is the administrator dashboard, rendered live from the
+application's own components. A photograph competing with it in the same fold
+weakens the one thing that fold has to establish — that this is real software.
+
+An earlier revision placed a cut-out PNG beside the headline with an infinite
+float animation and a hover scale. Both are gone: a decorative element that
+moves for no reason is the clearest tell of a generated page, and the files
+(`public/hero_asset.png` and its three siblings) are no longer referenced by any
+component.
+
+If the homepage needs warmth later, the place for it is a full-bleed band between
+the parents section and the integrations section, at 1600 × 500, with no text over
+it — not the fold.
 
 ### 2. Parents section
 

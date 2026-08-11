@@ -8,3 +8,6 @@ next-env.d.ts
 coverage
 .DS_Store
 /uploads
+
+# Crash logs the editor drops in the project root
+debug.log

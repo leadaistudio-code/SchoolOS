@@ -51,7 +51,7 @@ export default function ContactPage() {
                 {block.action ? (
                   <Link
                     href={block.action.href}
-                    className="mt-4 inline-block text-[15px] font-medium text-[var(--indigo)]"
+                    className="mt-4 inline-block text-[15px] font-medium text-[var(--blue)]"
                   >
                     {block.action.label}
                   </Link>

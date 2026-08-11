@@ -19,7 +19,7 @@ export function Parents() {
       <Container>
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-20">
           <div>
-            <p className="eyebrow">Parents</p>
+            <p className="eyebrow">Parents and teachers</p>
             <h2 className="display mt-3 text-[clamp(2rem,4vw,2.9rem)]">
               The office stops answering the same three questions.
             </h2>
@@ -40,13 +40,26 @@ export function Parents() {
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2.5 text-[16px] text-[var(--text-muted)]">
                   <span
-                    className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--indigo)]"
+                    className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--blue)]"
                     aria-hidden
                   />
                   {item}
                 </li>
               ))}
             </ul>
+
+            {/* The teacher side, stated rather than illustrated with a second
+                phone. One device on the page is enough to make the point. */}
+            <div className="mt-9 border-t border-[var(--rule-strong)] pt-6">
+              <h3 className="text-[16px] font-semibold text-[var(--text)]">
+                Teachers work from the same records, on whatever they have in hand
+              </h3>
+              <p className="muted mt-2 max-w-lg text-[16px] leading-[1.6]">
+                Registers are marked in the classroom on a phone, homework is set from the same
+                screen, and marks are entered against their own classes and nobody else&rsquo;s.
+                Nothing is collected on paper first and typed in later.
+              </p>
+            </div>
           </div>
 
           {/* A phone, drawn plainly. No hand holding it, no floating shadow

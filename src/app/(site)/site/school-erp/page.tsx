@@ -20,7 +20,7 @@ export default function ErpPage() {
       />
 
       <ProseSection>
-        <Prose title="Fees">
+        <Prose id="fees" title="Fees">
           <p>
             A fee structure is defined once per class and session — tuition, transport, laboratory,
             whatever the school charges — and invoices are generated from it. Because the structure
@@ -37,11 +37,12 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose title="Staff">
+        <Prose id="staff" title="Staff">
           <p>
             Staff records carry designation, department, contact details and joining date. Roles
-            decide what each person can reach: twelve are defined, from school administrator to
-            driver, and each is a set of specific permissions rather than a level.
+            decide what each person can reach: eleven are defined for a school, from school
+            administrator to driver, and each is a set of specific permissions rather than a level.
+            A school can add its own.
           </p>
           <p>
             Staff attendance can be marked from a device inside a geofence around the campus, with
@@ -49,7 +50,7 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose title="Communication">
+        <Prose id="communication" title="Communication">
           <p>
             Notices go to an audience — everyone, a role, a class, a section — and appear in the
             portals of exactly those people. Internal mail runs between staff and families inside
@@ -89,7 +90,10 @@ export default function ErpPage() {
                 },
                 {
                   heading: 'Communication',
-                  items: ['Notices by audience', 'Internal mailbox', 'Notification centre', 'Your own SMTP server'],
+                  // "Notification centre" was listed here and is a roadmap
+                  // item — see `content/site/modules.ts`. Push notifications
+                  // are not shipped, so the claim is gone rather than softened.
+                  items: ['Notices by audience', 'Internal mailbox', 'Your own SMTP server'],
                 },
                 {
                   heading: 'Administration',

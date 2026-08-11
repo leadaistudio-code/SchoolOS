@@ -93,13 +93,13 @@ const MOMENTS: Moment[] = [
                       ? 'color-mix(in srgb, var(--emerald) 14%, transparent)'
                       : entry.tone === 'absent'
                         ? 'color-mix(in srgb, var(--coral) 16%, transparent)'
-                        : 'color-mix(in srgb, var(--amber) 18%, transparent)',
+                        : 'color-mix(in srgb, var(--accent) 18%, transparent)',
                   color:
                     entry.tone === 'present'
                       ? 'var(--emerald)'
                       : entry.tone === 'absent'
                         ? 'var(--coral)'
-                        : 'var(--amber)',
+                        : 'var(--accent)',
                 }}
               >
                 {entry.tone === 'present' ? 'P' : entry.tone === 'absent' ? 'A' : 'L'}
@@ -207,7 +207,7 @@ export function StudentThread() {
           {MOMENTS.map((moment, index) => (
             <li key={moment.step} className="relative">
               <div className="flex items-center gap-3">
-                <span className="relative z-10 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--indigo-bright)] text-[12px] font-semibold text-white">
+                <span className="relative z-10 grid size-7 shrink-0 place-items-center rounded-full bg-[var(--blue)] text-[12px] font-semibold text-white">
                   {index + 1}
                 </span>
                 <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8f9dc0]">

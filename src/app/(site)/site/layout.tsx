@@ -1,19 +1,22 @@
 import type { Metadata } from 'next'
-import { Instrument_Serif } from 'next/font/google'
+import { Manrope } from 'next/font/google'
 import '@/styles/site.css'
 import { SiteNav } from '@/components/site/nav'
 import { SiteFooter } from '@/components/site/footer'
 import { env } from '@/lib/env'
 
 /**
- * One display face, one weight, headlines only.
+ * One display face, headlines only.
  *
- * The application already loads Golos Text for everything else, so the public
- * site adds a single file rather than a second family.
+ * Manrope, at two weights, subset to latin. The application already loads
+ * Golos Text for body copy, so the site adds one family rather than two, and
+ * the pairing is deliberate: a slightly tighter, geometric face for headlines
+ * against a neutral face for reading. Both are self-hosted by next/font, so
+ * there is no third-party request in the critical path and no layout shift.
  */
-const display = Instrument_Serif({
+const display = Manrope({
   subsets: ['latin'],
-  weight: '400',
+  weight: ['600', '700'],
   variable: '--font-display',
   display: 'swap',
 })

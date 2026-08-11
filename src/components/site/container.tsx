@@ -27,15 +27,30 @@ export function Container({
   )
 }
 
-/** Vertical rhythm. Sections breathe, but not so much that the page feels empty. */
+/**
+ * Vertical rhythm.
+ *
+ * Three step sizes and no others, so the page has a beat a visitor can feel
+ * rather than a different gap between every pair of sections. `snug` is for a
+ * section that continues the one above it; `loose` is for a section that has
+ * to be arrived at.
+ */
+const SPACE = {
+  snug: 'py-14 sm:py-[4.5rem]',
+  default: 'py-16 sm:py-[6.5rem]',
+  loose: 'py-20 sm:py-[8rem]',
+}
+
 export function Section({
   id,
   tone,
+  space = 'default',
   className,
   children,
 }: {
   id?: string
   tone?: 'paper' | 'page' | 'cream' | 'navy'
+  space?: keyof typeof SPACE
   className?: string
   children: React.ReactNode
 }) {
@@ -49,7 +64,7 @@ export function Section({
           : 'bg-[var(--paper)]'
 
   return (
-    <section id={id} className={cn('py-16 sm:py-24', background, className)}>
+    <section id={id} className={cn(SPACE[space], background, className)}>
       {children}
     </section>
   )

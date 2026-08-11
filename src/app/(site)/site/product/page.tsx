@@ -58,7 +58,7 @@ export default function ProductPage() {
           </p>
         </Prose>
 
-        <Prose title="Who sees what">
+        <Prose id="parents" title="Who sees what">
           <p>
             Everyone signs into the same system and gets a different application. A parent reaches
             their own children. A teacher marks their own classes. An accountant sees the fee

@@ -1,83 +1,81 @@
 import * as React from 'react'
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
 import { Container } from '../container'
+import { Button } from '../ui'
 import { DashboardRender } from '../product/dashboard-render'
+import { POSITIONING } from '@/content/site/company'
+import { MODULE_COUNTS } from '@/content/site/modules'
 
 /**
  * Hero.
  *
- * Type, then product, straight on. No tilt, no browser chrome mocked in
- * perspective, no collage of floating cards: a school director is deciding
- * whether this looks like real software, and the fastest way to answer that is
- * to show the software.
+ * Type on the left, the product on the right, both straight on. No tilt, no
+ * browser chrome drawn in perspective, no collage of cards floating past the
+ * headline: a school director is deciding whether this looks like real
+ * software, and the fastest way to answer that is to show the software.
  *
- * The composition holds the interface at the fold deliberately — the page
- * begins in the product rather than in an illustration of one.
+ * The interface is deliberately cropped by the right edge of the viewport
+ * rather than shrunk to fit. A dashboard scaled down until it fits neatly is
+ * unreadable, which defeats the point of showing it; one that runs off the edge
+ * reads at full size and implies there is more of it.
  */
 export function Hero() {
   return (
-    <div className="relative overflow-hidden bg-[var(--paper)] pt-14 sm:pt-20">
-      {/* A single quiet ground. Not a gradient wash: a plain tint that stops
-          before the product so the interface reads at full contrast. */}
+    <div className="relative overflow-hidden border-b border-[var(--rule)] bg-[var(--paper)] pt-16 sm:pt-24">
+      {/* One quiet ground, stopping well above the product so the interface
+          reads at full contrast. Not a gradient wash across the fold. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[520px]"
-        style={{
-          background:
-            'linear-gradient(180deg, color-mix(in srgb, var(--indigo) 5%, transparent) 0%, transparent 100%)',
-        }}
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[linear-gradient(180deg,var(--blue-tint)_0%,transparent_100%)] opacity-70"
         aria-hidden
       />
 
-      <Container className="relative">
-        <div className="max-w-3xl">
-          <h1 className="display text-[clamp(2.5rem,6.2vw,4.25rem)]">
-            One system to run your school.
-          </h1>
-          <p className="muted mt-5 max-w-xl text-[19px] leading-[1.55]">
-            Student records, attendance, fees, examinations, communication and transport share one
-            database. Information entered once is correct everywhere.
-          </p>
+      <Container wide className="relative">
+        <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,29rem)_minmax(0,1fr)] lg:gap-12 xl:gap-16">
+          <div className="reveal">
+            <h1 className="display text-[clamp(2.6rem,5.4vw,4.1rem)]">
+              One operating system for your entire school.
+            </h1>
+            <p className="muted mt-6 max-w-xl text-[19px] leading-[1.55]">
+              {POSITIONING.lead}
+            </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              href="/book-demo"
-              className="rounded-lg bg-[var(--ink)] px-5 py-3 text-[16px] font-medium text-white transition-colors hover:bg-[var(--navy)]"
-            >
-              Book a demo
-            </Link>
-            <Link
-              href="/product"
-              className="group inline-flex items-center gap-1.5 rounded-lg border border-[var(--rule-strong)] px-5 py-3 text-[16px] font-medium text-[var(--text)] transition-colors hover:border-[var(--ink)]"
-            >
-              See how it fits together
-              <ArrowRight
-                className="size-4 transition-transform group-hover:translate-x-0.5"
-                aria-hidden
-              />
-            </Link>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button href="/book-demo" size="lg">
+                Book a demo
+              </Button>
+              <Button href="/product" tone="secondary" size="lg">
+                Explore SchoolOS
+              </Button>
+            </div>
+
+            <p className="subtle mt-8 max-w-md text-[15px] leading-[1.55]">
+              {POSITIONING.trustLine} {MODULE_COUNTS.available} modules are available today, and
+              this site labels the ones that are not.
+            </p>
           </div>
 
-          <p className="subtle mt-6 text-[15px]">
-            Built for private schools, international schools, preschools and multi-campus groups.
-          </p>
-        </div>
-      </Container>
+          {/* Held to the right of the grid and allowed past the container edge,
+              so the dashboard is shown at a size it can be read at rather than
+              scaled down until the figures are decorative.
 
-      {/* The product, wider than the text column and cropped by the fold. */}
-      <Container wide className="relative mt-12 sm:mt-16">
-        <div className="screen shadow-lift reveal">
-          <div className="screen-chrome">
-            <span className="flex gap-1.5" aria-hidden>
-              <span className="size-2.5 rounded-full bg-[#e5e8f0]" />
-              <span className="size-2.5 rounded-full bg-[#e5e8f0]" />
-              <span className="size-2.5 rounded-full bg-[#e5e8f0]" />
-            </span>
-            <span className="ml-2 rounded-md bg-[var(--page)] px-2.5 py-1 text-[12px] text-[var(--text-subtle)]">
-              stjohns.schoolos.app
-            </span>
+              The minimum width starts at `xl` on purpose: between 1024px and
+              1280px the column is narrow enough that forcing 44rem would clip
+              half the dashboard against the section's `overflow-hidden`. There
+              it simply fills the column instead. */}
+          <div className="relative lg:-mr-[max(0px,calc((100vw-var(--wide-max))/2))]">
+            <div className="screen shadow-lift xl:min-w-[44rem]">
+              <div className="screen-chrome">
+                <span className="flex gap-1.5" aria-hidden>
+                  <span className="size-2.5 rounded-full bg-[var(--rule-strong)]" />
+                  <span className="size-2.5 rounded-full bg-[var(--rule-strong)]" />
+                  <span className="size-2.5 rounded-full bg-[var(--rule-strong)]" />
+                </span>
+                <span className="ml-1 truncate text-[13px] text-[var(--text-subtle)]">
+                  SchoolOS — administrator dashboard
+                </span>
+              </div>
+              <DashboardRender />
+            </div>
           </div>
-          <DashboardRender />
         </div>
       </Container>
     </div>

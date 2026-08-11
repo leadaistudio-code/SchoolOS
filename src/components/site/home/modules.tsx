@@ -1,147 +1,127 @@
+'use client'
+
 import * as React from 'react'
+import Link from 'next/link'
 import { Container, Section } from '../container'
+import { SectionHeader, StatusBadge, TextLink } from '../ui'
+import { MODULE_CATEGORIES, MODULE_COUNTS } from '@/content/site/modules'
+import { cn } from '@/lib/utils'
 
 /**
- * What the product actually contains.
+ * The module catalogue, on the homepage.
  *
- * An honest inventory rather than a wall of eighty icon tiles. Two things make
- * it worth reading: the modules are grouped the way a school is organised
- * (office, classroom, money, buses) rather than by software category, and the
- * list is limited to what is built.
+ * Six categories behind tabs rather than thirty identical tiles in a wall. A
+ * wall of tiles is how these sections are usually built and it is the least
+ * useful arrangement possible: a visitor looking for "does it do fees" has to
+ * read every tile to find out.
  *
- * What is not built yet is named at the bottom, quietly and without a badge on
- * every line. A school that books a demo on the strength of this page will see
- * exactly what it says.
+ * Every module carries its status. Showing "planned" next to a module on our own
+ * marketing page costs a little and buys the rest of the page: a director who
+ * finds one honest label believes the unlabelled ones.
+ *
+ * Implemented with real tabs — arrow keys move between them, the panel is
+ * labelled by its tab, and only the active tab is in the tab order.
  */
-
-const AVAILABLE: { area: string; blurb: string; items: string[] }[] = [
-  {
-    area: 'The office',
-    blurb: 'The records everything else reads from.',
-    items: [
-      'Student profiles and history',
-      'Parents and guardians',
-      'Classes and sections',
-      'Staff records',
-      'Roles and permissions',
-      'Audit log',
-      'School branding',
-    ],
-  },
-  {
-    area: 'The classroom',
-    blurb: 'What teachers touch daily.',
-    items: [
-      'Attendance registers',
-      'Timetable',
-      'Subjects',
-      'Homework',
-      'Classwork',
-      'Academic calendar',
-      'Leave requests',
-    ],
-  },
-  {
-    area: 'Examinations',
-    blurb: 'From marks entry to a printed report card.',
-    items: [
-      'Exam scheduling',
-      'Marks entry with validation',
-      'Grading scales',
-      'Results and ranking',
-      'Report cards',
-    ],
-  },
-  {
-    area: 'Money',
-    blurb: 'Billed, collected and reconciled in one place.',
-    items: [
-      'Fee structures',
-      'Invoice generation',
-      'Counter collection',
-      'Payments and receipts',
-      'Outstanding by class',
-      'Refunds',
-    ],
-  },
-  {
-    area: 'Buses',
-    blurb: 'Fleet, routes and the children on them.',
-    items: [
-      'Buses and documents',
-      'Routes and stops',
-      'Student assignments',
-      'Driver trip console',
-      'Live tracking',
-      'Boarding records',
-    ],
-  },
-  {
-    area: 'Communication',
-    blurb: 'Reaching families without personal phone numbers.',
-    items: [
-      'Notices by audience',
-      'Internal mailbox',
-      'Notifications',
-      "Your school's own mail server",
-      'Parent and staff portals',
-    ],
-  },
-]
-
-const IN_PROGRESS = [
-  'Admissions CRM',
-  'Library circulation',
-  'Inventory and assets',
-  'Events and sports',
-  'Front office and visitors',
-  'Cross-module reporting',
-  'Certificates',
-  'Bulk student import',
-]
-
 export function Modules() {
+  const [active, setActive] = React.useState(MODULE_CATEGORIES[0]!.key)
+  const tabRefs = React.useRef<Record<string, HTMLButtonElement | null>>({})
+
+  const category = MODULE_CATEGORIES.find((c) => c.key === active)!
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const index = MODULE_CATEGORIES.findIndex((c) => c.key === active)
+    const next =
+      event.key === 'ArrowRight'
+        ? (index + 1) % MODULE_CATEGORIES.length
+        : event.key === 'ArrowLeft'
+          ? (index - 1 + MODULE_CATEGORIES.length) % MODULE_CATEGORIES.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? MODULE_CATEGORIES.length - 1
+              : null
+
+    if (next === null) return
+    event.preventDefault()
+    const key = MODULE_CATEGORIES[next]!.key
+    setActive(key)
+    tabRefs.current[key]?.focus()
+  }
+
   return (
-    <Section tone="page" id="modules">
+    <Section id="modules">
       <Container wide>
-        <div className="max-w-2xl">
-          <p className="eyebrow">What is in it</p>
-          <h2 className="display mt-3 text-[clamp(2rem,4vw,2.9rem)]">
-            Grouped the way a school is, not the way software is.
-          </h2>
-        </div>
+        <SectionHeader
+          split
+          eyebrow="Modules"
+          title="Everything you need to run a school."
+          lead={`${MODULE_COUNTS.available} modules are working today, ${MODULE_COUNTS.inBuild} are partly there, and ${MODULE_COUNTS.planned} are on the roadmap. Each one below says which it is, because you will find out eventually and it may as well be now.`}
+          action={<TextLink href="/modules">See the full catalogue</TextLink>}
+        />
 
-        {/* Columns of text, separated by rules. No tiles, no icons: this is a
-            list, and a list should look like one. */}
-        <div className="mt-12 grid gap-x-12 gap-y-10 md:grid-cols-2 xl:grid-cols-3">
-          {AVAILABLE.map((group) => (
-            <div key={group.area} className="border-t border-[var(--rule-strong)] pt-5">
-              <h3 className="text-[17px] font-semibold text-[var(--text)]">{group.area}</h3>
-              <p className="subtle mt-1 text-[14px]">{group.blurb}</p>
-              <ul className="mt-4 space-y-2">
-                {group.items.map((item) => (
-                  <li key={item} className="text-[15px] text-[var(--text-muted)]">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+        <div className="mt-12">
+          <div
+            role="tablist"
+            aria-label="Module categories"
+            onKeyDown={onKeyDown}
+            className="-mx-[var(--gutter)] flex gap-1 overflow-x-auto px-[var(--gutter)] pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {MODULE_CATEGORIES.map((item) => {
+              const selected = item.key === active
+              return (
+                <button
+                  key={item.key}
+                  ref={(node) => {
+                    tabRefs.current[item.key] = node
+                  }}
+                  role="tab"
+                  id={`module-tab-${item.key}`}
+                  aria-selected={selected}
+                  aria-controls={`module-panel-${item.key}`}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setActive(item.key)}
+                  className={cn(
+                    'shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-[15px] font-medium transition-colors duration-150',
+                    selected
+                      ? 'bg-[var(--ink)] text-white'
+                      : 'text-[var(--text-muted)] hover:bg-[var(--page)] hover:text-[var(--text)]',
+                  )}
+                >
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
 
-        <div className="mt-14 rounded-xl border border-[var(--rule)] bg-white p-6 sm:p-8">
-          <h3 className="text-[17px] font-semibold text-[var(--text)]">Being built next</h3>
-          <p className="muted mt-1.5 max-w-2xl text-[15px]">
-            These are on the roadmap and are not part of the product today. We would rather you
-            read that here than discover it in a demonstration.
-          </p>
-          <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
-            {IN_PROGRESS.map((item) => (
-              <li key={item} className="text-[15px] text-[var(--text-subtle)]">
-                {item}
-              </li>
-            ))}
-          </ul>
+          <div
+            role="tabpanel"
+            id={`module-panel-${category.key}`}
+            aria-labelledby={`module-tab-${category.key}`}
+            tabIndex={0}
+            className="mt-8 border-t border-[var(--rule)] pt-8"
+          >
+            <p className="muted max-w-3xl text-[17px] leading-[1.6]">{category.lead}</p>
+
+            <ul className="mt-8 grid gap-x-10 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+              {category.modules.map((module) => (
+                <li key={module.name} className="border-t border-[var(--rule)] pt-4">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <h3 className="text-[16px] font-semibold text-[var(--text)]">
+                      {module.href ? (
+                        <Link href={module.href} className="hover:text-[var(--blue)]">
+                          {module.name}
+                        </Link>
+                      ) : (
+                        module.name
+                      )}
+                    </h3>
+                    {module.status === 'available' ? null : <StatusBadge status={module.status} />}
+                  </div>
+                  <p className="muted mt-1.5 text-[14px] leading-[1.55]">{module.blurb}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </Container>
     </Section>

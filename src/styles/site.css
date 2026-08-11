@@ -1,53 +1,122 @@
 /*
  * Public website tokens.
  *
- * Scoped to `.site` rather than :root so the marketing palette can be more
- * expressive than the application's without leaking into it. The two share an
- * indigo, deliberately: a visitor who books a demo should recognise the
- * product when they see it.
+ * Scoped to `.site` rather than :root so the marketing palette can be tuned
+ * without leaking into the application. The palette is deliberately narrow:
+ * a navy that carries every dark surface, one working blue for action and
+ * links, one amber used only to mark something that is not built yet, and a
+ * greyscale that does all the structural work.
  */
 
 .site {
-  --ink: #0b1220;
-  --navy: #111a32;
-  --navy-soft: #1b2647;
-  --indigo: #4f46e5;
-  --indigo-bright: #635bff;
-  --blue: #2563eb;
-  --emerald: #0f9d76;
-  --amber: #d97706;
-  --coral: #e05a5a;
+  --ink: #0a1024;
+  --navy: #0f1a38;
+  --navy-soft: #1a2850;
+  --navy-line: rgba(255, 255, 255, 0.12);
+
+  --blue: #1d4ed8;
+  --blue-deep: #17369e;
+  --blue-tint: #eef2fd;
+
+  /* The single accent. Status only — "planned", "in build". Never decorative. */
+  --accent: #a1620b;
+
+  /* Semantic, for form states. Not part of the brand palette. */
+  --emerald: #0f7a5c;
+  --coral: #c0392f;
 
   --paper: #ffffff;
-  --page: #f7f8fc;
-  --cream: #fbfaf7;
-  --rule: #e3e7f0;
-  --rule-strong: #cfd6e6;
+  --page: #f6f7fa;
+  --cream: #fafaf8;
+  --rule: #e4e7ee;
+  --rule-strong: #cdd3e0;
 
-  --text: #0b1220;
-  --text-muted: #48546b;
-  --text-subtle: #6b7791;
-  --on-dark: #eef1f8;
-  --on-dark-muted: #9aa6c2;
+  --text: #0a1024;
+  --text-muted: #4a5468;
+  --text-subtle: #6d7789;
+  --on-dark: #eaeef7;
+  --on-dark-muted: #9ba7c2;
 
   --measure: 68ch;
   --gutter: clamp(1.25rem, 5vw, 4rem);
-  --page-max: 1200px;
-  --wide-max: 1360px;
+  --page-max: 1240px;
+  --wide-max: 1320px;
 
   color: var(--text);
   background: var(--paper);
   font-size: 17px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Display face. Reserved for headlines: at body sizes a high-contrast serif
-   costs legibility and buys nothing. */
+/*
+ * The public site is a light document, always.
+ *
+ * A visitor whose operating system is set to dark gets `data-theme="dark"` on
+ * the root element before first paint — that is correct for the application,
+ * and wrong here: the marketing pages paint their own white and near-white
+ * grounds, while the product components embedded in them (the dashboard, the
+ * widgets, the badges, the bus map) read the application's tokens. Left alone,
+ * a dark-mode visitor saw near-white text on a white widget.
+ *
+ * Rather than duplicating the whole token file, this re-states the light values
+ * for exactly the tokens those embedded components use. Anything added to a
+ * product render later must be checked against this list.
+ */
+:root[data-theme='dark'] .site {
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --surface-3: #eef1f8;
+  --bg: #f6f8fc;
+  --border: #e4e8f1;
+  --border-strong: #d2d8e6;
+
+  /* `--text` and its two companions are shared names: the site palette above
+     sets them, and this block would otherwise shadow it with the application's
+     slightly different neutrals. Repeat the site's values, not the app's. */
+  --text: #0a1024;
+  --text-muted: #4a5468;
+  --text-subtle: #6d7789;
+
+  --success: #17734a;
+  --success-bg: #e9f4ee;
+  --warning: #93590a;
+  --warning-bg: #fbf2e3;
+  --danger: #b42318;
+  --danger-bg: #fdeceb;
+  --info: #175cd3;
+  --info-bg: #eaf1fd;
+
+  --chart-students: #7c5cfc;
+  --chart-staff: #f59e0b;
+  --chart-parents: #14b8a6;
+  --chart-attendance: #10b981;
+  --chart-fees: #2563eb;
+  --chart-pending: #f59e0b;
+  --chart-overdue: #f43f5e;
+  --chart-admissions: #6366f1;
+  --chart-transport: #06b6d4;
+  --chart-late: #fb923c;
+  --chart-leave: #38bdf8;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+  --shadow-card-hover:
+    0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 6px -2px rgba(16, 24, 40, 0.05);
+  --shadow-pop:
+    0 12px 28px -6px rgba(16, 24, 40, 0.16), 0 4px 10px -4px rgba(16, 24, 40, 0.08);
+}
+
+/*
+ * Headlines.
+ *
+ * One family across the whole site, set tighter and heavier than body copy
+ * rather than in a second face. `--font-display` is loaded by the site layout.
+ */
 .site .display {
-  font-family: var(--font-display), 'Iowan Old Style', Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -0.015em;
-  line-height: 1.08;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.06;
   text-wrap: balance;
 }
 
@@ -56,14 +125,14 @@
 .site h3 {
   color: var(--text);
   text-wrap: balance;
+  letter-spacing: -0.015em;
 }
 
 .site p {
   text-wrap: pretty;
 }
 
-/* Dark passages. Two of them on the homepage, both earning it: the section
-   that follows one record through the school, and transport. */
+/* Dark passages. Used for structural weight, never as a backdrop for a glow. */
 .site .on-navy {
   background: var(--navy);
   color: var(--on-dark);
@@ -75,6 +144,12 @@
 }
 .site .on-navy .muted {
   color: var(--on-dark-muted);
+}
+.site .on-navy .subtle {
+  color: #8593b3;
+}
+.site .on-navy .rule {
+  border-color: var(--navy-line);
 }
 
 .site .muted {
@@ -93,26 +168,35 @@
   color: var(--text-subtle);
 }
 .site .on-navy .eyebrow {
-  color: #8f9dc0;
+  color: #8c9bbd;
 }
 
 /* Rules do the dividing. Cards are reserved for things that are genuinely
-   objects — a school type, a service — never for laying out a section. */
+   objects — a school type, a module, a story — never for laying out a section. */
 .site .rule {
   border-top: 1px solid var(--rule);
+}
+
+/* Links inside prose. */
+.site .link {
+  color: var(--blue);
+  text-decoration: none;
+}
+.site .link:hover {
+  color: var(--blue-deep);
 }
 
 /*
  * Product surfaces.
  *
- * Real application components are rendered inside these, so they need the
- * application's own frame: a hairline and a modest radius, not a floating
- * glass panel tilted in space.
+ * Real application components render inside these, so they get the
+ * application's own frame: a hairline and a modest radius, held straight on.
+ * Nothing is tilted, nothing floats.
  */
 .site .screen {
   background: var(--page);
   border: 1px solid var(--rule);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .site .screen-chrome {
@@ -126,24 +210,38 @@
 
 .site .shadow-lift {
   box-shadow:
-    0 1px 2px rgba(11, 18, 32, 0.04),
-    0 12px 32px -12px rgba(11, 18, 32, 0.18);
+    0 1px 2px rgba(10, 16, 36, 0.04),
+    0 14px 34px -14px rgba(10, 16, 36, 0.16);
+}
+
+/* Focus. One treatment everywhere, visible on both grounds. */
+.site :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.site .on-navy :is(a, button):focus-visible {
+  outline-color: #fff;
 }
 
 /* Entrance. One transform, one duration, applied to whole compositions rather
-   than to every element in them. */
+   than to every element inside them. */
 @keyframes site-rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
 }
 .site .reveal {
-  animation: site-rise 480ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: site-rise 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .site .reveal {
     animation: none;
+  }
+  .site * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

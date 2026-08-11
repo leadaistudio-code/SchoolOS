@@ -34,18 +34,30 @@ export function PageIntro({
   )
 }
 
-/** A run of prose with a heading. The site's default way of saying something. */
+/**
+ * A run of prose with a heading. The site's default way of saying something.
+ *
+ * `id` makes the passage a deep-link target. The navigation links to a few of
+ * these directly — `/school-erp#fees`, for one — so a director following "fee
+ * collection" from a menu lands on the paragraph about fees rather than at the
+ * top of a long page to hunt for it.
+ */
 export function Prose({
+  id,
   title,
   children,
   aside,
 }: {
+  id?: string
   title: string
   children: React.ReactNode
   aside?: React.ReactNode
 }) {
   return (
-    <div className="grid gap-8 border-t border-[var(--rule)] py-12 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:gap-16">
+    <div
+      id={id}
+      className="grid scroll-mt-24 gap-8 border-t border-[var(--rule)] py-12 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] md:gap-16"
+    >
       <h2 className="text-[24px] font-semibold leading-tight text-[var(--text)]">{title}</h2>
       <div className="max-w-[var(--measure)] space-y-4 text-[17px] leading-[1.65] text-[var(--text-muted)]">
         {children}
@@ -99,7 +111,7 @@ export function LinkCard({
       {meta ? <p className="eyebrow">{meta}</p> : null}
       <h3 className="mt-2 text-[20px] font-semibold text-[var(--text)]">{title}</h3>
       <p className="muted mt-2 flex-1 text-[15px] leading-[1.6]">{body}</p>
-      <span className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-medium text-[var(--indigo)]">
+      <span className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-medium text-[var(--blue)]">
         Read more
         <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
       </span>

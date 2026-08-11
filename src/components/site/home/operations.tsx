@@ -41,7 +41,7 @@ export function Operations() {
 
             <Link
               href="/school-erp"
-              className="group mt-7 inline-flex items-center gap-1.5 text-[16px] font-medium text-[var(--indigo)]"
+              className="group mt-7 inline-flex items-center gap-1.5 text-[16px] font-medium text-[var(--blue)]"
             >
               How the office runs on it
               <ArrowRight
