@@ -247,6 +247,7 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'School Profile', href: '/settings', icon: 'School', permission: 'settings.view' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
+      { label: 'Custom Domains', href: '/settings/domains', icon: 'Globe', permission: 'settings.manage' },
       { label: 'Email', href: '/settings/email', icon: 'Mail', permission: 'settings.manage' },
     ],
   },

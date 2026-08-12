@@ -24,6 +24,13 @@ const TILES: Tile[] = [
     ready: true,
   },
   {
+    href: '/settings/domains',
+    title: 'Custom Domains',
+    description: 'Manage your portal\'s web addresses.',
+    permission: 'settings.manage',
+    ready: true,
+  },
+  {
     href: '/settings/sessions',
     title: 'Academic sessions',
     description: 'Session dates, promotion and archiving.',
