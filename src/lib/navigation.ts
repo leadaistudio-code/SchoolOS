@@ -100,6 +100,16 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'Assessments',
+    href: '/assessments/bank',
+    icon: 'FilePlus2',
+    section: 'ACADEMICS' as const,
+    permission: 'questionbank.view',
+    children: [
+      { label: 'Question Bank', href: '/assessments/bank', icon: 'Library', permission: 'questionbank.view' },
+    ],
+  },
+  {
     label: 'Examination',
     href: '/exams',
     icon: 'FileCheck',

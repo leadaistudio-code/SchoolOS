@@ -658,3 +658,33 @@ export async function publishedTopics(ctx: AppContext, classSubjectId: string, c
     },
   })
 }
+
+/**
+ * Every topic for a class-subject, chapter by chapter, published or not.
+ *
+ * Tagging a question is not setting a paper: a teacher writing questions while
+ * the syllabus is still a draft must be able to file them correctly, and
+ * `publishedTopics()` remains the stricter gate for generation.
+ */
+export async function listTopicsFor(ctx: AppContext, classSubjectId: string) {
+  await assertClassSubjectAccess(ctx, classSubjectId)
+  const sessionId = await currentSessionId(ctx)
+
+  return ctx.db.chapter.findMany({
+    where: {
+      deletedAt: null,
+      curriculum: { classSubjectId, sessionId, deletedAt: null },
+    },
+    orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      topics: {
+        where: { deletedAt: null },
+        orderBy: [{ position: 'asc' }, { name: 'asc' }],
+        select: { id: true, name: true },
+      },
+    },
+  })
+}

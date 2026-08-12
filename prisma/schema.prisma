@@ -545,6 +545,7 @@ model ClassSubject {
   classwork    Classwork[]
   examSubjects ExamSubject[]
   curricula    Curriculum[]
+  questions    Question[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
@@ -641,8 +642,9 @@ model Topic {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  chapter  Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  outcomes LearningOutcome[]
+  chapter   Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  outcomes  LearningOutcome[]
+  questions QuestionTopic[]
 
   @@index([tenantId, chapterId, position])
 }
@@ -661,6 +663,131 @@ model LearningOutcome {
   topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, topicId, position])
+}
+
+/// ---------------------------------------------------------------------------
+/// Question bank
+///
+/// A question belongs to a class-subject rather than to a curriculum, so it
+/// survives the syllabus being revised for a new session: the topics it is
+/// tagged with move, the question does not have to be re-entered. Tagging is
+/// many-to-many because a case study or an application question legitimately
+/// spans topics, and a paper set from "chapters 1-3" has to find it.
+/// ---------------------------------------------------------------------------
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  FILL_BLANK
+  MATCH
+  ONE_WORD
+  VERY_SHORT
+  SHORT
+  LONG
+  DESCRIPTIVE
+  CASE_STUDY
+  ASSERTION_REASON
+  NUMERICAL
+  DIAGRAM
+  COMPREHENSION
+  PRACTICAL
+  HOTS
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+/// Where a question came from. Kept because a teacher reviewing a paper judges
+/// an AI draft differently from a colleague's question, and because "how much
+/// of our bank is generated" is a question the school will eventually ask.
+enum QuestionOrigin {
+  MANUAL
+  AI
+  IMPORTED
+}
+
+/// AI output lands as DRAFT and cannot reach a paper until a teacher approves
+/// it. That is the whole of the review requirement, enforced in one column
+/// rather than in each screen that might forget.
+enum QuestionStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+model Question {
+  id             String             @id @default(cuid())
+  tenantId       String
+  classSubjectId String
+  text           String
+  type           QuestionType
+  difficulty     QuestionDifficulty @default(MEDIUM)
+  marks          Float              @default(1)
+  bloomLevel     BloomLevel?
+  /// The answer, in the form the type calls for: the correct option for an
+  /// MCQ, a worked solution for a numerical, the expected points for anything
+  /// descriptive. Deliberately one nullable column rather than a shape per
+  /// type, because the marking scheme is prose in every case that matters.
+  solution       String?
+  /// Why the answer is the answer. Shown when a result is released, never
+  /// before.
+  explanation    String?
+  /// Textbook, paper or page this came from, when a teacher records it.
+  source         String?
+  origin         QuestionOrigin     @default(MANUAL)
+  status         QuestionStatus     @default(APPROVED)
+  /// School-wide visibility. Off by default: a teacher's own drafts are their
+  /// own until they choose otherwise.
+  isShared       Boolean            @default(false)
+  /// Normalised-text hash, for exact duplicate detection. Near-duplicates are
+  /// found by token overlap against candidates narrowed by topic — that needs
+  /// no extension and no vector store, and at bank scale it is fast enough.
+  fingerprint    String
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
+
+  classSubject ClassSubject     @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  options      QuestionOption[]
+  topics       QuestionTopic[]
+
+  @@index([tenantId, classSubjectId, status])
+  @@index([tenantId, fingerprint])
+  @@index([tenantId, type, difficulty])
+  @@index([tenantId, createdById])
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  tenantId   String
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  /// The right-hand side of a match-the-following pair. Null for every other
+  /// type, which is why this is one model rather than two.
+  matchWith  String?
+  position   Int     @default(0)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, questionId, position])
+}
+
+model QuestionTopic {
+  id         String @id @default(cuid())
+  tenantId   String
+  questionId String
+  topicId    String
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  topic    Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, questionId, topicId])
+  @@index([tenantId, topicId])
 }
 
 enum Gender {
