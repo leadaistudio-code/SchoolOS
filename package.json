@@ -25,7 +25,8 @@
     "assistant:doctor": "tsx scripts/assistant-doctor.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "demo:content": "tsx scripts/demo-content.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
