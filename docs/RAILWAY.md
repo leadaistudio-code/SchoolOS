@@ -98,12 +98,21 @@ required — it puts the `secure` flag on the session cookie. At install time np
 reads the same variable and skips `devDependencies` entirely.
 
 So every build tool has to live in `dependencies`, which is where
-`tailwindcss`, `@tailwindcss/postcss`, `typescript`, `prisma` and `tsx` now
-are. If a future dependency is needed by `npm run build`, it belongs there too,
-not in `devDependencies`, or the deploy will fail with `Cannot find module`
+`tailwindcss`, `@tailwindcss/postcss`, `typescript`, `prisma`, `tsx` and
+`dotenv` now are. If a future dependency is needed by `npm run build`, by the
+pre-deploy command, or by a script you run with `railway ssh`, it belongs there
+too, not in `devDependencies`, or the deploy will fail with `Cannot find module`
 after the install appears to succeed. The same applies to `@types/*` packages
 for anything `src/` imports: the build type-checks the application, and a
 missing type declaration stops it as surely as a missing module.
+
+`dotenv` is the one that looks out of place there. Production does not need it —
+Railway injects the variables directly — but `scripts/sync-permissions.ts` and
+`scripts/assistant-doctor.ts` open with `import 'dotenv/config'` so they work
+from a laptop, and a static import loads whether or not its work is needed. Since
+`npm run rbac:sync` runs in the pre-deploy step, a dev-only `dotenv` fails the
+deploy *after* the build has succeeded and the migrations have applied — the
+container starts, the script exits, and Railway keeps the previous release.
 
 Two consequences worth knowing:
 
