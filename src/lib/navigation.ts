@@ -157,6 +157,23 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'Feedback',
+    href: '/feedback',
+    icon: 'MessageSquareHeart',
+    section: 'ENGAGEMENT' as const,
+    permission: 'feedback.view',
+    children: [
+      { label: 'Overview', href: '/feedback', icon: 'LayoutDashboard', permission: 'feedback.view' },
+      { label: 'My feedback', href: '/feedback/mine', icon: 'ChartNoAxesCombined', permission: 'feedback.teacher_view_own' },
+      { label: 'Give student feedback', href: '/feedback/students', icon: 'MessageSquarePlus', permission: 'feedback.teacher_give_student' },
+      { label: 'Campaigns', href: '/feedback/campaigns', icon: 'Send', permission: 'feedback.campaign_manage' },
+      { label: 'Templates', href: '/feedback/templates', icon: 'ListChecks', permission: 'feedback.template_manage' },
+      { label: 'Moderation', href: '/feedback/moderation', icon: 'ShieldCheck', permission: 'feedback.moderate' },
+      { label: 'Confidential concerns', href: '/feedback/concerns', icon: 'ShieldAlert', permission: 'feedback.concern_view' },
+      { label: 'Action items', href: '/feedback/actions', icon: 'ListTodo', permission: 'feedback.action_manage' },
+    ],
+  },
+  {
     label: 'Leave',
     href: '/leave',
     icon: 'CalendarOff',

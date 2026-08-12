@@ -125,6 +125,23 @@ export const PERMISSIONS: PermissionDef[] = [
     ['broadcast', 'Broadcast to audiences'],
   ]),
 
+  ...mod('feedback', [
+    ['view', 'View feedback'],
+    ['submit', 'Submit assigned feedback'],
+    ['student_submit', 'Submit student-to-teacher feedback'],
+    ['parent_submit', 'Submit parent feedback'],
+    ['teacher_view_own', 'View own aggregated feedback'],
+    ['teacher_give_student', 'Give student feedback'],
+    ['campaign_manage', 'Manage feedback campaigns'],
+    ['template_manage', 'Manage feedback templates'],
+    ['analytics_view', 'View feedback analytics'],
+    ['moderate', 'Moderate feedback comments'],
+    ['concern_view', 'View confidential concerns'],
+    ['concern_manage', 'Manage confidential concerns'],
+    ['action_manage', 'Manage feedback action items'],
+    ['settings_manage', 'Manage feedback settings'],
+  ]),
+
   ...mod('library', [
     ['view', 'View library'],
     ['manage', 'Manage books'],

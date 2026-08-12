@@ -25,6 +25,7 @@ export const FEATURE = {
   MODULE_CUSTOM_DOMAIN: 'module.custom_domain',
   MODULE_WHITE_LABEL_APP: 'module.white_label_app',
   MODULE_AI_ASSIST: 'module.ai_assist',
+  MODULE_FEEDBACK: 'module.feedback',
 
   LIMIT_STUDENTS: 'limit.students',
   LIMIT_STAFF: 'limit.staff',

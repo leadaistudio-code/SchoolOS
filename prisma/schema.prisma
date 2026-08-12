@@ -460,12 +460,13 @@ model AcademicSession {
   isLocked  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  classes       ClassLevel[]
-  enrollments   Enrollment[]
-  feeStructures FeeStructure[]
-  exams         Exam[]
-  curricula     Curriculum[]
-  assessments   Assessment[]
+  classes           ClassLevel[]
+  enrollments       Enrollment[]
+  feeStructures     FeeStructure[]
+  exams             Exam[]
+  curricula         Curriculum[]
+  assessments       Assessment[]
+  feedbackCampaigns FeedbackCampaign[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isCurrent])
@@ -528,7 +529,8 @@ model Subject {
   isElective Boolean   @default(false)
   deletedAt  DateTime?
 
-  classes ClassSubject[]
+  classes             ClassSubject[]
+  feedbackAssignments FeedbackAssignment[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1161,7 +1163,7 @@ model Student {
   updatedAt DateTime      @updatedAt
   deletedAt DateTime?
 
-  user                User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user                User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
   enrollments         Enrollment[]
   guardians           StudentGuardian[]
   attendance          StudentAttendance[]
@@ -1180,6 +1182,9 @@ model Student {
   sportsTeams         SportsTeamMember[]
   disciplineRecords   DisciplineRecord[]
   assessmentAttempts  AssessmentAttempt[]
+  feedbackAssignments FeedbackAssignment[]
+  feedbackResponses   FeedbackResponse[]
+  receivedFeedback    TeacherStudentFeedback[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])
@@ -1230,9 +1235,11 @@ model Parent {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  children  StudentGuardian[]
-  documents Document[]
+  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  children            StudentGuardian[]
+  documents           Document[]
+  feedbackAssignments FeedbackAssignment[]
+  feedbackResponses   FeedbackResponse[]
 
   @@index([tenantId, lastName, firstName])
   @@index([tenantId, phone])
@@ -1303,9 +1310,9 @@ model Staff {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  user                    User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user                    User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
   classSubjects           ClassSubject[]
-  classTeacherOf          Section[]           @relation("SectionClassTeacher")
+  classTeacherOf          Section[]                @relation("SectionClassTeacher")
   attendance              StaffAttendance[]
   leaveRequests           LeaveRequest[]
   timetableSlots          TimetableSlot[]
@@ -1314,7 +1321,10 @@ model Staff {
   documents               Document[]
   drivenBuses             Bus[]
   trips                   BusTrip[]
-  markedStudentAttendance StudentAttendance[] @relation("AttendanceMarker")
+  markedStudentAttendance StudentAttendance[]      @relation("AttendanceMarker")
+  feedbackTargets         FeedbackAssignment[]     @relation("FeedbackTargetStaff")
+  teacherStudentFeedback  TeacherStudentFeedback[] @relation("TeacherStudentFeedbackAuthor")
+  assignedFeedbackActions FeedbackActionItem[]     @relation("FeedbackActionAssignee")
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType])
@@ -1562,6 +1572,326 @@ model FeeConcession {
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, studentId])
+}
+
+// ===========================================================================
+// FEEDBACK & EXPERIENCE
+// Templates, campaigns, assignments and answers stay separate so reporting is
+// queryable and anonymous respondent identity never has to leave the server.
+// ===========================================================================
+
+enum FeedbackAudience {
+  STUDENT
+  PARENT
+  TEACHER
+}
+
+enum FeedbackTarget {
+  TEACHER
+  SCHOOL
+  STUDENT
+  PTM
+}
+
+enum FeedbackQuestionType {
+  RATING_5
+  RATING_10
+  YES_NO
+  MULTIPLE_CHOICE
+  CHECKBOX
+  EMOJI
+  NPS
+  SHORT_TEXT
+  LONG_TEXT
+  DROPDOWN
+}
+
+enum FeedbackCampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ARCHIVED
+}
+
+enum FeedbackAssignmentStatus {
+  PENDING
+  SUBMITTED
+  EXPIRED
+}
+
+enum FeedbackModerationStatus {
+  SUBMITTED
+  APPROVED
+  FLAGGED
+  UNDER_REVIEW
+  HIDDEN
+  ESCALATED
+  RESOLVED
+}
+
+enum FeedbackConcernStatus {
+  NEW
+  UNDER_REVIEW
+  FOLLOW_UP_REQUIRED
+  RESOLVED
+  CLOSED
+}
+
+enum FeedbackActionStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum FeedbackPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum FeedbackVisibility {
+  TEACHER_ONLY
+  STUDENT
+  PARENT
+  STUDENT_AND_PARENT
+  COORDINATOR
+  ADMINISTRATION
+}
+
+model FeedbackTemplate {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  name                String
+  audience            FeedbackAudience
+  target              FeedbackTarget
+  isAnonymousToTarget Boolean          @default(true)
+  minimumResponses    Int              @default(5)
+  classMinNumeric     Int?
+  classMaxNumeric     Int?
+  isActive            Boolean          @default(true)
+  createdById         String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
+
+  questions   FeedbackQuestion[]
+  campaigns   FeedbackCampaign[]
+  assignments FeedbackAssignment[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, audience, target, isActive])
+}
+
+model FeedbackQuestion {
+  id          String               @id @default(cuid())
+  tenantId    String
+  templateId  String
+  label       String
+  description String?
+  type        FeedbackQuestionType @default(RATING_5)
+  category    String?
+  required    Boolean              @default(true)
+  sortOrder   Int                  @default(0)
+  choices     Json?
+  isConcern   Boolean              @default(false)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+
+  template FeedbackTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  answers  FeedbackAnswer[]
+
+  @@index([tenantId, templateId, sortOrder])
+}
+
+model FeedbackCampaign {
+  id                  String                 @id @default(cuid())
+  tenantId            String
+  templateId          String
+  sessionId           String?
+  name                String
+  audience            FeedbackAudience
+  target              FeedbackTarget
+  status              FeedbackCampaignStatus @default(DRAFT)
+  frequency           String                 @default("FORTNIGHTLY")
+  startsAt            DateTime?
+  endsAt              DateTime?
+  classLevelIds       Json?
+  sectionIds          Json?
+  subjectIds          Json?
+  teacherIds          Json?
+  studentIds          Json?
+  isAnonymousToTarget Boolean                @default(true)
+  minimumResponses    Int                    @default(5)
+  createdById         String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  template    FeedbackTemplate     @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  session     AcademicSession?     @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  assignments FeedbackAssignment[]
+
+  @@index([tenantId, status, startsAt])
+  @@index([tenantId, templateId])
+}
+
+model FeedbackAssignment {
+  id            String                   @id @default(cuid())
+  tenantId      String
+  campaignId    String
+  templateId    String
+  studentId     String?
+  parentId      String?
+  targetStaffId String?
+  subjectId     String?
+  classLevelId  String?
+  sectionId     String?
+  periodKey     String
+  status        FeedbackAssignmentStatus @default(PENDING)
+  dueAt         DateTime?
+  submittedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+
+  campaign    FeedbackCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  template    FeedbackTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  student     Student?           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent      Parent?            @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  targetStaff Staff?             @relation("FeedbackTargetStaff", fields: [targetStaffId], references: [id], onDelete: SetNull)
+  subject     Subject?           @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  responses   FeedbackResponse[]
+
+  @@unique([tenantId, campaignId, studentId, targetStaffId, subjectId, periodKey])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, parentId, status])
+  @@index([tenantId, targetStaffId, status])
+}
+
+model FeedbackResponse {
+  id               String   @id @default(cuid())
+  tenantId         String
+  assignmentId     String
+  respondentUserId String
+  studentId        String?
+  parentId         String?
+  submittedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  assignment FeedbackAssignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student?             @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  parent     Parent?              @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  answers    FeedbackAnswer[]
+  concern    FeedbackConcern?
+  actions    FeedbackActionItem[]
+
+  @@unique([tenantId, assignmentId])
+  @@index([tenantId, submittedAt])
+}
+
+model FeedbackAnswer {
+  id         String   @id @default(cuid())
+  tenantId   String
+  responseId String
+  questionId String
+  rating     Int?
+  value      String?
+  createdAt  DateTime @default(now())
+
+  response   FeedbackResponse    @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question   FeedbackQuestion    @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  moderation FeedbackModeration?
+
+  @@unique([tenantId, responseId, questionId])
+  @@index([tenantId, questionId, rating])
+}
+
+model FeedbackConcern {
+  id         String                @id @default(cuid())
+  tenantId   String
+  responseId String                @unique
+  detail     String
+  status     FeedbackConcernStatus @default(NEW)
+  ownerId    String?
+  resolvedAt DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  response FeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt])
+}
+
+model FeedbackModeration {
+  id         String                   @id @default(cuid())
+  tenantId   String
+  answerId   String                   @unique
+  status     FeedbackModerationStatus @default(SUBMITTED)
+  flagReason String?
+  note       String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  answer FeedbackAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, createdAt])
+}
+
+model FeedbackActionItem {
+  id              String               @id @default(cuid())
+  tenantId        String
+  responseId      String?
+  concernId       String?
+  title           String
+  description     String?
+  category        String?
+  assigneeStaffId String?
+  priority        FeedbackPriority     @default(MEDIUM)
+  status          FeedbackActionStatus @default(OPEN)
+  dueAt           DateTime?
+  internalNotes   String?
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  response FeedbackResponse? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+  assignee Staff?            @relation("FeedbackActionAssignee", fields: [assigneeStaffId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, dueAt])
+  @@index([tenantId, assigneeStaffId, status])
+}
+
+model TeacherStudentFeedback {
+  id            String             @id @default(cuid())
+  tenantId      String
+  studentId     String
+  teacherId     String
+  subjectId     String?
+  classLevelId  String?
+  sectionId     String?
+  tags          Json?
+  performance   String?
+  participation String?
+  homework      String?
+  behaviour     String?
+  strengths     String?
+  improvement   String?
+  actions       String?
+  comment       String?
+  visibility    FeedbackVisibility @default(STUDENT_AND_PARENT)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Staff   @relation("TeacherStudentFeedbackAuthor", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, teacherId, createdAt])
 }
 
 enum InvoiceStatus {
