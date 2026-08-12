@@ -41,6 +41,11 @@ export const PERMISSIONS: PermissionDef[] = [
   ...mod('parents', [...CRUD, ['export', 'Export']]),
   ...mod('staff', [...CRUD, ['export', 'Export'], ['payroll', 'View payroll data']]),
 
+  ...mod('assessments', [
+    ...CRUD,
+    ['approve', 'Approve a paper for use'],
+    ['export', 'Print and export papers'],
+  ]),
   ...mod('questionbank', [
     ...CRUD,
     ['share', 'Share questions with the school'],

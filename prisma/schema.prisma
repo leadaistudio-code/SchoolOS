@@ -465,6 +465,7 @@ model AcademicSession {
   feeStructures FeeStructure[]
   exams         Exam[]
   curricula     Curriculum[]
+  assessments   Assessment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isCurrent])
@@ -511,6 +512,7 @@ model Section {
   timetableSlots TimetableSlot[]
   homework       Homework[]
   classwork      Classwork[]
+  assessments    Assessment[]
 
   @@unique([tenantId, classLevelId, name])
   @@index([tenantId])
@@ -546,6 +548,7 @@ model ClassSubject {
   examSubjects ExamSubject[]
   curricula    Curriculum[]
   questions    Question[]
+  assessments  Assessment[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
@@ -751,9 +754,11 @@ model Question {
   updatedAt      DateTime           @updatedAt
   deletedAt      DateTime?
 
-  classSubject ClassSubject     @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject         @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
   options      QuestionOption[]
   topics       QuestionTopic[]
+  placements   AssessmentQuestion[]
+  usages       QuestionUsage[]
 
   @@index([tenantId, classSubjectId, status])
   @@index([tenantId, fingerprint])
@@ -788,6 +793,190 @@ model QuestionTopic {
 
   @@unique([tenantId, questionId, topicId])
   @@index([tenantId, topicId])
+}
+
+/// ---------------------------------------------------------------------------
+/// Assessments
+///
+/// A question paper. Separate from `Exam`, which is the formal examination a
+/// report card is computed from: a fortnightly practice test is an assessment
+/// and has no business in a report card, while a half-yearly is both. Keeping
+/// them apart means the daily instrument can be used freely without every
+/// result reaching a parent, and `AssessmentResult` is promoted into `Mark`
+/// deliberately rather than by default.
+/// ---------------------------------------------------------------------------
+
+enum AssessmentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ASSIGNED
+  CLOSED
+}
+
+/// The test types from the spec, as rows rather than an enum, because a school
+/// has to be able to add its own. The seeded ones are `isSystem` and cannot be
+/// deleted, only deactivated.
+model AssessmentType {
+  id        String   @id @default(cuid())
+  tenantId  String
+  key       String
+  name      String
+  /// Suggested defaults a teacher can override, so picking "Unit Test" fills
+  /// the form rather than leaving it blank.
+  marks     Float?
+  minutes   Int?
+  isSystem  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  assessments Assessment[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, isActive, position])
+}
+
+/// Header and print settings. Multiple per school — a unit test slip and a
+/// board-style paper are not laid out the same way.
+model PaperTemplate {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  name                String
+  /// Overrides the school name in the header when a campus prints its own.
+  headingOverride     String?
+  showLogo            Boolean   @default(true)
+  showStudentName     Boolean   @default(true)
+  showRollNumber      Boolean   @default(true)
+  showDate            Boolean   @default(true)
+  generalInstructions String?
+  footerNote          String?
+  isDefault           Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  assessments Assessment[]
+
+  @@index([tenantId, isDefault])
+}
+
+model Assessment {
+  id               String           @id @default(cuid())
+  tenantId         String
+  sessionId        String
+  classSubjectId   String
+  /// Narrows the paper to one section when it is set for one; null means the
+  /// whole class level.
+  sectionId        String?
+  assessmentTypeId String
+  templateId       String?
+  title            String
+  /// What the teacher declared. Compared against the sum of placed questions,
+  /// so the builder can say the paper does not add up rather than silently
+  /// printing a 38-mark paper titled 40.
+  totalMarks       Float
+  durationMinutes  Int
+  instructions     String?
+  /// Free-text notes printed at the head of the answer key.
+  answerKeyNotes   String?
+  status           AssessmentStatus @default(DRAFT)
+  /// Set A / Set B / Set C. Null on the original; variants point at it.
+  parentId         String?
+  setLabel         String?
+  createdById      String?
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  session      AcademicSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject         @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  section      Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  type         AssessmentType       @relation(fields: [assessmentTypeId], references: [id])
+  template     PaperTemplate?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  parent       Assessment?          @relation("AssessmentSets", fields: [parentId], references: [id], onDelete: Cascade)
+  sets         Assessment[]         @relation("AssessmentSets")
+  sections     AssessmentSection[]
+  questions    AssessmentQuestion[]
+  usages       QuestionUsage[]
+
+  @@index([tenantId, classSubjectId, status])
+  @@index([tenantId, sessionId, createdAt])
+  @@index([tenantId, createdById])
+}
+
+model AssessmentSection {
+  id           String  @id @default(cuid())
+  tenantId     String
+  assessmentId String
+  /// "Section A". Printed as given.
+  title        String
+  instructions String?
+  position     Int     @default(0)
+
+  assessment Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questions  AssessmentQuestion[]
+
+  @@index([tenantId, assessmentId, position])
+}
+
+/// A question placed in a paper.
+///
+/// The text, options and answer are copied here at placement rather than read
+/// through to `Question` every time. A paper that has been sat is a record: if
+/// a colleague later corrects a typo in the bank, or archives the question
+/// entirely, last term's paper and the answers marked against it must not
+/// change underneath. The bank link is kept for analytics, and it is nullable
+/// for exactly that reason.
+model AssessmentQuestion {
+  id                 String             @id @default(cuid())
+  tenantId           String
+  assessmentId       String
+  sectionId          String
+  questionId         String?
+  position           Int                @default(0)
+  /// Marks for this placement. Defaults from the bank question and can differ:
+  /// the same question is worth more in a long-answer section.
+  marks              Float
+  textSnapshot       String
+  /// Options as placed: [{ text, isCorrect, matchWith }]. Json because the
+  /// shape varies by type and this copy is never queried, only rendered.
+  optionsSnapshot    Json?
+  /// The answer key entry. Seeded from the bank question's solution, then
+  /// editable per paper without touching the bank.
+  answerSnapshot     String?
+  typeSnapshot       QuestionType
+  difficultySnapshot QuestionDifficulty
+  createdAt          DateTime           @default(now())
+
+  assessment Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  section    AssessmentSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  question   Question?         @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, assessmentId, position])
+  @@index([tenantId, sectionId, position])
+  @@index([tenantId, questionId])
+}
+
+/// When a question was last used, and where.
+///
+/// Written on approval, not on placement: a question dragged into a draft and
+/// then removed was never asked. This is what stops the same five questions
+/// appearing in every fortnightly test.
+model QuestionUsage {
+  id           String   @id @default(cuid())
+  tenantId     String
+  questionId   String
+  assessmentId String
+  usedOn       DateTime @default(now())
+
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, questionId, assessmentId])
+  @@index([tenantId, questionId, usedOn])
 }
 
 enum Gender {
