@@ -29,6 +29,14 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
               {ASSESSMENT_STATUS_LABEL[assessment.status] ?? assessment.status}
             </Badge>
             {assessment.setLabel && <Badge tone="neutral">Set {assessment.setLabel}</Badge>}
+            {ctx.can('assessments.assign') && assessment.status !== 'DRAFT' && (
+              <Link
+                href={`/assessments/${assessment.id}/assign`}
+                className={buttonVariants({ variant: 'primary', size: 'sm' })}
+              >
+                Assign
+              </Link>
+            )}
             {ctx.can('assessments.export') && (
               <Link
                 href={`/assessments/${assessment.id}/print`}

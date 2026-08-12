@@ -481,16 +481,17 @@ model ClassLevel {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  session        AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sections       Section[]
-  subjects       ClassSubject[]
-  enrollments    Enrollment[]
-  feeStructures  FeeStructure[]
-  examClasses    ExamClass[]
-  timetableSlots TimetableSlot[]
-  homework       Homework[]
-  classwork      Classwork[]
-  noticeTargets  NoticeTarget[]
+  session               AcademicSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sections              Section[]
+  subjects              ClassSubject[]
+  enrollments           Enrollment[]
+  feeStructures         FeeStructure[]
+  examClasses           ExamClass[]
+  timetableSlots        TimetableSlot[]
+  homework              Homework[]
+  classwork             Classwork[]
+  noticeTargets         NoticeTarget[]
+  assessmentAssignments AssessmentAssignment[]
 
   @@unique([tenantId, sessionId, name])
   @@index([tenantId, sessionId])
@@ -506,13 +507,14 @@ model Section {
   classTeacherId String?
   deletedAt      DateTime?
 
-  classLevel     ClassLevel      @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
-  classTeacher   Staff?          @relation("SectionClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
-  enrollments    Enrollment[]
-  timetableSlots TimetableSlot[]
-  homework       Homework[]
-  classwork      Classwork[]
-  assessments    Assessment[]
+  classLevel            ClassLevel             @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  classTeacher          Staff?                 @relation("SectionClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
+  enrollments           Enrollment[]
+  timetableSlots        TimetableSlot[]
+  homework              Homework[]
+  classwork             Classwork[]
+  assessments           Assessment[]
+  assessmentAssignments AssessmentAssignment[]
 
   @@unique([tenantId, classLevelId, name])
   @@index([tenantId])
@@ -891,16 +893,17 @@ model Assessment {
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
 
-  session      AcademicSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  classSubject ClassSubject         @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
-  section      Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  type         AssessmentType       @relation(fields: [assessmentTypeId], references: [id])
-  template     PaperTemplate?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  parent       Assessment?          @relation("AssessmentSets", fields: [parentId], references: [id], onDelete: Cascade)
-  sets         Assessment[]         @relation("AssessmentSets")
+  session      AcademicSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject           @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  section      Section?               @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  type         AssessmentType         @relation(fields: [assessmentTypeId], references: [id])
+  template     PaperTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  parent       Assessment?            @relation("AssessmentSets", fields: [parentId], references: [id], onDelete: Cascade)
+  sets         Assessment[]           @relation("AssessmentSets")
   sections     AssessmentSection[]
   questions    AssessmentQuestion[]
   usages       QuestionUsage[]
+  assignments  AssessmentAssignment[]
 
   @@index([tenantId, classSubjectId, status])
   @@index([tenantId, sessionId, createdAt])
@@ -954,6 +957,7 @@ model AssessmentQuestion {
   assessment Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   section    AssessmentSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   question   Question?         @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  answers    StudentAnswer[]
 
   @@index([tenantId, assessmentId, position])
   @@index([tenantId, sectionId, position])
@@ -977,6 +981,135 @@ model QuestionUsage {
 
   @@unique([tenantId, questionId, assessmentId])
   @@index([tenantId, questionId, usedOn])
+}
+
+/// ---------------------------------------------------------------------------
+/// Sitting a paper
+///
+/// An assignment is a paper given to a group at a time. The attempt is one
+/// student's sitting of it, and the answers hang off the attempt rather than
+/// off the student, so a second attempt is a second row rather than an
+/// overwrite of the first.
+/// ---------------------------------------------------------------------------
+
+enum AssessmentMode {
+  /// Sat on paper. The application records who it was set for and marks are
+  /// entered later; there is no attempt to run.
+  OFFLINE
+  /// Answered in the student portal, timed.
+  ONLINE
+  /// Answered in the portal, untimed and unmarked — revision.
+  PRACTICE
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EVALUATED
+}
+
+model AssessmentAssignment {
+  id              String         @id @default(cuid())
+  tenantId        String
+  assessmentId    String
+  /// Who it is set for. A section is the common case; a class level with no
+  /// section means every section of that class.
+  classLevelId    String?
+  sectionId       String?
+  mode            AssessmentMode @default(OFFLINE)
+  opensAt         DateTime
+  dueAt           DateTime
+  /// Overrides the paper's own duration for this sitting, when a class is
+  /// given extra time.
+  minutesOverride Int?
+
+  /// Online options. Defaults are the conservative reading of each: the paper
+  /// as written, in order, with the student able to go back.
+  shuffleQuestions   Boolean @default(false)
+  shuffleOptions     Boolean @default(false)
+  onePerScreen       Boolean @default(false)
+  allowBack          Boolean @default(true)
+  /// Submits whatever is saved when the timer runs out, rather than losing it.
+  autoSubmit         Boolean @default(true)
+  attemptLimit       Int     @default(1)
+  /// Practice tests can show the score immediately; a real test should not,
+  /// because a result is released by a teacher and not by a clock.
+  showResultOnSubmit Boolean @default(false)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  assessment Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  classLevel ClassLevel?         @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
+  section    Section?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  attempts   AssessmentAttempt[]
+
+  @@index([tenantId, assessmentId])
+  @@index([tenantId, sectionId, opensAt])
+  @@index([tenantId, dueAt])
+}
+
+model AssessmentAttempt {
+  id             String        @id @default(cuid())
+  tenantId       String
+  assignmentId   String
+  studentId      String
+  attemptNumber  Int           @default(1)
+  status         AttemptStatus @default(IN_PROGRESS)
+  startedAt      DateTime      @default(now())
+  submittedAt    DateTime?
+  /// True when the timer submitted it rather than the student. Kept because a
+  /// run of auto-submissions in one section usually means the paper was too
+  /// long, not that the class was slow.
+  autoSubmitted  Boolean       @default(false)
+  /// Objective marks, computed at submission. Null until then, and it stays
+  /// partial until a teacher marks the written answers.
+  objectiveScore Float?
+  /// Everything, once evaluation is finished.
+  totalScore     Float?
+  evaluatedById  String?
+  evaluatedAt    DateTime?
+  /// Released to the student. A score existing and a student being allowed to
+  /// see it are different facts.
+  publishedAt    DateTime?
+  teacherComment String?
+
+  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers    StudentAnswer[]
+
+  @@unique([tenantId, assignmentId, studentId, attemptNumber])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, assignmentId, status])
+}
+
+model StudentAnswer {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  attemptId            String
+  assessmentQuestionId String
+  /// Written answers, and the typed answer for one-word and fill-in-the-blank.
+  responseText         String?
+  /// Chosen option indexes, against the placement's option snapshot. Indexes
+  /// rather than ids because the snapshot is the paper as sat, and shuffling
+  /// is presentation only — the server always scores against the original
+  /// order.
+  selectedIndexes      Json?
+  /// Set at submission for objective types, by a teacher for the rest.
+  isCorrect            Boolean?
+  marksAwarded         Float?
+  teacherComment       String?
+  evaluatedById        String?
+  evaluatedAt          DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  attempt            AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  assessmentQuestion AssessmentQuestion @relation(fields: [assessmentQuestionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, attemptId, assessmentQuestionId])
+  @@index([tenantId, attemptId])
 }
 
 enum Gender {
@@ -1046,6 +1179,7 @@ model Student {
   documents           Document[]
   sportsTeams         SportsTeamMember[]
   disciplineRecords   DisciplineRecord[]
+  assessmentAttempts  AssessmentAttempt[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])

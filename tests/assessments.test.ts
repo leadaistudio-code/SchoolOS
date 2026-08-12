@@ -170,11 +170,20 @@ describe('assessment wiring', () => {
     expect(teacher?.permissions).toContain('assessments.approve')
   })
 
-  it('keeps papers away from students and parents', () => {
-    for (const key of [ROLE.STUDENT, ROLE.PARENT]) {
-      const role = SYSTEM_ROLES.find((r) => r.key === key)
-      expect(role?.permissions.some((p) => p.startsWith('assessments.'))).toBe(false)
+  it('lets a student sit a paper and nothing else', () => {
+    const student = SYSTEM_ROLES.find((r) => r.key === ROLE.STUDENT)
+    expect(student?.permissions).toContain('assessments.attempt')
+
+    // The rest of the module is the teacher's. A student holding
+    // assessments.view could read the paper before it opened.
+    for (const key of ['view', 'create', 'edit', 'delete', 'approve', 'assign', 'export']) {
+      expect(student?.permissions).not.toContain(`assessments.${key}`)
     }
+  })
+
+  it('keeps parents out of the module entirely', () => {
+    const parent = SYSTEM_ROLES.find((r) => r.key === ROLE.PARENT)
+    expect(parent?.permissions.some((p) => p.startsWith('assessments.'))).toBe(false)
   })
 
   it('registers every model with the tenant client', () => {

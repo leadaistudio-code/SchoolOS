@@ -100,6 +100,14 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'My Assessments',
+    href: '/my/assessments',
+    icon: 'ClipboardCheck',
+    section: 'ACADEMICS' as const,
+    permission: 'assessments.attempt',
+    mobile: true,
+  },
+  {
     label: 'Assessments',
     href: '/assessments',
     icon: 'FilePlus2',
