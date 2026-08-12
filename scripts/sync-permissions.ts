@@ -49,6 +49,17 @@ async function main() {
   const dryRun = process.argv.includes('--dry-run')
 
   try {
+    // Two services deploy from the same branch, so two pre-deploy steps can run
+    // this at the same moment against one database. Each role is re-granted by
+    // deleting its rows and writing them back; interleave two of those and a
+    // role can end up short of permissions, or — for the instant between the
+    // delete and the insert — with none at all, which a session reading rights
+    // in that window would see. The lock makes the second run wait rather than
+    // overlap. The key is arbitrary and constant; only agreement matters.
+    if (!dryRun) {
+      await prisma.$executeRawUnsafe('SELECT pg_advisory_lock($1)', 4218771)
+    }
+
     const before = await prisma.permission.count()
 
     if (!dryRun) {
@@ -136,6 +147,11 @@ async function main() {
     if (dryRun) console.log('\nDry run — nothing was written.')
     else console.log('\nDone. Users must sign out and in again for new rights to reach a session.')
   } finally {
+    if (!dryRun) {
+      await prisma
+        .$executeRawUnsafe('SELECT pg_advisory_unlock($1)', 4218771)
+        .catch(() => {})
+    }
     await prisma.$disconnect()
   }
 }
