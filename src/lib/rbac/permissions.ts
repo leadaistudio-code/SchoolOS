@@ -50,6 +50,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ...CRUD,
     ['share', 'Share questions with the school'],
     ['approve', 'Approve draft questions'],
+    ['generate', 'Generate questions with AI'],
   ]),
   ...mod('curriculum', [
     ['view', 'View the syllabus'],

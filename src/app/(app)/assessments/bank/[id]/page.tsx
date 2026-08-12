@@ -1,5 +1,8 @@
 import { requireContext } from '@/server/context'
 import { getQuestion } from '@/server/modules/questions/service'
+import { assistantConfigured } from '@/server/assistant/providers'
+import { hasFeature } from '@/server/entitlements'
+import { FEATURE } from '@/lib/features'
 import {
   BLOOM_LABEL,
   QUESTION_TYPE_LABEL,
@@ -17,6 +20,11 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   const { id } = await params
   const ctx = await requireContext('questionbank.view')
   const question = await getQuestion(ctx, id)
+  const canTransform =
+    ctx.can('questionbank.generate') &&
+    assistantConfigured() &&
+    (await hasFeature(ctx.tenant.id, FEATURE.MODULE_AI_ASSIST)) &&
+    question.topics.length > 0
 
   return (
     <div>
@@ -34,6 +42,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
             status={question.status}
             canApprove={ctx.can('questionbank.approve')}
             canDelete={ctx.can('questionbank.delete')}
+            canTransform={canTransform}
           />
         }
       />

@@ -3,6 +3,9 @@ import { requireContext } from '@/server/context'
 import { bankSummary, listQuestions, questionFilterSchema } from '@/server/modules/questions/service'
 import { QUESTION_TYPE_LABEL, type QuestionTypeKey } from '@/lib/questions'
 import { listCoverage } from '@/server/modules/curriculum/service'
+import { assistantConfigured } from '@/server/assistant/providers'
+import { hasFeature } from '@/server/entitlements'
+import { FEATURE } from '@/lib/features'
 import { parseListQuery } from '@/lib/query'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
@@ -36,13 +39,17 @@ export default async function QuestionBankPage({
   const query = parseListQuery(flat)
   const filter = questionFilterSchema.parse(flat)
 
-  const [{ rows, total }, summary, coverage] = await Promise.all([
+  const [{ rows, total }, summary, coverage, licensed] = await Promise.all([
     listQuestions(ctx, query, filter),
     bankSummary(ctx, filter.classSubjectId),
     listCoverage(ctx),
+    hasFeature(ctx.tenant.id, FEATURE.MODULE_AI_ASSIST),
   ])
 
   const canCreate = ctx.can('questionbank.create')
+  // Hidden rather than disabled when generation is off: a button that explains
+  // why it cannot work is still a button that cannot work.
+  const canGenerate = ctx.can('questionbank.generate') && licensed && assistantConfigured()
 
   return (
     <div>
@@ -51,11 +58,21 @@ export default async function QuestionBankPage({
         description={`${total} questions match · ${summary.total} approved in all`}
         breadcrumbs={[{ label: 'Assessments', href: '/assessments/bank' }, { label: 'Question bank' }]}
         actions={
-          canCreate ? (
-            <Link href="/assessments/bank/new" className={buttonVariants({ variant: 'primary' })}>
-              New question
-            </Link>
-          ) : null
+          <div className="flex items-center gap-2">
+            {canGenerate && (
+              <Link
+                href="/assessments/bank/generate"
+                className={buttonVariants({ variant: 'secondary' })}
+              >
+                Generate with AI
+              </Link>
+            )}
+            {canCreate && (
+              <Link href="/assessments/bank/new" className={buttonVariants({ variant: 'primary' })}>
+                New question
+              </Link>
+            )}
+          </div>
         }
       />
 

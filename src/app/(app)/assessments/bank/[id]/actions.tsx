@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 
 /**
@@ -12,16 +13,27 @@ import { useToast } from '@/components/ui/toast'
  * drafts have to pass in Phase D, and a gate sharing a button with "save" is a
  * gate that gets opened by accident.
  */
+const TRANSFORMS = [
+  { key: 'EASIER', label: 'Make easier' },
+  { key: 'HARDER', label: 'Make harder' },
+  { key: 'SIMPLIFY', label: 'Simplify language' },
+  { key: 'SIMILAR', label: 'Similar question' },
+  { key: 'TO_MCQ', label: 'Convert to MCQ' },
+  { key: 'TO_DESCRIPTIVE', label: 'Convert to descriptive' },
+] as const
+
 export function QuestionActions({
   id,
   status,
   canApprove,
   canDelete,
+  canTransform,
 }: {
   id: string
   status: string
   canApprove: boolean
   canDelete: boolean
+  canTransform: boolean
 }) {
   const router = useRouter()
   const { push } = useToast()
@@ -55,7 +67,56 @@ export function QuestionActions({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {canTransform && (
+        <Select
+          aria-label="Create a variant with AI"
+          value=""
+          disabled={busy}
+          className="w-48"
+          onChange={async (event) => {
+            const action = event.target.value
+            if (!action) return
+            event.target.value = ''
+            setBusy(true)
+            try {
+              const res = await fetch(`/api/v1/questions/${id}/transform`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ action }),
+              })
+              const parsed = await res.json().catch(() => null)
+              if (!res.ok) {
+                push({
+                  tone: 'error',
+                  title: 'Could not create a variant',
+                  description: parsed?.error?.message ?? 'Please try again.',
+                })
+                return
+              }
+              push({
+                tone: 'success',
+                title: 'Draft variant created',
+                description: 'The original is unchanged.',
+              })
+              router.push(`/assessments/bank/${parsed.data.id}`)
+              router.refresh()
+            } catch {
+              push({ tone: 'error', title: 'Network error', description: 'Please try again.' })
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <option value="">Create a variant…</option>
+          {TRANSFORMS.map((transform) => (
+            <option key={transform.key} value={transform.key}>
+              {transform.label}
+            </option>
+          ))}
+        </Select>
+      )}
+
       {canApprove && status === 'DRAFT' && (
         <Button
           size="sm"
