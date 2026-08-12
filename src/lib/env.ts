@@ -22,6 +22,20 @@ const serverSchema = z.object({
    */
   APP_ROLE: z.enum(['both', 'app', 'marketing']).default('both'),
   APP_URL: z.string().default('http://lvh.me:3000'),
+  /**
+   * Where the website's "Sign in" should send people, when that cannot be
+   * worked out from the address they are on.
+   *
+   * Normally it can: every school is a subdomain of `APP_ROOT_DOMAIN`, so the
+   * website asks for the school's short name and builds the address. That
+   * assumes the root domain has wildcard DNS, which a `*.up.railway.app`
+   * hostname does not — no subdomain of it resolves, so the finder can only
+   * produce dead addresses. Setting this replaces the finder with a redirect
+   * to a single known sign-in page.
+   *
+   * Leave it unset once the real domain is attached and the finder works again.
+   */
+  APP_SIGN_IN_URL: z.string().url().optional(),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 

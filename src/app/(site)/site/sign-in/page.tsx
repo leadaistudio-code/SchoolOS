@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { Container } from '@/components/site/container'
 import { SchoolFinder } from '@/components/site/school-finder'
+import { env } from '@/lib/env'
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -15,8 +17,18 @@ export const metadata: Metadata = {
  * There is nothing to sign into here: every school has its own address, and a
  * single shared login page would have to ask which school you belong to before
  * it could do anything. So the page does exactly that, and sends you there.
+ *
+ * Unless `APP_SIGN_IN_URL` is set, in which case there is one known place to
+ * send everybody and asking would be theatre. That is the case on a deployment
+ * whose root domain has no wildcard — a `*.up.railway.app` hostname — where
+ * the finder can only ever build an address that does not resolve.
  */
+export const dynamic = 'force-dynamic'
+
 export default function SignInPage() {
+  const direct = env().APP_SIGN_IN_URL
+  if (direct) redirect(direct)
+
   return (
     <div className="bg-[var(--page)] py-24">
       <Container>

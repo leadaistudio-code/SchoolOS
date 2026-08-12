@@ -243,6 +243,7 @@ To do it, deploy the same repository twice and set `APP_ROLE` on each:
 | `APP_URL` | `https://yourdomain.com` | `https://yourdomain.com` |
 | `APP_ROOT_DOMAIN` | `yourdomain.com` | `yourdomain.com` |
 | `AI_*` | omit | set |
+| `APP_SIGN_IN_URL` | the app service's `/login` | omit |
 | `DATABASE_URL`, `REDIS_URL` | same references | same references |
 
 `APP_ROLE` matters more than it looks. Both services still answer on their own
@@ -252,6 +253,13 @@ the application's API on it. With `APP_ROLE=marketing` that deployment serves th
 website on every hostname and redirects application paths to the front page;
 with `APP_ROLE=app` it refuses `/site/*`, so the same pages never answer on two
 domains. Both are covered by `tests/middleware.test.ts`.
+
+`APP_SIGN_IN_URL` is only needed while you are on Railway-provided hostnames.
+The website's "Sign in" asks for a school's short name and builds
+`<slug>.<root domain>` — which requires wildcard DNS, and no subdomain of a
+`*.up.railway.app` hostname resolves. Setting it makes `/sign-in` redirect to
+one known login page instead of offering a form that can only produce dead
+addresses. Unset it once step 6's wildcard is in place and the finder works.
 
 Two things people expect to be true and are not:
 
