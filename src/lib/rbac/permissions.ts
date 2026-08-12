@@ -46,6 +46,8 @@ export const PERMISSIONS: PermissionDef[] = [
     ['assign', 'Assign a paper to students'],
     ['approve', 'Approve a paper for use'],
     ['attempt', 'Sit an assigned paper'],
+    ['evaluate', 'Mark submitted papers'],
+    ['publish', 'Release results to students'],
     ['export', 'Print and export papers'],
   ]),
   ...mod('questionbank', [

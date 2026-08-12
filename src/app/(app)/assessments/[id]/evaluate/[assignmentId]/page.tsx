@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { assignmentProgress } from '@/server/modules/assessments/attempts'
 import { PageHeader } from '@/components/page-header'
@@ -7,6 +8,8 @@ import { Metric, MetricRow } from '@/components/ui/metric'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { formatDay } from '@/lib/dates'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { PublishResults } from './publish'
 
 export const metadata = { title: 'Attempts' }
 
@@ -45,6 +48,7 @@ export default async function AttemptsPage({
   ).length
   const notStarted = rows.filter((row) => row.status === 'NOT_STARTED').length
   const marked = rows.filter((row) => row.status === 'EVALUATED').length
+  const released = rows.filter((row) => row.published).length
 
   return (
     <div>
@@ -56,6 +60,19 @@ export default async function AttemptsPage({
           { label: assignment.title, href: `/assessments/${id}` },
           { label: 'Attempts' },
         ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/assessments/${id}/evaluate/${assignmentId}/analytics`}
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Analytics
+            </Link>
+            {ctx.can('assessments.publish') && (
+              <PublishResults assignmentId={assignmentId} pending={marked - released} />
+            )}
+          </div>
+        }
       />
 
       <MetricRow columns={4}>
@@ -108,7 +125,16 @@ export default async function AttemptsPage({
                     </TD>
                     <TD className="text-sm text-ink-muted">{row.published ? 'Yes' : 'No'}</TD>
                     <TD align="right">
-                      <span className="text-sm text-ink-subtle">—</span>
+                      {row.attemptId && row.status !== 'IN_PROGRESS' ? (
+                        <Link
+                          href={`/assessments/${id}/evaluate/${assignmentId}/${row.attemptId}`}
+                          className="text-sm font-medium text-brand-600 hover:underline"
+                        >
+                          {row.status === 'EVALUATED' ? 'Review' : 'Mark'}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-ink-subtle">—</span>
+                      )}
                     </TD>
                   </TR>
                 ))}

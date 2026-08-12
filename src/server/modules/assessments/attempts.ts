@@ -284,6 +284,9 @@ export async function myAssessments(ctx: AppContext) {
       state,
       canStart: open && assignment.mode !== 'OFFLINE' && attemptsUsed < assignment.attemptLimit,
       attemptId: latest?.status === 'IN_PROGRESS' ? latest.id : null,
+      // Only set once released, so the portal cannot link to a result that
+      // does not exist yet — the API would refuse it anyway.
+      resultAttemptId: latest?.publishedAt ? latest.id : null,
       // A score exists as soon as it is computed; it is shown only once
       // released. Those are different facts and the portal must not conflate
       // them.

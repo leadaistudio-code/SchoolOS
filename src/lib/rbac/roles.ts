@@ -102,6 +102,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'questionbank.share', 'questionbank.approve', 'questionbank.generate',
       'assessments.view', 'assessments.create', 'assessments.edit', 'assessments.delete',
       'assessments.approve', 'assessments.export', 'assessments.assign',
+      'assessments.evaluate', 'assessments.publish',
       'timetable.view',
       'homework.view', 'homework.create', 'homework.edit', 'homework.delete', 'homework.review',
       'classwork.view', 'classwork.create', 'classwork.edit', 'classwork.delete',

@@ -70,11 +70,14 @@ export default async function MyAssessmentsPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {row.score !== null && (
-                      <span className="text-sm tnum text-ink">
-                        {row.score} / {row.totalMarks}
-                      </span>
-                    )}
+                    {row.resultAttemptId ? (
+                      <Link
+                        href={`/my/results/${row.resultAttemptId}`}
+                        className="text-sm font-medium text-brand-600 hover:underline tnum"
+                      >
+                        {row.score} / {row.totalMarks} — see the paper
+                      </Link>
+                    ) : null}
                     {row.canStart && (
                       <Link
                         href={`/my/assessments/${row.assignmentId}/attempt`}
