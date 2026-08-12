@@ -47,6 +47,48 @@ export const accessibleStudentIds = cache(
   },
 )
 
+/**
+ * The class-subjects a teacher may act on, or `null` for no restriction.
+ *
+ * The same shape as `accessibleStudentIds` and for the same reason:
+ * `curriculum.manage` says a role may edit a syllabus, not whose. A teacher
+ * holds it and must still be confined to the subjects they actually take, which
+ * `ClassSubject.teacherId` already records. Coordinators, principals and admins
+ * carry other roles alongside, so they fall through unrestricted.
+ *
+ * Returns an empty array — not `null` — for a teacher with no assigned
+ * subjects, so an unassigned account sees nothing rather than everything.
+ */
+export const teachingClassSubjectIds = cache(
+  async (ctx: AppContext): Promise<string[] | null> => {
+    const roles = ctx.user.roleKeys
+    if (!roles.every((r) => r === ROLE.TEACHER)) return null
+
+    const staff = await ctx.db.staff.findFirst({
+      where: { userId: ctx.user.userId },
+      select: { id: true },
+    })
+    if (!staff) return []
+
+    const rows = await ctx.db.classSubject.findMany({
+      where: { teacherId: staff.id },
+      select: { id: true },
+    })
+    return rows.map((r) => r.id)
+  },
+)
+
+/** Throws unless the caller may act on this specific class-subject. */
+export async function assertClassSubjectAccess(ctx: AppContext, classSubjectId: string) {
+  const ids = await teachingClassSubjectIds(ctx)
+  if (ids === null) return
+  if (!ids.includes(classSubjectId)) {
+    const err = new Error('You do not teach this subject')
+    ;(err as { status?: number }).status = 403
+    throw err
+  }
+}
+
 /** Prisma `where` fragment that applies the row restriction, if any. */
 export async function studentScopeWhere(ctx: AppContext) {
   const ids = await accessibleStudentIds(ctx)

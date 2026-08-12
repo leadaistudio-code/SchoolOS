@@ -92,6 +92,7 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Classes & Sections', href: '/academics/classes', icon: 'Layers', permission: 'academics.view' },
       { label: 'Subjects', href: '/academics/subjects', icon: 'BookMarked', permission: 'academics.view' },
+      { label: 'Syllabus', href: '/academics/curriculum', icon: 'ListTree', permission: 'curriculum.view' },
       { label: 'Homework', href: '/academics/homework', icon: 'ClipboardList', permission: 'homework.view' },
       { label: 'Classwork', href: '/academics/classwork', icon: 'PenLine', permission: 'classwork.view' },
       { label: 'Timetable', href: '/academics/timetable', icon: 'Clock', permission: 'timetable.view' },

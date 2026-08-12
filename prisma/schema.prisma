@@ -5,7 +5,7 @@
 // (prisma/migrations/*_rls/migration.sql).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // The build machine and the runtime are different Linux distributions on
   // most serverless hosts: Netlify builds on Debian and runs the functions on
   // Amazon Linux. Without the second target the client builds cleanly and then
@@ -464,6 +464,7 @@ model AcademicSession {
   enrollments   Enrollment[]
   feeStructures FeeStructure[]
   exams         Exam[]
+  curricula     Curriculum[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isCurrent])
@@ -543,6 +544,7 @@ model ClassSubject {
   homework     Homework[]
   classwork    Classwork[]
   examSubjects ExamSubject[]
+  curricula    Curriculum[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
@@ -551,6 +553,115 @@ model ClassSubject {
 // ===========================================================================
 // PEOPLE - STUDENTS, PARENTS, STAFF
 // ===========================================================================
+
+/// ---------------------------------------------------------------------------
+/// Curriculum
+///
+/// The syllabus, as structure rather than prose. `Classwork.topic` records what
+/// a teacher covered on a day as free text, which is right for a lesson log and
+/// useless for anything that has to reason about coverage: it cannot answer
+/// "which topics are in chapter 2", so it cannot scope a question paper either.
+///
+/// One curriculum per class-subject per session, because the same subject in
+/// the same class changes between years and last year's paper must still resolve
+/// to the syllabus it was set from.
+/// ---------------------------------------------------------------------------
+
+enum BloomLevel {
+  REMEMBER
+  UNDERSTAND
+  APPLY
+  ANALYZE
+  EVALUATE
+  CREATE
+}
+
+model Curriculum {
+  id             String    @id @default(cuid())
+  tenantId       String
+  sessionId      String
+  classSubjectId String
+  /// Free-text label, e.g. "CBSE Science VIII". Falls back to the subject name.
+  title          String?
+  /// CBSE, ICSE, IB, state board - recorded, not validated against a list.
+  board          String?
+  description    String?
+  /// Draft curricula are invisible to paper generation, so a half-entered
+  /// syllabus cannot silently narrow what a question may be set from.
+  isPublished    Boolean   @default(false)
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  session      AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject    @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  chapters     Chapter[]
+
+  @@unique([tenantId, sessionId, classSubjectId])
+  @@index([tenantId, sessionId, isPublished])
+}
+
+model Chapter {
+  id           String    @id @default(cuid())
+  tenantId     String
+  curriculumId String
+  name         String
+  /// What the school calls it - "Ch 1", "Unit II". Display only.
+  code         String?
+  /// Manual ordering. Deliberately not unique: reordering a list would
+  /// otherwise need a temporary value to dodge the constraint mid-swap.
+  position     Int       @default(0)
+  /// Planned teaching periods, used later to weight coverage.
+  periods      Int?
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  curriculum Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  topics     Topic[]
+
+  @@index([tenantId, curriculumId, position])
+}
+
+model Topic {
+  id        String    @id @default(cuid())
+  tenantId  String
+  chapterId String
+  name      String
+  position  Int       @default(0)
+  /// A few sentences of substance. This is what grounds AI generation: a topic
+  /// called "Photosynthesis" tells a model nothing a paper can be set from,
+  /// and the summary is what stops it inventing scope of its own.
+  summary   String?
+  /// Share of the paper this topic should carry, when the school sets one.
+  weightage Float?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  chapter  Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  outcomes LearningOutcome[]
+
+  @@index([tenantId, chapterId, position])
+}
+
+model LearningOutcome {
+  id         String      @id @default(cuid())
+  tenantId   String
+  topicId    String
+  statement  String
+  bloomLevel BloomLevel?
+  position   Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, topicId, position])
+}
 
 enum Gender {
   MALE
@@ -1118,7 +1229,7 @@ model FeePayment {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  student     Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
   allocations FeePaymentAllocation[]
   receipt     FeeReceipt?
   refunds     FeeRefund[]
