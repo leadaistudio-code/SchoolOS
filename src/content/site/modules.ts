@@ -290,7 +290,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       {
         name: 'Concessions',
         blurb: 'Sibling, staff and scholarship concessions applied to the record, not to the receipt.',
-        status: 'planned',
+        status: 'available',
         route: '/finance/concessions',
       },
       {

@@ -205,6 +205,12 @@ export const concessionSchema = z.object({
   value: z.coerce.number().min(0),
   feeHeadId: z.string().optional(),
   reason: z.string().trim().max(300).optional(),
+  validFrom: isoDate.optional(),
+  validTo: isoDate.optional(),
+}).superRefine((input, ctx) => {
+  if (input.validFrom && input.validTo && input.validTo < input.validFrom) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['validTo'], message: 'End date must be on or after the start date' })
+  }
 })
 
 export async function grantConcession(ctx: AppContext, input: z.infer<typeof concessionSchema>) {
@@ -220,6 +226,11 @@ export async function grantConcession(ctx: AppContext, input: z.infer<typeof con
   })
   if (!student) throw notFound('Student')
 
+  if (input.feeHeadId) {
+    const feeHead = await ctx.db.feeHead.findFirst({ where: { id: input.feeHeadId, deletedAt: null }, select: { id: true } })
+    if (!feeHead) throw notFound('Fee head')
+  }
+
   const created = await ctx.db.feeConcession.create({
     data: {
       tenantId: ctx.tenant.id,
@@ -231,6 +242,8 @@ export async function grantConcession(ctx: AppContext, input: z.infer<typeof con
       feeHeadId: input.feeHeadId || null,
       reason: input.reason,
       approvedById: ctx.user.userId,
+      validFrom: input.validFrom ? attendanceDate(input.validFrom) : null,
+      validTo: input.validTo ? attendanceDate(input.validTo) : null,
     },
   })
 
@@ -246,6 +259,27 @@ export async function grantConcession(ctx: AppContext, input: z.infer<typeof con
     after: created,
   })
   return created
+}
+
+/** The concession register shown to finance staff before they generate invoices. */
+export async function listConcessions(ctx: AppContext) {
+  ctx.require('fees.concession')
+  return ctx.db.feeConcession.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      student: { select: { firstName: true, lastName: true, admissionNo: true } },
+    },
+  })
+}
+
+/** A deliberately small projection for the grant form; no guardian or contact data leaves this query. */
+export async function concessionStudents(ctx: AppContext) {
+  ctx.require('fees.concession')
+  return ctx.db.student.findMany({
+    where: { deletedAt: null, status: 'ACTIVE' },
+    orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    select: { id: true, firstName: true, lastName: true, admissionNo: true },
+  })
 }
 
 /* -------------------------------------------------------- invoice generation */
@@ -322,8 +356,17 @@ export async function generateInvoices(
 
   const studentIds = enrollments.map((e) => e.studentId)
 
+  const invoiceDate = attendanceDate(input.issuedOn)
   const [concessions, alreadyInvoiced] = await Promise.all([
-    ctx.db.feeConcession.findMany({ where: { studentId: { in: studentIds } } }),
+    ctx.db.feeConcession.findMany({
+      where: {
+        studentId: { in: studentIds },
+        AND: [
+          { OR: [{ validFrom: null }, { validFrom: { lte: invoiceDate } }] },
+          { OR: [{ validTo: null }, { validTo: { gte: invoiceDate } }] },
+        ],
+      },
+    }),
     ctx.db.feeInvoice.findMany({
       where: { studentId: { in: studentIds }, structureId: structure.id, title: input.title },
       select: { studentId: true },

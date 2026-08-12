@@ -153,7 +153,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Collect Payment', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
       { label: 'Payments', href: '/finance/payments', icon: 'CreditCard', permission: 'fees.view' },
       { label: 'Outstanding', href: '/finance/outstanding', icon: 'AlertCircle', permission: 'fees.view' },
-      { label: 'Concessions', href: '/finance/concessions', soon: true, icon: 'Percent', permission: 'fees.concession' },
+      { label: 'Concessions', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
     ],
   },
   {

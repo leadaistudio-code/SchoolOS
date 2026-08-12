@@ -12,8 +12,10 @@ import {
   startPaymentSchema,
 } from '@/server/modules/finance/payments'
 import {
+  concessionSchema,
   generateInvoices,
   generateInvoicesSchema,
+  grantConcession,
   type GenerationResult,
 } from '@/server/modules/finance/service'
 
@@ -26,6 +28,17 @@ function fail(err: unknown, fallback: string): ActionResult<never> {
     return { ok: false, message: err.issues[0]?.message ?? fallback }
   }
   return { ok: false, message: err instanceof Error ? err.message : fallback }
+}
+
+export async function grantConcessionAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.concession')
+  try {
+    await grantConcession(ctx, concessionSchema.parse(payload))
+    revalidatePath('/finance/concessions')
+    return { ok: true, message: 'Concession granted. It will apply the next time an invoice is generated.' }
+  } catch (err) {
+    return fail(err, 'The concession could not be granted')
+  }
 }
 
 /** Records a counter payment and returns the receipt number to show at once. */

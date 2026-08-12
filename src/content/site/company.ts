@@ -82,7 +82,7 @@ export const CORE_PRODUCTS: {
       'Roles, permissions and an audit trail',
       'The school’s own domain and branding',
     ],
-    next: ['Concessions', 'Library and inventory', 'Payroll', 'Report builder'],
+    next: ['Library and inventory', 'Payroll', 'Report builder'],
   },
 ]
 
