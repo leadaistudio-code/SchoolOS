@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { StartSyllabus } from './start-syllabus'
 
 export const metadata = { title: 'Syllabus' }
@@ -35,8 +36,16 @@ export default async function CurriculumPage() {
       <Card className="overflow-hidden">
         {rows.length === 0 ? (
           <EmptyState
-            title="No subjects assigned"
-            description="Subjects appear here once they are attached to a class in Academics."
+            title="No subjects assigned to a class"
+            description="A syllabus belongs to a subject in a particular class. Attach subjects to classes under Subjects and each pairing appears here, ready to start."
+            action={
+              <Link
+                href="/academics/subjects"
+                className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+              >
+                Go to subjects
+              </Link>
+            }
           />
         ) : (
           <TableWrap>

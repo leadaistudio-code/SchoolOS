@@ -1,13 +1,16 @@
+import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { getClassTree } from '@/server/modules/academics/service'
-import { sectionTimetable, teacherTimetable } from '@/server/modules/timetable/service'
+import { listPeriods, sectionTimetable, teacherTimetable } from '@/server/modules/timetable/service'
 import { teacherOptions } from '@/server/modules/people/service'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { TimetableGrid } from './timetable-grid'
 import { TimetablePicker } from './picker'
+import { NewPeriodButton, PeriodStrip } from './period-form'
 
 export const metadata = { title: 'Timetable' }
 
@@ -19,14 +22,18 @@ export default async function TimetablePage({
   const ctx = await requireContext('timetable.view')
   const params = await searchParams
 
-  const [classes, teachers] = await Promise.all([getClassTree(ctx), teacherOptions(ctx)])
+  const canManage = ctx.can('timetable.manage')
+  const [classes, teachers, periods] = await Promise.all([
+    getClassTree(ctx),
+    teacherOptions(ctx),
+    listPeriods(ctx),
+  ])
   const sections = classes.flatMap((c) =>
     c.sections.map((s) => ({ id: s.id, label: `${c.name} · Section ${s.name}` })),
   )
 
   const isTeacherView = !!params.staffId
   const sectionId = params.sectionId ?? sections[0]?.id
-  const canManage = ctx.can('timetable.manage')
 
   if (sections.length === 0) {
     return (
@@ -35,7 +42,39 @@ export default async function TimetablePage({
         <Card>
           <EmptyState
             title="No sections yet"
-            description="Create classes and sections before building a timetable."
+            description="A timetable is drawn for one section at a time. Add a class and at least one section under Classes & sections first."
+            action={
+              <Link href="/academics/classes" className={buttonVariants({ size: 'sm' })}>
+                Go to classes
+              </Link>
+            }
+          />
+        </Card>
+      </div>
+    )
+  }
+
+  // Periods are the rows. Without them the grid has nothing to draw, so the
+  // page becomes a prompt to define the school day rather than an empty table.
+  if (periods.length === 0) {
+    return (
+      <div>
+        <PageHeader
+          title="Timetable"
+          description="Define the school day before building the grid"
+          actions={canManage ? <NewPeriodButton periods={[]} variant="primary" /> : null}
+        />
+        <Card>
+          <EmptyState
+            title="The school day has no periods yet"
+            description={
+              canManage
+                ? 'Add each period and break in the order they run. Every timetable in the product uses them as its rows.'
+                : 'An administrator needs to define the periods of the school day before a timetable can be built.'
+            }
+            action={
+              canManage ? <NewPeriodButton periods={[]} variant="primary" label="Add the first period" /> : undefined
+            }
           />
         </Card>
       </div>
@@ -49,8 +88,9 @@ export default async function TimetablePage({
         description={
           isTeacherView
             ? 'A teacher week: where they are, period by period.'
-            : 'The weekly grid for one class section.'
+            : `The weekly grid for one class section · ${periods.length} periods a day`
         }
+        actions={canManage ? <NewPeriodButton periods={periods} /> : null}
       />
 
       <Card className="overflow-hidden">
@@ -60,6 +100,8 @@ export default async function TimetablePage({
           sectionId={sectionId}
           staffId={params.staffId}
         />
+
+        <PeriodStrip periods={periods} />
 
         {isTeacherView ? (
           <TeacherView staffId={params.staffId!} />

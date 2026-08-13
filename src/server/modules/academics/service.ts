@@ -315,3 +315,79 @@ export async function createSubject(
   })
   return created
 }
+
+export const classSubjectSchema = z.object({
+  classLevelId: z.string().min(1, 'Select a class'),
+  subjectId: z.string().min(1, 'Select a subject'),
+  teacherId: z.string().optional(),
+})
+
+/**
+ * Attaches a subject to a class, optionally naming who teaches it.
+ *
+ * This mapping is the hinge the rest of academics turns on: a syllabus, a
+ * timetable slot, a homework task, a classwork entry and an exam paper all
+ * hang off a class-subject rather than off a subject, because "Maths" means
+ * nothing until it means Maths in Class 6 taught by someone.
+ */
+export async function assignSubjectToClass(
+  ctx: AppContext,
+  input: z.infer<typeof classSubjectSchema>,
+) {
+  ctx.require('academics.manage')
+
+  const [classLevel, subject] = await Promise.all([
+    ctx.db.classLevel.findFirst({ where: { id: input.classLevelId, deletedAt: null } }),
+    ctx.db.subject.findFirst({ where: { id: input.subjectId, deletedAt: null } }),
+  ])
+  if (!classLevel) throw notFound('Class')
+  if (!subject) throw notFound('Subject')
+
+  const existing = await ctx.db.classSubject.findFirst({
+    where: { classLevelId: input.classLevelId, subjectId: input.subjectId },
+  })
+  if (existing) throw conflict(`${subject.name} is already taught in ${classLevel.name}`)
+
+  const created = await ctx.db.classSubject.create({
+    data: {
+      tenantId: ctx.tenant.id,
+      classLevelId: input.classLevelId,
+      subjectId: input.subjectId,
+      teacherId: input.teacherId || null,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'class_subject.create',
+    module: 'academics',
+    entityType: 'ClassSubject',
+    entityId: created.id,
+    summary: `Added ${subject.name} to ${classLevel.name}`,
+    after: created,
+  })
+  return created
+}
+
+/**
+ * Every class-subject pairing, for the table on the Subjects page.
+ *
+ * Ordered by the class ladder rather than alphabetically: an admin checking
+ * that Class 6 has its full complement of subjects reads down a class, not
+ * across the alphabet.
+ */
+export async function listClassSubjects(ctx: AppContext) {
+  return ctx.db.classSubject.findMany({
+    where: { classLevel: { deletedAt: null } },
+    orderBy: [{ classLevel: { numeric: 'asc' } }, { subject: { name: 'asc' } }],
+    select: {
+      id: true,
+      classLevel: { select: { id: true, name: true } },
+      subject: { select: { id: true, name: true, code: true, isElective: true } },
+      teacher: { select: { id: true, firstName: true, lastName: true } },
+      _count: { select: { curricula: true, timetable: true } },
+    },
+  })
+}

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
-import { setSlot, slotSchema } from '@/server/modules/timetable/service'
+import { createPeriod, periodSchema, setSlot, slotSchema } from '@/server/modules/timetable/service'
 
 export type SlotResult = { ok: boolean; message: string }
 
@@ -26,6 +26,35 @@ export async function setSlotAction(payload: unknown): Promise<SlotResult> {
     return {
       ok: false,
       message: err instanceof Error ? err.message : 'The slot could not be saved',
+    }
+  }
+}
+
+/**
+ * Adds a period to the school day.
+ *
+ * Periods are the rows of every grid in the product, so until one exists the
+ * timetable has nothing to draw. Kept on this page rather than in Settings
+ * because the person building the timetable is the person who knows when the
+ * bells go.
+ */
+export async function createPeriodAction(payload: unknown): Promise<SlotResult> {
+  const ctx = await requireContext('timetable.manage')
+
+  try {
+    const created = await createPeriod(ctx, periodSchema.parse(payload))
+    revalidatePath('/academics/timetable')
+    return {
+      ok: true,
+      message: `${created.name} runs ${created.startTime}–${created.endTime}.`,
+    }
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return { ok: false, message: err.issues[0]?.message ?? 'Invalid period' }
+    }
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'The period could not be saved',
     }
   }
 }

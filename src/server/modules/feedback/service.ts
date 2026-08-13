@@ -125,6 +125,11 @@ export async function submitResponse(ctx: AppContext, assignmentId: string, inpu
   if (concernSelected && !input.concernDetail) throw new ApiException(400, 'BAD_REQUEST', 'Please describe your concern privately')
   const response = await ctx.db.$transaction(async (tx) => {
     const created = await tx.feedbackResponse.create({ data: { tenantId: ctx.tenant.id, assignmentId: assignment.id, respondentUserId: ctx.user.userId, studentId: student?.id, parentId: parent?.id, answers: { create: input.answers.map((answer) => ({ tenantId: ctx.tenant.id, questionId: answer.questionId, rating: answer.rating, value: answer.value })) } }, include: { answers: true } })
+    // Free text is the only thing a human has to read before anyone else
+    // does. Ratings carry no words to moderate, so queueing them would bury
+    // the comments that actually need a decision.
+    const textAnswers = created.answers.filter((answer) => (answer.value ?? '').trim().length > 0 && valid.get(answer.questionId)?.type.endsWith('TEXT'))
+    if (textAnswers.length > 0) await tx.feedbackModeration.createMany({ data: textAnswers.map((answer) => ({ tenantId: ctx.tenant.id, answerId: answer.id })) })
     if (concernSelected) await tx.feedbackConcern.create({ data: { tenantId: ctx.tenant.id, responseId: created.id, detail: input.concernDetail! } })
     await tx.feedbackAssignment.update({ where: { id: assignment.id }, data: { status: 'SUBMITTED', submittedAt: new Date() } })
     return created
@@ -161,3 +166,159 @@ export async function listConcerns(ctx: AppContext) { ctx.require('feedback.conc
 
 async function safeguardingUsers(ctx: AppContext) { const roles = await ctx.db.userRole.findMany({ where: { role: { key: { in: ['SCHOOL_ADMIN', 'PRINCIPAL'] } } }, select: { userId: true } }); return roles.map((r) => r.userId) }
 async function record(ctx: AppContext, action: string, entityType: string, entityId: string, summary: string, after?: unknown) { await audit({ tenantId: ctx.tenant.id, actorId: ctx.user.userId, actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`, action, module: 'feedback', entityType, entityId, summary, after: after as never }) }
+
+/* ------------------------------------------------------------- moderation */
+
+export const moderationSchema = z.object({
+  answerId: z.string().min(1),
+  status: z.enum(['APPROVED', 'FLAGGED', 'UNDER_REVIEW', 'HIDDEN', 'ESCALATED', 'RESOLVED']),
+  flagReason: z.string().trim().max(200).optional(),
+  note: z.string().trim().max(2000).optional(),
+})
+
+export const concernUpdateSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(['NEW', 'UNDER_REVIEW', 'FOLLOW_UP_REQUIRED', 'RESOLVED', 'CLOSED']),
+  note: z.string().trim().max(2000).optional(),
+})
+
+export const actionUpdateSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING', 'RESOLVED', 'CLOSED']),
+  assigneeStaffId: z.string().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  internalNotes: z.string().trim().max(3000).optional(),
+})
+
+/**
+ * The moderation queue: free-text feedback nobody has read yet.
+ *
+ * Ordered oldest first, because a comment left unread for a week is the one
+ * that matters — a queue sorted newest-first quietly buries its own backlog.
+ * Respondent identity is never selected: the point of anonymous feedback is
+ * that the moderator judges the words, not the child who wrote them.
+ */
+export async function listModerationQueue(ctx: AppContext) {
+  ctx.require('feedback.moderate')
+  return ctx.db.feedbackModeration.findMany({
+    orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+    take: 200,
+    include: {
+      answer: {
+        select: {
+          id: true,
+          value: true,
+          rating: true,
+          question: { select: { label: true, category: true, type: true } },
+          response: {
+            select: {
+              id: true,
+              submittedAt: true,
+              assignment: {
+                select: {
+                  campaign: { select: { name: true, isAnonymousToTarget: true } },
+                  targetStaff: { select: { firstName: true, lastName: true } },
+                  subject: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+}
+
+/** Counts for the tabs above the queue, so a moderator sees the backlog first. */
+export async function moderationCounts(ctx: AppContext) {
+  ctx.require('feedback.moderate')
+  const rows = await ctx.db.feedbackModeration.groupBy({ by: ['status'], _count: { _all: true } })
+  return Object.fromEntries(rows.map((r) => [r.status, r._count._all])) as Record<string, number>
+}
+
+/**
+ * Records a moderator's decision on one comment.
+ *
+ * Escalation notifies the safeguarding roles rather than merely changing a
+ * label: a comment serious enough to escalate is one somebody has to be told
+ * about today.
+ */
+export async function moderateAnswer(ctx: AppContext, input: z.infer<typeof moderationSchema>) {
+  ctx.require('feedback.moderate')
+
+  const existing = await ctx.db.feedbackModeration.findFirst({ where: { answerId: input.answerId } })
+  if (!existing) throw notFound('Moderation record')
+
+  const updated = await ctx.db.feedbackModeration.update({
+    where: { id: existing.id },
+    data: {
+      status: input.status,
+      flagReason: input.flagReason ?? null,
+      note: input.note ?? null,
+      reviewedBy: ctx.user.userId,
+      reviewedAt: new Date(),
+    },
+  })
+
+  if (input.status === 'ESCALATED') {
+    await notify(ctx, {
+      userIds: await safeguardingUsers(ctx),
+      eventKey: 'feedback.moderation_escalated',
+      title: 'Feedback escalated',
+      body: input.flagReason || 'A moderator escalated a feedback comment for review.',
+      linkUrl: '/feedback/moderation',
+    })
+  }
+
+  await record(ctx, 'feedback_moderation.decide', 'FeedbackModeration', updated.id, `Marked a comment ${input.status.toLowerCase()}`, updated)
+  return updated
+}
+
+/**
+ * Moves a confidential concern along and records who is holding it.
+ *
+ * Resolving stamps the time so "how long do concerns sit open" is answerable
+ * later; reopening clears it rather than leaving a resolution date on
+ * something that is not resolved.
+ */
+export async function updateConcern(ctx: AppContext, input: z.infer<typeof concernUpdateSchema>) {
+  ctx.require('feedback.concern_manage')
+
+  const concern = await ctx.db.feedbackConcern.findFirst({ where: { id: input.id } })
+  if (!concern) throw notFound('Concern')
+
+  const resolved = input.status === 'RESOLVED' || input.status === 'CLOSED'
+  const updated = await ctx.db.feedbackConcern.update({
+    where: { id: input.id },
+    data: {
+      status: input.status,
+      ownerId: ctx.user.userId,
+      resolvedAt: resolved ? (concern.resolvedAt ?? new Date()) : null,
+      ...(input.note ? { detail: `${concern.detail}\n\n— ${ctx.user.firstName} ${ctx.user.lastName}: ${input.note}` } : {}),
+    },
+  })
+
+  await record(ctx, 'feedback_concern.update', 'FeedbackConcern', updated.id, `Concern marked ${input.status.toLowerCase().replace(/_/g, ' ')}`, updated)
+  return updated
+}
+
+/** Reassigns or advances an action item. */
+export async function updateActionItem(ctx: AppContext, input: z.infer<typeof actionUpdateSchema>) {
+  ctx.require('feedback.action_manage')
+
+  const existing = await ctx.db.feedbackActionItem.findFirst({ where: { id: input.id } })
+  if (!existing) throw notFound('Action item')
+
+  const updated = await ctx.db.feedbackActionItem.update({
+    where: { id: input.id },
+    data: {
+      status: input.status,
+      ...(input.priority ? { priority: input.priority } : {}),
+      ...(input.assigneeStaffId !== undefined ? { assigneeStaffId: input.assigneeStaffId || null } : {}),
+      ...(input.internalNotes !== undefined ? { internalNotes: input.internalNotes || null } : {}),
+    },
+  })
+
+  await record(ctx, 'feedback_action.update', 'FeedbackActionItem', updated.id, `Action item marked ${input.status.toLowerCase().replace(/_/g, ' ')}`, updated)
+  return updated
+}

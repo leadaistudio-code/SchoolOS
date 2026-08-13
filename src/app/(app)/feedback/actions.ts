@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
-import { activateCampaign, campaignSchema, createCampaign, createTeacherStudentFeedback, createTemplate, teacherStudentFeedbackSchema, templateSchema, submitResponse, responseSchema, actionItemSchema, createActionItem } from '@/server/modules/feedback/service'
+import { activateCampaign, campaignSchema, createCampaign, createTeacherStudentFeedback, createTemplate, teacherStudentFeedbackSchema, templateSchema, submitResponse, responseSchema } from '@/server/modules/feedback/service'
 
 type Result = { ok: true; message: string } | { ok: false; message: string }
 const failure = (error: unknown, fallback: string): Result => ({ ok: false, message: error instanceof ZodError ? (error.issues[0]?.message ?? fallback) : error instanceof Error ? error.message : fallback })
@@ -22,7 +22,4 @@ export async function createTemplateAction(payload: unknown): Promise<Result> {
 }
 export async function giveStudentFeedbackAction(payload: unknown): Promise<Result> {
   try { const ctx = await requireContext('feedback.teacher_give_student'); await createTeacherStudentFeedback(ctx, teacherStudentFeedbackSchema.parse(payload)); revalidatePath('/feedback/students'); return { ok: true, message: 'Student feedback saved.' } } catch (error) { return failure(error, 'Student feedback could not be saved') }
-}
-export async function createFeedbackActionAction(payload: unknown): Promise<Result> {
-  try { const ctx = await requireContext('feedback.action_manage'); await createActionItem(ctx, actionItemSchema.parse(payload)); revalidatePath('/feedback/actions'); return { ok: true, message: 'Action item created.' } } catch (error) { return failure(error, 'Action item could not be created') }
 }

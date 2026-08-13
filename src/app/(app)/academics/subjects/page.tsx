@@ -1,27 +1,80 @@
+import Link from 'next/link'
 import { requireContext } from '@/server/context'
-import { listSubjects } from '@/server/modules/academics/service'
+import {
+  getClassTree,
+  listClassSubjects,
+  listSubjects,
+} from '@/server/modules/academics/service'
+import { teacherOptions } from '@/server/modules/people/service'
 import { PageHeader } from '@/components/page-header'
-import { Card } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
+import { AssignSubjectButton, NewSubjectButton } from './subject-forms'
 
 export const metadata = { title: 'Subjects' }
 
+/**
+ * Subjects, and where each one is taught.
+ *
+ * Two tables rather than one, because they answer different questions. The
+ * catalogue is what the school teaches at all; the assignments below it are
+ * what a particular class studies, and that pairing — not the subject on its
+ * own — is what a syllabus, a timetable slot and a lesson log attach to.
+ */
 export default async function SubjectsPage() {
   const ctx = await requireContext('academics.view')
-  const subjects = await listSubjects(ctx)
+  const canManage = ctx.can('academics.manage')
+
+  const [subjects, assignments, classes, teachers] = await Promise.all([
+    listSubjects(ctx),
+    listClassSubjects(ctx),
+    canManage ? getClassTree(ctx) : Promise.resolve([]),
+    canManage ? teacherOptions(ctx) : Promise.resolve([]),
+  ])
+
+  const classOptions = classes.map((c) => ({ id: c.id, label: c.name }))
+  const subjectOptions = subjects.map((s) => ({ id: s.id, label: `${s.name} (${s.code})` }))
+  const teacherOpts = teachers.map((t) => ({
+    id: t.id,
+    label: `${t.firstName} ${t.lastName} — ${t.employeeCode}`,
+  }))
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Subjects"
-        description={`${subjects.length} subjects`}
+        description={`${subjects.length} subjects · taught in ${assignments.length} class pairings`}
+        actions={
+          canManage ? (
+            <>
+              <AssignSubjectButton
+                classes={classOptions}
+                subjects={subjectOptions}
+                teachers={teacherOpts}
+              />
+              <NewSubjectButton />
+            </>
+          ) : null
+        }
       />
 
       <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Catalogue</CardTitle>
+          <span className="text-xs text-ink-subtle">Every subject the school teaches</span>
+        </CardHeader>
         {subjects.length === 0 ? (
-          <EmptyState title="No subjects" description="Add subjects to build timetables and exams." />
+          <EmptyState
+            title="No subjects"
+            description={
+              canManage
+                ? 'Add the subjects this school teaches, then attach each one to the classes that study it.'
+                : 'An administrator has not added any subjects yet.'
+            }
+            action={canManage ? <NewSubjectButton label="Add the first subject" /> : undefined}
+          />
         ) : (
           <TableWrap>
             <Table>
@@ -44,7 +97,88 @@ export default async function SubjectsPage() {
                       </Badge>
                     </TD>
                     <TD align="right" className="text-sm">
-                      {s._count.classes}
+                      {s._count.classes === 0 ? (
+                        <span className="text-ink-subtle">Not assigned</span>
+                      ) : (
+                        s._count.classes
+                      )}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        )}
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Taught in</CardTitle>
+          <span className="text-xs text-ink-subtle">
+            What each class studies, and who teaches it
+          </span>
+        </CardHeader>
+        {assignments.length === 0 ? (
+          <EmptyState
+            title="No subjects assigned to a class yet"
+            description={
+              canManage
+                ? 'Until a subject is attached to a class there is nothing for a syllabus, a timetable slot or a lesson log to hang off.'
+                : 'An administrator has not attached any subjects to classes yet.'
+            }
+            action={
+              canManage ? (
+                <AssignSubjectButton
+                  classes={classOptions}
+                  subjects={subjectOptions}
+                  teachers={teacherOpts}
+                  variant="primary"
+                  label="Assign the first subject"
+                />
+              ) : undefined
+            }
+          />
+        ) : (
+          <TableWrap>
+            <Table>
+              <THead>
+                <tr>
+                  <TH>Class</TH>
+                  <TH>Subject</TH>
+                  <TH>Teacher</TH>
+                  <TH>Syllabus</TH>
+                  <TH align="right">Periods a week</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {assignments.map((a) => (
+                  <TR key={a.id}>
+                    <TD className="text-sm text-ink">{a.classLevel.name}</TD>
+                    <TD className="text-sm text-ink">
+                      {a.subject.name}
+                      <span className="ml-1.5 text-xs tnum text-ink-subtle">{a.subject.code}</span>
+                    </TD>
+                    <TD className="text-sm text-ink-muted">
+                      {a.teacher ? (
+                        `${a.teacher.firstName} ${a.teacher.lastName}`
+                      ) : (
+                        <span className="text-warning">Not assigned</span>
+                      )}
+                    </TD>
+                    <TD>
+                      {a._count.curricula > 0 ? (
+                        <Link
+                          href="/academics/curriculum"
+                          className="text-sm font-medium text-brand-600 hover:underline"
+                        >
+                          Started
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-ink-subtle">Not started</span>
+                      )}
+                    </TD>
+                    <TD align="right" className="text-sm tnum">
+                      {a._count.timetable}
                     </TD>
                   </TR>
                 ))}

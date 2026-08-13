@@ -3,7 +3,6 @@ import { requireContext } from '@/server/context'
 import { PageHeader } from '@/components/page-header'
 import { ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 
 export const metadata = { title: 'Settings' }
 
@@ -12,7 +11,6 @@ type Tile = {
   title: string
   description: string
   permission: string
-  ready: boolean
 }
 
 const TILES: Tile[] = [
@@ -21,63 +19,60 @@ const TILES: Tile[] = [
     title: 'Branding',
     description: 'School colours, sign-in page and document footers.',
     permission: 'settings.branding',
-    ready: true,
   },
   {
     href: '/settings/security',
     title: 'Security',
     description: 'Two-factor authentication for your account.',
     permission: 'settings.view',
-    ready: true,
   },
   {
     href: '/settings/domains',
     title: 'Custom Domains',
     description: 'Manage your portal\'s web addresses.',
     permission: 'settings.manage',
-    ready: true,
   },
   {
     href: '/settings/templates',
     title: 'Message templates',
     description: 'Email, SMS and push copy for school notifications.',
     permission: 'settings.manage',
-    ready: true,
+  },
+  {
+    href: '/settings/email',
+    title: 'Email',
+    description: 'Send from the school’s own mailbox.',
+    permission: 'settings.manage',
   },
   {
     href: '/settings/sessions',
     title: 'Academic sessions',
     description: 'Session dates, promotion and archiving.',
     permission: 'academics.manage',
-    ready: false,
   },
   {
     href: '/settings/users',
     title: 'Users',
     description: 'Portal accounts and their status.',
     permission: 'users.view',
-    ready: false,
   },
   {
     href: '/settings/roles',
     title: 'Roles and permissions',
     description: 'Built-in roles and custom roles for your school.',
     permission: 'roles.view',
-    ready: false,
   },
   {
     href: '/settings/integrations',
     title: 'Integrations',
     description: 'Email, SMS, WhatsApp and payment gateway keys.',
     permission: 'settings.integrations',
-    ready: false,
   },
   {
     href: '/settings/audit',
     title: 'Audit log',
     description: 'Every sensitive change, who made it and when.',
     permission: 'audit.view',
-    ready: false,
   },
 ]
 
@@ -95,40 +90,20 @@ export default async function SettingsPage() {
 
       <Card className="overflow-hidden">
         <ul className="divide-y divide-[var(--border)]">
-          {visible.map((tile) => {
-            const body = (
-              <>
+          {visible.map((tile) => (
+            <li key={tile.href}>
+              <Link
+                href={tile.href}
+                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-2 transition-colors"
+              >
                 <span className="min-w-0">
                   <span className="block text-base font-medium text-ink">{tile.title}</span>
                   <span className="block text-sm text-ink-muted">{tile.description}</span>
                 </span>
-                {tile.ready ? (
-                  <ChevronRight className="size-4 text-ink-subtle shrink-0" aria-hidden />
-                ) : (
-                  <Badge tone="neutral">Not built yet</Badge>
-                )}
-              </>
-            )
-
-            // Unbuilt areas are listed so the roadmap is visible, but they are
-            // not links — a navigation item that 404s is worse than one that waits.
-            return (
-              <li key={tile.href}>
-                {tile.ready ? (
-                  <Link
-                    href={tile.href}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-2 transition-colors"
-                  >
-                    {body}
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-between gap-4 px-4 py-3 opacity-60">
-                    {body}
-                  </div>
-                )}
-              </li>
-            )
-          })}
+                <ChevronRight className="size-4 text-ink-subtle shrink-0" aria-hidden />
+              </Link>
+            </li>
+          ))}
         </ul>
       </Card>
     </div>
