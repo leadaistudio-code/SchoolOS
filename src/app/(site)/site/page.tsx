@@ -16,9 +16,9 @@ import { ClosingCta } from '@/components/site/cta'
 import { organisationJsonLd, softwareJsonLd } from '@/components/site/seo'
 
 export const metadata: Metadata = {
-  title: 'SchoolOS — school management software, SIS and admission CRM on one platform',
+  title: 'MyCampusView — school management software, SIS and admission CRM on one platform',
   description:
-    'SchoolOS runs admissions, student records, academics, fees, attendance, staff, parent communication and school operations on one database. Built for private schools, international schools, preschools and multi-campus groups.',
+    'MyCampusView runs admissions, student records, academics, fees, attendance, staff, parent communication and school operations on one database. Built for private schools, international schools, preschools and multi-campus groups.',
   alternates: { canonical: '/' },
 }
 

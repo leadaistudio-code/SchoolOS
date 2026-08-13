@@ -112,7 +112,7 @@ describe('spreadsheet grid', () => {
 
     const parsed = parseSpreadsheet(
       buildOnboardingWorkbook(),
-      'schoolos-onboarding-pack.xlsx',
+      'mycampusview-onboarding-pack.xlsx',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     expect(parsed.sheetName).toBe('Students')

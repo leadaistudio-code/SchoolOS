@@ -5,7 +5,7 @@ import { ClosingCta } from '@/components/site/cta'
 export const metadata: Metadata = {
   title: 'Security and data separation',
   description:
-    'How SchoolOS separates one school from another, controls what each role can reach, and records who did what.',
+    'How MyCampusView separates one school from another, controls what each role can reach, and records who did what.',
   alternates: { canonical: '/security' },
 }
 
@@ -63,7 +63,7 @@ export default function SecurityPage() {
 
         <Prose title="What we do not claim">
           <p>
-            SchoolOS holds no ISO, SOC 2 or similar certification, and we will not imply otherwise.
+            MyCampusView holds no ISO, SOC 2 or similar certification, and we will not imply otherwise.
             Postgres row-level security ships with the product as an optional hardening layer and
             is not enabled by default. If your IT team wants to review any of this in detail, we
             will walk them through it.

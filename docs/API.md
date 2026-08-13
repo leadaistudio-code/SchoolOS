@@ -221,14 +221,23 @@ authorization.
 
 ### `GET /api/health`
 
-Unauthenticated. Reports process liveness and the database round trip; returns
-`503` when the database is unreachable, so an orchestrator can distinguish "up"
-from "able to serve".
+Unauthenticated. Reports process liveness, the database round trip, and Redis
+when configured; returns `503` when the database is unreachable (or when Redis
+is required by `RATE_LIMIT_DRIVER=redis` and down).
 
 ```json
-{ "status": "ok", "checks": { "database": "up", "latencyMs": 3 },
+{ "status": "ok",
+  "checks": { "database": "up", "latencyMs": 3, "redis": "up", "redisLatencyMs": 1 },
   "uptimeSeconds": 412, "timestamp": "2026-08-08T12:02:14.165Z" }
 ```
+
+### `GET /api/metrics`
+
+Unauthenticated Prometheus text metrics (`mycampusview_uptime_seconds`, memory,
+DB/Redis latency). Restrict at the edge in production.
+
+See also [docs/MONITORING.md](MONITORING.md), [docs/LOAD_TESTING.md](LOAD_TESTING.md),
+and [docs/BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 ---
 

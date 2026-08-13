@@ -1,7 +1,7 @@
 /**
  * Proof: metrics, customer logos, stories, testimonials.
  *
- * The rule this file exists to enforce: SchoolOS does not put a number, a
+ * The rule this file exists to enforce: MyCampusView does not put a number, a
  * school name or a quotation in front of a visitor unless it is real.
  *
  * The reference sites in this market lead with client counts, retention rates
@@ -88,7 +88,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     problem:
       'Fees were collected on a desktop accounting package, attendance on paper registers, and results in spreadsheets. Reconciling the three at the end of a term took the office most of a week.',
     approach:
-      'Fee structures were rebuilt per class inside SchoolOS, two years of student history was migrated, and counter collection moved over at the start of a term.',
+      'Fee structures were rebuilt per class inside MyCampusView, two years of student history was migrated, and counter collection moved over at the start of a term.',
     outcome:
       'Outstanding fees are now a screen rather than an exercise. This is the shape a written-up implementation takes — replace it with a real one before launch.',
     sample: true,
@@ -112,7 +112,7 @@ export const CASE_STUDIES: CaseStudy[] = [
     problem:
       'Each campus ran its own software, so the group office could not see strength or collection without asking three people.',
     approach:
-      'Each campus kept its own separate system inside SchoolOS, with group-level reporting reading across all three.',
+      'Each campus kept its own separate system inside MyCampusView, with group-level reporting reading across all three.',
     outcome:
       'The group office reads one report. Sample layout, pending a named group’s approval.',
     sample: true,

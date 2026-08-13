@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 import { ClosingCta } from '@/components/site/cta'
 
 export const metadata: Metadata = {
-  title: "SchoolOS for private schools",
+  title: "MyCampusView for private schools",
   description: "Fee collection, attendance, examinations and parent communication for K-12 private schools, on one system.",
   alternates: { canonical: '/solutions/private-schools' },
 }

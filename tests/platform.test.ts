@@ -13,6 +13,9 @@ import {
 import {
   createTenantTicket,
   replyPlatformTicket,
+  createPasswordResetTicket,
+  PASSWORD_RESET_CATEGORY,
+  listPlatformTickets,
 } from '../src/server/modules/platform/support'
 import { tenantDb } from '../src/server/db/tenant-client'
 import { getEntitlements } from '../src/server/entitlements'
@@ -210,6 +213,32 @@ describe('platform SaaS ops', () => {
     const pctx = platformCtx(superAdminId)
     const msg = await replyPlatformTicket(pctx, ticket.id, { body: 'We are looking into it.' })
     expect(msg.authorKind).toBe('PLATFORM')
+  })
+
+  it('password reset request creates a platform support ticket', async () => {
+    const email = `${slug}@test.local`
+    const result = await createPasswordResetTicket({
+      email,
+      tenantId,
+      tenantName: 'Phase 8 Test School',
+      ip: '127.0.0.1',
+    })
+    expect(result.created).toBe(true)
+
+    const pctx = platformCtx(superAdminId)
+    const { rows } = await listPlatformTickets(pctx, { page: 1, pageSize: 20, tenantId })
+    const ticket = rows.find((t) => t.category === PASSWORD_RESET_CATEGORY && t.subject.includes(email))
+    expect(ticket).toBeTruthy()
+    expect(ticket?.priority).toBe('HIGH')
+    expect(ticket?.status).toBe('OPEN')
+
+    const duplicate = await createPasswordResetTicket({
+      email,
+      tenantId,
+      tenantName: 'Phase 8 Test School',
+      ip: '127.0.0.1',
+    })
+    expect(duplicate.created).toBe(false)
   })
 
   it('new plan is created with default entitlements', async () => {

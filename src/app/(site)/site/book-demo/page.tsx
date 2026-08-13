@@ -7,9 +7,9 @@ import { MODULE_COUNTS } from '@/content/site/modules'
 import { CONTACT } from '@/content/site/company'
 
 export const metadata: Metadata = {
-  title: 'Book a demo of SchoolOS',
+  title: 'Book a demo of MyCampusView',
   description:
-    'See SchoolOS with your own workflows. Tell us how your school runs today — admissions, fees, attendance, communication — and we will shape the demonstration around it.',
+    'See MyCampusView with your own workflows. Tell us how your school runs today — admissions, fees, attendance, communication — and we will shape the demonstration around it.',
   alternates: { canonical: '/book-demo' },
   robots: { index: true, follow: true },
 }
@@ -57,7 +57,7 @@ export default function BookDemoPage() {
                   ],
                   [
                     'What happens after',
-                    'A written summary of what we showed you, and a straight note on anything SchoolOS does not do yet.',
+                    'A written summary of what we showed you, and a straight note on anything MyCampusView does not do yet.',
                   ],
                   [
                     'What we will not do',

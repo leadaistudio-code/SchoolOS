@@ -3,7 +3,7 @@ import { prisma } from '@/server/db/prisma'
 import { env, isProd } from '@/lib/env'
 import { randomToken, sha256 } from '@/server/crypto'
 
-export const SESSION_COOKIE = 'schoolos_session'
+export const SESSION_COOKIE = 'mycampusview_session'
 
 /** Cookie domain shared across tenant subdomains (e.g. `.lvh.me`, `.schoolos.app`). */
 export function sessionCookieDomain(host?: string | null): string | undefined {

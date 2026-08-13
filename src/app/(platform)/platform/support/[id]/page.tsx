@@ -65,6 +65,11 @@ export default async function SupportTicketPage({ params }: { params: Promise<{ 
             <CardTitle>Triage</CardTitle>
           </CardHeader>
           <CardContent>
+            {ticket.category ? (
+              <p className="text-sm text-ink-muted mb-3 capitalize">
+                Category: {ticket.category.replace(/_/g, ' ')}
+              </p>
+            ) : null}
             <form action={updateTicketAction.bind(null, id)} className="space-y-3">
               <label className="block space-y-1 text-sm">
                 Status

@@ -23,19 +23,19 @@ const display = Manrope({
 })
 
 const DESCRIPTION =
-  'SchoolOS runs student records, attendance, fees, examinations, communication and transport on one database, so information entered once is correct everywhere.'
+  'MyCampusView runs student records, attendance, fees, examinations, communication and transport on one database, so information entered once is correct everywhere.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(env().APP_URL),
   title: {
-    default: 'SchoolOS — one system to run your school',
-    template: '%s · SchoolOS',
+    default: 'MyCampusView — one system to run your school',
+    template: '%s · MyCampusView',
   },
   description: DESCRIPTION,
   openGraph: {
     type: 'website',
-    siteName: 'SchoolOS',
-    title: 'SchoolOS — one system to run your school',
+    siteName: 'MyCampusView',
+    title: 'MyCampusView — one system to run your school',
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },

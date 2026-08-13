@@ -70,7 +70,7 @@ export function Showcase() {
         {/* On navy, the frame's white chrome is what separates the product from
             the section. No glow, no border gradient. */}
         <div className="mt-12">
-          <ProductFrame label="SchoolOS — administrator dashboard, reporting panels">
+          <ProductFrame label="MyCampusView — administrator dashboard, reporting panels">
             <DashboardRender view="charts" />
           </ProductFrame>
         </div>

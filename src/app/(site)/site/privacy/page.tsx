@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 
 export const metadata: Metadata = {
   title: 'Privacy',
-  description: 'What SchoolOS collects from this website and how school data is handled.',
+  description: 'What MyCampusView collects from this website and how school data is handled.',
   alternates: { canonical: '/privacy' },
 }
 
@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <PageIntro
         eyebrow="Privacy"
         title="Privacy"
-        lead="This page covers the public website. Data held inside a school's SchoolOS system belongs to that school and is governed by the agreement it signs."
+        lead="This page covers the public website. Data held inside a school's MyCampusView system belongs to that school and is governed by the agreement it signs."
       />
 
       <ProseSection>
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <p>
             If you complete the demo form we store what you enter — your name, email, phone,
             school, and anything you write in the message — together with the time, your network
-            address and the page you came from. It is used to contact you about SchoolOS and for
+            address and the page you came from. It is used to contact you about MyCampusView and for
             nothing else.
           </p>
           <p>
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
 
         <Prose title="School data">
           <p>
-            Data your school enters into SchoolOS — student records, attendance, fees, results —
+            Data your school enters into MyCampusView — student records, attendance, fees, results —
             belongs to your school. We process it to provide the service. We do not use it to train
             anything, and we do not disclose it to anyone else except where a school instructs us
             to or the law requires it.

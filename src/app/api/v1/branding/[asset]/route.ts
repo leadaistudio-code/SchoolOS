@@ -2,18 +2,25 @@ import type { NextRequest } from 'next/server'
 import { resolveTenant } from '@/server/tenant'
 import { readBrandingAsset, type BrandingAssetKind } from '@/server/branding-assets'
 
+const ALLOWED = new Set<BrandingAssetKind>([
+  'logo',
+  'banner',
+  'favicon',
+  'darkLogo',
+  'signature',
+])
+
 /**
- * GET /api/v1/branding/logo | /api/v1/branding/banner
+ * GET /api/v1/branding/{logo|banner|favicon|darkLogo|signature}
  *
- * Public, tenant-scoped branding images for the sign-in page and shell.
- * Resolved from the request Host header — no session required.
+ * Public, tenant-scoped branding images. Resolved from Host — no session.
  */
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ asset: string }> },
 ) {
   const { asset } = await context.params
-  if (asset !== 'logo' && asset !== 'banner') {
+  if (!ALLOWED.has(asset as BrandingAssetKind)) {
     return new Response('Not found', { status: 404 })
   }
 

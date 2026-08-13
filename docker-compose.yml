@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: schoolos-postgres
+    container_name: mycampusview-postgres
     environment:
-      POSTGRES_USER: schoolos
-      POSTGRES_PASSWORD: schoolos
-      POSTGRES_DB: schoolos
+      POSTGRES_USER: mycampusview
+      POSTGRES_PASSWORD: mycampusview
+      POSTGRES_DB: mycampusview
     ports: ['5433:5432']
-    volumes: ['schoolos-pgdata:/var/lib/postgresql/data']
+    volumes: ['mycampusview-pgdata:/var/lib/postgresql/data']
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U schoolos -d schoolos']
+      test: ['CMD-SHELL', 'pg_isready -U mycampusview -d mycampusview']
       interval: 5s
       timeout: 5s
       retries: 20
 
   redis:
     image: redis:7-alpine
-    container_name: schoolos-redis
+    container_name: mycampusview-redis
     ports: ['6380:6379']
-    volumes: ['schoolos-redisdata:/data']
+    volumes: ['mycampusview-redisdata:/data']
 
 volumes:
-  schoolos-pgdata:
-  schoolos-redisdata:
+  mycampusview-pgdata:
+  mycampusview-redisdata:

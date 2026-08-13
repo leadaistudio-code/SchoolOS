@@ -26,6 +26,11 @@ export type ResolvedTenant = {
     loginSubtext: string | null
     loginBannerUrl: string | null
     footerText: string | null
+    pwaName: string | null
+    pwaShortName: string | null
+    pwaThemeHex: string | null
+    pdfHeaderHtml: string | null
+    pdfFooterHtml: string | null
   } | null
 }
 
@@ -108,7 +113,7 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
           name: tenant.school.name,
           code: tenant.school.code,
           logoUrl: resolveBrandingAssetUrl(b?.logoUrl, 'logo'),
-          faviconUrl: b?.faviconUrl ?? null,
+          faviconUrl: resolveBrandingAssetUrl(b?.faviconUrl, 'favicon'),
           primaryHex: b?.primaryHex ?? '#E41F07',
           secondaryHex: b?.secondaryHex ?? '#0A0C0C',
           accentHex: b?.accentHex ?? '#FFA201',
@@ -117,6 +122,11 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
           loginSubtext: b?.loginSubtext ?? null,
           loginBannerUrl: resolveBrandingAssetUrl(b?.loginImageUrl, 'banner'),
           footerText: b?.footerText ?? null,
+          pwaName: b?.pwaName ?? null,
+          pwaShortName: b?.pwaShortName ?? null,
+          pwaThemeHex: b?.pwaThemeHex ?? null,
+          pdfHeaderHtml: b?.pdfHeaderHtml ?? null,
+          pdfFooterHtml: b?.pdfFooterHtml ?? null,
         }
       : null,
   }

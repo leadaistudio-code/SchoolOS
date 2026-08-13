@@ -24,7 +24,7 @@ export function CoreProducts() {
           split
           eyebrow="Three products, one system"
           title="SIS, CRM and ERP — sold together because they are built together."
-          lead="Most schools buy these separately and then pay, in staff time, for the gap between them. Inside SchoolOS they are three views of the same data rather than three databases with an import between them."
+          lead="Most schools buy these separately and then pay, in staff time, for the gap between them. Inside MyCampusView they are three views of the same data rather than three databases with an import between them."
         />
 
         <div className="mt-14 space-y-6">

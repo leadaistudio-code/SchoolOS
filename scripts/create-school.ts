@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { FEATURE } from '../src/lib/features'
 import { ROLE } from '../src/lib/rbac/roles'
 import { ensureRolesAndPermissions, provisionSchool } from '../src/server/modules/platform/provision'
+import { ensureExamDefaults } from '../src/server/modules/exams/defaults'
 
 /**
  * First-run setup for a real deployment.
@@ -186,6 +187,8 @@ async function main() {
     },
     update: { isCurrent: true },
   })
+
+  await ensureExamDefaults(prisma, tenant.id)
 
   console.log(`${schoolName} (${slug})`)
 

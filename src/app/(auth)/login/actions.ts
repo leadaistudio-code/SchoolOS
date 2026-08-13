@@ -46,7 +46,16 @@ export async function loginAction(
     tenantId: tenant?.id ?? null,
   })
 
-  if (!result.ok) return { error: result.message, fieldErrors: {} }
+  if (!result.ok) {
+    if (result.reason === 'mfa') {
+      const next = parsed.data.next
+      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : ''
+      const qs = new URLSearchParams({ token: result.challengeToken })
+      if (safeNext) qs.set('next', safeNext)
+      redirect(`/login/mfa?${qs.toString()}`)
+    }
+    return { error: result.message, fieldErrors: {} }
+  }
 
   const next = parsed.data.next
   const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null

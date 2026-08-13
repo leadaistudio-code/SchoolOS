@@ -1,49 +1,67 @@
 import { cache } from 'react'
 import { prisma } from '@/server/db/prisma'
-
 import { FEATURE, type FeatureKey } from '@/lib/features'
+import { cacheDel, cacheGet, cacheSet, entitlementsCacheKey } from '@/server/cache'
 
 // Re-exported so existing server-side imports keep working. The definitions
 // live in lib/ because the browser reads them too — see the note there.
 export { FEATURE, type FeatureKey }
 
-
 export type Entitlement = { enabled: boolean; limit: number | null }
 
 export type EntitlementMap = Record<string, Entitlement>
+
+const ENTITLEMENTS_TTL_SECONDS = 60
+
+async function loadEntitlements(tenantId: string): Promise<EntitlementMap> {
+  const sub = await prisma.subscription.findUnique({
+    where: { tenantId },
+    include: { plan: { include: { entitlements: true } } },
+  })
+
+  const map: EntitlementMap = {}
+  if (sub) {
+    for (const e of sub.plan.entitlements) {
+      map[e.featureKey] = { enabled: e.enabled, limit: e.limitValue }
+    }
+  }
+
+  const overrides = await prisma.tenantEntitlementOverride.findMany({
+    where: { tenantId },
+  })
+  for (const o of overrides) {
+    const base = map[o.featureKey] ?? { enabled: false, limit: null }
+    map[o.featureKey] = {
+      enabled: o.enabled ?? base.enabled,
+      limit: o.limitValue ?? base.limit,
+    }
+  }
+  return map
+}
 
 /**
  * Effective entitlements = plan defaults, then per-tenant overrides.
  * A tenant with no subscription gets nothing enabled, which is the safe
  * default for an expired or unprovisioned school.
+ *
+ * When Redis is available, the map is cached for a short TTL so every
+ * navigation/permission check does not re-hit the plan tables.
  */
-export const getEntitlements = cache(
-  async (tenantId: string): Promise<EntitlementMap> => {
-    const sub = await prisma.subscription.findUnique({
-      where: { tenantId },
-      include: { plan: { include: { entitlements: true } } },
-    })
+export const getEntitlements = cache(async (tenantId: string): Promise<EntitlementMap> => {
+  const key = entitlementsCacheKey(tenantId)
+  const cached = await cacheGet<EntitlementMap>(key)
+  if (cached) return cached
 
-    const map: EntitlementMap = {}
-    if (sub) {
-      for (const e of sub.plan.entitlements) {
-        map[e.featureKey] = { enabled: e.enabled, limit: e.limitValue }
-      }
-    }
+  const map = await loadEntitlements(tenantId)
+  await cacheSet(key, map, ENTITLEMENTS_TTL_SECONDS)
+  return map
+})
 
-    const overrides = await prisma.tenantEntitlementOverride.findMany({
-      where: { tenantId },
-    })
-    for (const o of overrides) {
-      const base = map[o.featureKey] ?? { enabled: false, limit: null }
-      map[o.featureKey] = {
-        enabled: o.enabled ?? base.enabled,
-        limit: o.limitValue ?? base.limit,
-      }
-    }
-    return map
-  },
-)
+/** Drop cached entitlements after plan or override changes. */
+export async function invalidateEntitlementsCache(tenantId: string | 'all' = 'all') {
+  if (tenantId === 'all') return
+  await cacheDel(entitlementsCacheKey(tenantId))
+}
 
 export async function hasFeature(tenantId: string, key: FeatureKey): Promise<boolean> {
   const map = await getEntitlements(tenantId)

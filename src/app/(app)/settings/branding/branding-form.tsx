@@ -19,6 +19,11 @@ export type BrandingValues = {
   loginHeadline: string
   loginSubtext: string
   footerText: string
+  pdfHeaderHtml: string
+  pdfFooterHtml: string
+  pwaName: string
+  pwaShortName: string
+  pwaThemeHex: string
 }
 
 const PLATFORM_DEFAULT: Pick<BrandingValues, 'primaryHex' | 'accentHex' | 'secondaryHex' | 'radius'> = {
@@ -48,10 +53,16 @@ export function BrandingForm({
   initial,
   logoUrl,
   bannerUrl,
+  faviconUrl,
+  darkLogoUrl,
+  signatureUrl,
 }: {
   initial: BrandingValues
   logoUrl: string | null
   bannerUrl: string | null
+  faviconUrl: string | null
+  darkLogoUrl: string | null
+  signatureUrl: string | null
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -67,7 +78,7 @@ export function BrandingForm({
 
   const [assetPending, startAssetTransition] = React.useTransition()
 
-  const uploadAsset = (kind: 'logo' | 'banner', file: File | null | undefined) => {
+  const uploadAsset = (kind: 'logo' | 'banner' | 'favicon' | 'darkLogo' | 'signature', file: File | null | undefined) => {
     if (!file?.size) return
     const form = new FormData()
     form.set('kind', kind)
@@ -110,11 +121,33 @@ export function BrandingForm({
               onFile={(file) => uploadAsset('logo', file)}
             />
             <AssetUploadField
+              label="Dark logo"
+              hint="Optional logo for dark header strips"
+              previewUrl={darkLogoUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('darkLogo', file)}
+            />
+            <AssetUploadField
               label="Login banner"
               hint="Sign-in page and dashboard welcome strip"
               previewUrl={bannerUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('banner', file)}
+            />
+            <AssetUploadField
+              label="Favicon / app icon"
+              hint="Browser tab and PWA icon"
+              previewUrl={faviconUrl}
+              pending={assetPending}
+              accept="image/png,image/jpeg,image/webp,image/x-icon,.ico"
+              onFile={(file) => uploadAsset('favicon', file)}
+            />
+            <AssetUploadField
+              label="Signature"
+              hint="Printed on certificates and report cards"
+              previewUrl={signatureUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('signature', file)}
             />
           </CardContent>
         </Card>
@@ -237,6 +270,65 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>PDF letterhead</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field
+              label="PDF header HTML"
+              htmlFor="pdfHeaderHtml"
+              hint="Injected at the top of printable PDFs"
+            >
+              <Textarea
+                id="pdfHeaderHtml"
+                rows={3}
+                value={values.pdfHeaderHtml}
+                onChange={(e) => set('pdfHeaderHtml', e.target.value)}
+                placeholder="<p>{{school_name}}</p>"
+              />
+            </Field>
+            <Field label="PDF footer HTML" htmlFor="pdfFooterHtml">
+              <Textarea
+                id="pdfFooterHtml"
+                rows={3}
+                value={values.pdfFooterHtml}
+                onChange={(e) => set('pdfFooterHtml', e.target.value)}
+              />
+            </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Installed app (PWA)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field label="App name" htmlFor="pwaName">
+              <Input
+                id="pwaName"
+                value={values.pwaName}
+                onChange={(e) => set('pwaName', e.target.value)}
+                placeholder="School name"
+              />
+            </Field>
+            <Field label="Short name" htmlFor="pwaShortName" hint="Under the home-screen icon">
+              <Input
+                id="pwaShortName"
+                value={values.pwaShortName}
+                onChange={(e) => set('pwaShortName', e.target.value)}
+                maxLength={20}
+              />
+            </Field>
+            <ColourField
+              label="Theme"
+              hint="Status bar / splash"
+              value={values.pwaThemeHex || values.primaryHex}
+              onChange={(v) => set('pwaThemeHex', v)}
+            />
+          </CardContent>
+        </Card>
+
         <div className="flex items-center gap-2">
           <Button onClick={save} loading={pending}>
             <Save aria-hidden />
@@ -334,12 +426,14 @@ function AssetUploadField({
   previewUrl,
   pending,
   onFile,
+  accept = 'image/jpeg,image/png,image/webp',
 }: {
   label: string
   hint: string
   previewUrl: string | null
   pending: boolean
   onFile: (file: File | null | undefined) => void
+  accept?: string
 }) {
   return (
     <div className="space-y-2">
@@ -359,7 +453,7 @@ function AssetUploadField({
       )}
       <Input
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={accept}
         disabled={pending}
         className="text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
         onChange={(e) => onFile(e.target.files?.[0])}

@@ -41,7 +41,7 @@ export function Admissions() {
           split
           eyebrow="Admissions"
           title="Every enquiry on the system from the first phone call."
-          lead="Admissions is where schools lose the most information and notice it the least — a name on a notepad, a follow-up nobody owned, a family who visited twice and was never called back. SchoolOS records the enquiry today; the pipeline that works it through to enrolment is the release we are building now."
+          lead="Admissions is where schools lose the most information and notice it the least — a name on a notepad, a follow-up nobody owned, a family who visited twice and was never called back. MyCampusView records the enquiry today; the pipeline that works it through to enrolment is the release we are building now."
           action={<TextLink href="/admission-crm">Read about admissions</TextLink>}
         />
 

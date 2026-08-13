@@ -28,12 +28,13 @@ Deploying with `STORAGE_DRIVER=local` and using uploads will silently lose
 files. It is the one item on this page that will cost you data rather than
 just convenience.
 
-### 2. Rate limiting is per-instance
+### 2. Rate limiting across instances
 
-`RATE_LIMIT_DRIVER` defaults to in-memory. Each Netlify Function instance keeps
-its own counters, so login throttling weakens roughly in proportion to how many
-instances are warm. Set `RATE_LIMIT_DRIVER=redis` and `REDIS_URL` (Upstash has
-a free tier that speaks the Redis protocol).
+`RATE_LIMIT_DRIVER` defaults to in-memory (fine for one process). For more than
+one app instance set `RATE_LIMIT_DRIVER=redis` and `REDIS_URL` (Upstash speaks
+the Redis protocol). Counters use an atomic Lua script; if Redis is down the
+app falls back to memory and keeps serving. Entitlement lookups are also cached
+in Redis for 60 seconds when available.
 
 ### 3. Tenant subdomains need wildcard DNS
 
@@ -205,7 +206,9 @@ the right tool when the database has no roles or permissions yet.
 | File uploads | lost — local disk driver on ephemeral storage | implement the S3 driver |
 | Queued email/SMS | `Job` rows are written but nothing drains them; notifications to 25 or fewer recipients send inline | build the worker (Phase 8) |
 | Rate limiting | per-instance unless Redis is configured | `RATE_LIMIT_DRIVER=redis` |
-| Postgres RLS | `prisma/rls.sql` is not applied by default; isolation is enforced in the Prisma client layer | apply it for defence in depth |
+| Postgres RLS | Opt-in: apply `prisma/rls.sql`, use a non-owner role, set `DATABASE_RLS=true` so `tenantTx()` issues `SET LOCAL app.tenant_id` | leave off in local/dev unless configured |
+| MFA (TOTP) | School users enrol at `/settings/security`; challenge at `/login/mfa` | optional per user |
+
 | Cold starts | first request after idle is slow | expected on serverless |
 
 ---

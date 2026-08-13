@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 
 export const metadata: Metadata = {
   title: 'Terms',
-  description: 'The terms covering use of the SchoolOS website.',
+  description: 'The terms covering use of the MyCampusView website.',
   alternates: { canonical: '/terms' },
 }
 
@@ -13,7 +13,7 @@ export default function TermsPage() {
       <PageIntro
         eyebrow="Terms"
         title="Website terms"
-        lead="These terms cover this website. Use of the SchoolOS application is governed by the separate agreement a school signs."
+        lead="These terms cover this website. Use of the MyCampusView application is governed by the separate agreement a school signs."
       />
 
       <ProseSection>
@@ -34,7 +34,7 @@ export default function TermsPage() {
 
         <Prose title="Trade marks and content">
           <p>
-            The SchoolOS name, the wordmark and the contents of this site belong to us. You are
+            The MyCampusView name, the wordmark and the contents of this site belong to us. You are
             welcome to quote or link to it; please do not reproduce it as your own.
           </p>
         </Prose>

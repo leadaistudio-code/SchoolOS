@@ -1,7 +1,7 @@
 /**
  * The module catalogue.
  *
- * This file is the website's single source of truth for what SchoolOS can be
+ * This file is the website's single source of truth for what MyCampusView can be
  * said to do, and it is written against the application rather than against a
  * wish list.
  *
@@ -125,7 +125,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       {
         name: 'Certificates',
         blurb: 'Bonafide, transfer and character certificates issued from the student record.',
-        status: 'planned',
+        status: 'available',
         route: '/exams/certificates',
       },
     ],
@@ -200,47 +200,49 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
   {
     key: 'admissions',
     label: 'Admissions',
-    lead: 'Enquiries arrive on the system rather than in a notebook. The pipeline that works them through to enrolment is the next release.',
+    lead: 'Enquiries arrive on the system rather than in a notebook, move through a pipeline, and convert into a student record without retyping.',
     modules: [
       {
         name: 'Enquiry capture',
         blurb: 'Enquiries recorded with the family behind them and shown on the administrator’s dashboard.',
-        status: 'in-build',
+        status: 'available',
         route: '/admissions',
         href: '/admission-crm',
       },
       {
         name: 'Admission pipeline',
-        blurb: 'Enquiry, visit, application, offer, enrolled — the stage held on the record.',
-        status: 'planned',
+        blurb: 'Kanban from new enquiry through campus visit, application, approval and enrolment.',
+        status: 'available',
         route: '/admissions',
         href: '/admission-crm',
       },
       {
         name: 'Follow-ups & call logs',
         blurb: 'Scheduled follow-ups per enquiry, listed by who owes the call and when.',
-        status: 'planned',
+        status: 'available',
         route: '/admissions/followups',
       },
       {
         name: 'Conversion analytics',
-        blurb: 'Enquiry-to-enrolment conversion by source, counsellor and stage.',
-        status: 'planned',
+        blurb: 'Enquiry-to-enrolment conversion by source and stage, with overdue follow-up counts.',
+        status: 'available',
+        route: '/admissions/analytics',
       },
       {
-        name: 'Online application forms',
-        blurb: 'A public application form, with documents, that writes straight into the pipeline.',
-        status: 'planned',
+        name: 'Online enquiry form',
+        blurb: 'A public enquiry form on the school host that writes straight into the pipeline.',
+        status: 'available',
+        route: '/enquire',
       },
       {
         name: 'Front office & visitors',
-        blurb: 'Visitors, calls and gate passes logged at the desk they arrive at.',
-        status: 'planned',
+        blurb: 'Visitors, gate passes and appointments logged at the desk they arrive at.',
+        status: 'available',
         route: '/front-office',
       },
       {
         name: 'Enrol as a student',
-        blurb: 'Creating the student record directly, which is how admissions are enrolled today.',
+        blurb: 'Convert a lead into a student and guardian record in one step, or enrol directly.',
         status: 'available',
         route: '/students/new',
       },
@@ -295,7 +297,7 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       },
       {
         name: 'Accounting ledgers',
-        blurb: 'Double-entry ledgers, vouchers and a trial balance inside SchoolOS.',
+        blurb: 'Double-entry ledgers, vouchers and a trial balance inside MyCampusView.',
         status: 'planned',
       },
     ],
@@ -365,31 +367,31 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       {
         name: 'Library',
         blurb: 'Catalogue, issues and returns against the same student records.',
-        status: 'planned',
+        status: 'available',
         route: '/library',
       },
       {
         name: 'Inventory',
-        blurb: 'Stock, issues and consumption for uniforms, books and school supplies.',
-        status: 'planned',
+        blurb: 'Assets, assignment, maintenance and disposal with a history trail.',
+        status: 'available',
         route: '/inventory',
       },
       {
         name: 'Events',
         blurb: 'School events with the audience they concern and their place in the calendar.',
-        status: 'planned',
+        status: 'available',
         route: '/events',
       },
       {
         name: 'Sports',
         blurb: 'Teams, fixtures and participation recorded per student.',
-        status: 'planned',
+        status: 'available',
         route: '/sports',
       },
       {
         name: 'School website',
         blurb: 'A public site for the school, editable by the school, on its own domain.',
-        status: 'planned',
+        status: 'available',
         route: '/website',
       },
       {
@@ -435,9 +437,21 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
       },
       {
         name: 'Custom domain',
-        blurb: 'The application on a domain the school owns, with certificates handled for you.',
+        blurb: 'The application on a domain the school owns, with DNS verification and TLS status checks.',
         status: 'available',
-        route: '/settings',
+        route: '/settings/domains',
+      },
+      {
+        name: 'Message templates',
+        blurb: 'Editable email, SMS and push copy for fee, attendance and notice events.',
+        status: 'available',
+        route: '/settings/templates',
+      },
+      {
+        name: 'Progressive web app',
+        blurb: 'Installable portal with an offline shell and optional push subscriptions.',
+        status: 'available',
+        route: '/settings/branding',
       },
       {
         name: 'Report builder & MIS',

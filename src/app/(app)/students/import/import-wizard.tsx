@@ -432,7 +432,7 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
                 <p className="text-sm text-ink-muted">
                   {needsReview
                     ? 'Review what smart import detected. Adjust anything that looks wrong, then confirm.'
-                    : 'Match your spreadsheet columns to SchoolOS fields. Required fields must be mapped before import.'}
+                    : 'Match your spreadsheet columns to MyCampusView fields. Required fields must be mapped before import.'}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {IMPORT_FIELDS.map((field) => (

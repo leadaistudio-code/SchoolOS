@@ -130,9 +130,33 @@ export function tenantDb(tenantId: string) {
 
 export type TenantClient = ReturnType<typeof tenantDb>
 
+/** SQL used to bind the current tenant for Postgres RLS policies. */
+export function tenantRlsSetLocalSql(tenantId: string): string {
+  // Guard against injection: tenant ids are cuids (alphanumeric).
+  if (!/^[a-zA-Z0-9_-]+$/.test(tenantId)) {
+    throw new TenantIsolationError('Invalid tenant id for RLS context')
+  }
+  return `SELECT set_config('app.tenant_id', '${tenantId}', true)`
+}
+
+export function databaseRlsEnabled(): boolean {
+  try {
+    // Lazy import avoids circular env load during unit tests that only
+    // exercise assignClassRanks-style helpers.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { env } = require('@/lib/env') as typeof import('@/lib/env')
+    return env().DATABASE_RLS === true
+  } catch {
+    return process.env.DATABASE_RLS === 'true' || process.env.DATABASE_RLS === '1'
+  }
+}
+
 /**
  * Runs `fn` in a transaction on the tenant-bound client. Client extensions
  * apply to the transactional client too, so isolation is preserved.
+ *
+ * When `DATABASE_RLS=true`, also sets `app.tenant_id` for the transaction so
+ * Postgres policies in prisma/rls.sql can filter rows.
  */
 export async function tenantTx<T>(
   tenantId: string,
@@ -141,7 +165,13 @@ export async function tenantTx<T>(
 ): Promise<T> {
   const db = tenantDb(tenantId)
   return db.$transaction(
-    async (tx) => fn(tx as unknown as Prisma.TransactionClient),
+    async (tx) => {
+      const client = tx as unknown as Prisma.TransactionClient
+      if (databaseRlsEnabled()) {
+        await client.$executeRawUnsafe(tenantRlsSetLocalSql(tenantId))
+      }
+      return fn(client)
+    },
     options,
   )
 }

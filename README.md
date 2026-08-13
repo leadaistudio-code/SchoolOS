@@ -1,4 +1,4 @@
-# SchoolOS
+# MyCampusView
 
 A multi-tenant School Management & ERP SaaS. One deployment serves many
 schools, each with its own isolated data, branding, domain, users and enabled
@@ -11,9 +11,11 @@ branding, copy, imagery or design of, any existing school ERP.
 
 ## Status
 
-**Phases 1 to 4 and Phase 8 are complete and verified end to end.** Later phases have their
-database schema, entitlements and navigation in place, and are listed in
-[docs/ROADMAP.md](docs/ROADMAP.md).
+**Phases 1–10 foundation work is complete** for the roadmap items that ship in
+this repository (including Phase 10 hardening: RLS path, MFA, Redis, CI, load
+scripts, monitoring endpoints, backup drills). Remaining product gaps (e.g.
+transport fare auto-invoice, S3 upload driver) are called out in
+[docs/ROADMAP.md](docs/ROADMAP.md) and ops docs.
 
 What runs today:
 
@@ -25,6 +27,12 @@ What runs today:
 | RBAC: 12 system roles, 120 permissions, custom roles supported | Working |
 | Row-level scoping (a parent sees only their own children) | Working |
 | White-label theme engine, per-tenant PWA manifest | Working |
+| School website CMS + public `/site-pages` | Working |
+| Custom domain DNS verify + TLS reachability check | Working |
+| Message templates (email / SMS / push) | Working |
+| PWA offline shell + push subscription storage | Working |
+| MFA (TOTP) + Redis rate limit/cache | Working |
+| Health/metrics probes + backup drill scripts | Working |
 | Role-specific dashboards with real aggregate queries | Working |
 | Students module, end to end (list, filter, sort, create, edit, archive) | Working |
 | Parents & staff modules, classes / sections / subjects | Working |

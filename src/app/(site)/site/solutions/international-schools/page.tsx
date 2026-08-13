@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 import { ClosingCta } from '@/components/site/cta'
 
 export const metadata: Metadata = {
-  title: "SchoolOS for international schools",
+  title: "MyCampusView for international schools",
   description: "Multiple curricula, grading scales, a mobile parent community and board-level reporting on one school system.",
   alternates: { canonical: '/solutions/international-schools' },
 }

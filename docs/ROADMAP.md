@@ -125,18 +125,32 @@ Also fixed here: an env var set to the empty string parsed as `''` rather than
 every signature verified against an empty secret. Empty values are now treated
 as absent, and the payment provider refuses a blank signing key outright.
 
-## Phase 5 — Examination
+## Phase 5 — Examination ✅ complete
 
-Exam creation and scheduling; subject and class mapping; marks entry with
+Exam creation and scheduling (exam window plus per-paper date/time/room);
+subject and class mapping; configurable max/pass marks; marks entry with
 validation against maximum marks; configurable grading scales; result
-computation with ranking; report card templates and PDF generation; the
-certificate builder with dynamic variables and QR verification.
+computation with dense class ranking; report card templates with attendance
+when enabled; printable report cards and certificates (browser print-to-PDF);
+certificate builder with dynamic variables and public QR verification; results
+CSV export.
 
-## Phase 6 — Operations
+Verified: create exam → edit papers → enter marks → compute/rank → publish →
+print report card; certificates issue with QR verify and revoke; Marks Entry
+lists open exams; certificates nav gated by `module.certificates`.
 
-Library catalogue, circulation and fines; inventory and asset lifecycle; front
-office visitors and appointments; the admissions CRM as a Kanban pipeline with
-follow-up reminders and conversion analytics; events; sports.
+## Phase 6 — Operations ✅ complete
+
+Library catalogue with issue/return and overdue fines; inventory assets with
+lifecycle history; front-office visitors and appointments (including walk-in →
+lead); admissions CRM as a Kanban pipeline with follow-ups, conversion analytics,
+public `/enquire`, and AI counsellor assists (next action, draft message, call
+brief) behind `module.ai_assist` with rule-based fallbacks; events with
+participant registration; sports with teams and members.
+
+Verified: lead create → stage move → follow-up → convert writes a student;
+public enquire is rate-limited and honeypotted; library issue decrements
+availability and return restores it with fine; AI never auto-sends messages.
 
 ## Phase 7 — Transport ✅ built
 
@@ -172,12 +186,23 @@ tenant detail reflect live student/staff counts vs plan limits.
 
 ## Phase 9 — White label and mobile
 
-The branding editor; custom domain verification and certificate issuance; the
-school website CMS; email, SMS and PDF template editing; full PWA with offline
-shell and push notifications.
+**Done.** Branding editor (logo, favicon, login image, PDF header/footer, PWA
+name/theme); custom domain DNS verification, primary domain and TLS reachability
+check; school website CMS (pages, blocks, posts) with public `/site-pages`;
+email/SMS/push notification template editing; PWA offline shell (`/sw.js`,
+`/offline`) and push subscription storage (VAPID keys optional for live push).
 
-## Phase 10 — Hardening
+## Phase 10 — Hardening ✅ complete
 
-Postgres RLS enabled with connection-level tenant context; MFA enrolment and
-challenge; Redis-backed rate limiting and caching; load testing; monitoring and
-alerting; automated backup and restore drills; CI/CD.
+Postgres RLS enable path (`prisma/rls.sql` + `DATABASE_RLS` / `SET LOCAL` in
+`tenantTx`); MFA enrolment and login challenge; Redis-backed rate limiting and
+entitlement caching; CI with Postgres + Redis; k6 smoke/soak load scripts;
+`/api/health` + `/api/metrics` + webhook health watcher; backup/restore drill
+scripts and docs.
+
+Verified: rate-limit Lua counters; entitlements cache invalidation on plan
+override; CI workflow services; health reports Redis when configured; backup
+scripts refuse restore without `RESTORE_CONFIRM=YES`.
+
+Remaining product gaps outside hardening (e.g. transport fare auto-invoice,
+S3 upload driver) stay tracked in their own sections / ops docs.

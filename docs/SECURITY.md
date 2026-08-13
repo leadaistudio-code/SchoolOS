@@ -30,13 +30,18 @@ See ARCHITECTURE.md §3. Four layers, all covered by tests:
 ### Optional Postgres RLS
 
 `prisma/rls.sql` contains row-level-security policies as defence in depth. It is
-**not applied by default**, and the application does not depend on it.
+**not applied by default**.
 
-Enabling it correctly requires running the app as a non-owner role (table owners
-bypass RLS unless `FORCE ROW LEVEL SECURITY` is set) and setting a per-connection
-`app.tenant_id` GUC inside a transaction. Applying the file without that plumbing
-would break every query — which is why it is opt-in rather than switched on
-alongside an unverified claim of protection.
+To enable:
+
+1. Create a non-owner Postgres role for the app (table owners bypass RLS unless
+   `FORCE` is set — the script forces policies, but a dedicated role is safer).
+2. Apply policies: `psql "$DATABASE_URL" -f prisma/rls.sql`
+3. Set `DATABASE_RLS=true` so `tenantTx()` runs
+   `SET LOCAL app.tenant_id = '<tenant>'` inside each tenant transaction.
+
+Without step 3, policies would see an empty GUC and block every row. Leave the
+flag false in local development unless you have completed the steps above.
 
 ---
 
@@ -161,12 +166,17 @@ denying camera and microphone while allowing geolocation to same-origin only
 
 Stated plainly rather than left implied:
 
-- **Postgres RLS ships but is not enabled** (§1). Application-level isolation is
-  the enforced mechanism today.
-- **The in-memory rate limiter is per-process.** Set `RATE_LIMIT_DRIVER=redis`
-  before running more than one instance.
-- **MFA is modelled, not implemented.** `User.mfaEnabled` / `mfaSecret` and the
-  `OTP_LOGIN` token purpose exist; enrolment and challenge flows do not.
+- **Postgres RLS ships but is not enabled by default** (§1). Application-level
+  isolation is the enforced mechanism today; set `DATABASE_RLS=true` only after
+  applying `prisma/rls.sql` with a non-owner role.
+- **Rate limiting is multi-instance when Redis is configured.** Set
+  `RATE_LIMIT_DRIVER=redis` and `REDIS_URL`. Without Redis the limiter falls
+  back to per-process memory (fine for a single instance).
+- **Entitlements are cached in Redis for 60s** when Redis is available, and
+  invalidated when platform overrides or plan entitlements change.
+- **MFA is available for school users.** Enrol at `/settings/security` (TOTP
+  authenticator app). Sign-in pauses for a `/login/mfa` challenge when
+  `User.mfaEnabled` is true. Platform accounts are unchanged.
 - **The local storage driver is for development.** Use S3-compatible storage in
   production so uploads do not live on the app instance disk.
 - **Geofenced attendance trusts a cooperating client for location.** Coordinates,

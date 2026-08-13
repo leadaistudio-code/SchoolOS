@@ -68,7 +68,7 @@ describe('a marketing-only service', () => {
 
   it('keeps the demo form and the health check reachable', () => {
     setup('marketing')
-    for (const path of ['/api/v1/site/demo', '/api/health']) {
+    for (const path of ['/api/v1/site/demo', '/api/health', '/api/metrics']) {
       const res = middleware(request(ROOT, path))
       expect(res.status, path).toBe(200)
       expect(res.headers.get('location'), path).toBeNull()

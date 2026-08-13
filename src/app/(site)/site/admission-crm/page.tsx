@@ -9,7 +9,7 @@ import { MODULE_CATEGORIES } from '@/content/site/modules'
 export const metadata: Metadata = {
   title: 'Admission CRM for schools — enquiry to enrolment',
   description:
-    'How SchoolOS handles admission enquiries today, what enrolment writes into student records, and exactly which parts of the admission pipeline are still being built.',
+    'How MyCampusView handles admission enquiries today, what enrolment writes into student records, and exactly which parts of the admission pipeline are still being built.',
   alternates: { canonical: '/admission-crm' },
 }
 
@@ -32,7 +32,7 @@ export default function AdmissionCrmPage() {
       <PageIntro
         eyebrow="Admission CRM"
         title="Turn every admission enquiry into a record, not a note."
-        lead="A school’s admission season runs on memory: a name on a pad, a follow-up somebody meant to make, a family who visited twice and was never called back. SchoolOS puts the enquiry on the system from the first call and turns an admitted child into a student record without retyping anything."
+        lead="A school’s admission season runs on memory: a name on a pad, a follow-up somebody meant to make, a family who visited twice and was never called back. MyCampusView puts the enquiry on the system from the first call and turns an admitted child into a student record without retyping anything."
       />
 
       <ProseSection>

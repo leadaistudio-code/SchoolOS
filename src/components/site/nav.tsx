@@ -97,7 +97,7 @@ export function SiteNav() {
     >
       <Container wide>
         <div className="flex h-[70px] items-center gap-6">
-          <Link href="/" className="shrink-0" aria-label="SchoolOS home">
+          <Link href="/" className="shrink-0" aria-label="MyCampusView home">
             <Wordmark />
           </Link>
 
@@ -384,7 +384,7 @@ export function Wordmark({ onDark }: { onDark?: boolean }) {
           onDark ? 'text-white' : 'text-[var(--ink)]',
         )}
       >
-        SchoolOS
+        MyCampusView
       </span>
     </span>
   )

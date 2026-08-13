@@ -19,6 +19,8 @@
 --      the setting will be wrong or absent -- which is exactly why this is not
 --      switched on by default.
 --
+--   3. Set DATABASE_RLS=true so tenantTx() / withTenantRls() run SET LOCAL.
+--
 -- Enable with:
 --   psql "$DATABASE_URL" -f prisma/rls.sql
 -- =============================================================================
@@ -31,10 +33,18 @@ BEGIN
     'School','Branding','Setting',
     'Student','Enrollment','Parent','StudentGuardian','Staff','DisciplineRecord',
     'AcademicSession','ClassLevel','Section','Subject','ClassSubject',
+    'Curriculum','Chapter','Topic','LearningOutcome',
+    'Question','QuestionOption','QuestionTopic',
+    'AssessmentType','PaperTemplate','Assessment','AssessmentSection',
+    'AssessmentQuestion','QuestionUsage','AssessmentAssignment','AssessmentAttempt',
+    'StudentAnswer',
     'StudentAttendance','StaffAttendance','LeaveType','LeaveRequest',
     'FeeHead','FeeStructure','FeeStructureItem','FeeConcession','FeeInvoice',
     'FeeInvoiceLine','FeePayment','FeePaymentAllocation','FeeReceipt',
     'FeeRefund','FeePenaltyRule',
+    'FeedbackTemplate','FeedbackQuestion','FeedbackCampaign','FeedbackAssignment',
+    'FeedbackResponse','FeedbackAnswer','FeedbackConcern','FeedbackModeration',
+    'FeedbackActionItem','TeacherStudentFeedback',
     'GradingScale','GradeBand','Exam','ExamClass','ExamSubject','Mark','Result',
     'ReportCardTemplate','CertificateTemplate','Certificate',
     'Homework','HomeworkSubmission','Classwork','TimetablePeriod',
@@ -48,7 +58,8 @@ BEGIN
     'BusLocation','TransportBoardingLog',
     'Sport','SportsTeam','SportsTeamMember','SchoolEvent','EventParticipant',
     'CmsPage','CmsBlock','CmsPost','CmsMedia',
-    'Document','Attachment','ImportBatch'
+    'Document','Attachment','ImportBatch','SupportTicket',
+    'PushSubscription','TenantDomain'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', target);

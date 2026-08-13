@@ -1,7 +1,7 @@
 /**
  * Integrations, stated as they actually are.
  *
- * SchoolOS talks to the outside world through provider interfaces in
+ * MyCampusView talks to the outside world through provider interfaces in
  * `src/server/providers`. That design means a vendor can be swapped by
  * configuration — but it also means an interface existing is *not* the same as
  * a vendor being connected. This file keeps that distinction visible:
@@ -32,7 +32,7 @@ export const INTEGRATION_STATUS_LABEL: Record<IntegrationStatus, string> = {
 export const INTEGRATION_STATUS_NOTE: Record<IntegrationStatus, string> = {
   available: 'Running in production today.',
   ready:
-    'Built and metered inside SchoolOS. We connect your own vendor account during implementation.',
+    'Built and metered inside MyCampusView. We connect your own vendor account during implementation.',
   planned: 'On the roadmap. Not available today, and we will say so on a call.',
 }
 
@@ -102,7 +102,7 @@ export const INTEGRATION_GROUPS: { heading: string; lead: string; items: Integra
   },
   {
     heading: 'Identity & platform',
-    lead: 'How your school’s own systems and domain meet SchoolOS.',
+    lead: 'How your school’s own systems and domain meet MyCampusView.',
     items: [
       {
         name: 'Custom domain',

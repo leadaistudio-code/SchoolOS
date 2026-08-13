@@ -29,13 +29,27 @@ export default async function HealthPage() {
           value={health.database.ok ? 'Healthy' : 'Down'}
           sub={`${health.database.latencyMs}ms`}
         />
+        <Metric
+          label="Redis"
+          value={
+            health.redis.ok === null
+              ? 'Not configured'
+              : health.redis.ok
+                ? 'Healthy'
+                : health.redis.required
+                  ? 'Down'
+                  : 'Unreachable'
+          }
+          sub={
+            health.redis.latencyMs != null
+              ? `${health.redis.latencyMs}ms`
+              : health.redis.required
+                ? 'Required by rate limit driver'
+                : 'Optional'
+          }
+        />
         <Metric label="Schools" value={formatNumber(tenantTotal)} sub="By status below" />
         <Metric label="Open tickets" value={formatNumber(health.openTickets)} sub="OPEN + PENDING" />
-        <Metric
-          label="Failed jobs"
-          value={formatNumber(health.failedJobs.length)}
-          sub={`${health.failedDeliveries.length} failed deliveries`}
-        />
       </MetricRow>
 
       <div className="grid gap-4 lg:grid-cols-2">

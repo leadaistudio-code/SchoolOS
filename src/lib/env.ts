@@ -12,7 +12,7 @@ const bool = z
 
 const serverSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  APP_NAME: z.string().default('SchoolOS'),
+  APP_NAME: z.string().default('MyCampusView'),
   APP_ROOT_DOMAIN: z.string().default('lvh.me:3000'),
   /**
    * Which half of the product this deployment serves. `both` is one service
@@ -65,7 +65,7 @@ const serverSchema = z.object({
   MAX_UPLOAD_MB: z.coerce.number().int().positive().default(15),
 
   EMAIL_DRIVER: z.enum(['log', 'smtp', 'ses', 'resend']).default('log'),
-  EMAIL_FROM: z.string().default('SchoolOS <no-reply@example.com>'),
+  EMAIL_FROM: z.string().default('MyCampusView <no-reply@example.com>'),
   SMTP_URL: z.string().optional(),
 
   SMS_DRIVER: z.enum(['log', 'msg91', 'twilio']).default('log'),

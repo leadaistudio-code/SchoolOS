@@ -9,7 +9,7 @@ import { SECURITY_LIMITS, SECURITY_POINTS } from '@/content/site/company'
  * Security.
  *
  * The competitive move here is unusual and deliberate: the section ends by
- * saying what SchoolOS does *not* have. Every other site in this market puts a
+ * saying what MyCampusView does *not* have. Every other site in this market puts a
  * row of certification badges here, and a school's IT reviewer knows most of
  * them are decorative. Naming the gaps ourselves is the only claim on the page
  * that cannot be made by someone who is bluffing.

@@ -6,7 +6,7 @@ import { ClosingCta } from '@/components/site/cta'
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Why SchoolOS exists, what we believe school software should do, and how we build it.',
+    'Why MyCampusView exists, what we believe school software should do, and how we build it.',
   alternates: { canonical: '/about' },
 }
 

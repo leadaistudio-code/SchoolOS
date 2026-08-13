@@ -4,6 +4,7 @@ import { PERMISSIONS } from '@/lib/rbac/permissions'
 import { SYSTEM_ROLES, ROLE } from '@/lib/rbac/roles'
 import { env } from '@/lib/env'
 import { badRequest, conflict, ApiException } from '@/server/api/response'
+import { ensureExamDefaults } from '@/server/modules/exams/defaults'
 
 export type ProvisionInput = {
   slug: string
@@ -35,7 +36,7 @@ export async function provisionSchool(db: PrismaClient, input: ProvisionInput) {
   if (!adminRole) throw badRequest('School admin role is missing — run db:seed first')
 
   try {
-    return await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const existingSlug = await tx.tenant.findUnique({ where: { slug: input.slug } })
       if (existingSlug) throw conflict(`Slug "${input.slug}" is already taken`)
 
@@ -112,8 +113,11 @@ export async function provisionSchool(db: PrismaClient, input: ProvisionInput) {
         },
       })
 
+      await ensureExamDefaults(tx, tenant.id)
+
       return { tenant, user, school }
     })
+    return result
   } catch (err) {
     if (err instanceof ApiException) throw err
     const code = (err as { code?: string })?.code

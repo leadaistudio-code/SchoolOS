@@ -8,7 +8,7 @@ import { emptyFormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { Field, Input } from '@/components/ui/input'
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({ next, showForgotPassword = false }: { next?: string; showForgotPassword?: boolean }) {
   const [state, formAction, pending] = useActionState(loginAction, emptyFormState)
   const [showPassword, setShowPassword] = React.useState(false)
 
@@ -73,9 +73,11 @@ export function LoginForm({ next }: { next?: string }) {
           <input type="checkbox" name="remember" className="size-4 rounded-[3px] border border-line-strong accent-[var(--brand-500)]" defaultChecked />
           Keep me signed in
         </label>
-        <a href="/forgot-password" className="text-xs font-semibold text-[var(--brand-500)] hover:underline">
-          Forgot password?
-        </a>
+        {showForgotPassword ? (
+          <a href="/forgot-password" className="text-xs font-semibold text-[var(--brand-500)] hover:underline">
+            Forgot password?
+          </a>
+        ) : null}
       </div>
 
       <Button type="submit" size="lg" block loading={pending}>

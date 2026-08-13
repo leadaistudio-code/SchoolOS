@@ -9,7 +9,7 @@ export default async function BrandingPage() {
   const ctx = await requireContext('settings.branding')
 
   const school = await ctx.db.school.findFirst({
-    select: { id: true, branding: true },
+    select: { id: true, name: true, code: true, branding: true },
   })
   const b = school?.branding
 
@@ -17,11 +17,14 @@ export default async function BrandingPage() {
     <div>
       <PageHeader
         title="Branding"
-        description="Applied across the portal, receipts and report cards"
+        description="Applied across the portal, receipts, report cards and the installed app"
       />
       <BrandingForm
         logoUrl={resolveBrandingAssetUrl(b?.logoUrl, 'logo')}
         bannerUrl={resolveBrandingAssetUrl(b?.loginImageUrl, 'banner')}
+        faviconUrl={resolveBrandingAssetUrl(b?.faviconUrl, 'favicon')}
+        darkLogoUrl={resolveBrandingAssetUrl(b?.darkLogoUrl, 'darkLogo')}
+        signatureUrl={resolveBrandingAssetUrl(b?.signatureUrl, 'signature')}
         initial={{
           primaryHex: b?.primaryHex ?? '#E41F07',
           accentHex: b?.accentHex ?? '#FFA201',
@@ -30,6 +33,11 @@ export default async function BrandingPage() {
           loginHeadline: b?.loginHeadline ?? '',
           loginSubtext: b?.loginSubtext ?? '',
           footerText: b?.footerText ?? '',
+          pdfHeaderHtml: b?.pdfHeaderHtml ?? '',
+          pdfFooterHtml: b?.pdfFooterHtml ?? '',
+          pwaName: b?.pwaName ?? school?.name ?? '',
+          pwaShortName: b?.pwaShortName ?? school?.code ?? '',
+          pwaThemeHex: b?.pwaThemeHex ?? b?.primaryHex ?? '#E41F07',
         }}
       />
     </div>

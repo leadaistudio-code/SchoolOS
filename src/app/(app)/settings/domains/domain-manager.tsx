@@ -27,6 +27,7 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
   const [verifying, setVerifying] = React.useState<string | null>(null)
   const [removing, setRemoving] = React.useState<string | null>(null)
   const [settingPrimary, setSettingPrimary] = React.useState<string | null>(null)
+  const [checkingCert, setCheckingCert] = React.useState<string | null>(null)
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,6 +101,25 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
     }
   }
 
+  const handleCheckCertificate = async (id: string) => {
+    setCheckingCert(id)
+    try {
+      const res = await fetch(`/api/v1/domains/${id}/certificate`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error?.message || 'Certificate check failed')
+      const status = data.data as { httpsReachable: boolean | null; message: string }
+      toast.push({
+        tone: status.httpsReachable ? 'success' : 'info',
+        title: status.httpsReachable ? 'TLS active' : 'TLS pending',
+        description: status.message,
+      })
+    } catch (err: any) {
+      toast.push({ tone: 'error', title: 'Error', description: err.message })
+    } finally {
+      setCheckingCert(null)
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] items-start">
       <Card>
@@ -139,6 +159,16 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {domain.verified && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={checkingCert === domain.id}
+                          onClick={() => handleCheckCertificate(domain.id)}
+                        >
+                          Check TLS
+                        </Button>
+                      )}
                       {domain.verified && !domain.isPrimary && (
                         <Button
                           variant="ghost"

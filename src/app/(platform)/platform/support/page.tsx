@@ -61,6 +61,7 @@ export default async function SupportPage({
                 <tr>
                   <TH>Subject</TH>
                   <TH>School</TH>
+                  <TH>Category</TH>
                   <TH>Priority</TH>
                   <TH>Status</TH>
                   <TH>Updated</TH>
@@ -72,6 +73,9 @@ export default async function SupportPage({
                   <TR key={t.id}>
                     <TD className="text-sm">{t.subject}</TD>
                     <TD className="text-sm text-ink-muted">{t.tenant.name}</TD>
+                    <TD className="text-sm text-ink-muted">
+                      {t.category?.replace(/_/g, ' ') ?? '—'}
+                    </TD>
                     <TD>
                       <Badge tone={t.priority === 'URGENT' ? 'danger' : 'neutral'}>
                         {t.priority.toLowerCase()}

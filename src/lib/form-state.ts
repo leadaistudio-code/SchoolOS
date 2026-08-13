@@ -9,6 +9,7 @@ export type FormState = {
   error: string | null
   fieldErrors: Record<string, string>
   ok?: boolean
+  message?: string
 }
 
 export const emptyFormState: FormState = { error: null, fieldErrors: {} }

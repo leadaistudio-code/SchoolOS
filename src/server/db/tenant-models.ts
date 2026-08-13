@@ -116,6 +116,8 @@ export const TENANT_SCOPED_MODELS = [
   'Attachment',
   'ImportBatch',
   'SupportTicket',
+  'PushSubscription',
+  'TenantDomain',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -183,9 +185,11 @@ export function isTenantSharedOptional(model: string | undefined): boolean {
  * one context that is meant to see across tenants. Tenant-facing code reaches
  * them only through `getEntitlements()` and friends, which take an explicit
  * tenantId.
+ *
+ * `TenantDomain` is tenant-scoped (schools manage their own hosts); host
+ * resolution uses the unscoped `prisma` client by unique `host`.
  */
 export const PLATFORM_MODELS = new Set<string>([
-  'TenantDomain',
   'Subscription',
   'SubscriptionInvoice',
   'TenantEntitlementOverride',

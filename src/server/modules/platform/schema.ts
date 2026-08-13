@@ -111,6 +111,12 @@ export const supportTicketCreateSchema = z.object({
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
 })
 
+/** Unauthenticated request from a school's sign-in page. */
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address'),
+  note: z.string().trim().max(500).optional(),
+})
+
 export const supportMessageSchema = z.object({
   body: z.string().min(1).max(8000),
 })

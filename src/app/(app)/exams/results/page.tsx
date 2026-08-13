@@ -57,6 +57,17 @@ export default async function ResultsPage({
         />
       ) : null}
 
+      {selected && ctx.can('results.export') && results.length > 0 ? (
+        <p className="mt-3">
+          <a
+            href={`/api/v1/exams/results/export?exam=${selected.id}`}
+            className="text-sm text-[var(--brand-600)] hover:underline"
+          >
+            Download CSV
+          </a>
+        </p>
+      ) : null}
+
       <Card className="mt-4 overflow-hidden">
         {!selected ? (
           <EmptyState

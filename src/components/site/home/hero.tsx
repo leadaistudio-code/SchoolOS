@@ -50,7 +50,7 @@ export function Hero() {
                 Book a demo
               </Button>
               <Button href="/product" tone="secondary" size="lg">
-                Explore SchoolOS
+                Explore MyCampusView
               </Button>
             </div>
 
@@ -77,7 +77,7 @@ export function Hero() {
                   <span className="size-2.5 rounded-full bg-[var(--rule-strong)]" />
                 </span>
                 <span className="ml-1 truncate text-[13px] text-[var(--text-subtle)]">
-                  SchoolOS — administrator dashboard
+                  MyCampusView — administrator dashboard
                 </span>
               </div>
               <DashboardRender />

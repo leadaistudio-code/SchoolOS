@@ -24,9 +24,23 @@ const TILES: Tile[] = [
     ready: true,
   },
   {
+    href: '/settings/security',
+    title: 'Security',
+    description: 'Two-factor authentication for your account.',
+    permission: 'settings.view',
+    ready: true,
+  },
+  {
     href: '/settings/domains',
     title: 'Custom Domains',
     description: 'Manage your portal\'s web addresses.',
+    permission: 'settings.manage',
+    ready: true,
+  },
+  {
+    href: '/settings/templates',
+    title: 'Message templates',
+    description: 'Email, SMS and push copy for school notifications.',
     permission: 'settings.manage',
     ready: true,
   },

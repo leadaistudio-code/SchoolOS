@@ -2,6 +2,9 @@ import crypto from 'node:crypto'
 import dns from 'node:dns/promises'
 import { AppContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
+import { assertWithinLimit, hasFeature } from '@/server/entitlements'
+import { FEATURE } from '@/lib/features'
+import { ApiException } from '@/server/api/response'
 import { AddDomainInput } from './schema'
 
 export async function listDomains(ctx: AppContext) {
@@ -14,8 +17,17 @@ export async function listDomains(ctx: AppContext) {
 export async function addDomain(ctx: AppContext, input: AddDomainInput) {
   ctx.require('settings.manage')
 
-  // Check if it already exists globally (hosts must be globally unique)
-  // But wait, the prisma model has host @unique, so we should query prisma directly to check if it's used elsewhere
+  if (!(await hasFeature(ctx.tenant.id, FEATURE.MODULE_CUSTOM_DOMAIN))) {
+    throw new ApiException(
+      402,
+      'FEATURE_LOCKED',
+      'Custom domains are not part of this school’s plan.',
+    )
+  }
+
+  const count = await ctx.db.tenantDomain.count()
+  await assertWithinLimit(ctx.tenant.id, FEATURE.LIMIT_DOMAINS, count)
+
   const existing = await prisma.tenantDomain.findUnique({
     where: { host: input.host },
   })
@@ -29,7 +41,7 @@ export async function addDomain(ctx: AppContext, input: AddDomainInput) {
 
   const verifyToken = crypto.randomBytes(24).toString('hex')
 
-  const domain = await ctx.db.tenantDomain.create({
+  return ctx.db.tenantDomain.create({
     data: {
       tenantId: ctx.tenant.id,
       host: input.host,
@@ -38,8 +50,6 @@ export async function addDomain(ctx: AppContext, input: AddDomainInput) {
       isPrimary: false,
     },
   })
-
-  return domain
 }
 
 export async function verifyDomain(ctx: AppContext, id: string) {
@@ -50,27 +60,27 @@ export async function verifyDomain(ctx: AppContext, id: string) {
   if (domain.verified) return domain
 
   const challengeHost = `_schoolos-challenge.${domain.host}`
-  
+
   try {
     const records = await dns.resolveTxt(challengeHost)
-    // records is an array of arrays of strings
     const txtValues = records.map((record) => record.join(''))
-    
+
     if (txtValues.includes(domain.verifyToken!)) {
-      const verified = await ctx.db.tenantDomain.update({
+      return ctx.db.tenantDomain.update({
         where: { id },
         data: { verified: true },
       })
-      return verified
     }
-  } catch (error: any) {
-    // If ENOTFOUND or similar, DNS just hasn't propagated or isn't set
-    if (error.code !== 'ENOTFOUND' && error.code !== 'ENODATA') {
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code
+    if (code !== 'ENOTFOUND' && code !== 'ENODATA') {
       console.error('DNS lookup error:', error)
     }
   }
 
-  throw new Error('Verification failed. We could not find the correct TXT record. DNS propagation may take up to 24 hours.')
+  throw new Error(
+    'Verification failed. We could not find the correct TXT record. DNS propagation may take up to 24 hours.',
+  )
 }
 
 export async function setPrimaryDomain(ctx: AppContext, id: string) {
@@ -80,7 +90,6 @@ export async function setPrimaryDomain(ctx: AppContext, id: string) {
   if (!domain) throw new Error('Domain not found')
   if (!domain.verified) throw new Error('Domain must be verified before setting as primary')
 
-  // Clear existing primary domains in a transaction
   return ctx.db.$transaction(async (tx) => {
     await tx.tenantDomain.updateMany({
       where: { isPrimary: true },
@@ -105,4 +114,38 @@ export async function removeDomain(ctx: AppContext, id: string) {
   }
 
   await ctx.db.tenantDomain.delete({ where: { id } })
+}
+
+/**
+ * TLS is issued by the hosting platform. We probe HTTPS so operators can see
+ * whether a certificate is live after DNS is verified.
+ */
+export async function getDomainCertificateStatus(host: string): Promise<{
+  host: string
+  httpsReachable: boolean | null
+  message: string
+}> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 4000)
+    const res = await fetch(`https://${host}/api/health`, {
+      method: 'GET',
+      signal: controller.signal,
+      redirect: 'follow',
+    }).finally(() => clearTimeout(timer))
+    return {
+      host,
+      httpsReachable: res.ok || res.status < 500,
+      message: res.ok
+        ? 'HTTPS responds. Certificate is active on the hosting platform.'
+        : `HTTPS reached the host (HTTP ${res.status}). Confirm the certificate in your host dashboard if the browser still warns.`,
+    }
+  } catch {
+    return {
+      host,
+      httpsReachable: false,
+      message:
+        'HTTPS is not reachable yet. After DNS is verified, add this host on Railway/Netlify so a TLS certificate can be issued.',
+    }
+  }
 }

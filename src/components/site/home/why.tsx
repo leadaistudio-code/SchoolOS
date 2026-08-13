@@ -4,7 +4,7 @@ import { SectionHeader } from '../ui'
 import { DIFFERENTIATORS } from '@/content/site/company'
 
 /**
- * Why SchoolOS.
+ * Why MyCampusView.
  *
  * Eight points, each a property of the build rather than an adjective, set as a
  * numbered editorial list. Deliberately no icons: a lucide glyph beside
@@ -18,7 +18,7 @@ export function Why() {
       <Container wide>
         <SectionHeader
           split
-          eyebrow="Why SchoolOS"
+          eyebrow="Why MyCampusView"
           title="What is actually different about it."
           lead="Not a list of adjectives. Each of these is a decision in the software that you can ask us to demonstrate, or that your IT team can check for themselves."
         />

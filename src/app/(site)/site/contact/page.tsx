@@ -5,7 +5,7 @@ import { PageIntro } from '@/components/site/page-parts'
 
 export const metadata: Metadata = {
   title: 'Contact',
-  description: 'How to reach the SchoolOS team about sales, support or partnerships.',
+  description: 'How to reach the MyCampusView team about sales, support or partnerships.',
   alternates: { canonical: '/contact' },
 }
 
@@ -22,7 +22,7 @@ export default function ContactPage() {
       <PageIntro
         eyebrow="Contact"
         title="Talk to someone who knows the product."
-        lead="Enquiries reach the people who build and run SchoolOS, not a call centre."
+        lead="Enquiries reach the people who build and run MyCampusView, not a call centre."
       />
 
       <Section>
@@ -31,12 +31,12 @@ export default function ContactPage() {
             {[
               {
                 heading: 'Sales and demonstrations',
-                body: 'Questions about whether SchoolOS fits your school, and arranging a demonstration.',
+                body: 'Questions about whether MyCampusView fits your school, and arranging a demonstration.',
                 action: { label: 'Book a demo', href: '/book-demo' },
               },
               {
                 heading: 'Existing schools',
-                body: 'If your school already uses SchoolOS, your administrator has a direct line to support.',
+                body: 'If your school already uses MyCampusView, your administrator has a direct line to support.',
                 action: null,
               },
               {

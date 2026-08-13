@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 type Mode = 'light' | 'dark' | 'system'
 
-const STORAGE_KEY = 'schoolos-theme'
+const STORAGE_KEY = 'mycampusview-theme'
 
 function apply(mode: Mode) {
   const root = document.documentElement

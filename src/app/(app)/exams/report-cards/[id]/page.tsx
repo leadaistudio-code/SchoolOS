@@ -19,7 +19,7 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
   const ctx = await requireContext('results.view')
   const { id } = await params
   const card = await getReportCard(ctx, id)
-  const { result } = card
+  const { result, template } = card
 
   return (
     <div className="max-w-4xl">
@@ -35,6 +35,12 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
       </div>
 
       <article className="border border-line bg-surface p-5 sm:p-8 print:border-0 print:p-0">
+        {template?.headerHtml ? (
+          <div
+            className="mb-4 text-center prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: template.headerHtml }}
+          />
+        ) : null}
         <header className="border-b border-line pb-4 text-center">
           <p className="caption">Academic report card</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink">{result.exam.name}</h1>
@@ -58,7 +64,7 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
             <p className="mt-1 text-lg font-semibold text-ink">
               {card.className} · Section {card.sectionName}
             </p>
-            <p className="text-sm text-ink-muted">Rank in class {result.rankInClass ?? '—'}</p>
+            <p className="text-sm text-ink-muted">Rank in class {template?.showRank === false ? '—' : (result.rankInClass ?? '—')}</p>
           </div>
         </section>
 
@@ -79,7 +85,7 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
                     <p className="text-sm font-medium text-ink">{subject.name}</p>
                     <p className="text-xs text-ink-subtle">
                       {subject.code}
-                      {subject.remarks ? ` · ${subject.remarks}` : ''}
+                      {template?.showRemarks !== false && subject.remarks ? ` · ${subject.remarks}` : ''}
                     </p>
                   </td>
                   <td className="py-2.5 text-right text-sm tnum">
@@ -123,6 +129,21 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
             </p>
           </div>
         </footer>
+        {template?.showAttendance && card.attendance ? (
+          <section className="mt-4 border-t border-line pt-4 text-sm">
+            <p className="caption">Attendance (session)</p>
+            <p className="mt-1 text-ink">
+              Present {card.attendance.present} · Absent {card.attendance.absent} ·{' '}
+              {card.attendance.percent}% of {card.attendance.total} marked days
+            </p>
+          </section>
+        ) : null}
+        {template?.footerHtml ? (
+          <div
+            className="mt-6 border-t border-line pt-4 prose prose-sm max-w-none text-center"
+            dangerouslySetInnerHTML={{ __html: template.footerHtml }}
+          />
+        ) : null}
       </article>
     </div>
   )

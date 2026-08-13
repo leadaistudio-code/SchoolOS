@@ -61,7 +61,7 @@ export function ClosingCta({
               ))}
             </ul>
             <p className="subtle mt-6 text-[14px] leading-[1.6]">
-              No obligation, and no pricing pressure on the first call. If SchoolOS is the wrong fit
+              No obligation, and no pricing pressure on the first call. If MyCampusView is the wrong fit
               for your school we would rather say so then.
             </p>
           </div>

@@ -76,7 +76,7 @@ export default async function ExamsPage({
                     <TR key={exam.id}>
                       <TD>
                         <Link
-                          href={`/exams/${exam.id}/marks`}
+                          href={`/exams/${exam.id}`}
                           className="text-sm font-medium text-ink hover:text-[var(--brand-600)]"
                         >
                           {exam.name}

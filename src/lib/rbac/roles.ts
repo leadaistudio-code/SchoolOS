@@ -76,7 +76,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('messages'),
       ...all('feedback'),
       'library.view', 'inventory.view', 'frontoffice.view',
-      'admissions.view', 'admissions.manage',
+      'admissions.view', 'admissions.manage', 'admissions.convert',
       'transport.view', 'transport.track',
       ...all('sports'),
       ...all('events'),

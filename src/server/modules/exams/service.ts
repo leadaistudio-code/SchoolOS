@@ -8,6 +8,7 @@ import { currentSession } from '@/server/modules/academics/service'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { accessibleStudentIds } from '@/server/scope'
 import { notify } from '@/server/notifications'
+import { getDefaultReportCardTemplate } from './report-templates'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
 
@@ -62,6 +63,83 @@ export type GradeBandValue = { grade: string; minPercent: number; maxPercent: nu
 export function gradeForPercent(percent: number, bands: GradeBandValue[]) {
   return bands.find((band) => percent >= band.minPercent && percent <= band.maxPercent) ?? null
 }
+
+/** Dense ranking: equal percentage + total share a rank; next rank skips. */
+export function assignClassRanks(
+  results: { id: string; percentage: number; totalObtained: number }[],
+): { id: string; rank: number }[] {
+  const sorted = [...results].sort(
+    (a, b) => b.percentage - a.percentage || b.totalObtained - a.totalObtained,
+  )
+  let rank = 0
+  let previous: { percentage: number; totalObtained: number } | null = null
+  return sorted.map((result, index) => {
+    if (
+      !previous ||
+      previous.percentage !== result.percentage ||
+      previous.totalObtained !== result.totalObtained
+    ) {
+      rank = index + 1
+    }
+    previous = result
+    return { id: result.id, rank }
+  })
+}
+
+const optionalTime = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM')
+  .optional()
+  .or(z.literal(''))
+  .transform((v) => (v ? v : undefined))
+
+export const examPaperUpdateSchema = z.object({
+  papers: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        maxMarks: z.coerce.number().positive().max(1000),
+        passMarks: z.coerce.number().min(0).max(1000),
+        examDate: isoDate.optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
+        startTime: optionalTime,
+        endTime: optionalTime,
+        roomName: z
+          .string()
+          .trim()
+          .max(80)
+          .optional()
+          .or(z.literal(''))
+          .transform((v) => (v ? v : undefined)),
+      }),
+    )
+    .min(1),
+}).superRefine((value, context) => {
+  for (const [index, paper] of value.papers.entries()) {
+    if (paper.passMarks > paper.maxMarks) {
+      context.addIssue({
+        code: 'custom',
+        path: ['papers', index, 'passMarks'],
+        message: 'Pass marks cannot exceed maximum marks',
+      })
+    }
+  }
+})
+
+export const examMetaUpdateSchema = z
+  .object({
+    name: z.string().trim().min(3).max(100).optional(),
+    startsOn: isoDate.optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
+    endsOn: isoDate.optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
+    status: z.enum(['DRAFT', 'SCHEDULED', 'ONGOING', 'MARKS_ENTRY', 'PUBLISHED', 'ARCHIVED']).optional(),
+  })
+  .refine(
+    (value) =>
+      !value.startsOn ||
+      !value.endsOn ||
+      attendanceDate(value.endsOn) >= attendanceDate(value.startsOn),
+    { path: ['endsOn'], message: 'The end date cannot be before the start date' },
+  )
 
 const EXAM_SORT_FIELDS = ['createdAt', 'name', 'startsOn', 'status'] as const
 
@@ -178,6 +256,140 @@ export async function setExamGradingScale(ctx: AppContext, examId: string, gradi
   const updated = await ctx.db.exam.update({ where: { id: examId }, data: { gradingScaleId } })
   await audit({ tenantId: ctx.tenant.id, actorId: ctx.user.userId, actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`, action: 'exam.grading_scale.set', module: 'exams', entityType: 'Exam', entityId: examId, summary: `Set ${scale.name} as the grading scale for ${exam.name}`, before: { gradingScaleId: exam.gradingScaleId }, after: { gradingScaleId } })
   return updated
+}
+
+export async function getExamDetail(ctx: AppContext, examId: string) {
+  ctx.require('exams.view')
+  const exam = await ctx.db.exam.findFirst({
+    where: { id: examId },
+    include: {
+      gradingScale: { select: { id: true, name: true } },
+      classes: {
+        include: { classLevel: { select: { id: true, name: true } } },
+        orderBy: { classLevel: { numeric: 'asc' } },
+      },
+      subjects: {
+        orderBy: [
+          { classSubject: { classLevel: { numeric: 'asc' } } },
+          { classSubject: { subject: { name: 'asc' } } },
+        ],
+        include: {
+          classSubject: {
+            select: {
+              classLevel: { select: { name: true } },
+              subject: { select: { name: true, code: true } },
+            },
+          },
+        },
+      },
+      _count: { select: { results: true } },
+    },
+  })
+  if (!exam) throw notFound('Exam')
+  return exam
+}
+
+export async function updateExamMeta(
+  ctx: AppContext,
+  examId: string,
+  raw: z.infer<typeof examMetaUpdateSchema>,
+) {
+  ctx.require('exams.manage')
+  const input = examMetaUpdateSchema.parse(raw)
+  const exam = await ctx.db.exam.findFirst({ where: { id: examId } })
+  if (!exam) throw notFound('Exam')
+  if (exam.status === 'PUBLISHED' && input.status && input.status !== 'ARCHIVED' && input.status !== 'PUBLISHED') {
+    throw conflict('Published exams can only be archived')
+  }
+  if (exam.status === 'PUBLISHED' && (input.name || input.startsOn || input.endsOn)) {
+    throw conflict('Published exam details cannot be changed; archive instead')
+  }
+
+  const nextStatus =
+    input.status && input.status !== exam.status
+      ? input.status === 'PUBLISHED'
+        ? undefined
+        : input.status
+      : undefined
+
+  const updated = await ctx.db.exam.update({
+    where: { id: examId },
+    data: {
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.startsOn !== undefined
+        ? { startsOn: input.startsOn ? attendanceDate(input.startsOn) : null }
+        : {}),
+      ...(input.endsOn !== undefined
+        ? { endsOn: input.endsOn ? attendanceDate(input.endsOn) : null }
+        : {}),
+      ...(nextStatus ? { status: nextStatus } : {}),
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'exam.update',
+    module: 'exams',
+    entityType: 'Exam',
+    entityId: examId,
+    summary: `Updated exam ${updated.name}`,
+    before: { name: exam.name, status: exam.status },
+    after: { name: updated.name, status: updated.status },
+  })
+  return updated
+}
+
+export async function updateExamPapers(
+  ctx: AppContext,
+  examId: string,
+  raw: z.infer<typeof examPaperUpdateSchema>,
+) {
+  ctx.require('exams.manage')
+  const input = examPaperUpdateSchema.parse(raw)
+  const exam = await ctx.db.exam.findFirst({
+    where: { id: examId },
+    select: { id: true, name: true, status: true, subjects: { select: { id: true } } },
+  })
+  if (!exam) throw notFound('Exam')
+  if (exam.status === 'PUBLISHED') throw conflict('Papers cannot be changed after publishing')
+
+  const allowed = new Set(exam.subjects.map((s) => s.id))
+  if (input.papers.some((p) => !allowed.has(p.id))) {
+    throw conflict('One or more papers do not belong to this exam')
+  }
+
+  await ctx.db.$transaction(async (tx) => {
+    for (const paper of input.papers) {
+      await tx.examSubject.update({
+        where: { id: paper.id },
+        data: {
+          maxMarks: paper.maxMarks,
+          passMarks: paper.passMarks,
+          examDate: paper.examDate ? attendanceDate(paper.examDate) : null,
+          startTime: paper.startTime ?? null,
+          endTime: paper.endTime ?? null,
+          roomName: paper.roomName ?? null,
+        },
+      })
+    }
+    if (exam.status === 'DRAFT' && input.papers.some((p) => p.examDate)) {
+      await tx.exam.update({ where: { id: examId }, data: { status: 'SCHEDULED' } })
+    }
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'exam.papers.update',
+    module: 'exams',
+    entityType: 'Exam',
+    entityId: examId,
+    summary: `Updated ${input.papers.length} papers for ${exam.name}`,
+  })
+  return { updated: input.papers.length }
 }
 
 export async function examMarksSetup(ctx: AppContext, examId: string) {
@@ -301,13 +513,12 @@ export async function computeResults(ctx: AppContext, examId: string) {
     }
   }
   for (const ids of resultIdsByClass.values()) {
-    const results = await ctx.db.result.findMany({ where: { id: { in: ids } }, orderBy: [{ percentage: 'desc' }, { totalObtained: 'desc' }] })
-    let rank = 0
-    let previous: { percentage: number; totalObtained: number } | null = null
-    for (const [index, result] of results.entries()) {
-      if (!previous || previous.percentage !== result.percentage || previous.totalObtained !== result.totalObtained) rank = index + 1
-      await ctx.db.result.update({ where: { id: result.id }, data: { rankInClass: rank } })
-      previous = result
+    const results = await ctx.db.result.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, percentage: true, totalObtained: true },
+    })
+    for (const ranked of assignClassRanks(results)) {
+      await ctx.db.result.update({ where: { id: ranked.id }, data: { rankInClass: ranked.rank } })
     }
   }
   await audit({ tenantId: ctx.tenant.id, actorId: ctx.user.userId, actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`, action: 'exam.results.compute', module: 'results', entityType: 'Exam', entityId: examId, summary: `Computed ${calculated} results for ${exam.name}`, after: { calculated, skipped } })
@@ -372,8 +583,32 @@ export async function getReportCard(ctx: AppContext, resultId: string) {
     orderBy: { examSubject: { classSubject: { subject: { name: 'asc' } } } },
     select: { marksObtained: true, isAbsent: true, remarks: true, examSubject: { select: { maxMarks: true, passMarks: true, classSubject: { select: { subject: { select: { code: true, name: true } } } } } } },
   })
+  const template = await getDefaultReportCardTemplate(ctx)
+  let attendance: { present: number; absent: number; total: number; percent: number } | null = null
+  if (template?.showAttendance) {
+    const rows = await ctx.db.studentAttendance.groupBy({
+      by: ['status'],
+      where: { studentId: result.studentId, sessionId: result.exam.sessionId },
+      _count: { _all: true },
+    })
+    const present = rows
+      .filter((r) => r.status === 'PRESENT' || r.status === 'LATE')
+      .reduce((sum, r) => sum + r._count._all, 0)
+    const absent = rows
+      .filter((r) => r.status === 'ABSENT')
+      .reduce((sum, r) => sum + r._count._all, 0)
+    const total = rows.reduce((sum, r) => sum + r._count._all, 0)
+    attendance = {
+      present,
+      absent,
+      total,
+      percent: total === 0 ? 0 : Math.round((present / total) * 1000) / 10,
+    }
+  }
   return {
     result,
+    template,
+    attendance,
     className: result.student.enrollments[0]?.classLevel.name ?? '—',
     sectionName: result.student.enrollments[0]?.section.name ?? '—',
     subjects: marks.map((mark) => {
@@ -382,4 +617,41 @@ export async function getReportCard(ctx: AppContext, resultId: string) {
       return { code: mark.examSubject.classSubject.subject.code, name: mark.examSubject.classSubject.subject.name, maxMarks: mark.examSubject.maxMarks, passMarks: mark.examSubject.passMarks, marksObtained: mark.marksObtained, isAbsent: mark.isAbsent, remarks: mark.remarks, grade: band?.grade ?? null, isPass: !mark.isAbsent && (mark.marksObtained ?? 0) >= mark.examSubject.passMarks }
     }),
   }
+}
+
+export async function exportResultsCsv(ctx: AppContext, examId: string) {
+  ctx.require('results.export')
+  const results = await listResults(ctx, examId)
+  const header = [
+    'Admission No',
+    'Student',
+    'Class',
+    'Total Obtained',
+    'Total Max',
+    'Percentage',
+    'Grade',
+    'Rank',
+    'Pass',
+    'Published',
+  ]
+  const lines = results.map((r) =>
+    [
+      r.student.admissionNo,
+      `${r.student.firstName} ${r.student.lastName}`,
+      r.student.enrollments[0]?.classLevel.name ?? '',
+      r.totalObtained,
+      r.totalMax,
+      r.percentage,
+      r.grade ?? '',
+      r.rankInClass ?? '',
+      r.isPass ? 'Yes' : 'No',
+      r.publishedAt ? 'Yes' : 'No',
+    ]
+      .map((cell) => {
+        const value = String(cell)
+        return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value
+      })
+      .join(','),
+  )
+  return [header.join(','), ...lines].join('\n')
 }

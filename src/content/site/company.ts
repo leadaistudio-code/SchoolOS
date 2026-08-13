@@ -6,7 +6,7 @@
  */
 
 export const POSITIONING = {
-  name: 'SchoolOS',
+  name: 'MyCampusView',
   promise: 'One operating system for your entire school.',
   lead: 'Admissions, student records, academics, fees, attendance, staff, parent communication and school operations run on one connected platform — not six that have to be reconciled.',
   trustLine:
@@ -237,7 +237,7 @@ export const SECURITY_POINTS: { title: string; body: string }[] = [
   },
   {
     title: 'Passwords stored as bcrypt hashes',
-    body: 'Hashed with bcrypt at cost 12, with a length-first policy. Nobody at SchoolOS can read a password, and support will never ask for one.',
+    body: 'Hashed with bcrypt at cost 12, with a length-first policy. Nobody at MyCampusView can read a password, and support will never ask for one.',
   },
   {
     title: 'Brute force made expensive',
@@ -254,7 +254,7 @@ export const SECURITY_POINTS: { title: string; body: string }[] = [
 ]
 
 /**
- * What SchoolOS does *not* have. Published deliberately: a director who finds
+ * What MyCampusView does *not* have. Published deliberately: a director who finds
  * this section trusts the rest of the page more, and their IT team was going to
  * ask anyway.
  */

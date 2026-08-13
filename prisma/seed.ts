@@ -6,6 +6,7 @@ import { attendanceDate } from '../src/lib/dates'
 import { PERMISSIONS } from '../src/lib/rbac/permissions'
 import { SYSTEM_ROLES, ROLE } from '../src/lib/rbac/roles'
 import { FEATURE } from '../src/server/entitlements'
+import { ensureExamDefaults } from '../src/server/modules/exams/defaults'
 import {
   ASSET_ITEMS,
   BLOOD_GROUPS,
@@ -150,6 +151,7 @@ const PLAN_DEFS = [
       FEATURE.MODULE_CERTIFICATES,
       FEATURE.MODULE_ONLINE_PAYMENTS,
       FEATURE.MODULE_WEBSITE,
+      FEATURE.MODULE_CUSTOM_DOMAIN,
     ],
   },
   {
@@ -307,6 +309,7 @@ async function seedTenant(spec: TenantSpec, planId: string, passwordHash: string
   })
 
   await seedAcademicStructure(tenant.id, session.id, spec, rand)
+  await ensureExamDefaults(prisma, tenant.id)
   const staff = await seedStaff(tenant.id, spec, rand, passwordHash)
   await assignTeachers(tenant.id, staff)
   const students = await seedStudents(tenant.id, session.id, spec, rand, passwordHash)
@@ -1797,7 +1800,7 @@ async function seedDemoAccounts(
 /* ------------------------------------------------------------------- main */
 
 async function main() {
-  console.log('Seeding SchoolOS...\n')
+  console.log('Seeding MyCampusView...\n')
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12)
 
   await seedPermissionsAndRoles()

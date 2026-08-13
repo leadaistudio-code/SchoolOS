@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 import { ClosingCta } from '@/components/site/cta'
 
 export const metadata: Metadata = {
-  title: "SchoolOS for multi-campus school groups",
+  title: "MyCampusView for multi-campus school groups",
   description: "Each campus runs independently while the group office sees consolidated figures, with data separated at the database layer.",
   alternates: { canonical: '/solutions/multi-campus' },
 }

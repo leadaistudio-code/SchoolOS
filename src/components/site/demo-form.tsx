@@ -129,7 +129,7 @@ export function DemoForm() {
       // Fires only when a request genuinely lands, so the number in analytics
       // matches the number in the queue.
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('schoolos:demo-requested'))
+        window.dispatchEvent(new CustomEvent('mycampusview:demo-requested'))
       }
     } catch (error) {
       setStatus('failed')
@@ -256,7 +256,7 @@ export function DemoForm() {
           className="mt-1 size-4 rounded border-[var(--rule-strong)] accent-[var(--blue)]"
         />
         <span>
-          You may contact me about SchoolOS. We will not add you to a mailing list.
+          You may contact me about MyCampusView. We will not add you to a mailing list.
           {errors.consent ? (
             <span className="mt-1 block text-[14px] text-[var(--coral)]">{errors.consent}</span>
           ) : null}

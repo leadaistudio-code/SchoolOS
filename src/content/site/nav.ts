@@ -28,7 +28,7 @@ export const MEGA_MENUS: MegaMenu[] = [
     label: 'Product',
     lead: 'One system, three jobs: the record of every student, the pipeline that admits them, and the office that runs around them.',
     featured: {
-      label: 'How SchoolOS fits together',
+      label: 'How MyCampusView fits together',
       href: '/product',
       note: 'The whole platform in one page',
     },
@@ -128,12 +128,12 @@ export const MEGA_MENUS: MegaMenu[] = [
   },
   {
     label: 'Company',
-    lead: 'Who builds SchoolOS, how an implementation runs, and how your data is kept.',
+    lead: 'Who builds MyCampusView, how an implementation runs, and how your data is kept.',
     columns: [
       {
         heading: 'Company',
         links: [
-          { label: 'About SchoolOS', href: '/about' },
+          { label: 'About MyCampusView', href: '/about' },
           { label: 'Implementation & support', href: '/services' },
           { label: 'Security & data protection', href: '/security' },
           { label: 'Contact us', href: '/contact' },

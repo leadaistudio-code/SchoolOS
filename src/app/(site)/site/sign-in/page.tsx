@@ -6,7 +6,7 @@ import { env } from '@/lib/env'
 
 export const metadata: Metadata = {
   title: 'Sign in',
-  description: 'Each school signs in at its own SchoolOS address.',
+  description: 'Each school signs in at its own MyCampusView address.',
   alternates: { canonical: '/sign-in' },
   robots: { index: false, follow: true },
 }
@@ -38,7 +38,7 @@ export default function SignInPage() {
             Your school has its own address.
           </h1>
           <p className="muted mt-4 text-[17px] leading-[1.6]">
-            SchoolOS gives each school its own space. Enter the short name your school uses and we
+            MyCampusView gives each school its own space. Enter the short name your school uses and we
             will take you to its sign-in page.
           </p>
           <div className="mt-8">

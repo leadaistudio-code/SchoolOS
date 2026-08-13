@@ -8,6 +8,7 @@ import { unreadThreadCount } from '@/server/modules/messages/service'
 import { AssistantLauncher } from '@/components/assistant/panel'
 import { assistantConfigured } from '@/server/assistant/agent'
 import { FEATURE } from '@/lib/features'
+import { PwaRegister } from '@/components/pwa-register'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -79,6 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }}
     >
       {children}
+      <PwaRegister />
     </AppShell>
   )
 }

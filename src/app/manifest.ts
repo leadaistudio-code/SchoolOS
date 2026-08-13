@@ -8,20 +8,27 @@ import { env } from '@/lib/env'
  */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const tenant = await resolveTenant()
-  const name = tenant?.school?.name ?? env().APP_NAME
-  const themeColor = tenant?.school?.primaryHex ?? '#E41F07'
+  const school = tenant?.school
+  const name = school?.pwaName?.trim() || school?.name || env().APP_NAME
+  const shortName = school?.pwaShortName?.trim() || school?.code || env().APP_NAME
+  const themeColor = school?.pwaThemeHex || school?.primaryHex || '#E41F07'
+  const icon = school?.faviconUrl || school?.logoUrl
 
   return {
     name,
-    short_name: tenant?.school?.code ?? env().APP_NAME,
+    short_name: shortName,
     description: `${name} school management portal`,
     start_url: '/',
+    scope: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#ffffff',
     theme_color: themeColor,
-    icons: tenant?.school?.faviconUrl
-      ? [{ src: tenant.school.faviconUrl, sizes: 'any', type: 'image/png' }]
+    icons: icon
+      ? [
+          { src: icon, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: icon, sizes: '512x512', type: 'image/png', purpose: 'any' },
+        ]
       : [],
   }
 }

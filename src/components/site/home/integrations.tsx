@@ -8,7 +8,7 @@ import { INTEGRATION_GROUPS, INTEGRATION_STATUS_NOTE } from '@/content/site/inte
  * Integrations.
  *
  * The usual treatment is a grid of vendor logos, which implies a signed
- * integration with each. SchoolOS reaches the outside world through provider
+ * integration with each. MyCampusView reaches the outside world through provider
  * interfaces, and for messaging and payments the vendor account is the
  * school's own, connected during implementation — so the honest unit here is a
  * capability with a status, not a logo.

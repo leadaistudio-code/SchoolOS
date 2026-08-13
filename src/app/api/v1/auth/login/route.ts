@@ -30,6 +30,12 @@ export const POST = publicRoute(async (req: NextRequest) => {
   })
 
   if (!result.ok) {
+    if (result.reason === 'mfa') {
+      return ok({
+        mfaRequired: true,
+        challengeToken: result.challengeToken,
+      })
+    }
     throw new ApiException(
       result.retryAfterSeconds ? 429 : 401,
       result.retryAfterSeconds ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS',

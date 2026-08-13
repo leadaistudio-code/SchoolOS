@@ -12,7 +12,8 @@ export type LoginInput = {
 
 export type LoginOutcome =
   | { ok: true; userId: string; mustChangePassword: boolean }
-  | { ok: false; message: string; retryAfterSeconds?: number }
+  | { ok: false; reason: 'error'; message: string; retryAfterSeconds?: number }
+  | { ok: false; reason: 'mfa'; challengeToken: string }
 
 const GENERIC_FAILURE = 'Email or password is incorrect'
 const MAX_FAILED = 8
@@ -47,6 +48,7 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     await recordAttempt(null, input.tenantId, identifier, false, 'rate_limited', meta)
     return {
       ok: false,
+      reason: 'error',
       message: 'Too many sign-in attempts. Please wait a few minutes and try again.',
       retryAfterSeconds: Math.max(byIdentifier.retryAfterSeconds, byIp.retryAfterSeconds),
     }
@@ -63,13 +65,14 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
 
   if (!user || !user.passwordHash) {
     await recordAttempt(null, input.tenantId, identifier, false, 'no_such_user', meta)
-    return { ok: false, message: GENERIC_FAILURE }
+    return { ok: false, reason: 'error', message: GENERIC_FAILURE }
   }
 
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     await recordAttempt(user.id, input.tenantId, identifier, false, 'locked', meta)
     return {
       ok: false,
+      reason: 'error',
       message: `This account is temporarily locked. Try again after ${LOCK_MINUTES} minutes or reset your password.`,
     }
   }
@@ -78,6 +81,7 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     await recordAttempt(user.id, input.tenantId, identifier, false, 'inactive', meta)
     return {
       ok: false,
+      reason: 'error',
       message: 'This account is not active. Please contact your school administrator.',
     }
   }
@@ -94,13 +98,20 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
       },
     })
     await recordAttempt(user.id, input.tenantId, identifier, false, 'bad_password', meta)
-    return { ok: false, message: GENERIC_FAILURE }
+    return { ok: false, reason: 'error', message: GENERIC_FAILURE }
   }
 
   await prisma.user.update({
     where: { id: user.id },
     data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
   })
+
+  if (user.mfaEnabled && user.mfaSecret) {
+    const { createMfaChallenge } = await import('@/server/modules/mfa/service')
+    const challengeToken = await createMfaChallenge(user.id)
+    await recordAttempt(user.id, input.tenantId, identifier, true, 'mfa_required', meta)
+    return { ok: false, reason: 'mfa', challengeToken }
+  }
 
   await createSession({
     userId: user.id,

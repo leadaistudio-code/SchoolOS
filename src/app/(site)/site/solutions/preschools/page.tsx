@@ -3,7 +3,7 @@ import { PageIntro, Prose, ProseSection } from '@/components/site/page-parts'
 import { ClosingCta } from '@/components/site/cta'
 
 export const metadata: Metadata = {
-  title: "SchoolOS for preschools",
+  title: "MyCampusView for preschools",
   description: "Attendance, fees and daily parent communication for early years settings, without the machinery of examinations.",
   alternates: { canonical: '/solutions/preschools' },
 }

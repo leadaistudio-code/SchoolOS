@@ -64,7 +64,7 @@ export default async function LoginPage({
           <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
           <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
 
-          <LoginForm next={params.next} />
+          <LoginForm next={params.next} showForgotPassword={!!tenant} />
 
           <p className="mt-8 text-xs text-ink-subtle flex items-center gap-1.5">
             <ShieldCheck className="size-3.5" aria-hidden />

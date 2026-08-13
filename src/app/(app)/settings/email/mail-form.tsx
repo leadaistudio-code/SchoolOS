@@ -107,7 +107,7 @@ export function MailForm({
         </Notice>
       ) : (
         <Notice tone="info" title="Using the platform sender">
-          School email currently goes out through SchoolOS. Connect your own mailbox to send from
+          School email currently goes out through MyCampusView. Connect your own mailbox to send from
           your school&rsquo;s address instead.
         </Notice>
       )}

@@ -5,9 +5,9 @@ import { DashboardRender } from '@/components/site/product/dashboard-render'
 import { ClosingCta } from '@/components/site/cta'
 
 export const metadata: Metadata = {
-  title: 'How SchoolOS fits together',
+  title: 'How MyCampusView fits together',
   description:
-    'SchoolOS keeps student records, attendance, fees, examinations, communication and transport in one database, so a change in one place is correct everywhere else.',
+    'MyCampusView keeps student records, attendance, fees, examinations, communication and transport in one database, so a change in one place is correct everywhere else.',
   alternates: { canonical: '/product' },
 }
 
@@ -17,7 +17,7 @@ export default function ProductPage() {
       <PageIntro
         eyebrow="Product"
         title="One database, not seven integrations."
-        lead="Most school software is a set of products that talk to each other on a schedule. SchoolOS is one application over one database, which is why a child admitted this morning appears on this afternoon's register without anyone copying anything."
+        lead="Most school software is a set of products that talk to each other on a schedule. MyCampusView is one application over one database, which is why a child admitted this morning appears on this afternoon's register without anyone copying anything."
       />
 
       <Section>
@@ -46,7 +46,7 @@ export default function ProductPage() {
           </p>
         </Prose>
 
-        <Prose title="What SchoolOS does instead">
+        <Prose title="What MyCampusView does instead">
           <p>
             There is one student record. The fee module reads it, the register writes to it, the
             transport module points a bus stop at it, and the report card is generated from marks

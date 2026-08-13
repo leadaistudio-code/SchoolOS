@@ -11,7 +11,7 @@ import { Icon } from './icon'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/ui/toast'
 
-const COLLAPSE_KEY = 'schoolos.nav.collapsed'
+const COLLAPSE_KEY = 'mycampusview.nav.collapsed'
 
 /**
  * Application shell.

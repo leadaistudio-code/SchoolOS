@@ -33,7 +33,7 @@ export function Journey() {
         <SectionHeader
           split
           eyebrow="Implementation"
-          title="Getting started with SchoolOS is a term’s work, not a year’s."
+          title="Getting started with MyCampusView is a term’s work, not a year’s."
           lead="A single-campus school of a thousand students is usually live in about four weeks. Migration is the part that takes the time, and we reconcile the totals with your office before anybody signs in."
           action={<TextLink href="/services">Implementation and support</TextLink>}
         />

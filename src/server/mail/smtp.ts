@@ -174,9 +174,9 @@ export async function verifySmtp(
     await transport.sendMail({
       from: `"${stored.fromName}" <${stored.fromEmail}>`,
       to: testRecipient,
-      subject: 'SchoolOS test message',
-      text: 'Your school mailbox is connected. This message was sent from SchoolOS to confirm the settings work.',
-      html: '<p>Your school mailbox is connected.</p><p>This message was sent from SchoolOS to confirm the settings work.</p>',
+      subject: 'MyCampusView test message',
+      text: 'Your school mailbox is connected. This message was sent from MyCampusView to confirm the settings work.',
+      html: '<p>Your school mailbox is connected.</p><p>This message was sent from MyCampusView to confirm the settings work.</p>',
     })
 
     await recordOutcome(tenantId, { verifiedAt: new Date().toISOString(), lastError: null })

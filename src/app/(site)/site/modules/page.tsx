@@ -12,9 +12,9 @@ import {
 } from '@/content/site/modules'
 
 export const metadata: Metadata = {
-  title: 'Modules — everything in SchoolOS, and what is not built yet',
+  title: 'Modules — everything in MyCampusView, and what is not built yet',
   description:
-    'The full SchoolOS module catalogue: admissions, student records, attendance, academics, examinations, fees, communication, transport and administration — each labelled available, in build or planned.',
+    'The full MyCampusView module catalogue: admissions, student records, attendance, academics, examinations, fees, communication, transport and administration — each labelled available, in build or planned.',
   alternates: { canonical: '/modules' },
 }
 

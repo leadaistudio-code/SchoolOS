@@ -109,6 +109,13 @@ export async function setPlanEntitlements(
     summary: `Updated entitlements for ${plan.name}`,
   })
 
+  const tenants = await ctx.db.subscription.findMany({
+    where: { planId },
+    select: { tenantId: true },
+  })
+  const { invalidateEntitlementsCache } = await import('@/server/entitlements')
+  await Promise.all(tenants.map((t) => invalidateEntitlementsCache(t.tenantId)))
+
   return getPlan(ctx, planId)
 }
 

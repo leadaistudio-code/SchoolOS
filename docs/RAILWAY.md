@@ -63,7 +63,7 @@ RATE_LIMIT_DRIVER=redis
 
 NODE_ENV=production
 AUTH_SECRET=<paste a 48-character random string>
-APP_NAME=SchoolOS
+APP_NAME=MyCampusView
 APP_URL=https://<your-domain>
 APP_ROOT_DOMAIN=<your-domain>
 

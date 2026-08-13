@@ -6,7 +6,7 @@ import { IMPORT_FIELDS } from './fields'
  *
  * One .xlsx a school fills in before go-live: profile, structure, people,
  * attendance, leave, academics, exams, fees and transport. Column names match
- * SchoolOS fields so the Students sheet imports without remapping.
+ * MyCampusView fields so the Students sheet imports without remapping.
  */
 
 export type OnboardingSheet = {
@@ -486,7 +486,7 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
   },
 ]
 
-export const ONBOARDING_PACK_FILENAME = 'schoolos-onboarding-pack.xlsx'
+export const ONBOARDING_PACK_FILENAME = 'mycampusview-onboarding-pack.xlsx'
 
 const SKIP_SHEETS = new Set(['Read me', 'Allowed values'])
 const STUDENT_SHEET_ALIASES = ['Students', 'Student', 'students']

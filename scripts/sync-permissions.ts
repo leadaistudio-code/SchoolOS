@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import { PERMISSIONS } from '../src/lib/rbac/permissions'
 import { SYSTEM_ROLES } from '../src/lib/rbac/roles'
+import { ensureExamDefaultsForAllTenants } from '../src/server/modules/exams/defaults'
 
 /**
  * Pushes the permission catalogue and the built-in role grants into the database.
@@ -145,7 +146,11 @@ async function main() {
     }
 
     if (dryRun) console.log('\nDry run — nothing was written.')
-    else console.log('\nDone. Users must sign out and in again for new rights to reach a session.')
+    else {
+      const tenants = await ensureExamDefaultsForAllTenants(prisma)
+      console.log(`\nExam defaults ensured for ${tenants} tenant(s).`)
+      console.log('Done. Users must sign out and in again for new rights to reach a session.')
+    }
   } finally {
     if (!dryRun) {
       await prisma

@@ -8,8 +8,13 @@ import type {
   supportTicketCreateSchema,
   supportTicketUpdateSchema,
   listSupportTicketsSchema,
+  passwordResetRequestSchema,
 } from './schema'
 import type { z } from 'zod'
+import { prisma } from '@/server/db/prisma'
+import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
+
+export const PASSWORD_RESET_CATEGORY = 'password_reset'
 
 export async function listPlatformTickets(
   ctx: PlatformContext,
@@ -201,4 +206,92 @@ export async function replyTenantTicket(
   })
 
   return message.messages[0]!
+}
+
+/**
+ * Password reset from the public sign-in page (no session).
+ *
+ * Creates a platform support ticket so an operator can run the reset script and
+ * contact the user out of band. Always returns success to the caller — even when
+ * the email is unknown or a ticket already exists — so the form cannot be used
+ * to enumerate accounts.
+ */
+export async function createPasswordResetTicket(
+  input: z.infer<typeof passwordResetRequestSchema> & {
+    tenantId: string
+    tenantName: string
+    ip?: string | null
+  },
+): Promise<{ created: boolean }> {
+  const email = input.email.trim().toLowerCase()
+
+  const byEmail = await rateLimit(
+    `password-reset:email:${input.tenantId}:${email}`,
+    RATE_LIMITS.passwordResetRequest.limit,
+    RATE_LIMITS.passwordResetRequest.windowSeconds,
+  )
+  const byIp = await rateLimit(
+    `password-reset:ip:${input.ip ?? 'unknown'}`,
+    RATE_LIMITS.passwordResetRequest.limit * 2,
+    RATE_LIMITS.passwordResetRequest.windowSeconds,
+  )
+  if (!byEmail.ok || !byIp.ok) {
+    return { created: false }
+  }
+
+  const subject = `Password reset — ${email}`
+
+  const existing = await prisma.supportTicket.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      category: PASSWORD_RESET_CATEGORY,
+      subject,
+      status: { in: ['OPEN', 'PENDING'] },
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+    select: { id: true },
+  })
+  if (existing) return { created: false }
+
+  const account = await prisma.user.findFirst({
+    where: { tenantId: input.tenantId, email, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true, status: true },
+  })
+
+  const body = [
+    'Password reset requested from the school sign-in page.',
+    '',
+    `School: ${input.tenantName}`,
+    `Email: ${email}`,
+    account
+      ? `Account: ${account.firstName} ${account.lastName} (${account.status.toLowerCase()})`
+      : 'Account: no matching user found for this email at this school',
+    input.note ? `User note: ${input.note}` : null,
+    '',
+    'Platform action: reset with scripts/reset-user-password.ts and share the temporary password out of band.',
+    input.ip ? `Request IP: ${input.ip}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  await prisma.supportTicket.create({
+    data: {
+      tenantId: input.tenantId,
+      subject,
+      body,
+      category: PASSWORD_RESET_CATEGORY,
+      priority: 'HIGH',
+      status: 'OPEN',
+      openedById: account?.id ?? null,
+      messages: {
+        create: {
+          authorKind: 'TENANT',
+          authorId: account?.id ?? null,
+          body,
+        },
+      },
+    },
+  })
+
+  return { created: true }
 }

@@ -34,7 +34,7 @@ export function Platform() {
           split
           eyebrow="One platform"
           title="Everything your school needs. Connected."
-          lead="Schools usually buy an SIS, an accounting package and a messaging tool, then spend the year reconciling them. SchoolOS is one system on one database: the student record admissions created is the record fees invoices, the register marks and the report card is built from."
+          lead="Schools usually buy an SIS, an accounting package and a messaging tool, then spend the year reconciling them. MyCampusView is one system on one database: the student record admissions created is the record fees invoices, the register marks and the report card is built from."
           action={<TextLink href="/product">How the pieces fit together</TextLink>}
         />
 
@@ -103,7 +103,7 @@ function PlatformDiagram() {
           fontWeight="600"
           letterSpacing="-0.01em"
         >
-          SchoolOS
+          MyCampusView
         </text>
         <text x="400" y="208" textAnchor="middle" fill="#9ba7c2" fontSize="12.5">
           One database

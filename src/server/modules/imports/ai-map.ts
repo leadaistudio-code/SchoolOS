@@ -56,7 +56,7 @@ const emitAnalysisSchema = z.object({
     .describe('0-based index of the row that contains column headers'),
   mapping: z
     .object(mappingShape)
-    .describe('Map each SchoolOS field to a column header from that row, or null if absent'),
+    .describe('Map each MyCampusView field to a column header from that row, or null if absent'),
   summary: z
     .string()
     .describe('One sentence for the admin explaining what was detected in plain language'),
@@ -109,9 +109,9 @@ function systemPrompt(classes: AnalyzeImportInput['classes']): string {
           .map((c) => `- ${c.name}${c.sections.length ? ` (sections: ${c.sections.join(', ')})` : ''}`)
           .join('\n')
 
-  return `You analyse student admission spreadsheets for import into SchoolOS.
+  return `You analyse student admission spreadsheets for import into MyCampusView.
 
-# SchoolOS fields you may map
+# MyCampusView fields you may map
 ${fieldList}
 
 # This school's classes (use these exact names in classAliases)
@@ -120,7 +120,7 @@ ${classList}
 # Rules
 - Schools use different layouts: title rows, merged headers, Hindi/English mix, "Std" instead of "Class", combined parent names, etc.
 - Find the real header row. Row 0 is often a school title, not headers.
-- Map columns to SchoolOS fields using the header text from that row.
+- Map columns to MyCampusView fields using the header text from that row.
 - Required fields: admissionNo, firstName, lastName, className, sectionName.
 - If one column holds the full student name, set splitFullNameColumn to that header and leave firstName/lastName null.
 - If class values in the file do not exactly match the school's class list, add classAliases (fileValue → className).
@@ -164,7 +164,7 @@ Each line is "rowIndex | cell | cell | ...". Row indices are 0-based.
 
 ${preview}${clarificationBlock}
 
-Analyse this spreadsheet and map it to SchoolOS fields.`
+Analyse this spreadsheet and map it to MyCampusView fields.`
 
   const model = assistantModel()
   const result = await model.turn({

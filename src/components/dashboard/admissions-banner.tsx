@@ -1,13 +1,10 @@
 import * as React from 'react'
+import Link from 'next/link'
 import { AdmissionsScene } from '@/components/illustrations/school-scene'
 import { formatNumber } from '@/lib/utils'
 
 /**
- * Admissions this week.
- *
- * No call to action: the enquiry pipeline is not built yet, and a button that
- * goes nowhere useful is worse than none. The figure is real and the card
- * earns its place by carrying it; the CTA arrives with the module.
+ * Admissions this week — links into the live pipeline.
  */
 export function AdmissionsBanner({
   thisWeek,
@@ -37,6 +34,12 @@ export function AdmissionsBanner({
             ? `${formatNumber(openLeads)} still open and waiting on a follow-up.`
             : 'Every enquiry has been converted or closed.'}
         </p>
+        <Link
+          href="/admissions"
+          className="mt-3 inline-flex text-sm font-semibold text-white underline-offset-2 hover:underline"
+        >
+          Open pipeline
+        </Link>
       </div>
 
       <AdmissionsScene className="absolute -bottom-2 right-1 h-28 w-28 opacity-90" />

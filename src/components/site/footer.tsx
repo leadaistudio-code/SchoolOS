@@ -80,7 +80,7 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-[var(--navy-line)] py-6 text-[14px] text-[var(--on-dark-muted)] sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} SchoolOS. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} MyCampusView. All rights reserved.</p>
           <p>
             School management software for private schools, international schools, preschools and
             multi-campus groups.

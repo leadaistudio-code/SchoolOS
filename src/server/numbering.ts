@@ -9,13 +9,14 @@ export type RawCapableClient = {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>
 }
 
-export type DocumentKind = 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE'
+export type DocumentKind = 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'LEAD'
 
 const PREFIX: Record<DocumentKind, string> = {
   INVOICE: 'INV',
   RECEIPT: 'RCP',
   REFUND: 'REF',
   CERTIFICATE: 'CRT',
+  LEAD: 'LEAD',
 }
 
 /**
@@ -41,21 +42,30 @@ export async function nextDocumentNumber(
 ): Promise<string> {
   const prefix = `${PREFIX[params.kind]}-${params.sessionLabel}-`
 
-  const table = params.kind === 'RECEIPT' ? 'FeeReceipt' : 'FeeInvoice'
+  const table =
+    params.kind === 'RECEIPT'
+      ? 'FeeReceipt'
+      : params.kind === 'CERTIFICATE'
+        ? 'Certificate'
+        : params.kind === 'LEAD'
+          ? 'AdmissionLead'
+          : 'FeeInvoice'
+
+  const column = params.kind === 'LEAD' ? 'reference' : 'number'
 
   // FOR UPDATE takes a row lock; a concurrent transaction blocks here rather
   // than reading a stale maximum.
-  const rows = await tx.$queryRawUnsafe<{ number: string }[]>(
-    `SELECT number FROM "${table}"
-      WHERE "tenantId" = $1 AND number LIKE $2
-      ORDER BY number DESC
+  const rows = await tx.$queryRawUnsafe<{ value: string }[]>(
+    `SELECT "${column}" AS value FROM "${table}"
+      WHERE "tenantId" = $1 AND "${column}" LIKE $2
+      ORDER BY "${column}" DESC
       LIMIT 1
       FOR UPDATE`,
     params.tenantId,
     `${prefix}%`,
   )
 
-  const last = rows[0]?.number
+  const last = rows[0]?.value
   const lastSeq = last ? Number(last.slice(prefix.length)) : 0
   const next = Number.isFinite(lastSeq) ? lastSeq + 1 : 1
 

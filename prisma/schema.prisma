@@ -1,4 +1,4 @@
-// SchoolOS — multi-tenant School Management & ERP SaaS
+// MyCampusView — multi-tenant School Management & ERP SaaS
 // Tenancy model: shared database / shared schema with a `tenantId` discriminator
 // on every tenant-scoped table, enforced by a Prisma client extension
 // (src/server/db/tenant-client.ts) and defended in depth by Postgres RLS
@@ -336,6 +336,7 @@ model User {
   student       Student?
   parent        Parent?
   sentMessages  Message[]           @relation("MessageSender")
+  pushSubscriptions PushSubscription[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -3356,4 +3357,21 @@ model ImportBatch {
   createdAt   DateTime  @default(now())
 
   @@index([tenantId, kind, status])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, endpoint])
+  @@index([tenantId, userId])
 }

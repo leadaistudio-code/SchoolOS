@@ -1,4 +1,4 @@
-# SchoolOS — System Architecture
+# MyCampusView — System Architecture
 
 ## 1. What this is
 

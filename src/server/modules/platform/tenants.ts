@@ -147,6 +147,8 @@ export async function updateTenant(
       before: { planId: before.subscription.planId },
       after: { planId: input.planId },
     })
+    const { invalidateEntitlementsCache } = await import('@/server/entitlements')
+    await invalidateEntitlementsCache(id)
   }
 
   const tenant = await ctx.db.tenant.update({
@@ -247,6 +249,9 @@ export async function setEntitlementOverride(
     after: input,
   })
 
+  const { invalidateEntitlementsCache } = await import('@/server/entitlements')
+  await invalidateEntitlementsCache(tenantId)
+
   return row
 }
 
@@ -264,4 +269,6 @@ export async function removeEntitlementOverride(
     entityType: 'TenantEntitlementOverride',
     summary: `Removed override for ${featureKey}`,
   })
+  const { invalidateEntitlementsCache } = await import('@/server/entitlements')
+  await invalidateEntitlementsCache(tenantId)
 }

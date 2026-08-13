@@ -34,10 +34,10 @@ export function organisationJsonLd() {
       data={{
         '@context': 'https://schema.org',
         '@type': 'Organization',
-        name: 'SchoolOS',
+        name: 'MyCampusView',
         url: origin(),
         description:
-          'SchoolOS is school management software combining a student information system, an admission CRM and school ERP on one platform.',
+          'MyCampusView is school management software combining a student information system, an admission CRM and school ERP on one platform.',
         areaServed: ['IN', 'AE', 'SG'],
         knowsAbout: [
           'School management software',
@@ -56,7 +56,7 @@ export function softwareJsonLd() {
       data={{
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'SchoolOS',
+        name: 'MyCampusView',
         applicationCategory: 'BusinessApplication',
         applicationSubCategory: 'School Management Software',
         operatingSystem: 'Web browser',

@@ -12,28 +12,28 @@ import {
 export const metadata: Metadata = {
   title: 'Integrations — WhatsApp, SMS, email, payments and vehicle tracking',
   description:
-    'How SchoolOS connects to messaging, payment gateways, vehicle tracking and your own domain — with each capability marked live, connected at setup, or planned.',
+    'How MyCampusView connects to messaging, payment gateways, vehicle tracking and your own domain — with each capability marked live, connected at setup, or planned.',
   alternates: { canonical: '/integrations' },
 }
 
 const FAQ = [
   {
-    question: 'Does SchoolOS send WhatsApp and SMS messages to parents?',
+    question: 'Does MyCampusView send WhatsApp and SMS messages to parents?',
     answer:
       'The delivery pipeline, templates and per-school metering are built. The vendor account is your school’s own, connected during implementation, so messages are sent from your sender ID and billed to you rather than resold by us.',
   },
   {
-    question: 'Which payment gateway does SchoolOS support?',
+    question: 'Which payment gateway does MyCampusView support?',
     answer:
       'Online fee payment is built against a provider interface: orders are created server-side and callbacks are signature-verified. Your gateway account is connected at setup, and money settles directly into the school’s bank account.',
   },
   {
-    question: 'Can SchoolOS run on our own domain?',
+    question: 'Can MyCampusView run on our own domain?',
     answer:
       'Yes. The application runs on a domain your school owns, with certificates issued and renewed automatically, and the school’s name, logo and colours throughout.',
   },
   {
-    question: 'Does SchoolOS integrate with Tally or biometric devices?',
+    question: 'Does MyCampusView integrate with Tally or biometric devices?',
     answer:
       'Not today. Both are on the roadmap and are marked as planned on this page rather than presented as available.',
   },
@@ -48,7 +48,7 @@ export default function IntegrationsPage() {
       <PageIntro
         eyebrow="Integrations"
         title="Connected to what your school already uses — through your own accounts."
-        lead="SchoolOS reaches the outside world through provider interfaces, so a messaging vendor or a payment gateway can be changed by configuration rather than by rewriting a module. It also means the account is yours: your sender ID, your gateway, your bank."
+        lead="MyCampusView reaches the outside world through provider interfaces, so a messaging vendor or a payment gateway can be changed by configuration rather than by rewriting a module. It also means the account is yours: your sender ID, your gateway, your bank."
       >
         <dl className="grid max-w-3xl gap-5 sm:grid-cols-3">
           {(['available', 'ready', 'planned'] as const).map((status) => (
@@ -92,7 +92,7 @@ export default function IntegrationsPage() {
             the contract ends, so does the number parents have learned to trust.
           </p>
           <p>
-            SchoolOS connects to your own gateway and your own WhatsApp Business account instead.
+            MyCampusView connects to your own gateway and your own WhatsApp Business account instead.
             You pay the vendor directly, the sender is your school, and nothing about your parents&rsquo;
             experience depends on our commercial relationship with a telecom provider.
           </p>

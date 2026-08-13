@@ -10,7 +10,7 @@ import { JOURNEY } from '@/content/site/company'
 export const metadata: Metadata = {
   title: 'Customer stories',
   description:
-    'How schools move onto SchoolOS: the problem, the migration, and what changes in the first term. Written up as implementations complete.',
+    'How schools move onto MyCampusView: the problem, the migration, and what changes in the first term. Written up as implementations complete.',
   alternates: { canonical: '/customers' },
 }
 
@@ -29,14 +29,14 @@ export default function CustomersPage() {
 
       <PageIntro
         eyebrow="Customers"
-        title="What changes in a school’s first term on SchoolOS."
+        title="What changes in a school’s first term on MyCampusView."
         lead="Every story here follows the same three questions: what was the problem, what did we actually do, and what changed afterwards. Schools are named only once they have agreed in writing to be."
       />
 
       {CUSTOMER_LOGOS.length > 0 && PROOF_FLAGS.customerLogos ? (
         <Section space="snug" tone="page">
           <Container wide>
-            <p className="eyebrow">Schools using SchoolOS</p>
+            <p className="eyebrow">Schools using MyCampusView</p>
             <ul className="mt-6 flex flex-wrap items-center gap-x-12 gap-y-8">
               {CUSTOMER_LOGOS.map((logo) => (
                 <li key={logo.name}>
@@ -150,7 +150,7 @@ export default function CustomersPage() {
       <ProseSection>
         <Prose title="Would you speak to a school for us?">
           <p>
-            If you are already running SchoolOS and the first term went well, a written-up story
+            If you are already running MyCampusView and the first term went well, a written-up story
             helps the next school more than any page we could write ourselves. We will draft it, you
             approve every word and every number, and you can withdraw it at any point.
           </p>

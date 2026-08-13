@@ -28,6 +28,13 @@ export default async function ReportCardsPage({
       <PageHeader
         title="Report cards"
         description={selected ? `${selected.name} · ${cards.length} students` : undefined}
+        actions={
+          ctx.can('exams.manage') ? (
+            <a href="/exams/report-cards/templates" className="text-sm text-[var(--brand-600)] hover:underline">
+              Templates
+            </a>
+          ) : null
+        }
       />
 
       <LinkTabs

@@ -45,6 +45,9 @@ const PASSTHROUGH = [
   '/_next',
   '/favicon',
   '/manifest.webmanifest',
+  '/sw.js',
+  '/offline',
+  '/site-pages',
   '/robots.txt',
   '/sitemap.xml',
 ]
@@ -56,7 +59,7 @@ const PASSTHROUGH = [
  * the application's endpoints are simply absent from that host rather than
  * relying on each one to reject the request.
  */
-const MARKETING_API = ['/api/v1/site', '/api/health']
+const MARKETING_API = ['/api/v1/site', '/api/health', '/api/metrics']
 
 type Role = 'both' | 'app' | 'marketing'
 
