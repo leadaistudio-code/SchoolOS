@@ -3,28 +3,38 @@ import { prisma } from '@/server/db/prisma'
 import { env } from '@/lib/env'
 import { ApiException } from '@/server/api/response'
 
-export type BrandingAssetKind = 'logo' | 'banner'
+export type BrandingAssetKind = 'logo' | 'banner' | 'favicon' | 'darkLogo' | 'signature'
 
 const IMAGE_TYPES = new Map<string, string>([
   ['image/jpeg', 'jpg'],
   ['image/png', 'png'],
   ['image/webp', 'webp'],
+  ['image/x-icon', 'ico'],
+  ['image/vnd.microsoft.icon', 'ico'],
 ])
 
 const SIGNATURES: Record<string, string[]> = {
   'image/jpeg': ['ffd8ff'],
   'image/png': ['89504e47'],
   'image/webp': ['52494646'],
+  'image/x-icon': ['00000100'],
+  'image/vnd.microsoft.icon': ['00000100'],
 }
 
-const FIELD: Record<BrandingAssetKind, 'logoUrl' | 'loginImageUrl'> = {
+const FIELD: Record<
+  BrandingAssetKind,
+  'logoUrl' | 'loginImageUrl' | 'faviconUrl' | 'darkLogoUrl' | 'signatureUrl'
+> = {
   logo: 'logoUrl',
   banner: 'loginImageUrl',
+  favicon: 'faviconUrl',
+  darkLogo: 'darkLogoUrl',
+  signature: 'signatureUrl',
 }
 
 function signatureMatches(buffer: Buffer, mimeType: string): boolean {
   const expected = SIGNATURES[mimeType]
-  if (!expected) return false
+  if (!expected) return true // ico variants vary; allow after mime check
   const head = buffer.subarray(0, 8).toString('hex')
   return expected.some((prefix) => head.startsWith(prefix))
 }
@@ -48,7 +58,7 @@ export function resolveBrandingAssetUrl(
   return brandingAssetPublicUrl(kind)
 }
 
-function assertImageFile(file: File) {
+function assertImageFile(file: File, kind: BrandingAssetKind) {
   const maxBytes = env().MAX_UPLOAD_MB * 1024 * 1024
   if (file.size === 0) throw new ApiException(400, 'BAD_REQUEST', 'The file is empty')
   if (file.size > maxBytes) {
@@ -58,25 +68,31 @@ function assertImageFile(file: File) {
       `Images must be ${env().MAX_UPLOAD_MB}MB or smaller`,
     )
   }
-  if (!IMAGE_TYPES.has(file.type)) {
+  if (kind === 'favicon') {
+    if (!IMAGE_TYPES.has(file.type) && file.type !== 'image/png') {
+      throw new ApiException(415, 'UNSUPPORTED_FILE_TYPE', 'Favicon must be PNG, JPEG, WebP or ICO')
+    }
+    return
+  }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     throw new ApiException(
       415,
       'UNSUPPORTED_FILE_TYPE',
-      'Logo and banner must be JPEG, PNG or WebP images',
+      'Images must be JPEG, PNG or WebP',
     )
   }
 }
 
-/** Stores a school logo or login banner under the tenant prefix. */
+/** Stores a school branding image under the tenant prefix. */
 export async function uploadBrandingAsset(
   tenantId: string,
   file: File,
   kind: BrandingAssetKind,
 ): Promise<string> {
-  assertImageFile(file)
+  assertImageFile(file, kind)
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  if (!signatureMatches(buffer, file.type)) {
+  if (SIGNATURES[file.type] && !signatureMatches(buffer, file.type)) {
     throw new ApiException(
       415,
       'UNSUPPORTED_FILE_TYPE',
@@ -84,10 +100,10 @@ export async function uploadBrandingAsset(
     )
   }
 
-  const extension = IMAGE_TYPES.get(file.type)!
+  const extension = IMAGE_TYPES.get(file.type) ?? 'png'
   const storageKey = `${tenantId}/branding/${kind}.${extension}`
 
-  await storageProvider().put(storageKey, buffer, file.type)
+  await storageProvider().put(storageKey, buffer, file.type || 'image/png')
   return storageKey
 }
 
@@ -116,13 +132,32 @@ export async function saveBrandingAsset(
 export async function readBrandingAsset(tenantId: string, kind: BrandingAssetKind) {
   const school = await prisma.school.findFirst({
     where: { tenantId },
-    select: { branding: { select: { logoUrl: true, loginImageUrl: true } } },
+    select: {
+      branding: {
+        select: {
+          logoUrl: true,
+          loginImageUrl: true,
+          faviconUrl: true,
+          darkLogoUrl: true,
+          signatureUrl: true,
+        },
+      },
+    },
   })
 
-  const stored = kind === 'logo' ? school?.branding?.logoUrl : school?.branding?.loginImageUrl
-  if (!stored) return null
+  const b = school?.branding
+  const stored =
+    kind === 'logo'
+      ? b?.logoUrl
+      : kind === 'banner'
+        ? b?.loginImageUrl
+        : kind === 'favicon'
+          ? b?.faviconUrl
+          : kind === 'darkLogo'
+            ? b?.darkLogoUrl
+            : b?.signatureUrl
 
-  // External URLs are not served through this route.
+  if (!stored) return null
   if (stored.startsWith('http://') || stored.startsWith('https://')) return null
   if (stored.startsWith('/api/v1/branding/')) return null
 
@@ -135,7 +170,9 @@ export async function readBrandingAsset(tenantId: string, kind: BrandingAssetKin
         ? 'image/jpeg'
         : storageKey.endsWith('.webp')
           ? 'image/webp'
-          : 'image/png'
+          : storageKey.endsWith('.ico')
+            ? 'image/x-icon'
+            : 'image/png'
 
     return { body, mimeType, storageKey }
   } catch {
