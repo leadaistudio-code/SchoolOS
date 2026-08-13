@@ -63,12 +63,13 @@ export async function provisionSchool(db: PrismaClient, input: ProvisionInput) {
         },
       })
 
-      await tx.school.create({
+      const school = await tx.school.create({
         data: {
           tenantId: tenant.id,
           code: input.slug.toUpperCase(),
           name: input.schoolName,
           email,
+          branding: { create: { tenantId: tenant.id } },
         },
       })
 
@@ -111,7 +112,7 @@ export async function provisionSchool(db: PrismaClient, input: ProvisionInput) {
         },
       })
 
-      return { tenant, user }
+      return { tenant, user, school }
     })
   } catch (err) {
     if (err instanceof ApiException) throw err

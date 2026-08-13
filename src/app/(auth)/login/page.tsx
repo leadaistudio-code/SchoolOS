@@ -28,6 +28,7 @@ export default async function LoginPage({
     (tenant
       ? 'Sign in to view attendance, homework, fees and results.'
       : 'Platform administration console.')
+  const bannerUrl = school?.loginBannerUrl ?? null
 
   return (
     <div className="min-h-dvh grid lg:grid-cols-2">
@@ -47,6 +48,15 @@ export default async function LoginPage({
             <span className="font-semibold text-lg text-ink">{title}</span>
           </div>
 
+          {bannerUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={bannerUrl}
+              alt=""
+              className="mb-6 w-full max-h-36 rounded-[var(--radius)] object-cover border border-line lg:hidden"
+            />
+          ) : null}
+
           <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
           <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
 
@@ -65,15 +75,37 @@ export default async function LoginPage({
         </div>
       </div>
 
-      {/* Right: a plain brand field. No gradient, no pattern — the sign-in
-          page should look like the product it opens, not like a campaign. */}
-      <div className="hidden lg:flex flex-col justify-end p-12 bg-[var(--brand-700)] text-white">
-        <p className="text-xl leading-snug max-w-md">
-          Attendance, fees, homework, results and transport in one record system.
-        </p>
-        <p className="mt-3 text-base text-white/70">
-          {title} runs on {env().APP_NAME}
-        </p>
+      {/* Right: school banner on desktop, or brand tint when none is set. */}
+      <div
+        className="hidden lg:flex flex-col justify-end p-12 text-white relative overflow-hidden min-h-[320px]"
+        style={
+          bannerUrl
+            ? undefined
+            : { background: 'var(--brand-700)' }
+        }
+      >
+        {bannerUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={bannerUrl}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20"
+              aria-hidden
+            />
+          </>
+        ) : null}
+        <div className="relative max-w-md">
+          <p className="text-xl leading-snug">
+            Attendance, fees, homework, results and transport in one record system.
+          </p>
+          <p className="mt-3 text-base text-white/70">
+            {title} runs on {env().APP_NAME}
+          </p>
+        </div>
       </div>
     </div>
   )

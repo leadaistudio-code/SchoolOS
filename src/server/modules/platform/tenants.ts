@@ -6,6 +6,7 @@ import type { listTenantsSchema, provisionTenantSchema, updateTenantSchema, enti
 import type { z } from 'zod'
 import { provisionSchool } from './provision'
 import { snapshotUsage, usageVsLimits } from './usage'
+import { uploadAndSaveBrandingAsset } from '@/server/branding-assets'
 
 export async function listTenants(
   ctx: PlatformContext,
@@ -86,6 +87,7 @@ export async function getTenant(ctx: PlatformContext, id: string) {
 export async function provisionTenant(
   ctx: PlatformContext,
   input: z.infer<typeof provisionTenantSchema>,
+  assets?: { logo?: File; banner?: File },
 ) {
   const result = await provisionSchool(ctx.db, {
     slug: input.slug,
@@ -97,6 +99,13 @@ export async function provisionTenant(
     trial: input.trial,
     host: input.host,
   })
+
+  if (assets?.logo) {
+    await uploadAndSaveBrandingAsset(result.tenant.id, assets.logo, 'logo')
+  }
+  if (assets?.banner) {
+    await uploadAndSaveBrandingAsset(result.tenant.id, assets.banner, 'banner')
+  }
 
   await audit({
     tenantId: result.tenant.id,

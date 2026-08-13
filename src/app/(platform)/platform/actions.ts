@@ -46,8 +46,15 @@ export async function provisionSchoolAction(formData: FormData) {
     redirectWithFormError('/platform/tenants', parsed.error)
   }
 
+  const logo = formData.get('logo')
+  const banner = formData.get('banner')
+  const assets = {
+    logo: logo instanceof File && logo.size > 0 ? logo : undefined,
+    banner: banner instanceof File && banner.size > 0 ? banner : undefined,
+  }
+
   try {
-    const { tenant } = await provisionTenant(ctx, parsed.data)
+    const { tenant } = await provisionTenant(ctx, parsed.data, assets)
     revalidatePath('/platform')
     revalidatePath('/platform/tenants')
     redirect(`/platform/tenants/${tenant.id}`)

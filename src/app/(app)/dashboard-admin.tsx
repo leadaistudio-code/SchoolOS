@@ -79,6 +79,7 @@ export async function AdminDashboard() {
         firstName={ctx.user.firstName}
         schoolName={schoolName}
         headline={headline}
+        bannerUrl={ctx.tenant.school?.loginBannerUrl}
         action={
           unmarked > 0 && ctx.can('attendance.mark')
             ? { label: 'Mark attendance', href: '/attendance' }

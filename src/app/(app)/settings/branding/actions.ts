@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireContext } from '@/server/context'
 import { audit } from '@/server/audit'
+import { uploadAndSaveBrandingAsset, type BrandingAssetKind } from '@/server/branding-assets'
 
 const hex = z
   .string()
@@ -21,6 +22,48 @@ export const brandingSchema = z.object({
 })
 
 export type BrandingResult = { ok: boolean; message: string }
+
+export async function uploadBrandingAssetAction(
+  formData: FormData,
+): Promise<BrandingResult> {
+  const ctx = await requireContext('settings.branding')
+  const kind = formData.get('kind')
+  const file = formData.get('file')
+
+  if (kind !== 'logo' && kind !== 'banner') {
+    return { ok: false, message: 'Unknown asset type' }
+  }
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: 'Choose an image to upload' }
+  }
+
+  try {
+    await uploadAndSaveBrandingAsset(ctx.tenant.id, file, kind as BrandingAssetKind)
+
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'branding.asset.upload',
+      module: 'settings',
+      entityType: 'Branding',
+      summary: `Uploaded ${kind} image`,
+    })
+
+    revalidatePath('/', 'layout')
+    revalidatePath('/settings/branding')
+
+    return {
+      ok: true,
+      message: kind === 'logo' ? 'Header logo updated.' : 'Login banner updated.',
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'The image could not be uploaded',
+    }
+  }
+}
 
 /**
  * Saves the school's palette.

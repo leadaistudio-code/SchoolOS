@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { cache } from 'react'
+import { resolveBrandingAssetUrl } from '@/server/branding-assets'
 import { prisma } from '@/server/db/prisma'
 import { env } from '@/lib/env'
 
@@ -23,6 +24,7 @@ export type ResolvedTenant = {
     radius: string
     loginHeadline: string | null
     loginSubtext: string | null
+    loginBannerUrl: string | null
     footerText: string | null
   } | null
 }
@@ -87,7 +89,7 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
           id: tenant.school.id,
           name: tenant.school.name,
           code: tenant.school.code,
-          logoUrl: b?.logoUrl ?? null,
+          logoUrl: resolveBrandingAssetUrl(b?.logoUrl, 'logo'),
           faviconUrl: b?.faviconUrl ?? null,
           primaryHex: b?.primaryHex ?? '#E41F07',
           secondaryHex: b?.secondaryHex ?? '#0A0C0C',
@@ -95,6 +97,7 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
           radius: b?.radius ?? '8px',
           loginHeadline: b?.loginHeadline ?? null,
           loginSubtext: b?.loginSubtext ?? null,
+          loginBannerUrl: resolveBrandingAssetUrl(b?.loginImageUrl, 'banner'),
           footerText: b?.footerText ?? null,
         }
       : null,

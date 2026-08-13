@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Palette, RotateCcw, Save } from 'lucide-react'
-import { saveBrandingAction } from './actions'
+import { saveBrandingAction, uploadBrandingAssetAction } from './actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -44,7 +44,15 @@ const PRESETS = [
  * that its brand red makes button text unreadable. Contrast is derived, not
  * chosen, so that cannot happen either way.
  */
-export function BrandingForm({ initial }: { initial: BrandingValues }) {
+export function BrandingForm({
+  initial,
+  logoUrl,
+  bannerUrl,
+}: {
+  initial: BrandingValues
+  logoUrl: string | null
+  bannerUrl: string | null
+}) {
   const router = useRouter()
   const toast = useToast()
   const [values, setValues] = React.useState(initial)
@@ -56,6 +64,24 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
   const contrast = contrastOn(values.primaryHex)
   const tint = shade(values.primaryHex, 0.92)
   const hover = shade(values.primaryHex, -0.15)
+
+  const [assetPending, startAssetTransition] = React.useTransition()
+
+  const uploadAsset = (kind: 'logo' | 'banner', file: File | null | undefined) => {
+    if (!file?.size) return
+    const form = new FormData()
+    form.set('kind', kind)
+    form.set('file', file)
+    startAssetTransition(async () => {
+      const result = await uploadBrandingAssetAction(form)
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Image saved' : 'Upload failed',
+        description: result.message,
+      })
+      if (result.ok) router.refresh()
+    })
+  }
 
   const save = () =>
     startTransition(async () => {
@@ -71,6 +97,28 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px] items-start">
       <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Logo &amp; banner</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6 sm:grid-cols-2">
+            <AssetUploadField
+              label="Header logo"
+              hint="Sign-in page, sidebar and receipts"
+              previewUrl={logoUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('logo', file)}
+            />
+            <AssetUploadField
+              label="Login banner"
+              hint="Sign-in page and dashboard welcome strip"
+              previewUrl={bannerUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('banner', file)}
+            />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Colours</CardTitle>
@@ -276,6 +324,46 @@ export function BrandingForm({ initial }: { initial: BrandingValues }) {
           </p>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function AssetUploadField({
+  label,
+  hint,
+  previewUrl,
+  pending,
+  onFile,
+}: {
+  label: string
+  hint: string
+  previewUrl: string | null
+  pending: boolean
+  onFile: (file: File | null | undefined) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-ink">{label}</p>
+      <p className="text-xs text-ink-subtle">{hint}</p>
+      {previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt=""
+          className="h-20 w-full max-w-[200px] rounded-[var(--radius-sm)] border border-line object-contain bg-surface-2 p-2"
+        />
+      ) : (
+        <div className="flex h-20 w-full max-w-[200px] items-center justify-center rounded-[var(--radius-sm)] border border-dashed border-line text-xs text-ink-subtle">
+          No image yet
+        </div>
+      )}
+      <Input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        disabled={pending}
+        className="text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
     </div>
   )
 }

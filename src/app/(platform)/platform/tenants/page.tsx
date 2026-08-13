@@ -170,6 +170,30 @@ export default async function TenantsPage({
                 <input type="checkbox" name="trial" defaultChecked />
                 Start on trial
               </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-ink-muted">Header logo</span>
+                <Input
+                  name="logo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
+                />
+                <span className="text-xs text-ink-subtle">
+                  Shown in the sign-in page, sidebar and app header. JPEG, PNG or WebP.
+                </span>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-ink-muted">Login banner</span>
+                <Input
+                  name="banner"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
+                />
+                <span className="text-xs text-ink-subtle">
+                  Wide image on the sign-in page and dashboard welcome strip.
+                </span>
+              </label>
               <Button type="submit" className="w-full">
                 Create school
               </Button>
