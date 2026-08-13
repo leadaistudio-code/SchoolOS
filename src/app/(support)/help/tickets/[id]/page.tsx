@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { getTenantTicket } from '@/server/modules/platform/support'
-import { replyTicketAction } from './actions'
+import { replyTicketAction } from '../actions'
 
 export const metadata = { title: 'Support ticket' }
 
