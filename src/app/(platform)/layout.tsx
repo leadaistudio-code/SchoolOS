@@ -7,6 +7,8 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { ToastProvider } from '@/components/ui/toast'
 import { env } from '@/lib/env'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * The platform console is a separate application shell from the school ERP.
  * Different audience, different navigation, and no chance of a tenant screen
@@ -48,6 +50,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className="px-2.5 py-1.5 rounded-[var(--radius-sm)] text-base text-ink-muted hover:bg-surface-2 hover:text-ink"
                 >
                   {item.label}

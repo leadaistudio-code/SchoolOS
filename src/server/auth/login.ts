@@ -58,7 +58,6 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
       tenantId: input.tenantId,
       deletedAt: null,
       ...(isEmail ? { email: identifier } : { phone: identifier }),
-      ...(input.tenantId === null ? { isSuperAdmin: true } : {}),
     },
   })
 

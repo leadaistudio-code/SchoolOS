@@ -6,17 +6,28 @@ import { randomToken, sha256 } from '@/server/crypto'
 export const SESSION_COOKIE = 'schoolos_session'
 
 /** Cookie domain shared across tenant subdomains (e.g. `.lvh.me`, `.schoolos.app`). */
-export function sessionCookieDomain(): string | undefined {
+export function sessionCookieDomain(host?: string | null): string | undefined {
   const root = env().APP_ROOT_DOMAIN.split(':')[0]!.toLowerCase()
   if (root === 'localhost' || root === '127.0.0.1' || root.endsWith('.localhost')) {
     return undefined
   }
   if (!root.includes('.')) return undefined
-  return root.startsWith('.') ? root : `.${root}`
+
+  const bare = (host ?? root).split(':')[0]!.toLowerCase()
+  const normalizedRoot = root.startsWith('.') ? root.slice(1) : root
+
+  // Only attach a shared domain when the request host belongs to our root.
+  if (bare !== normalizedRoot && !bare.endsWith(`.${normalizedRoot}`)) {
+    return undefined
+  }
+
+  return `.${normalizedRoot}`
 }
 
-function sessionCookieOptions(expires: Date) {
-  const domain = sessionCookieDomain()
+async function sessionCookieOptions(expires: Date) {
+  const h = await headers()
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  const domain = sessionCookieDomain(host)
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
@@ -74,7 +85,7 @@ export async function createSession(input: CreateSessionInput) {
   })
 
   const jar = await cookies()
-  jar.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
+  jar.set(SESSION_COOKIE, token, await sessionCookieOptions(expiresAt))
 
   return session
 }
@@ -88,7 +99,7 @@ export async function destroyCurrentSession() {
       data: { revokedAt: new Date() },
     })
   }
-  jar.delete({ name: SESSION_COOKIE, ...sessionCookieOptions(new Date(0)) })
+  jar.delete({ name: SESSION_COOKIE, ...(await sessionCookieOptions(new Date(0))) })
 }
 
 export async function revokeAllSessions(userId: string, exceptSessionId?: string) {

@@ -8,6 +8,7 @@ import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { formatMoney, formatNumber } from '@/lib/utils'
+import { ProvisionSchoolForm } from './tenants/provision-form'
 
 export const metadata = { title: 'Platform console' }
 
@@ -79,12 +80,12 @@ export default async function PlatformDashboard() {
         title="Platform console"
         description={`${tenants.length} tenants · ${activeCount} active`}
         actions={
-          <Link
-            href="/platform/tenants"
+          <a
+            href="#provision"
             className="inline-flex items-center rounded-[var(--radius-sm)] bg-ink text-bg px-3 py-1.5 text-sm font-medium hover:opacity-90"
           >
             Provision school
-          </Link>
+          </a>
         }
       />
 
@@ -106,6 +107,15 @@ export default async function PlatformDashboard() {
           sub={`${formatMoney(processed._sum.amountMinor ?? 0)} fees processed`}
         />
       </MetricRow>
+
+      <Card id="provision">
+        <CardHeader>
+          <CardTitle>Provision school</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProvisionSchoolForm plans={plans.map((p) => ({ id: p.id, name: p.name }))} />
+        </CardContent>
+      </Card>
 
       <Card className="overflow-hidden">
         <CardHeader>

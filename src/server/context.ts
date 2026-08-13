@@ -159,7 +159,9 @@ export type PlatformContext = { user: SessionUser; db: typeof prisma }
  */
 export const getPlatformContext = cache(async (): Promise<PlatformContext | null> => {
   const user = await getSessionUser()
-  if (!user || !user.isSuperAdmin) return null
+  if (!user) return null
+  // Platform operators are not bound to a tenant (tenantId is null).
+  if (user.tenantId !== null) return null
   return { user, db: prisma }
 })
 
