@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getSessionUser, type SessionUser } from '@/server/auth/session'
 import { resolveTenant, type ResolvedTenant } from '@/server/tenant'
 import { tenantDb, type TenantClient } from '@/server/db/tenant-client'
@@ -166,7 +167,11 @@ export async function requirePlatformContext(
   permission?: string,
 ): Promise<PlatformContext> {
   const ctx = await getPlatformContext()
-  if (!ctx) redirect('/login')
+  if (!ctx) {
+    const h = await headers()
+    const path = h.get('x-pathname') ?? '/platform'
+    redirect(`/login?next=${encodeURIComponent(path)}`)
+  }
   if (permission && !ctx.user.permissions.has(permission)) redirect('/403')
   return ctx
 }

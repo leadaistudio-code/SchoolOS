@@ -32,6 +32,20 @@ export type ResolvedTenant = {
 /** Hosts that never map to a tenant. */
 const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'admin', 'api', 'platform', 'static'])
 
+/** True for the marketing apex, www, and application/platform subdomains. */
+export function isPlatformHost(host: string | null): boolean {
+  if (!host) return false
+  const root = env().APP_ROOT_DOMAIN.split(':')[0]!.toLowerCase()
+  const bare = host.split(':')[0]!.toLowerCase()
+  if (bare === root || bare === `www.${root}`) return true
+  if (bare.endsWith(`.${root}`)) {
+    const sub = bare.slice(0, -(root.length + 1))
+    if (!sub || sub.includes('.')) return false
+    return RESERVED_SUBDOMAINS.has(sub)
+  }
+  return false
+}
+
 export function hostToSlug(host: string | null): string | null {
   if (!host) return null
   const root = env().APP_ROOT_DOMAIN.split(':')[0]!.toLowerCase()
@@ -57,6 +71,10 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
   if (!host) return null
 
   const bare = host.split(':')[0]!.toLowerCase()
+
+  // The platform console runs on app./admin./platform. subdomains (and the apex).
+  // Never bind those hosts to a school, even if a TenantDomain row exists.
+  if (isPlatformHost(host)) return null
 
   const byDomain = await prisma.tenantDomain.findUnique({
     where: { host: bare },
@@ -110,6 +128,16 @@ export function tenantUrl(slug: string, path = '/'): string {
 }
 
 export function platformUrl(path = '/'): string {
-  const url = new URL(env().APP_URL)
-  return `${url.protocol}//${env().APP_ROOT_DOMAIN}${path}`
+  const root = env().APP_ROOT_DOMAIN.split(':')[0]!
+  const appUrl = env().APP_URL
+  try {
+    const parsed = new URL(appUrl)
+    // When the app is deployed on app.domain.com, platform links should stay there.
+    if (parsed.hostname.startsWith('app.')) {
+      return `${parsed.protocol}//${parsed.host}${path}`
+    }
+  } catch {
+    /* fall through */
+  }
+  return `${new URL(appUrl).protocol}//${root}${path}`
 }

@@ -105,13 +105,23 @@ export function middleware(request: NextRequest) {
     if (pathname === '/site' || pathname.startsWith('/site/')) {
       return new NextResponse('Not found', { status: 404 })
     }
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-pathname', pathname)
+    return response
   }
 
   const servesMarketing = deployment === 'marketing' || isMarketingHost(host)
-  if (!servesMarketing) return NextResponse.next()
+  if (!servesMarketing) {
+    const response = NextResponse.next()
+    response.headers.set('x-pathname', pathname)
+    return response
+  }
 
-  if (PASSTHROUGH.some((prefix) => pathname.startsWith(prefix))) return NextResponse.next()
+  if (PASSTHROUGH.some((prefix) => pathname.startsWith(prefix))) {
+    const response = NextResponse.next()
+    response.headers.set('x-pathname', pathname)
+    return response
+  }
 
   // Already rewritten, or someone typed the internal path: send them to the
   // canonical public one so a page never has two addresses.

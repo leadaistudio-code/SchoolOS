@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { LogOut, Server } from 'lucide-react'
 import { getPlatformContext } from '@/server/context'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -13,7 +14,11 @@ import { env } from '@/lib/env'
  */
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getPlatformContext()
-  if (!ctx) redirect('/login')
+  if (!ctx) {
+    const h = await headers()
+    const path = h.get('x-pathname') ?? '/platform'
+    redirect(`/login?next=${encodeURIComponent(path)}`)
+  }
 
   const nav = [
     { label: 'Overview', href: '/platform' },

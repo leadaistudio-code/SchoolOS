@@ -18,7 +18,11 @@ export default async function LoginPage({
     searchParams,
   ])
 
-  if (user) redirect(tenant ? '/' : '/platform')
+  if (user) {
+    const next = params.next
+    const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+    redirect(safeNext ?? (tenant ? '/' : '/platform'))
+  }
 
   const school = tenant?.school
   const title = school?.name ?? env().APP_NAME

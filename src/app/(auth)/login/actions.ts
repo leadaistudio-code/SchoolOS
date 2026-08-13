@@ -1,9 +1,10 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { login } from '@/server/auth/login'
-import { resolveTenant } from '@/server/tenant'
+import { resolveTenant, isPlatformHost } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
 import type { FormState as LoginState } from '@/lib/form-state'
 
@@ -33,9 +34,11 @@ export async function loginAction(
     return { error: null, fieldErrors }
   }
 
-  // The tenant comes from the request host. A user on schoolA.example.com can
-  // only ever authenticate against school A, whatever the form contains.
-  const tenant = await resolveTenant()
+  // The tenant comes from the request host. Platform hosts (app., admin., apex)
+  // always authenticate as the platform super-admin, never a school tenant.
+  const h = await headers()
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  const tenant = isPlatformHost(host) ? null : await resolveTenant()
 
   const result = await login({
     identifier: parsed.data.identifier,
