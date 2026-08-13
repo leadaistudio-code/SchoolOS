@@ -11,26 +11,48 @@ const hex = z
   .trim()
   .regex(/^#[0-9a-fA-F]{6}$/, 'Use a 6-digit hex colour such as #E41F07')
 
-export const brandingSchema = z.object({
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v === '' ? undefined : v))
+
+// Keep schema private — Next.js "use server" files may only export async functions.
+const brandingSchema = z.object({
   primaryHex: hex,
   accentHex: hex,
   secondaryHex: hex,
   radius: z.enum(['4px', '6px', '8px', '12px', '16px']),
-  loginHeadline: z.string().trim().max(120).optional(),
-  loginSubtext: z.string().trim().max(200).optional(),
-  footerText: z.string().trim().max(200).optional(),
+  loginHeadline: optionalText(120),
+  loginSubtext: optionalText(200),
+  footerText: optionalText(200),
+  pdfHeaderHtml: optionalText(4000),
+  pdfFooterHtml: optionalText(4000),
+  pwaName: optionalText(60),
+  pwaShortName: optionalText(20),
+  pwaThemeHex: hex.optional().or(z.literal('')).transform((v) => (v === '' ? undefined : v)),
 })
 
-export type BrandingResult = { ok: boolean; message: string }
+type BrandingResult = { ok: boolean; message: string }
+
+const ASSET_KINDS = new Set<BrandingAssetKind>([
+  'logo',
+  'banner',
+  'favicon',
+  'darkLogo',
+  'signature',
+])
 
 export async function uploadBrandingAssetAction(
   formData: FormData,
 ): Promise<BrandingResult> {
   const ctx = await requireContext('settings.branding')
-  const kind = formData.get('kind')
+  const kind = String(formData.get('kind') ?? '') as BrandingAssetKind
   const file = formData.get('file')
 
-  if (kind !== 'logo' && kind !== 'banner') {
+  if (!ASSET_KINDS.has(kind)) {
     return { ok: false, message: 'Unknown asset type' }
   }
   if (!(file instanceof File) || file.size === 0) {
@@ -38,7 +60,7 @@ export async function uploadBrandingAssetAction(
   }
 
   try {
-    await uploadAndSaveBrandingAsset(ctx.tenant.id, file, kind as BrandingAssetKind)
+    await uploadAndSaveBrandingAsset(ctx.tenant.id, file, kind)
 
     await audit({
       tenantId: ctx.tenant.id,
@@ -52,11 +74,9 @@ export async function uploadBrandingAssetAction(
 
     revalidatePath('/', 'layout')
     revalidatePath('/settings/branding')
+    revalidatePath('/manifest.webmanifest')
 
-    return {
-      ok: true,
-      message: kind === 'logo' ? 'Header logo updated.' : 'Login banner updated.',
-    }
+    return { ok: true, message: `${kind} image updated.` }
   } catch (err) {
     return {
       ok: false,
@@ -66,11 +86,7 @@ export async function uploadBrandingAssetAction(
 }
 
 /**
- * Saves the school's palette.
- *
- * This is the control surface for the theme engine: the values written here
- * are emitted as CSS custom properties on the next request, so the change is
- * live everywhere without a rebuild.
+ * Saves the school's palette and white-label copy.
  */
 export async function saveBrandingAction(payload: unknown): Promise<BrandingResult> {
   const ctx = await requireContext('settings.branding')
@@ -83,10 +99,25 @@ export async function saveBrandingAction(payload: unknown): Promise<BrandingResu
 
     const before = await ctx.db.branding.findFirst({ where: { schoolId: school.id } })
 
+    const data = {
+      primaryHex: input.primaryHex,
+      accentHex: input.accentHex,
+      secondaryHex: input.secondaryHex,
+      radius: input.radius,
+      loginHeadline: input.loginHeadline ?? null,
+      loginSubtext: input.loginSubtext ?? null,
+      footerText: input.footerText ?? null,
+      pdfHeaderHtml: input.pdfHeaderHtml ?? null,
+      pdfFooterHtml: input.pdfFooterHtml ?? null,
+      pwaName: input.pwaName ?? null,
+      pwaShortName: input.pwaShortName ?? null,
+      pwaThemeHex: input.pwaThemeHex ?? null,
+    }
+
     await ctx.db.branding.upsert({
       where: { schoolId: school.id },
-      create: { tenantId: ctx.tenant.id, schoolId: school.id, ...input },
-      update: input,
+      create: { tenantId: ctx.tenant.id, schoolId: school.id, ...data },
+      update: data,
     })
 
     await audit({
@@ -99,13 +130,14 @@ export async function saveBrandingAction(payload: unknown): Promise<BrandingResu
       entityId: school.id,
       summary: `Updated school branding to ${input.primaryHex}`,
       before,
-      after: input,
+      after: data,
     })
 
-    // The palette is read in the root layout, so every route revalidates.
     revalidatePath('/', 'layout')
+    revalidatePath('/settings/branding')
+    revalidatePath('/manifest.webmanifest')
 
-    return { ok: true, message: 'Branding saved. The new colours are live across the portal.' }
+    return { ok: true, message: 'Branding saved. Colours and PWA details are live.' }
   } catch (err) {
     if (err instanceof z.ZodError) {
       return { ok: false, message: err.issues[0]?.message ?? 'Invalid branding' }

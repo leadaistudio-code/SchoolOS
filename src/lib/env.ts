@@ -38,6 +38,15 @@ const serverSchema = z.object({
   APP_SIGN_IN_URL: z.string().url().optional(),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  /**
+   * When true, tenant transactions issue `SET LOCAL app.tenant_id` so Postgres
+   * RLS policies in prisma/rls.sql can see the current school. Leave false
+   * unless you have applied rls.sql and connected as a non-owner role.
+   */
+  DATABASE_RLS: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
 
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(720),
@@ -109,9 +118,27 @@ function withoutEmptyStrings(source: NodeJS.ProcessEnv): Record<string, unknown>
   return out
 }
 
+/**
+ * Railway "AWS SDK (Generic)" bucket connect injects AWS_* names. Map those
+ * onto our S3_* keys when the latter are unset so either naming works.
+ */
+function withStorageAliases(source: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...source,
+    S3_ENDPOINT:
+      source.S3_ENDPOINT ?? source.AWS_ENDPOINT_URL ?? source.AWS_ENDPOINT_URL_S3,
+    S3_REGION: source.S3_REGION ?? source.AWS_DEFAULT_REGION ?? source.AWS_REGION,
+    S3_BUCKET: source.S3_BUCKET ?? source.AWS_S3_BUCKET_NAME ?? source.AWS_BUCKET_NAME,
+    S3_ACCESS_KEY_ID: source.S3_ACCESS_KEY_ID ?? source.AWS_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY: source.S3_SECRET_ACCESS_KEY ?? source.AWS_SECRET_ACCESS_KEY,
+  }
+}
+
 export function env(): ServerEnv {
   if (cached) return cached
-  const parsed = serverSchema.safeParse(withoutEmptyStrings(process.env))
+  const parsed = serverSchema.safeParse(
+    withStorageAliases(withoutEmptyStrings(process.env)),
+  )
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)

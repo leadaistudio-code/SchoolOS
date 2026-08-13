@@ -1,5 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { env } from '@/lib/env'
 import { hmacSha256, randomToken, timingSafeEqual } from '@/server/crypto'
 import type {
@@ -132,6 +139,10 @@ export function paymentProvider(): PaymentProvider {
 
 /* ----------------------------------------------------------------- storage */
 
+function fileProxyUrl(key: string) {
+  return `/api/v1/files/${encodeURIComponent(key)}`
+}
+
 function localStorageProvider(): StorageProvider {
   const root = path.resolve(env().STORAGE_LOCAL_DIR)
   const full = (key: string) => path.join(root, key.replace(/\.\./g, ''))
@@ -142,7 +153,7 @@ function localStorageProvider(): StorageProvider {
       const target = full(key)
       await fs.mkdir(path.dirname(target), { recursive: true })
       await fs.writeFile(target, body)
-      return { key, url: `/api/v1/files/${encodeURIComponent(key)}`, sizeBytes: body.length, mimeType }
+      return { key, url: fileProxyUrl(key), sizeBytes: body.length, mimeType }
     },
     async get(key) {
       return fs.readFile(full(key))
@@ -153,13 +164,93 @@ function localStorageProvider(): StorageProvider {
     async signedUrl(key) {
       // The local driver serves through the permission-checked file route
       // rather than handing out a bucket URL.
-      return `/api/v1/files/${encodeURIComponent(key)}`
+      return fileProxyUrl(key)
+    },
+  }
+}
+
+function requireS3Config() {
+  const cfg = env()
+  const missing = (
+    [
+      ['S3_ENDPOINT', cfg.S3_ENDPOINT],
+      ['S3_BUCKET', cfg.S3_BUCKET],
+      ['S3_ACCESS_KEY_ID', cfg.S3_ACCESS_KEY_ID],
+      ['S3_SECRET_ACCESS_KEY', cfg.S3_SECRET_ACCESS_KEY],
+    ] as const
+  ).filter(([, value]) => !value)
+
+  if (missing.length) {
+    throw new Error(
+      `STORAGE_DRIVER=s3 requires ${missing.map(([name]) => name).join(', ')}`,
+    )
+  }
+
+  return {
+    endpoint: cfg.S3_ENDPOINT!,
+    region: cfg.S3_REGION || 'auto',
+    bucket: cfg.S3_BUCKET!,
+    accessKeyId: cfg.S3_ACCESS_KEY_ID!,
+    secretAccessKey: cfg.S3_SECRET_ACCESS_KEY!,
+    forcePathStyle: cfg.S3_FORCE_PATH_STYLE ?? false,
+  }
+}
+
+function s3StorageProvider(): StorageProvider {
+  const cfg = requireS3Config()
+  const client = new S3Client({
+    region: cfg.region,
+    endpoint: cfg.endpoint,
+    forcePathStyle: cfg.forcePathStyle,
+    credentials: {
+      accessKeyId: cfg.accessKeyId,
+      secretAccessKey: cfg.secretAccessKey,
+    },
+  })
+
+  return {
+    name: 's3',
+    async put(key, body, mimeType) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: cfg.bucket,
+          Key: key,
+          Body: body,
+          ContentType: mimeType,
+        }),
+      )
+      // Keep serving through the RBAC-checked app proxy (Railway buckets are private).
+      return { key, url: fileProxyUrl(key), sizeBytes: body.length, mimeType }
+    },
+    async get(key) {
+      const result = await client.send(
+        new GetObjectCommand({ Bucket: cfg.bucket, Key: key }),
+      )
+      const bytes = await result.Body?.transformToByteArray()
+      if (!bytes) throw new Error(`S3 object missing body: ${key}`)
+      return Buffer.from(bytes)
+    },
+    async delete(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }))
+    },
+    async signedUrl(key, expiresInSeconds) {
+      return getSignedUrl(
+        client,
+        new GetObjectCommand({ Bucket: cfg.bucket, Key: key }),
+        { expiresIn: expiresInSeconds },
+      )
     },
   }
 }
 
 export function storageProvider(): StorageProvider {
-  return localStorageProvider()
+  switch (env().STORAGE_DRIVER) {
+    case 's3':
+      return s3StorageProvider()
+    case 'local':
+    default:
+      return localStorageProvider()
+  }
 }
 
 /* -------------------------------------------------------------- maps + ai */
