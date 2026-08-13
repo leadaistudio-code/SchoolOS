@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import dns from 'node:dns/promises'
 import { AppContext } from '@/server/context'
+import { prisma } from '@/server/db/prisma'
 import { AddDomainInput } from './schema'
 
 export async function listDomains(ctx: AppContext) {
@@ -15,7 +16,7 @@ export async function addDomain(ctx: AppContext, input: AddDomainInput) {
 
   // Check if it already exists globally (hosts must be globally unique)
   // But wait, the prisma model has host @unique, so we should query prisma directly to check if it's used elsewhere
-  const existing = await ctx.db.$parent.tenantDomain.findUnique({
+  const existing = await prisma.tenantDomain.findUnique({
     where: { host: input.host },
   })
 
@@ -30,6 +31,7 @@ export async function addDomain(ctx: AppContext, input: AddDomainInput) {
 
   const domain = await ctx.db.tenantDomain.create({
     data: {
+      tenantId: ctx.tenant.id,
       host: input.host,
       verifyToken,
       verified: false,

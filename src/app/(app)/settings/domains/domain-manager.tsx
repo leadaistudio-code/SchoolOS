@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Field, Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 
 type Domain = {
   id: string
@@ -153,10 +153,10 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
                       {!domain.isPrimary && (
                         <Button
                           variant="ghost"
-                          tone="danger"
                           size="sm"
                           loading={removing === domain.id}
                           onClick={() => handleRemove(domain.id)}
+                          className="text-danger hover:text-danger"
                         >
                           <Trash className="size-4" />
                         </Button>
@@ -174,20 +174,20 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
 
                       <div className="border border-amber-200 rounded bg-white overflow-hidden mb-4">
                         <Table>
-                          <TableHeader>
-                            <TableRow className="bg-amber-50">
-                              <TableHead className="py-2 text-xs">Type</TableHead>
-                              <TableHead className="py-2 text-xs">Host / Name</TableHead>
-                              <TableHead className="py-2 text-xs">Value</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow>
-                              <TableCell className="py-2 font-mono text-xs">TXT</TableCell>
-                              <TableCell className="py-2 font-mono text-xs">_schoolos-challenge</TableCell>
-                              <TableCell className="py-2 font-mono text-xs break-all">{domain.verifyToken}</TableCell>
-                            </TableRow>
-                          </TableBody>
+                          <THead>
+                            <TR className="bg-amber-50">
+                              <TH className="py-2 text-xs">Type</TH>
+                              <TH className="py-2 text-xs">Host / Name</TH>
+                              <TH className="py-2 text-xs">Value</TH>
+                            </TR>
+                          </THead>
+                          <TBody>
+                            <TR>
+                              <TD className="py-2 font-mono text-xs">TXT</TD>
+                              <TD className="py-2 font-mono text-xs">_schoolos-challenge</TD>
+                              <TD className="py-2 font-mono text-xs break-all">{domain.verifyToken}</TD>
+                            </TR>
+                          </TBody>
                         </Table>
                       </div>
 
@@ -196,20 +196,20 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
                           Additionally, add a CNAME record pointing to our servers to route traffic:
                         </p>
                         <Table>
-                          <TableHeader>
-                            <TableRow className="bg-amber-50">
-                              <TableHead className="py-2 text-xs">Type</TableHead>
-                              <TableHead className="py-2 text-xs">Host / Name</TableHead>
-                              <TableHead className="py-2 text-xs">Value</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow>
-                              <TableCell className="py-2 font-mono text-xs">CNAME</TableCell>
-                              <TableCell className="py-2 font-mono text-xs">@ (or subdomain)</TableCell>
-                              <TableCell className="py-2 font-mono text-xs">cname.schoolos.dev</TableCell>
-                            </TableRow>
-                          </TableBody>
+                          <THead>
+                            <TR className="bg-amber-50">
+                              <TH className="py-2 text-xs">Type</TH>
+                              <TH className="py-2 text-xs">Host / Name</TH>
+                              <TH className="py-2 text-xs">Value</TH>
+                            </TR>
+                          </THead>
+                          <TBody>
+                            <TR>
+                              <TD className="py-2 font-mono text-xs">CNAME</TD>
+                              <TD className="py-2 font-mono text-xs">@ (or subdomain)</TD>
+                              <TD className="py-2 font-mono text-xs">cname.schoolos.dev</TD>
+                            </TR>
+                          </TBody>
                         </Table>
                       </div>
 

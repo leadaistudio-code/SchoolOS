@@ -17,10 +17,14 @@ export async function startImpersonation(
 
   const target = await ctx.db.user.findFirst({
     where: { id: input.userId, tenantId: input.tenantId, deletedAt: null, status: 'ACTIVE' },
-    include: { tenant: true },
   })
   if (!target) throw notFound('User')
   if (target.isSuperAdmin) throw badRequest('Cannot impersonate platform administrators')
+
+  const tenant = await ctx.db.tenant.findUnique({
+    where: { id: input.tenantId },
+    select: { slug: true },
+  })
 
   // End the platform session cookie; the new session is the target user.
   await destroyCurrentSession()
@@ -44,7 +48,7 @@ export async function startImpersonation(
     summary: `Impersonating ${target.email ?? target.id}`,
   })
 
-  const slug = target.tenant?.slug
+  const slug = tenant?.slug
   const redirectTo = slug ? tenantUrl(slug, '/') : platformUrl('/platform')
 
   return { sessionId: session.id, redirectTo }

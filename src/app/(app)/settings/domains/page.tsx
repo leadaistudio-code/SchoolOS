@@ -16,7 +16,12 @@ export default async function DomainsPage() {
         description="Add a custom domain to serve your portal (e.g. erp.yourschool.com)"
       />
       <div className="mt-8">
-        <DomainManager initialDomains={domains} />
+        <DomainManager
+          initialDomains={domains.map((domain) => ({
+            ...domain,
+            createdAt: domain.createdAt.toISOString(),
+          }))}
+        />
       </div>
     </div>
   )

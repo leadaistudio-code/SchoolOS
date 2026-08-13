@@ -1099,7 +1099,7 @@ function toSummary(batch: {
     preview: meta.preview,
     committedCount: meta.committedIds?.length ?? 0,
     aiSummary: meta.aiAnalysis?.summary,
-    aiNotes: meta.aiAnalysis?.notes,
+    aiNotes: meta.aiAnalysis?.notes ?? undefined,
     pendingQuestions: meta.pendingQuestions,
     splitFullNameColumn: meta.splitFullNameColumn,
     fileKind: meta.fileKind,

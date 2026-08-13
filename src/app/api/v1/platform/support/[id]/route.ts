@@ -5,7 +5,7 @@ import { getPlatformTicket, replyPlatformTicket, updatePlatformTicket } from '@/
 import { supportMessageSchema, supportTicketUpdateSchema } from '@/server/modules/platform/schema'
 
 export const GET = platformRoute(
-  async (_req, ctx, params) => ok(await getPlatformTicket(ctx, params.id)),
+  async (_req, ctx, params) => ok(await getPlatformTicket(ctx, params.id!)),
   { permission: 'platform.support' },
 )
 
@@ -13,7 +13,7 @@ export const PATCH = platformRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const input = supportTicketUpdateSchema.parse(body)
-    return ok(await updatePlatformTicket(ctx, params.id, input))
+    return ok(await updatePlatformTicket(ctx, params.id!, input))
   },
   { permission: 'platform.support', rateLimitKey: 'mutation' },
 )

@@ -8,7 +8,7 @@ export const POST = supportRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const input = supportMessageSchema.parse(body)
-    return ok(await replyTenantTicket(ctx, params.id, input), undefined, { status: 201 })
+    return ok(await replyTenantTicket(ctx, params.id!, input), undefined, { status: 201 })
   },
   { permission: 'support.create', rateLimitKey: 'mutation' },
 )

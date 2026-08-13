@@ -8,7 +8,7 @@ export const POST = platformRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const input = entitlementOverrideSchema.parse(body)
-    return ok(await setEntitlementOverride(ctx, params.id, input))
+    return ok(await setEntitlementOverride(ctx, params.id!, input))
   },
   { permission: 'platform.tenants', rateLimitKey: 'mutation' },
 )

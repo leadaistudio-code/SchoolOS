@@ -8,7 +8,7 @@ export const POST = platformRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const input = supportMessageSchema.parse(body)
-    return ok(await replyPlatformTicket(ctx, params.id, input), undefined, { status: 201 })
+    return ok(await replyPlatformTicket(ctx, params.id!, input), undefined, { status: 201 })
   },
   { permission: 'platform.support', rateLimitKey: 'mutation' },
 )

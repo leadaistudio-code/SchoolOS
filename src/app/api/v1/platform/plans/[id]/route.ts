@@ -6,7 +6,7 @@ import { planEntitlementSchema, planUpsertSchema } from '@/server/modules/platfo
 import { z } from 'zod'
 
 export const GET = platformRoute(
-  async (_req, ctx, params) => ok(await getPlan(ctx, params.id)),
+  async (_req, ctx, params) => ok(await getPlan(ctx, params.id!)),
   { permission: 'platform.plans' },
 )
 
@@ -14,14 +14,14 @@ export const PATCH = platformRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const input = planUpsertSchema.partial().parse(body)
-    return ok(await updatePlan(ctx, params.id, input))
+    return ok(await updatePlan(ctx, params.id!, input))
   },
   { permission: 'platform.plans', rateLimitKey: 'mutation' },
 )
 
 export const DELETE = platformRoute(
   async (_req, ctx, params) => {
-    await deletePlan(ctx, params.id)
+    await deletePlan(ctx, params.id!)
     return ok({ deleted: true })
   },
   { permission: 'platform.plans', rateLimitKey: 'mutation' },

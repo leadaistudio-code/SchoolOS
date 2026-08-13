@@ -9,7 +9,7 @@ export const POST = platformRoute(
   async (req: NextRequest, ctx, params) => {
     const body = await req.json()
     const entitlements = z.array(planEntitlementSchema).parse(body.entitlements ?? body)
-    return ok(await setPlanEntitlements(ctx, params.id, entitlements))
+    return ok(await setPlanEntitlements(ctx, params.id!, entitlements))
   },
   { permission: 'platform.plans', rateLimitKey: 'mutation' },
 )

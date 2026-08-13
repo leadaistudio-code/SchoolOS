@@ -4,8 +4,8 @@ import { ok } from '@/server/api/response'
 import { setPrimaryDomain } from '@/server/modules/domains/service'
 
 export const POST = route(
-  async (_req: NextRequest, ctx, { params }: { params: { id: string } }) => {
-    const domain = await setPrimaryDomain(ctx, params.id)
+  async (_req: NextRequest, ctx, params) => {
+    const domain = await setPrimaryDomain(ctx, params.id!)
     return ok(domain)
   },
   { permission: 'settings.manage', rateLimitKey: 'mutation' },

@@ -3,7 +3,7 @@ import type { PlatformContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { badRequest, notFound } from '@/server/api/response'
 import { paginationMeta } from '@/server/api/response'
-import type { generateInvoiceSchema } from './schema'
+import type { generateInvoiceSchema, listInvoicesSchema } from './schema'
 import type { z } from 'zod'
 
 function cycleEnd(start: Date, cycle: string) {
@@ -11,9 +11,6 @@ function cycleEnd(start: Date, cycle: string) {
   if (cycle === 'QUARTERLY') return addMonths(start, 3)
   return addYears(start, 1)
 }
-
-import type { listInvoicesSchema } from './schema'
-import type { z } from 'zod'
 
 async function nextInvoiceNumber(db: PlatformContext['db']) {
   const year = new Date().getFullYear()

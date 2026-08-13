@@ -4,8 +4,8 @@ import { ok } from '@/server/api/response'
 import { verifyDomain } from '@/server/modules/domains/service'
 
 export const POST = route(
-  async (_req: NextRequest, ctx, { params }: { params: { id: string } }) => {
-    const domain = await verifyDomain(ctx, params.id)
+  async (_req: NextRequest, ctx, params) => {
+    const domain = await verifyDomain(ctx, params.id!)
     return ok(domain)
   },
   { permission: 'settings.manage', rateLimitKey: 'mutation' },
