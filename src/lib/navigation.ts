@@ -236,7 +236,22 @@ export const NAVIGATION: NavItem[] = [
   { label: 'Sports', href: '/sports', icon: 'Medal', section: 'OPERATIONS' as const, permission: 'sports.view', feature: FEATURE.MODULE_SPORTS },
   { label: 'Events', href: '/events', icon: 'PartyPopper', section: 'OPERATIONS' as const, permission: 'events.view', feature: FEATURE.MODULE_EVENTS },
   { label: 'School Website', href: '/website', icon: 'Globe', section: 'ENGAGEMENT' as const, permission: 'website.view', feature: FEATURE.MODULE_WEBSITE },
-  { label: 'Reports', href: '/reports', soon: true, icon: 'BarChart3', section: 'INSIGHTS' as const, permission: 'reports.view' },
+  {
+    label: 'Reports',
+    href: '/reports',
+    icon: 'BarChart3',
+    section: 'INSIGHTS' as const,
+    permission: 'reports.view',
+    children: [
+      { label: 'Overview', href: '/reports', icon: 'LayoutDashboard', permission: 'reports.view' },
+      { label: 'Fee collection', href: '/reports/collection', icon: 'Wallet', permission: 'reports.view' },
+      { label: 'Attendance', href: '/reports/attendance', icon: 'CalendarCheck', permission: 'reports.view' },
+      { label: 'Exam results', href: '/reports/academic', icon: 'GraduationCap', permission: 'reports.view' },
+      { label: 'Enrolment', href: '/reports/enrolment', icon: 'Users', permission: 'reports.view' },
+      { label: 'Admissions funnel', href: '/reports/admissions', icon: 'UserPlus', permission: 'reports.view' },
+      { label: 'Staff', href: '/reports/staff', icon: 'Briefcase', permission: 'reports.view' },
+    ],
+  },
   {
     label: 'Settings',
     href: '/settings',

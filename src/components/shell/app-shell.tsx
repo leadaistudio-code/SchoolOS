@@ -14,6 +14,12 @@ import { ToastProvider } from '@/components/ui/toast'
 const COLLAPSE_KEY = 'mycampusview.nav.collapsed'
 
 /**
+ * Below this the full rail costs more width than the content can spare, so it
+ * folds to icons on its own. Above it, the stored preference decides.
+ */
+const AUTO_COLLAPSE = '(max-width: 1279px)'
+
+/**
  * Application shell.
  *
  * Desktop gets a persistent rail that can collapse to icons; a phone gets a
@@ -24,6 +30,11 @@ const COLLAPSE_KEY = 'mycampusview.nav.collapsed'
  * The collapsed state is remembered per browser rather than per account: it
  * is a statement about the screen in front of you, not a preference that
  * should follow you onto a different machine.
+ *
+ * On a narrow desktop the rail folds itself and the stored preference is
+ * restored when the window grows again — so a laptop does not permanently
+ * inherit the choice a wide monitor made. A manual toggle still wins for as
+ * long as the window stays that size.
  */
 export function AppShell({
   navigation,
@@ -53,13 +64,27 @@ export function AppShell({
   // Read after mount: the server has no way to know, and rendering the
   // collapsed rail on the server would flash the wrong width for everyone
   // who has not collapsed it.
+  //
+  // Crossing the width threshold — not every resize — is what re-decides the
+  // rail, so dragging a window around does not keep overruling a deliberate
+  // click.
   React.useEffect(() => {
-    setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === '1')
+    const query = window.matchMedia(AUTO_COLLAPSE)
+    const decide = () =>
+      setCollapsed(query.matches || window.localStorage.getItem(COLLAPSE_KEY) === '1')
+
+    decide()
+    query.addEventListener('change', decide)
+    return () => query.removeEventListener('change', decide)
   }, [])
 
   const toggleCollapse = () => {
     setCollapsed((current) => {
-      window.localStorage.setItem(COLLAPSE_KEY, current ? '0' : '1')
+      // Only a wide window writes the preference. A fold forced by a small
+      // screen is a fact about that screen, not a choice worth remembering.
+      if (!window.matchMedia(AUTO_COLLAPSE).matches) {
+        window.localStorage.setItem(COLLAPSE_KEY, current ? '0' : '1')
+      }
       return !current
     })
   }
@@ -91,6 +116,7 @@ export function AppShell({
             schoolName={schoolName}
             logoUrl={logoUrl}
             collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
           />
         </aside>
 

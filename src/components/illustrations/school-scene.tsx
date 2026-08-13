@@ -42,14 +42,14 @@ export function SchoolScene({ className }: { className?: string }) {
 
       {/* School building */}
       <g>
-        <path d="M96 54V32l24-12 24 12v22z" fill="var(--sidebar-fg-strong)" opacity="0.9" />
+        <path d="M96 54V32l24-12 24 12v22z" fill="var(--sidebar-ill-ink)" opacity="0.9" />
         <path d="M120 20 96 32h48z" fill="var(--product-500)" />
         <rect x="114" y="42" width="12" height="12" rx="1" fill="var(--product-500)" opacity="0.85" />
         <g fill="var(--product-500)" opacity="0.5">
           <rect x="102" y="36" width="7" height="6" rx="1" />
           <rect x="131" y="36" width="7" height="6" rx="1" />
         </g>
-        <path d="M120 20v-6" stroke="var(--sidebar-fg-strong)" strokeWidth="1.2" opacity="0.7" />
+        <path d="M120 20v-6" stroke="var(--sidebar-ill-ink)" strokeWidth="1.2" opacity="0.7" />
         <path d="M120 14h7l-2.5 3 2.5 3h-7z" fill="var(--chart-overdue)" opacity="0.9" />
       </g>
 
@@ -58,12 +58,12 @@ export function SchoolScene({ className }: { className?: string }) {
         <rect width="34" height="16" rx="4" fill="var(--chart-staff)" />
         <rect x="3" y="3" width="9" height="6" rx="1.5" fill="var(--sidebar-bg-deep)" opacity="0.55" />
         <rect x="15" y="3" width="9" height="6" rx="1.5" fill="var(--sidebar-bg-deep)" opacity="0.55" />
-        <circle cx="9" cy="17" r="2.6" fill="var(--sidebar-fg-strong)" opacity="0.85" />
-        <circle cx="26" cy="17" r="2.6" fill="var(--sidebar-fg-strong)" opacity="0.85" />
+        <circle cx="9" cy="17" r="2.6" fill="var(--sidebar-ill-ink)" opacity="0.85" />
+        <circle cx="26" cy="17" r="2.6" fill="var(--sidebar-ill-ink)" opacity="0.85" />
       </g>
 
       {/* Path markings */}
-      <g stroke="var(--sidebar-fg-strong)" strokeOpacity="0.25" strokeWidth="2" strokeLinecap="round">
+      <g stroke="var(--sidebar-ill-ink)" strokeOpacity="0.25" strokeWidth="2" strokeLinecap="round">
         <path d="M46 59h10M64 59h10M82 59h10" />
       </g>
     </svg>

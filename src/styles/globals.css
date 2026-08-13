@@ -74,19 +74,23 @@
   --text-subtle: #737f93;
 
   /* Shell ----------------------------------------------------------------
-     The navigation is a dark surface in both themes. It is the one part of
-     the product that does not follow the page: a constant edge to orient
-     against while the content area changes all day. */
+     The navigation follows the theme like everything else. It stays one step
+     lighter than the page in light mode and one step darker in dark mode, so
+     the rail still reads as a distinct edge without being a slab of night
+     next to a white page. */
   --sidebar-w: 252px;
   --sidebar-w-collapsed: 68px;
   --topbar-h: 60px;
-  --sidebar-bg: #10172a;
-  --sidebar-bg-deep: #0b1120;
-  --sidebar-border: #1e293b;
-  --sidebar-fg: #94a3b8;
-  --sidebar-fg-strong: #f1f5f9;
-  --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-caption: #64748b;
+  --sidebar-bg: #ffffff;
+  --sidebar-bg-deep: #f2f5fb;
+  --sidebar-border: #e4e8f1;
+  --sidebar-fg: #4a5568;
+  --sidebar-fg-strong: #101828;
+  --sidebar-hover: rgba(16, 24, 40, 0.05);
+  --sidebar-caption: #737f93;
+  /* Illustration ink. Named apart from the text tokens because a silhouette
+     wants a slate, not the near-black a label needs. */
+  --sidebar-ill-ink: #475569;
   --topbar-bg: #ffffff;
 
   /* Shape ---------------------------------------------------------------- */
@@ -145,6 +149,11 @@
   --sidebar-bg: #0d1424;
   --sidebar-bg-deep: #080d18;
   --sidebar-border: #1c2740;
+  --sidebar-fg: #94a3b8;
+  --sidebar-fg-strong: #f1f5f9;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-caption: #64748b;
+  --sidebar-ill-ink: #e2e8f0;
   --topbar-bg: #131a2a;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronDown, Sparkles } from 'lucide-react'
+import { ChevronDown, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import { NAV_SECTIONS, type NavItem, type NavSection } from '@/lib/navigation'
 import { cn } from '@/lib/utils'
 import { Icon } from './icon'
@@ -29,10 +29,10 @@ function isActive(pathname: string, href: string): boolean {
 /**
  * Primary navigation.
  *
- * A dark rail in both themes. It is the one surface that does not follow the
- * page: a constant edge to orient against while the content area changes all
- * day, and enough contrast that the active row is findable from across a
- * desk.
+ * The rail follows the theme: light on a light page, dark on a dark one. It
+ * separates itself from the content by one step of surface and a hairline
+ * rather than by staying dark, so a school working in daylight is not looking
+ * at a slab of night down the side of every screen.
  *
  * Grouping is declared on each item rather than inferred from a list of paths
  * here, so a new module lands in the right block by saying so.
@@ -43,12 +43,18 @@ export function Sidebar({
   logoUrl,
   collapsed = false,
   onNavigate,
+  onToggleCollapse,
 }: {
   items: NavItem[]
   schoolName: string
   logoUrl: string | null
   collapsed?: boolean
   onNavigate?: () => void
+  /**
+   * Collapse the rail to icons. Omitted on the mobile drawer, where the rail
+   * has no collapsed state to reach — it closes instead.
+   */
+  onToggleCollapse?: () => void
 }) {
   const pathname = usePathname()
   const groups = React.useMemo(() => groupItems(items), [items])
@@ -77,16 +83,30 @@ export function Sidebar({
           </span>
         )}
         {!collapsed ? (
-          <span className="min-w-0">
-            <span className="block truncate text-[15px] font-semibold text-[var(--sidebar-fg-strong)]">
-              {schoolName}
+          <>
+            <span className="min-w-0">
+              <span className="block truncate text-[15px] font-semibold text-[var(--sidebar-fg-strong)]">
+                {schoolName}
+              </span>
+              <span className="block truncate text-[11px] text-[var(--sidebar-caption)]">
+                School management
+              </span>
             </span>
-            <span className="block truncate text-[11px] text-[var(--sidebar-caption)]">
-              School management
-            </span>
-          </span>
+            {onToggleCollapse ? (
+              <CollapseButton collapsed={false} onClick={onToggleCollapse} className="ml-auto" />
+            ) : null}
+          </>
         ) : null}
       </div>
+
+      {/* Collapsed, the header has no room beside the logo, so the control
+          moves to its own row rather than disappearing — the rail must be
+          re-openable from the rail itself. */}
+      {collapsed && onToggleCollapse ? (
+        <div className="flex shrink-0 justify-center border-b border-[var(--sidebar-border)] py-1.5">
+          <CollapseButton collapsed onClick={onToggleCollapse} />
+        </div>
+      ) : null}
 
       <div className="scroll-thin flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3">
         {groups.map((group) => (
@@ -222,6 +242,37 @@ function NavNode({
         </ul>
       ) : null}
     </div>
+  )
+}
+
+/** Minimise the rail to icons, or bring it back. */
+function CollapseButton({
+  collapsed,
+  onClick,
+  className,
+}: {
+  collapsed: boolean
+  onClick: () => void
+  className?: string
+}) {
+  const label = collapsed ? 'Expand navigation' : 'Collapse navigation'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={cn(
+        'grid size-8 shrink-0 place-items-center rounded-[8px] text-[var(--sidebar-caption)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-fg-strong)]',
+        className,
+      )}
+    >
+      {collapsed ? (
+        <PanelLeftOpen className="size-[18px]" aria-hidden />
+      ) : (
+        <PanelLeftClose className="size-[18px]" aria-hidden />
+      )}
+    </button>
   )
 }
 
