@@ -47,6 +47,9 @@ export const getContext = cache(async (): Promise<AppContext | null> => {
   // accepted here, even though the cookie itself is valid.
   if (user.tenantId !== tenant.id) return null
 
+  // Suspended schools cannot use the ERP unless a platform admin is impersonating.
+  if (tenant.status === 'SUSPENDED' && !user.impersonatedById) return null
+
   const db = tenantDb(tenant.id)
   const can = (permission: string) => user.permissions.has(permission)
 
@@ -66,10 +69,75 @@ export const getContext = cache(async (): Promise<AppContext | null> => {
 
 /** Server-component guard: redirects instead of throwing. */
 export async function requireContext(permission?: string): Promise<AppContext> {
+  const user = await getSessionUser()
+  const tenant = await resolveTenant()
+
+  if (user && tenant && user.tenantId === tenant.id && tenant.status === 'SUSPENDED' && !user.impersonatedById) {
+    redirect('/suspended')
+  }
+
   const ctx = await getContext()
   if (!ctx) redirect('/login')
   if (ctx.user.mustChangePassword) redirect('/account/password')
   if (permission && !ctx.can(permission)) redirect('/403')
+  return ctx
+}
+
+function buildAppContext(user: SessionUser, tenant: ResolvedTenant): AppContext {
+  const db = tenantDb(tenant.id)
+  const can = (permission: string) => user.permissions.has(permission)
+  return {
+    user,
+    tenant,
+    db,
+    can,
+    canAny: (...perms: string[]) => perms.some(can),
+    require: (permission: string) => {
+      if (!can(permission)) {
+        throw new ForbiddenError(`Missing permission: ${permission}`)
+      }
+    },
+  }
+}
+
+/**
+ * Support context for suspended schools: allows ticket access without full ERP.
+ */
+export async function requireSupportContext(permission?: string): Promise<AppContext> {
+  const [user, tenant] = await Promise.all([getSessionUser(), resolveTenant()])
+  if (!user || !tenant || user.tenantId !== tenant.id) redirect('/login')
+
+  const suspended = tenant.status === 'SUSPENDED' && !user.impersonatedById
+  if (!suspended) {
+    return requireContext(permission)
+  }
+
+  if (!user.permissions.has('support.view') && !user.permissions.has('support.create')) {
+    redirect('/suspended')
+  }
+
+  const ctx = buildAppContext(user, tenant)
+  if (ctx.user.mustChangePassword) redirect('/account/password')
+  if (permission && !ctx.can(permission)) redirect('/403')
+  return ctx
+}
+
+/** API guard for support routes on suspended tenants. */
+export async function requireSupportApiContext(permission?: string): Promise<AppContext> {
+  const [user, tenant] = await Promise.all([getSessionUser(), resolveTenant()])
+  if (!user || !tenant || user.tenantId !== tenant.id) throw new AuthError()
+
+  const suspended = tenant.status === 'SUSPENDED' && !user.impersonatedById
+  if (!suspended) {
+    return requireApiContext(permission)
+  }
+
+  if (!user.permissions.has('support.view') && !user.permissions.has('support.create')) {
+    throw new ForbiddenError('Account suspended')
+  }
+
+  const ctx = buildAppContext(user, tenant)
+  if (permission) ctx.require(permission)
   return ctx
 }
 
@@ -100,5 +168,17 @@ export async function requirePlatformContext(
   const ctx = await getPlatformContext()
   if (!ctx) redirect('/login')
   if (permission && !ctx.user.permissions.has(permission)) redirect('/403')
+  return ctx
+}
+
+/** API guard for platform routes. */
+export async function requirePlatformApiContext(
+  permission?: string,
+): Promise<PlatformContext> {
+  const ctx = await getPlatformContext()
+  if (!ctx) throw new AuthError()
+  if (permission && !ctx.user.permissions.has(permission)) {
+    throw new ForbiddenError(`Missing permission: ${permission}`)
+  }
   return ctx
 }

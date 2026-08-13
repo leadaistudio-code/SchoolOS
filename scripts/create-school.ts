@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
-import { PERMISSIONS } from '../src/lib/rbac/permissions'
-import { SYSTEM_ROLES, ROLE } from '../src/lib/rbac/roles'
 import { FEATURE } from '../src/lib/features'
+import { ROLE } from '../src/lib/rbac/roles'
+import { ensureRolesAndPermissions, provisionSchool } from '../src/server/modules/platform/provision'
 
 /**
  * First-run setup for a real deployment.
@@ -58,55 +58,8 @@ function required(name: string): string {
  */
 async function ensureRoles() {
   process.stdout.write('  permissions and roles ... ')
-
-  await prisma.$transaction(
-    PERMISSIONS.map((permission) =>
-      prisma.permission.upsert({
-        where: { key: permission.key },
-        create: permission,
-        update: {
-          module: permission.module,
-          action: permission.action,
-          label: permission.label,
-        },
-      }),
-    ),
-  )
-
-  const permissionIds = new Map(
-    (await prisma.permission.findMany({ select: { id: true, key: true } })).map((p) => [
-      p.key,
-      p.id,
-    ]),
-  )
-
-  for (const def of SYSTEM_ROLES) {
-    // A compound unique containing a nullable column cannot be matched with
-    // null in Prisma, so system roles are resolved by findFirst.
-    const existing = await prisma.role.findFirst({ where: { tenantId: null, key: def.key } })
-    const role =
-      existing ??
-      (await prisma.role.create({
-        data: {
-          tenantId: null,
-          key: def.key,
-          name: def.name,
-          description: def.description,
-          isSystem: true,
-        },
-      }))
-
-    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } })
-    await prisma.rolePermission.createMany({
-      data: def.permissions
-        .map((key) => permissionIds.get(key))
-        .filter((id): id is string => !!id)
-        .map((permissionId) => ({ roleId: role.id, permissionId })),
-      skipDuplicates: true,
-    })
-  }
-
-  console.log(`${PERMISSIONS.length} permissions, ${SYSTEM_ROLES.length} roles`)
+  await ensureRolesAndPermissions(prisma)
+  console.log('done')
 }
 
 /**

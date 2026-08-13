@@ -1,32 +1,30 @@
 import { requireContext } from '@/server/context'
-import { ModulePlaceholder } from '@/components/module-placeholder'
+import { assistantConfigured } from '@/server/assistant/providers'
+import { hasFeature } from '@/server/entitlements'
+import { FEATURE } from '@/lib/features'
+import { listStudentImports } from '@/server/modules/imports/service'
+import { PageHeader } from '@/components/page-header'
+import { ImportWizard } from './import-wizard'
 
-export const metadata = { title: "Bulk Import" }
+export const metadata = { title: 'Bulk Import' }
 
-export default async function Page() {
-  await requireContext("students.import")
+export default async function StudentImportPage() {
+  const ctx = await requireContext('students.import')
+  const batches = await listStudentImports(ctx)
+  const smartImportAvailable =
+    assistantConfigured() && (await hasFeature(ctx.tenant.id, FEATURE.MODULE_AI_ASSIST))
 
   return (
-    <ModulePlaceholder
-      title="Bulk Import"
-      icon="Upload"
-      phase="Phase 10 - Data tools"
-      summary="Bringing a whole school onto SchoolOS by hand is not realistic, so imports will accept the spreadsheet you already keep and tell you what is wrong with it before anything is written."
-      planned={[
-        "CSV and Excel upload",
-        "Column mapping with a saved template",
-        "Row-level validation before commit",
-        "A dry run that reports every rejection",
-        "Rollback of a completed batch",
-      ]}
-      related={[
-        { label: "All Students", href: "/students", description: "Browse the current roll" },
-        { label: "Add Student", href: "/students/new", description: "Create one record" },
-      ]}
-      breadcrumbs={[
-        { label: "Students", href: "/students" },
-        { label: "Bulk Import" },
-      ]}
-    />
+    <div>
+      <PageHeader
+        title="Bulk import"
+        description="Download the school pack, send it to the office, and upload the filled workbook. Students import first; the other sheets are the rest of onboarding."
+        breadcrumbs={[
+          { label: 'Students', href: '/students' },
+          { label: 'Bulk Import' },
+        ]}
+      />
+      <ImportWizard initialBatches={batches} smartImportAvailable={smartImportAvailable} />
+    </div>
   )
 }

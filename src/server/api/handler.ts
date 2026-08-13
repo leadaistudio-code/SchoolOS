@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { requireApiContext, type AppContext } from '@/server/context'
+import { requireApiContext, requirePlatformApiContext, requireSupportApiContext, type AppContext, type PlatformContext } from '@/server/context'
 import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
 import { ApiException, toErrorResponse } from './response'
 
@@ -11,6 +11,12 @@ type HandlerOptions = {
 type Handler = (
   req: NextRequest,
   ctx: AppContext,
+  params: Record<string, string>,
+) => Promise<Response>
+
+type PlatformHandler = (
+  req: NextRequest,
+  ctx: PlatformContext,
   params: Record<string, string>,
 ) => Promise<Response>
 
@@ -30,6 +36,60 @@ export function route(handler: Handler, options: HandlerOptions = {}) {
       const limitCfg = RATE_LIMITS[options.rateLimitKey ?? 'api']
       const limited = await rateLimit(
         `${options.rateLimitKey ?? 'api'}:${ctx.tenant.id}:${ctx.user.userId}`,
+        limitCfg.limit,
+        limitCfg.windowSeconds,
+      )
+      if (!limited.ok) {
+        throw new ApiException(429, 'RATE_LIMITED', 'Too many requests, please slow down')
+      }
+
+      const params = context?.params ? await context.params : {}
+      return await handler(req, ctx, params)
+    } catch (err) {
+      return toErrorResponse(err)
+    }
+  }
+}
+
+/** Tenant API wrapper that allows suspended schools for support routes only. */
+export function supportRoute(handler: Handler, options: HandlerOptions = {}) {
+  return async (
+    req: NextRequest,
+    context: { params: Promise<Record<string, string>> },
+  ): Promise<Response> => {
+    try {
+      const ctx = await requireSupportApiContext(options.permission)
+
+      const limitCfg = RATE_LIMITS[options.rateLimitKey ?? 'api']
+      const limited = await rateLimit(
+        `${options.rateLimitKey ?? 'api'}:${ctx.tenant.id}:${ctx.user.userId}`,
+        limitCfg.limit,
+        limitCfg.windowSeconds,
+      )
+      if (!limited.ok) {
+        throw new ApiException(429, 'RATE_LIMITED', 'Too many requests, please slow down')
+      }
+
+      const params = context?.params ? await context.params : {}
+      return await handler(req, ctx, params)
+    } catch (err) {
+      return toErrorResponse(err)
+    }
+  }
+}
+
+/** Platform API wrapper — super-admin only, no tenant binding. */
+export function platformRoute(handler: PlatformHandler, options: HandlerOptions = {}) {
+  return async (
+    req: NextRequest,
+    context: { params: Promise<Record<string, string>> },
+  ): Promise<Response> => {
+    try {
+      const ctx = await requirePlatformApiContext(options.permission)
+
+      const limitCfg = RATE_LIMITS[options.rateLimitKey ?? 'api']
+      const limited = await rateLimit(
+        `${options.rateLimitKey ?? 'api'}:platform:${ctx.user.userId}`,
         limitCfg.limit,
         limitCfg.windowSeconds,
       )

@@ -182,6 +182,22 @@ branding, and `https://yourdomain.com` should show no tenant.
 
 ---
 
+## Provisioning schools
+
+Two equivalent paths:
+
+1. **Platform console** — sign in as a super admin at `/platform`, open
+   **Schools**, and use **Provision school**. This runs the same shared
+   `provisionSchool()` service as the CLI.
+2. **CLI** — `npm run setup:school` (or `npx tsx scripts/create-school.ts`) for
+   first-run setup on a fresh database without using the browser.
+
+Both create the tenant, subscription, default domain, academic session and school
+administrator. The console is for day-to-day SaaS operations; the CLI remains
+the right tool when the database has no roles or permissions yet.
+
+---
+
 ## Known limitations in production
 
 | Area | Behaviour | Fix |

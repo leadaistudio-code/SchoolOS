@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
 import { AuthError, ForbiddenError } from '@/server/context'
 import { TenantIsolationError } from '@/server/db/tenant-client'
+import { QuotaExceededError } from '@/server/entitlements'
 
 export const API_VERSION = 'v1'
 
@@ -51,6 +52,10 @@ export function conflict(message: string) {
   return new ApiException(409, 'CONFLICT', message)
 }
 
+export function forbidden(message = 'You do not have permission to do this') {
+  return new ApiException(403, 'FORBIDDEN', message)
+}
+
 /**
  * Translates anything a handler can throw into the standard error envelope.
  * Internal details never reach the client; they go to the server log.
@@ -71,6 +76,13 @@ export function toErrorResponse(err: unknown) {
   }
   if (err instanceof ForbiddenError) {
     return fail(403, { code: 'FORBIDDEN', message: err.message })
+  }
+  if (err instanceof QuotaExceededError) {
+    return fail(err.status, {
+      code: 'QUOTA_EXCEEDED',
+      message: err.message,
+      details: { feature: err.feature, limit: err.limit, current: err.current },
+    })
   }
   if (err instanceof TenantIsolationError) {
     // Do not confirm the record exists elsewhere.

@@ -78,6 +78,14 @@ export default async function PlatformDashboard() {
       <PageHeader
         title="Platform console"
         description={`${tenants.length} tenants · ${activeCount} active`}
+        actions={
+          <Link
+            href="/platform/tenants"
+            className="inline-flex items-center rounded-[var(--radius-sm)] bg-ink text-bg px-3 py-1.5 text-sm font-medium hover:opacity-90"
+          >
+            Provision school
+          </Link>
+        }
       />
 
       <MetricRow>
@@ -208,9 +216,17 @@ export default async function PlatformDashboard() {
                       <p className="text-sm text-ink truncate">{t.subject}</p>
                       <p className="text-xs text-ink-subtle">{t.tenant.name}</p>
                     </div>
-                    <Badge tone={t.status === 'OPEN' ? 'warning' : 'neutral'}>
-                      {humanizeStatus(t.status)}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge tone={t.status === 'OPEN' ? 'warning' : 'neutral'}>
+                        {humanizeStatus(t.status)}
+                      </Badge>
+                      <Link
+                        href={`/platform/support/${t.id}`}
+                        className="text-xs text-[var(--brand-600)] hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </div>
                   </li>
                 ))}
               </ul>

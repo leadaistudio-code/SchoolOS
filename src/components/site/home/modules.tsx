@@ -102,7 +102,7 @@ export function Modules() {
           >
             <p className="muted max-w-3xl text-[17px] leading-[1.6]">{category.lead}</p>
 
-            <ul className="mt-8 grid gap-x-10 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mt-8 grid gap-x-10 gap-y-7 sm:grid-cols-2 lg:grid-cols-3" data-reveal data-reveal-stagger>
               {category.modules.map((module) => (
                 <li key={module.name} className="border-t border-[var(--rule)] pt-4">
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">

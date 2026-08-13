@@ -3,6 +3,7 @@ import { Manrope } from 'next/font/google'
 import '@/styles/site.css'
 import { SiteNav } from '@/components/site/nav'
 import { SiteFooter } from '@/components/site/footer'
+import { Reveal } from '@/components/site/reveal'
 import { env } from '@/lib/env'
 
 /**
@@ -49,7 +50,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       >
         Skip to content
       </a>
-      <SiteNav />
+      <Reveal />
+        <SiteNav />
       <main id="main">{children}</main>
       <SiteFooter />
     </div>

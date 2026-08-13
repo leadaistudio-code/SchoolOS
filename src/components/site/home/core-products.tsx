@@ -31,7 +31,7 @@ export function CoreProducts() {
           {CORE_PRODUCTS.map((product, index) => (
             <article
               key={product.key}
-              className="grid gap-8 rounded-xl border border-[var(--rule)] bg-white p-6 sm:p-9 lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:gap-14"
+              className="grid gap-8 rounded-xl border border-[var(--rule)] bg-white p-6 sm:p-9 lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:gap-14 panel-hover"
             >
               <div className={index % 2 === 1 ? 'lg:order-2' : undefined}>
                 <div className="flex items-baseline gap-3">

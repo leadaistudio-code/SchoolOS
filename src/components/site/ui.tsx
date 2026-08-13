@@ -119,6 +119,7 @@ export function SectionHeader({
           'grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end md:gap-16',
           className,
         )}
+        data-reveal
       >
         <div>
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}

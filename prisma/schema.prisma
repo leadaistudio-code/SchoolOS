@@ -137,6 +137,9 @@ model SubscriptionInvoice {
   amountMinor    Int
   currency       String       @default("INR")
   status         String       @default("DUE") // DUE | PAID | VOID
+  periodStart    DateTime?    @db.Date
+  periodEnd      DateTime?    @db.Date
+  notes          String?
   dueAt          DateTime
   paidAt         DateTime?
   createdAt      DateTime     @default(now())
@@ -171,18 +174,35 @@ model UsageMetric {
 }
 
 model SupportTicket {
-  id         String   @id @default(cuid())
-  tenantId   String
-  subject    String
-  body       String
-  priority   String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
-  status     String   @default("OPEN") // OPEN | PENDING | RESOLVED | CLOSED
-  openedById String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  tenantId    String
+  subject     String
+  body        String
+  category    String?
+  priority    String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  status      String   @default("OPEN") // OPEN | PENDING | RESOLVED | CLOSED
+  openedById  String?
+  assigneeId  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages    SupportTicketMessage[]
 
   @@index([tenantId, status])
+  @@index([assigneeId])
+}
+
+model SupportTicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  authorId   String?
+  authorKind String   @default("TENANT") // PLATFORM | TENANT
+  body       String
+  createdAt  DateTime @default(now())
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 // ===========================================================================

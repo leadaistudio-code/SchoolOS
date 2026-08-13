@@ -189,6 +189,13 @@ export function toOpenAiTools(tools: ModelToolSpec[]): ChatCompletionTool[] {
  * rejects the whole request with `400 Invalid schema for function …`.
  */
 export function toStrictSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  if (schema.type === 'array' && schema.items && typeof schema.items === 'object') {
+    return {
+      ...schema,
+      items: toStrictSchema(schema.items as Record<string, unknown>),
+    }
+  }
+
   if (schema.type !== 'object' || typeof schema.properties !== 'object' || !schema.properties) {
     return schema
   }
@@ -198,8 +205,19 @@ export function toStrictSchema(schema: Record<string, unknown>): Record<string, 
 
   const rewritten: Record<string, unknown> = {}
   for (const [key, property] of Object.entries(properties)) {
-    const nested =
-      property.type === 'object' ? toStrictSchema(property) : { ...property }
+    // Nested objects *and* array-of-object items must also be strict — OpenAI
+    // rejects the whole tool if an inner `required` list omits any property.
+    let nested: Record<string, unknown>
+    if (property.type === 'object') {
+      nested = toStrictSchema(property)
+    } else if (property.type === 'array' && property.items && typeof property.items === 'object') {
+      nested = {
+        ...property,
+        items: toStrictSchema(property.items as Record<string, unknown>),
+      }
+    } else {
+      nested = { ...property }
+    }
 
     rewritten[key] = required.has(key) ? nested : nullable(nested)
   }

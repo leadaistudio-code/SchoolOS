@@ -45,7 +45,7 @@ export function Admissions() {
           action={<TextLink href="/admission-crm">Read about admissions</TextLink>}
         />
 
-        <div className="mt-14 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
+        <div className="mt-14 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16" data-reveal>
           <div>
             <p className="eyebrow">What works today</p>
             <dl className="mt-5 space-y-6">

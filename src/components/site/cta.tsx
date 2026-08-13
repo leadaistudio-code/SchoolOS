@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Container, Section } from './container'
+import { ConnectionGrid } from './connection-grid'
 import { Button } from './ui'
 
 /**
@@ -23,9 +24,13 @@ export function ClosingCta({
   body?: string
 }) {
   return (
-    <Section tone="navy">
-      <Container wide>
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:gap-20">
+    <Section tone="navy" className="relative overflow-hidden">
+      <ConnectionGrid variant="dark" />
+      <Container wide className="relative">
+        <div
+          className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:gap-20"
+          data-reveal
+        >
           <div>
             <p className="eyebrow">{eyebrow}</p>
             <h2 className="display mt-3 max-w-2xl text-[clamp(2rem,4.2vw,3rem)]">{title}</h2>

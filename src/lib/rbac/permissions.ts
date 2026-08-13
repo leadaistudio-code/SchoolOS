@@ -182,6 +182,10 @@ export const PERMISSIONS: PermissionDef[] = [
     ['branding', 'Manage branding'],
     ['integrations', 'Manage integrations and secrets'],
   ]),
+  ...mod('support', [
+    ['view', 'View support tickets'],
+    ['create', 'Raise support tickets'],
+  ]),
   ...mod('users', [
     ...CRUD,
     ['roles', 'Assign roles'],

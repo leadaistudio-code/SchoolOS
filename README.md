@@ -11,7 +11,7 @@ branding, copy, imagery or design of, any existing school ERP.
 
 ## Status
 
-**Phases 1 to 4 are complete and verified end to end.** Later phases have their
+**Phases 1 to 4 and Phase 8 are complete and verified end to end.** Later phases have their
 database schema, entitlements and navigation in place, and are listed in
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -44,7 +44,9 @@ What runs today:
 | Printable branded receipts, outstanding & overdue dashboards | Working |
 | Versioned REST API (`/api/v1`) with a consistent envelope | Working |
 | Subscription plans and feature entitlements | Working |
-| Super-admin platform console | Working |
+| Super-admin platform console (tenants, plans, billing, support, health) | Working |
+| School help tickets (`/help/tickets`) | Working |
+| Manual SaaS billing, usage metering, audited impersonation | Working |
 | Seed: 2 tenants, 160 students, 4,160 attendance rows, 11 demo logins | Working |
 | Test suite: 169 tests, including 42 money tests and 14 isolation tests | Passing |
 

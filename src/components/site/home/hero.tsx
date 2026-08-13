@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Container } from '../container'
+import { ConnectionGrid } from '../connection-grid'
 import { Button } from '../ui'
 import { DashboardRender } from '../product/dashboard-render'
 import { POSITIONING } from '@/content/site/company'
@@ -28,9 +29,15 @@ export function Hero() {
         aria-hidden
       />
 
+      {/* The lattice sits inside that same top band, so it is strongest behind
+          the headline and gone by the time the dashboard starts. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px]" aria-hidden>
+        <ConnectionGrid />
+      </div>
+
       <Container wide className="relative">
         <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,29rem)_minmax(0,1fr)] lg:gap-12 xl:gap-16">
-          <div className="reveal">
+          <div data-reveal>
             <h1 className="display text-[clamp(2.6rem,5.4vw,4.1rem)]">
               One operating system for your entire school.
             </h1>

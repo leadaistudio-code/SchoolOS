@@ -6,15 +6,11 @@ import { CoreProducts } from '@/components/site/home/core-products'
 import { Showcase } from '@/components/site/home/showcase'
 import { Modules } from '@/components/site/home/modules'
 import { Admissions } from '@/components/site/home/admissions'
-import { StudentThread } from '@/components/site/home/student-thread'
 import { Operations } from '@/components/site/home/operations'
-import { Transport } from '@/components/site/home/transport'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
-import { SchoolTypes } from '@/components/site/home/school-types'
-import { Why } from '@/components/site/home/why'
 import { Security } from '@/components/site/home/security'
-import { CaseStudies, Testimonials } from '@/components/site/home/stories'
+import { CaseStudies } from '@/components/site/home/stories'
 import { Journey } from '@/components/site/home/journey'
 import { ClosingCta } from '@/components/site/cta'
 import { organisationJsonLd, softwareJsonLd } from '@/components/site/seo'
@@ -39,17 +35,20 @@ export const metadata: Metadata = {
  *   5  the dashboard, large, on navy
  *   6  the catalogue, behind category tabs
  *   7  admissions — including what is not built yet
- *   8  one student record followed through the school
- *   9  a Monday morning in the office
- *  10  transport, the part nobody else does well
- *  11  parents and teachers
- *  12  integrations, with their real status
- *  13  the four kinds of institution
- *  14  what is genuinely different
- *  15  security, ending with what we lack
- *  16  stories and quotations, marked as samples until approved
- *  17  how an implementation runs
- *  18  the ask
+ *   8  a Monday morning in the office
+ *   9  parents and teachers
+ *  10  integrations, with their real status
+ *  11  security, ending with what we lack
+ *  12  case studies, marked as samples until approved
+ *  13  how an implementation runs
+ *  14  the ask
+ *
+ * The page was cut from eighteen sections to fourteen. The four that went —
+ * the student-record walkthrough, transport, the school-type grid and the
+ * differentiators — were the ones that restated an argument the sections
+ * above them had already made, and the length was costing more attention
+ * than the repetition bought. Quotations went with them: sample testimonials
+ * read as filler to the kind of buyer this page is for.
  *
  * Structured data is emitted here rather than in the layout: the homepage is
  * the only page that should describe the organisation and the product itself.
@@ -67,16 +66,11 @@ export default function HomePage() {
       <Showcase />
       <Modules />
       <Admissions />
-      <StudentThread />
       <Operations />
-      <Transport />
       <Parents />
       <Integrations />
-      <SchoolTypes />
-      <Why />
       <Security />
       <CaseStudies />
-      <Testimonials />
       <Journey />
       <ClosingCta />
     </>

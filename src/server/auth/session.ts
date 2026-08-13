@@ -5,6 +5,28 @@ import { randomToken, sha256 } from '@/server/crypto'
 
 export const SESSION_COOKIE = 'schoolos_session'
 
+/** Cookie domain shared across tenant subdomains (e.g. `.lvh.me`, `.schoolos.app`). */
+export function sessionCookieDomain(): string | undefined {
+  const root = env().APP_ROOT_DOMAIN.split(':')[0]!.toLowerCase()
+  if (root === 'localhost' || root === '127.0.0.1' || root.endsWith('.localhost')) {
+    return undefined
+  }
+  if (!root.includes('.')) return undefined
+  return root.startsWith('.') ? root : `.${root}`
+}
+
+function sessionCookieOptions(expires: Date) {
+  const domain = sessionCookieDomain()
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: isProd(),
+    path: '/',
+    expires,
+    ...(domain ? { domain } : {}),
+  }
+}
+
 export type SessionUser = {
   sessionId: string
   userId: string
@@ -52,13 +74,7 @@ export async function createSession(input: CreateSessionInput) {
   })
 
   const jar = await cookies()
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isProd(),
-    path: '/',
-    expires: expiresAt,
-  })
+  jar.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt))
 
   return session
 }
@@ -72,7 +88,7 @@ export async function destroyCurrentSession() {
       data: { revokedAt: new Date() },
     })
   }
-  jar.delete(SESSION_COOKIE)
+  jar.delete({ name: SESSION_COOKIE, ...sessionCookieOptions(new Date(0)) })
 }
 
 export async function revokeAllSessions(userId: string, exceptSessionId?: string) {

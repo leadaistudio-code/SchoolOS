@@ -38,7 +38,7 @@ export function Platform() {
           action={<TextLink href="/product">How the pieces fit together</TextLink>}
         />
 
-        <div className="mt-14 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-16">
+        <div className="mt-14 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-16" data-reveal>
           <PlatformDiagram />
 
           <div>

@@ -17,7 +17,7 @@ export function Parents() {
   return (
     <Section tone="cream">
       <Container>
-        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-20">
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-20" data-reveal>
           <div>
             <p className="eyebrow">Parents and teachers</p>
             <h2 className="display mt-3 text-[clamp(2rem,4vw,2.9rem)]">

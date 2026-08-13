@@ -30,11 +30,11 @@ export function CaseStudies() {
           action={<TextLink href="/customers">All customer stories</TextLink>}
         />
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
+        <div className="mt-12 grid gap-6 lg:grid-cols-3" data-reveal data-reveal-stagger>
           {CASE_STUDIES.map((story) => (
             <article
               key={story.school + story.location}
-              className="flex flex-col rounded-xl border border-[var(--rule)] bg-white p-6"
+              className="flex flex-col rounded-xl border border-[var(--rule)] bg-white p-6 panel-hover"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[17px] font-semibold text-[var(--text)]">{story.school}</h3>

@@ -24,7 +24,7 @@ export function Operations() {
   return (
     <Section>
       <Container wide>
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-16" data-reveal>
           <div className="lg:sticky lg:top-28">
             <p className="eyebrow">A Monday morning</p>
             <h2 className="display mt-3 text-[clamp(2rem,4vw,2.9rem)]">

@@ -11,7 +11,21 @@ import { FEATURE } from '@/lib/features'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
-  if (!ctx) redirect('/login')
+  if (!ctx) {
+    const { getSessionUser } = await import('@/server/auth/session')
+    const { resolveTenant } = await import('@/server/tenant')
+    const [user, tenant] = await Promise.all([getSessionUser(), resolveTenant()])
+    if (
+      user &&
+      tenant &&
+      user.tenantId === tenant.id &&
+      tenant.status === 'SUSPENDED' &&
+      !user.impersonatedById
+    ) {
+      redirect('/suspended')
+    }
+    redirect('/login')
+  }
 
   const entitlements = await getEntitlements(ctx.tenant.id)
 

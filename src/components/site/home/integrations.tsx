@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Banknote, Building2, MessageSquare, KeyRound } from 'lucide-react'
 import { Container, Section } from '../container'
 import { SectionHeader, StatusBadge, TextLink } from '../ui'
 import { INTEGRATION_GROUPS, INTEGRATION_STATUS_NOTE } from '@/content/site/integrations'
@@ -14,6 +15,13 @@ import { INTEGRATION_GROUPS, INTEGRATION_STATUS_NOTE } from '@/content/site/inte
  *
  * Three statuses, and the legend is on the page rather than in a tooltip.
  */
+const GROUP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'Reaching parents': MessageSquare,
+  Money: Banknote,
+  'On campus': Building2,
+  'Identity & platform': KeyRound,
+}
+
 export function Integrations() {
   return (
     <Section>
@@ -26,9 +34,20 @@ export function Integrations() {
           action={<TextLink href="/integrations">Integration details</TextLink>}
         />
 
-        <div className="mt-12 grid gap-x-12 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-          {INTEGRATION_GROUPS.map((group) => (
+        <div
+          className="mt-12 grid gap-x-12 gap-y-12 sm:grid-cols-2 lg:grid-cols-4"
+          data-reveal
+          data-reveal-stagger
+        >
+          {INTEGRATION_GROUPS.map((group) => {
+            const Icon = GROUP_ICONS[group.heading]
+            return (
             <div key={group.heading}>
+              {Icon ? (
+                <span className="icon-tile mb-4">
+                  <Icon className="size-[18px]" />
+                </span>
+              ) : null}
               <h3 className="text-[16px] font-semibold text-[var(--text)]">{group.heading}</h3>
               <p className="muted mt-2 text-[14px] leading-[1.55]">{group.lead}</p>
 
@@ -46,7 +65,8 @@ export function Integrations() {
                 ))}
               </ul>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <dl className="mt-12 grid gap-x-10 gap-y-4 border-t border-[var(--rule)] pt-6 sm:grid-cols-3">

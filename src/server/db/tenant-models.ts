@@ -115,6 +115,7 @@ export const TENANT_SCOPED_MODELS = [
   'Document',
   'Attachment',
   'ImportBatch',
+  'SupportTicket',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -189,6 +190,5 @@ export const PLATFORM_MODELS = new Set<string>([
   'SubscriptionInvoice',
   'TenantEntitlementOverride',
   'UsageMetric',
-  'SupportTicket',
 ])
 

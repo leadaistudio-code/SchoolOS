@@ -295,4 +295,33 @@ describe('OpenAI strict-mode schemas', () => {
       expect(strict.required, `${name} must require every property`).toEqual(keys)
     }
   })
+
+  it('requires every property on nested array item objects too', () => {
+    // Smart import's emit_import_analysis failed here: OpenAI walks into
+    // `questions.items` and demands a full `required` list. Recursing only into
+    // object properties left those items half-strict.
+    const strict = toStrictSchema(
+      zodToJsonSchema(
+        z.object({
+          questions: z.array(
+            z.object({
+              id: z.string(),
+              options: z.array(z.string()).optional(),
+              relatedField: z.enum(['admissionNo', 'firstName']).optional(),
+            }),
+          ),
+        }),
+      ),
+    )
+
+    const questions = (strict.properties as Record<string, Record<string, unknown>>).questions!
+    const items = questions.items as Record<string, unknown>
+    expect(items.required).toEqual(['id', 'options', 'relatedField'])
+    expect(items.additionalProperties).toBe(false)
+
+    const itemProps = items.properties as Record<string, Record<string, unknown>>
+    expect(itemProps.id!.type).toBe('string')
+    expect(itemProps.options!.type).toEqual(['array', 'null'])
+    expect(itemProps.relatedField!.type).toEqual(['string', 'null'])
+  })
 })

@@ -61,7 +61,7 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'All Students', href: '/students', icon: 'Users', permission: 'students.view' },
       { label: 'Add Student', href: '/students/new', icon: 'UserPlus', permission: 'students.create' },
-      { label: 'Bulk Import', href: '/students/import', soon: true, icon: 'Upload', permission: 'students.import' },
+      { label: 'Bulk Import', href: '/students/import', icon: 'Upload', permission: 'students.import' },
       { label: 'Promotions', href: '/students/promotions', soon: true, icon: 'ArrowUpRight', permission: 'students.promote' },
       { label: 'Documents', href: '/students/documents', soon: true, icon: 'FolderOpen', permission: 'students.documents' },
     ],
@@ -249,6 +249,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
       { label: 'Custom Domains', href: '/settings/domains', icon: 'Globe', permission: 'settings.manage' },
       { label: 'Email', href: '/settings/email', icon: 'Mail', permission: 'settings.manage' },
+      { label: 'Help & Support', href: '/help/tickets', icon: 'LifeBuoy', permission: 'support.view' },
     ],
   },
 ]

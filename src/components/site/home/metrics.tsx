@@ -26,7 +26,7 @@ export function Metrics() {
   return (
     <Section tone="page" space="snug">
       <Container wide>
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-16" data-reveal>
           <div>
             <p className="eyebrow">The shape of the product</p>
             <h2 className="mt-3 text-[22px] font-semibold leading-[1.3] text-[var(--text)]">
@@ -38,7 +38,7 @@ export function Metrics() {
             </p>
           </div>
 
-          <dl className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-4" data-reveal data-reveal-stagger>
             {METRICS.map((metric) => (
               <div key={metric.label} className="border-t border-[var(--rule-strong)] pt-5">
                 <dd className="display text-[clamp(2.1rem,4vw,2.6rem)] tabular-nums text-[var(--text)]">

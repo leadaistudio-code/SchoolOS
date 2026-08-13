@@ -155,11 +155,20 @@ Still open: transport fares are held on the stop and billed through the
 standard fee structure rather than being invoiced automatically from the
 assignment.
 
-## Phase 8 — SaaS operations
+## Phase 8 — SaaS operations ✅ complete
 
 Tenant provisioning and suspension from the console; plan and entitlement
-editing; usage metering against limits; billing and subscription invoices;
-audited impersonation; support ticketing; the system health view.
+editing; usage metering against limits; manual SaaS billing and subscription
+invoices; audited impersonation; support ticketing; the system health view.
+
+Verified end to end: provisioning a school from `/platform/tenants` creates
+tenant, subscription, domain, academic session and admin; duplicate slug returns
+409; suspend blocks ERP access while platform console remains reachable;
+impersonation sets `impersonatedById` and the topbar stop route restores the
+platform session; invoice generate → mark paid extends the period; overdue scan
+sets tenant and subscription to `PAST_DUE`; schools raise tickets at
+`/help/tickets` and platform replies from `/platform/support`; usage bars on
+tenant detail reflect live student/staff counts vs plan limits.
 
 ## Phase 9 — White label and mobile
 
