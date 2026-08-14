@@ -39,7 +39,13 @@ export const PERMISSIONS: PermissionDef[] = [
     ['documents', 'Manage documents'],
   ]),
   ...mod('parents', [...CRUD, ['export', 'Export']]),
-  ...mod('staff', [...CRUD, ['export', 'Export'], ['payroll', 'View payroll data']]),
+  ...mod('staff', [
+    ...CRUD,
+    ['export', 'Export'],
+    ['payroll', 'View payroll data'],
+    ['payroll_manage', 'Set salaries and run payroll'],
+    ['appraise', 'Run appraisals and record performance'],
+  ]),
 
   ...mod('assessments', [
     ...CRUD,

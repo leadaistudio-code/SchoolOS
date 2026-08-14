@@ -1343,6 +1343,10 @@ model Staff {
   drivenBuses             Bus[]
   trips                   BusTrip[]
   markedStudentAttendance StudentAttendance[]      @relation("AttendanceMarker")
+  salaryStructures        StaffSalaryStructure[]
+  payslips                StaffPayslip[]
+  appraisals              StaffAppraisal[]         @relation("AppraisalSubject")
+  appraisalsReviewed      StaffAppraisal[]         @relation("AppraisalReviewer")
   feedbackTargets         FeedbackAssignment[]     @relation("FeedbackTargetStaff")
   teacherStudentFeedback  TeacherStudentFeedback[] @relation("TeacherStudentFeedbackAuthor")
   assignedFeedbackActions FeedbackActionItem[]     @relation("FeedbackActionAssignee")
@@ -3374,4 +3378,155 @@ model PushSubscription {
 
   @@unique([tenantId, endpoint])
   @@index([tenantId, userId])
+}
+
+// ===========================================================================
+// STAFF LIFECYCLE - SALARY, PAYSLIPS AND APPRAISALS
+//
+// `Staff.salaryMinor` records what somebody is paid in one number, which is
+// enough to show on a profile and useless for running a month: it cannot say
+// what the figure is made of, when it changed, or what actually left the bank
+// in March. These three tables carry that.
+//
+// Money is integer minor units throughout, like the rest of finance.
+// ===========================================================================
+
+/// A salary as of a date. Revisions are inserted, never updated, so a payslip
+/// raised last year can still be explained by the structure that produced it.
+model StaffSalaryStructure {
+  id            String   @id @default(cuid())
+  tenantId      String
+  staffId       String
+  effectiveFrom DateTime @db.Date
+
+  basicMinor      Int @default(0)
+  hraMinor        Int @default(0)
+  allowancesMinor Int @default(0)
+  // Statutory and recurring deductions: PF, professional tax, insurance.
+  deductionsMinor Int @default(0)
+
+  // Stored rather than computed on read so a payslip and the structure behind
+  // it can never disagree after a rounding rule changes.
+  grossMinor Int @default(0)
+  netMinor   Int @default(0)
+
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, effectiveFrom])
+  @@index([tenantId, staffId, effectiveFrom])
+}
+
+enum PayslipStatus {
+  DRAFT
+  PUBLISHED
+  PAID
+}
+
+/// One month for one person. Draft until checked, published when the payslip
+/// is visible to the member of staff, paid once the money has gone out.
+model StaffPayslip {
+  id          String @id @default(cuid())
+  tenantId    String
+  staffId     String
+  periodYear  Int
+  periodMonth Int // 1-12
+
+  // Attendance-derived, but frozen at generation: a register corrected in
+  // June must not silently restate a March payslip.
+  workingDays Int @default(0)
+  paidDays    Int @default(0)
+
+  basicMinor      Int @default(0)
+  hraMinor        Int @default(0)
+  allowancesMinor Int @default(0)
+  bonusMinor      Int @default(0)
+  deductionsMinor Int @default(0)
+  /// Loss of pay for unpaid absence, held apart from other deductions so a
+  /// query about absence cost does not have to unpick a total.
+  lopMinor        Int @default(0)
+
+  grossMinor Int @default(0)
+  netMinor   Int @default(0)
+
+  status        PayslipStatus @default(DRAFT)
+  notes         String?
+  generatedById String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, periodYear, periodMonth])
+  @@index([tenantId, periodYear, periodMonth, status])
+  @@index([tenantId, staffId])
+}
+
+enum AppraisalStatus {
+  DRAFT
+  SELF_REVIEW
+  MANAGER_REVIEW
+  COMPLETED
+}
+
+/// A review cycle for one person.
+///
+/// Self-assessment and the reviewer's assessment are separate columns rather
+/// than one running note, because the point of an appraisal is that the two
+/// can differ and both are on the record.
+model StaffAppraisal {
+  id         String   @id @default(cuid())
+  tenantId   String
+  staffId    String
+  cycleName  String
+  periodFrom DateTime @db.Date
+  periodTo   DateTime @db.Date
+
+  status AppraisalStatus @default(DRAFT)
+
+  selfComment     String?
+  reviewerStaffId String?
+  reviewerComment String?
+
+  /// 1-5, the weighted mean of the competency ratings below.
+  overallRating Float?
+  strengths     String?
+  improvements  String?
+  goals         String?
+
+  /// PROMOTION | INCREMENT | SUSTAIN | IMPROVEMENT_PLAN
+  outcome        String?
+  incrementMinor Int?
+
+  submittedAt DateTime?
+  completedAt DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  staff    Staff                  @relation("AppraisalSubject", fields: [staffId], references: [id], onDelete: Cascade)
+  reviewer Staff?                 @relation("AppraisalReviewer", fields: [reviewerStaffId], references: [id], onDelete: SetNull)
+  ratings  StaffAppraisalRating[]
+
+  @@unique([tenantId, staffId, cycleName])
+  @@index([tenantId, status, periodTo])
+  @@index([tenantId, staffId])
+}
+
+model StaffAppraisalRating {
+  id          String  @id @default(cuid())
+  tenantId    String
+  appraisalId String
+  competency  String
+  rating      Int // 1-5
+  comment     String?
+
+  appraisal StaffAppraisal @relation(fields: [appraisalId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, appraisalId, competency])
+  @@index([tenantId, appraisalId])
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStaff } from '@/server/modules/people/service'
 import { parseListQuery } from '@/lib/query'
@@ -11,6 +12,8 @@ import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
 import { StaffTypeFilter } from './type-filter'
 import { PersonCell } from '@/components/ui/identity'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { StaffTabs } from './tabs'
 
 export const metadata = { title: 'Teachers & staff' }
 
@@ -25,10 +28,26 @@ export default async function StaffPage({
   const { rows, total } = await listStaff(ctx, query, { staffType: params.staffType })
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Teachers & staff"
         description={`${total} staff records`}
+        actions={
+          ctx.can('staff.create') ? (
+            <Link href="/staff/new" className={buttonVariants({ size: 'sm' })}>
+              <Plus aria-hidden /> Add staff
+            </Link>
+          ) : null
+        }
+      />
+
+      <StaffTabs
+        active="directory"
+        ctxCan={{
+          payroll: ctx.can('staff.payroll'),
+          appraise: ctx.can('staff.appraise'),
+          leave: ctx.can('leave.view'),
+        }}
       />
 
       <Card className="overflow-hidden">
@@ -39,7 +58,14 @@ export default async function StaffPage({
         {rows.length === 0 ? (
           <EmptyState
             title={params.q || params.staffType ? 'No staff match these filters' : 'No staff yet'}
-            description="Add teaching and support staff to assign classes, subjects and attendance."
+            description="Add teaching and support staff to assign classes and subjects, run attendance, and manage salary and appraisals."
+            action={
+              ctx.can('staff.create') && !params.q && !params.staffType ? (
+                <Link href="/staff/new" className={buttonVariants({ size: 'sm' })}>
+                  Add the first staff member
+                </Link>
+              ) : undefined
+            }
           />
         ) : (
           <>

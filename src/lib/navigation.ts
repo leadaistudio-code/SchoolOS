@@ -67,7 +67,20 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   { label: 'Parents', href: '/parents', icon: 'Users2', section: 'PEOPLE' as const, permission: 'parents.view' },
-  { label: 'Teachers & Staff', href: '/staff', icon: 'Briefcase', section: 'PEOPLE' as const, permission: 'staff.view' },
+  {
+    label: 'Teachers & Staff',
+    href: '/staff',
+    icon: 'Briefcase',
+    section: 'PEOPLE' as const,
+    permission: 'staff.view',
+    children: [
+      { label: 'Directory', href: '/staff', icon: 'Users', permission: 'staff.view' },
+      { label: 'Add staff', href: '/staff/new', icon: 'UserPlus', permission: 'staff.create' },
+      { label: 'Payroll', href: '/staff/payroll', icon: 'Wallet', permission: 'staff.payroll' },
+      { label: 'Appraisals', href: '/staff/appraisals', icon: 'ClipboardCheck', permission: 'staff.view' },
+      { label: 'Approvals', href: '/staff/approvals', icon: 'CheckCheck', permission: 'leave.view' },
+    ],
+  },
 
   {
     label: 'Attendance',
