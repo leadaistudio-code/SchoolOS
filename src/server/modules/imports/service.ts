@@ -681,8 +681,9 @@ function buildRow(
         firstName = parts[0]!
         lastName = parts.slice(1).join(' ')
       } else if (parts.length === 1) {
+        // One word is a whole name, not a first name missing its other half.
         firstName = parts[0]!
-        lastName = '-'
+        lastName = ''
       }
     }
   }
@@ -693,7 +694,6 @@ function buildRow(
 
   if (!admissionNo) messages.push('Admission number is missing')
   if (!firstName) messages.push('First name is missing')
-  if (!lastName) messages.push('Last name is missing')
   if (!className) messages.push('Class is missing')
   if (!sectionName) messages.push('Section is missing')
 

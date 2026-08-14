@@ -93,8 +93,13 @@ export function StudentForm({
           <Field label="First name" htmlFor="firstName" required error={err('firstName')}>
             <Input id="firstName" name="firstName" defaultValue={values?.firstName} required />
           </Field>
-          <Field label="Last name" htmlFor="lastName" required error={err('lastName')}>
-            <Input id="lastName" name="lastName" defaultValue={values?.lastName} required />
+          <Field
+            label="Last name"
+            htmlFor="lastName"
+            hint="Leave blank for a student who goes by one name"
+            error={err('lastName')}
+          >
+            <Input id="lastName" name="lastName" defaultValue={values?.lastName} />
           </Field>
 
           <Field label="Date of birth" htmlFor="dateOfBirth" error={err('dateOfBirth')}>

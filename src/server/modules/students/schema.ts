@@ -28,7 +28,11 @@ export const studentCreateSchema = z.object({
     .max(40)
     .regex(/^[A-Za-z0-9/_-]+$/, 'Use letters, numbers, dash, slash or underscore only'),
   firstName: z.string().trim().min(1, 'First name is required').max(60),
-  lastName: z.string().trim().min(1, 'Last name is required').max(60),
+  // Optional, and stored as an empty string rather than null: plenty of
+  // children go by one name, and the column is non-null everywhere it is
+  // read. `fullName()` trims, so a one-name student renders without a
+  // trailing space.
+  lastName: z.string().trim().max(60).default(''),
   dateOfBirth: z.coerce.date().max(new Date(), 'Date of birth cannot be in the future').optional(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   bloodGroup: optionalString(5),

@@ -121,7 +121,7 @@ ${classList}
 - Schools use different layouts: title rows, merged headers, Hindi/English mix, "Std" instead of "Class", combined parent names, etc.
 - Find the real header row. Row 0 is often a school title, not headers.
 - Map columns to MyCampusView fields using the header text from that row.
-- Required fields: admissionNo, firstName, lastName, className, sectionName.
+- Required fields: admissionNo, firstName, className, sectionName. lastName is optional.
 - If one column holds the full student name, set splitFullNameColumn to that header and leave firstName/lastName null.
 - If class values in the file do not exactly match the school's class list, add classAliases (fileValue → className).
 - Ask questions only when you genuinely cannot decide — max 8, each with a stable id like "class_column" or "section_std_5".

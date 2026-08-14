@@ -83,7 +83,7 @@ export async function attendanceRollup(ctx: AppContext, range: ReportRange) {
       }[]
     >`
       SELECT a."studentId",
-             (st."firstName" || ' ' || st."lastName") AS name,
+             trim(st."firstName" || ' ' || st."lastName") AS name,
              st."admissionNo",
              cl.name AS "className",
              sec.name AS "sectionName",
