@@ -322,6 +322,10 @@ model User {
   mfaSecret  String?
 
   mustChangePassword Boolean @default(false)
+  // Set when an administrator issues a temporary password over the phone or
+  // counter. Such a password is read aloud and often written down, so it is
+  // given a deadline rather than living until somebody happens to use it.
+  tempPasswordExpiresAt DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -415,13 +419,25 @@ enum TokenPurpose {
   EMAIL_VERIFY
   INVITE
   OTP_LOGIN
+  // A one-time code sent to a phone to prove control of it before a reset.
+  OTP_RESET
 }
 
 model VerificationToken {
   id        String       @id @default(cuid())
   userId    String
   purpose   TokenPurpose
+  // The opaque handle the client holds. For OTP_RESET this identifies the
+  // challenge; the code itself lives in codeHash.
   tokenHash String       @unique
+  // HMAC of the one-time code for OTP_RESET, keyed with AUTH_SECRET so a
+  // database leak alone does not reveal a six-digit code.
+  codeHash  String?
+  // Wrong guesses so far. A six-digit code is only safe because this is
+  // capped — the short expiry alone would not make brute force impractical.
+  attempts  Int          @default(0)
+  // WHATSAPP | SMS | EMAIL, recorded so a failed delivery can be traced.
+  channel   String?
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime     @default(now())
@@ -2026,6 +2042,11 @@ model FeePayment {
   idempotencyKey String?
 
   reference     String? // cheque no / UTR
+  // Serial number written on the school's physical receipt book when the
+  // cashier issues a paper receipt alongside this one. Free text and not
+  // unique: schools commonly run two counters from two books whose numbers
+  // overlap. It exists to reconcile paper against system, so it is indexed.
+  billBookNo    String?
   paidAt        DateTime?
   failedAt      DateTime?
   failureReason String?
@@ -2044,6 +2065,7 @@ model FeePayment {
   @@unique([provider, providerPaymentId])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, billBookNo])
 }
 
 // One payment can settle several invoices; this is the money ledger.

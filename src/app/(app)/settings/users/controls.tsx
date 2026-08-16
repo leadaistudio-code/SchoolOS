@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Checkbox, Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
-import { setUserRolesAction, setUserStatusAction } from '../admin-actions'
+import {
+  sendUserInviteAction,
+  setTemporaryPasswordAction,
+  setUserRolesAction,
+  setUserStatusAction,
+} from '../admin-actions'
 
 export type RoleOption = { id: string; label: string }
 
@@ -96,6 +101,11 @@ export function UserRow({
   const [pending, startTransition] = React.useTransition()
   const [open, setOpen] = React.useState(false)
   const [selected, setSelected] = React.useState<string[]>(roleIds)
+  const [tempPassword, setTempPassword] = React.useState<{
+    value: string
+    expiresAt: string | null
+  } | null>(null)
+  const [copied, setCopied] = React.useState(false)
 
   const setStatus = (next: string) =>
     startTransition(async () => {
@@ -105,6 +115,33 @@ export function UserRow({
         title: result.ok ? 'Account updated' : 'Could not update',
         description: result.message,
       })
+    })
+
+  const invite = () =>
+    startTransition(async () => {
+      const result = await sendUserInviteAction({ id })
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Invitation sent' : 'Could not send invitation',
+        description: result.message,
+      })
+    })
+
+  const issueTempPassword = () =>
+    startTransition(async () => {
+      const result = await setTemporaryPasswordAction({ id })
+      if (!result.ok || !result.password) {
+        toast.push({
+          tone: 'error',
+          title: 'Could not issue a password',
+          description: result.message,
+        })
+        return
+      }
+      // Held in component state only. It is never fetched again, because the
+      // server kept a bcrypt digest and not the password itself.
+      setTempPassword({ value: result.password, expiresAt: result.expiresAt ?? null })
+      setCopied(false)
     })
 
   const saveRoles = () =>
@@ -120,6 +157,33 @@ export function UserRow({
 
   return (
     <div className="flex items-center justify-end gap-1.5">
+      {canEdit && status !== 'DISABLED' ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={pending}
+          onClick={invite}
+          title="Email a link to set a password"
+        >
+          {status === 'INVITED' ? 'Resend invite' : 'Send reset link'}
+        </Button>
+      ) : null}
+
+      {/* For the people email never reaches: a wrong address, a dead mailbox,
+          a parent who does not use email. Without this they are a support
+          ticket, which is what self-service was meant to end. */}
+      {canEdit && status !== 'DISABLED' && !isSelf ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={pending}
+          onClick={issueTempPassword}
+          title="Generate a password to read out over the phone or hand over at the office"
+        >
+          Temp password
+        </Button>
+      ) : null}
+
       {canAssign && roles.length > 0 ? (
         <Button
           size="sm"
@@ -151,6 +215,47 @@ export function UserRow({
           </Button>
         )
       ) : null}
+
+      {/* Shown once and never again — the server stored a bcrypt digest, so
+          there is nothing to come back for. Says so plainly, because an
+          administrator who assumes they can reopen it will close it early. */}
+      <Dialog
+        open={!!tempPassword}
+        onClose={() => setTempPassword(null)}
+        title={`Temporary password for ${name}`}
+        description="Read this out or hand it over now. It cannot be shown again."
+        footer={
+          <Button onClick={() => setTempPassword(null)}>Done</Button>
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 rounded-[var(--radius-sm)] bg-surface-2 border border-line px-3 py-2.5 text-lg font-semibold tracking-wide text-ink select-all">
+              {tempPassword?.value}
+            </code>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!tempPassword) return
+                void navigator.clipboard.writeText(tempPassword.value)
+                setCopied(true)
+              }}
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+
+          <ul className="text-xs text-ink-muted space-y-1 list-disc pl-4">
+            <li>
+              {tempPassword?.expiresAt
+                ? `Expires ${new Date(tempPassword.expiresAt).toLocaleString()}.`
+                : 'Expires in 24 hours.'}
+            </li>
+            <li>They must choose their own password the first time they sign in.</li>
+            <li>Any device already signed in to this account has been signed out.</li>
+          </ul>
+        </div>
+      </Dialog>
 
       <Dialog
         open={open}

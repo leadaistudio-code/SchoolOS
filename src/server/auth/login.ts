@@ -101,6 +101,19 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     return { ok: false, reason: 'error', message: GENERIC_FAILURE }
   }
 
+  // A temporary password issued at the counter has a deadline. Checked after
+  // the password itself, so an expired one cannot be used to probe which
+  // accounts have had a reset issued.
+  if (user.tempPasswordExpiresAt && user.tempPasswordExpiresAt < new Date()) {
+    await recordAttempt(user.id, input.tenantId, identifier, false, 'temp_password_expired', meta)
+    return {
+      ok: false,
+      reason: 'error',
+      message:
+        'This temporary password has expired. Ask the school office for a new one, or reset your password by email.',
+    }
+  }
+
   await prisma.user.update({
     where: { id: user.id },
     data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },

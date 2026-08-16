@@ -69,6 +69,82 @@ flag false in local development unless you have completed the steps above.
 - Every attempt, successful or not, is recorded in `LoginEvent` with IP and user
   agent.
 
+### Reset and invitation links
+
+Both are the same mechanism (`VerificationToken`) with different lifetimes:
+a reset lasts an hour, an invitation a week.
+
+- The token is 256 bits of entropy and is stored **only as a SHA-256 hash**, so
+  a database leak cannot be replayed into account takeover.
+- **Single use, and issuing a new one invalidates the previous** — a "resend"
+  does not leave another live key under the doormat.
+- **Bound to the issuing school.** A link opened on another tenant's host is
+  refused outright.
+- **Spent in the same transaction that writes the password**, so a crash cannot
+  both burn the link and leave the password unchanged.
+- **Redeeming does not create a session.** The user is sent to the sign-in page,
+  so an account with MFA still has to present its second factor — otherwise a
+  mailbox compromise would be a way around it.
+- Redeeming **revokes every existing session** and clears the lockout counter,
+  which is also the intended way out of a lockout.
+- Requesting a reset **answers identically whether or not the address exists**.
+  Where the school has no mailbox connected and the platform has no email driver,
+  the request falls back to a support ticket for the platform team; that choice
+  depends on the school's configuration, never on the address typed.
+- Super admins have no tenant host to receive a link on and remain reset by CLI
+  (`npm run reset:password`).
+
+### WhatsApp one-time codes
+
+The primary self-service path. A six-digit code is a small secret, so what
+makes it safe enough to reset a password with is everything bounding it:
+
+- **Ten-minute expiry, five wrong guesses, then dead** (`VerificationToken.attempts`).
+  Rate limited per number and per IP on top of that.
+- **The code is never stored.** An HMAC keyed with `AUTH_SECRET` is, so a
+  database leak alone does not reveal a live code.
+- **Proving the code does not sign anyone in.** It exchanges for the same
+  short-lived `PASSWORD_RESET` token the emailed link carries, so the password
+  is set through one shared path and **MFA still applies** at the sign-in that
+  follows. Without this, a phone would be a way around the second factor.
+- **An unknown number is answered exactly like a known one** — a challenge is
+  returned that no row backs, so verification fails as any wrong code does.
+  The same applies when a request is throttled. Answering honestly would turn
+  the form into a way of asking "does this child attend this school?", which
+  is a safeguarding question before it is a security one.
+- **Challenges are tenant-bound**; a code issued for one school is worthless
+  on another's host.
+- Requesting a new code retires the previous one.
+
+**Residual risk worth naming:** whoever controls the phone can reset the
+account. For a parent that is the intended trade. For a `SCHOOL_ADMIN` it means
+a SIM swap reaches the whole school's data — so admin accounts should carry
+MFA, which the exchange design above deliberately preserves.
+
+Platform super admins are excluded from every self-service path and remain
+CLI-only (`npm run reset:password`).
+
+### Temporary passwords issued at the counter
+
+For the people an emailed link never reaches — a mistyped address, a mailbox
+nobody checks, a parent who does not use email — an administrator holding
+`users.edit` can issue a temporary password from Settings → Users.
+
+- Generated from pronounceable syllables with ambiguous characters removed
+  (no `l/I/1`, `O/0`, `S/5`), because the failure mode is a parent who cannot
+  transcribe it rather than an attacker who guesses it.
+- **Shown once**, to the administrator who asked for it. The server keeps only
+  the bcrypt digest, so there is nothing to retrieve afterwards. The plaintext
+  is never written to the audit log — the log records that one was issued, by
+  whom and for whom.
+- **Expires in 24 hours** (`User.tempPasswordExpiresAt`), checked at sign-in
+  *after* the password itself so an expired one cannot be used to probe which
+  accounts have had a reset issued.
+- **Forces a password change at first sign-in** (`mustChangePassword`, enforced
+  in `requireContext`), and **revokes every live session** on issue.
+- Refused for a disabled account, and for the administrator's own account —
+  which would sign them out mid-action. `Account → Password` is that path.
+
 ---
 
 ## 3. Authorization

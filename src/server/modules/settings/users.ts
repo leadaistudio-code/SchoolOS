@@ -3,6 +3,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, notFound } from '@/server/api/response'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
+import { generateTemporaryPassword, hashPassword } from '@/server/auth/password'
 
 export const USER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'lastName', 'status'] as const
 
@@ -132,6 +133,95 @@ export async function setUserStatus(ctx: AppContext, input: z.infer<typeof userS
     after: { status: updated.status },
   })
   return updated
+}
+
+/** How long a phone-dictated password stays usable. */
+const TEMP_PASSWORD_TTL_HOURS = 24
+
+/**
+ * Issues a temporary password for the school office to hand over directly.
+ *
+ * The counterpart to the emailed reset link, for the people that link never
+ * reaches: an address that was mistyped at enrolment, a mailbox nobody checks,
+ * a parent who does not use email at all. Without this, those cases are a
+ * support ticket, which is the thing self-service was meant to end.
+ *
+ * The plaintext is returned to the caller exactly once and never stored. Three
+ * things keep that acceptable: it expires in a day, it forces a change at
+ * first sign-in, and issuing it revokes every existing session — so it is a
+ * one-time handover rather than a second, weaker password on the account.
+ */
+export async function setTemporaryPassword(ctx: AppContext, id: string) {
+  ctx.require('users.edit')
+
+  const user = await ctx.db.user.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, firstName: true, lastName: true, email: true, status: true },
+  })
+  if (!user) throw notFound('User')
+
+  // Resetting your own password this way would sign you out mid-action and
+  // send you back through the temporary one. The account page is the path.
+  if (user.id === ctx.user.userId) {
+    throw new ApiException(
+      409,
+      'CONFLICT',
+      'Use Account → Password to change your own password',
+    )
+  }
+  if (user.status === 'DISABLED') {
+    throw new ApiException(
+      409,
+      'CONFLICT',
+      'This account is disabled. Re-enable it before issuing a password.',
+    )
+  }
+
+  const plain = generateTemporaryPassword()
+  const expiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_HOURS * 3600_000)
+  const passwordHash = await hashPassword(plain)
+
+  await ctx.db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        mustChangePassword: true,
+        tempPasswordExpiresAt: expiresAt,
+        // Whoever is being helped is usually locked out; leaving the counter
+        // set would strand them behind the very password just issued.
+        failedLoginCount: 0,
+        lockedUntil: null,
+        // An invited account that never activated is now set up.
+        ...(user.status === 'INVITED' ? { status: 'ACTIVE' as const } : {}),
+      },
+    })
+    // Any live session predates this handover and cannot be assumed to be theirs.
+    await tx.session.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'user.temp_password',
+    module: 'settings',
+    entityType: 'User',
+    entityId: id,
+    // The password itself is never written here; the audit records that one
+    // was issued, by whom, and to whom.
+    summary: `Issued a temporary password to ${user.firstName} ${user.lastName}, valid for ${TEMP_PASSWORD_TTL_HOURS} hours`,
+  })
+
+  return {
+    password: plain,
+    expiresAt,
+    name: `${user.firstName} ${user.lastName}`,
+  }
 }
 
 /**

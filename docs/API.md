@@ -98,6 +98,50 @@ use the permission list to decide what to render — the server still enforces i
 
 Revokes the session server-side, not just the cookie.
 
+### `POST /auth/password/forgot`
+
+```bash
+curl -X POST https://demo.schoolos.app/api/v1/auth/password/forgot   -H 'content-type: application/json'   -d '{"email":"parent@demo.schoolos.dev"}'
+```
+
+Emails a one-hour reset link. Always reports success, whether or not the address
+belongs to an account — an app must not be able to enumerate a school's families
+any more than a browser can.
+
+### `POST /auth/password/otp/request`
+
+```bash
+curl -X POST https://demo.schoolos.app/api/v1/auth/password/otp/request   -H 'content-type: application/json'   -d '{"phone":"9842115933"}'
+```
+
+Sends a WhatsApp code to the number on the school record. Local numbers are
+normalised against `DEFAULT_COUNTRY_CODE`. Returns `challengeToken` and a
+masked number. A number belonging to nobody still receives a challenge, so a
+native client cannot enumerate a school's families. `503 CHANNEL_UNAVAILABLE`
+means WhatsApp could not deliver and a support ticket was raised instead.
+
+### `POST /auth/password/otp/verify`
+
+```bash
+curl -X POST https://demo.schoolos.app/api/v1/auth/password/otp/verify   -H 'content-type: application/json'   -d '{"challengeToken":"...","code":"123456"}'
+```
+
+Exchanges a correct code for a short-lived `resetToken`, which is then spent
+against `/auth/password/reset` below. Returns **no session** — the client signs
+in afterwards, so MFA still applies. Fails `400 INVALID_CODE` with an
+`attemptsLeft` detail; the challenge dies after five wrong codes.
+
+### `POST /auth/password/reset`
+
+```bash
+curl -X POST https://demo.schoolos.app/api/v1/auth/password/reset   -H 'content-type: application/json'   -d '{"token":"<from the emailed link>","password":"NewPassword123"}'
+```
+
+Redeems a reset link, or an invitation with `"purpose":"INVITE"`. Returns **no
+session**: the client signs in afterwards, so MFA still applies. Fails with
+`INVALID_TOKEN` when the link is expired, spent or issued for another school,
+and `WEAK_PASSWORD` when it does not meet the policy.
+
 ---
 
 ## Conventions

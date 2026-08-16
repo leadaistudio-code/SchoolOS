@@ -72,6 +72,25 @@ const serverSchema = z.object({
   SMS_SENDER_ID: z.string().optional(),
 
   WHATSAPP_DRIVER: z.enum(['log', 'meta_cloud', 'gupshup']).default('log'),
+  WHATSAPP_API_VERSION: z.string().default('v21.0'),
+  /** The sending number's id in the WhatsApp Business account, not the number. */
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  /**
+   * Meta requires a pre-approved template in the Authentication category for
+   * one-time codes; free-form text is rejected outside a 24-hour customer
+   * window, which a password reset never has.
+   */
+  WHATSAPP_OTP_TEMPLATE: z.string().default('password_reset_otp'),
+  WHATSAPP_OTP_TEMPLATE_LANG: z.string().default('en'),
+  /** Authentication templates carry a copy-code button unless created without one. */
+  WHATSAPP_OTP_COPY_BUTTON: bool.default('true'),
+
+  /**
+   * Applied when somebody types a local number. Parents enter ten digits, the
+   * school record holds E.164, and the lookup has to reconcile the two.
+   */
+  DEFAULT_COUNTRY_CODE: z.string().default('+91'),
 
   PAYMENT_DRIVER: z.enum(['mock', 'razorpay', 'stripe', 'cashfree']).default('mock'),
   PAYMENT_KEY_ID: z.string().optional(),

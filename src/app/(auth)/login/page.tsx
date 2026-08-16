@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { ShieldCheck } from 'lucide-react'
+import { CheckCircle2, ShieldCheck } from 'lucide-react'
 import { LoginForm } from './login-form'
 import { resolveTenant } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
@@ -7,10 +7,20 @@ import { env } from '@/lib/env'
 
 export const metadata = { title: 'Sign in' }
 
+/**
+ * Confirmations shown after a redirect here. Looked up from a fixed table
+ * rather than printed from the query string, so the URL cannot be used to put
+ * arbitrary text on a sign-in page.
+ */
+const LOGIN_NOTICES: Record<string, string | undefined> = {
+  'password-set': 'Your password has been saved. Sign in with it to continue.',
+  'account-ready': 'Your account is ready. Sign in with your new password.',
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>
+  searchParams: Promise<{ next?: string; notice?: string }>
 }) {
   const [tenant, user, params] = await Promise.all([
     resolveTenant(),
@@ -33,6 +43,7 @@ export default async function LoginPage({
       ? 'Sign in to view attendance, homework, fees and results.'
       : 'Platform administration console.')
   const bannerUrl = school?.loginBannerUrl ?? null
+  const notice = LOGIN_NOTICES[params.notice ?? '']
 
   return (
     <div className="min-h-dvh grid lg:grid-cols-2">
@@ -63,6 +74,19 @@ export default async function LoginPage({
 
           <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
           <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
+
+          {notice ? (
+            <div
+              role="status"
+              className="mb-5 flex items-start gap-2.5 rounded-[var(--radius)] bg-success-bg border border-[color-mix(in_srgb,var(--success)_30%,transparent)] px-3.5 py-2.5"
+            >
+              <CheckCircle2
+                className="size-4.5 text-[var(--success)] mt-0.5 shrink-0"
+                aria-hidden
+              />
+              <p className="text-sm text-ink">{notice}</p>
+            </div>
+          ) : null}
 
           <LoginForm next={params.next} showForgotPassword={!!tenant} />
 

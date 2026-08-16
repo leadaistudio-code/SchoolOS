@@ -73,6 +73,8 @@ export async function changePasswordAction(
       passwordHash: await hashPassword(parsed.data.newPassword),
       passwordChangedAt: new Date(),
       mustChangePassword: false,
+      // Whatever temporary password brought them here is now spent.
+      tempPasswordExpiresAt: null,
     },
   })
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
   createSession,
@@ -10,6 +10,7 @@ import {
   setSessionLock,
 } from '@/server/modules/settings/sessions'
 import {
+  setTemporaryPassword,
   setUserRoles,
   setUserStatus,
   userRolesSchema,
@@ -23,6 +24,7 @@ import {
   setRolePermissions,
 } from '@/server/modules/settings/roles'
 import { credentialSchema, saveCredential } from '@/server/modules/settings/integrations'
+import { sendAccountLink } from '@/server/auth/reset'
 
 /**
  * Server actions for the administrative settings screens.
@@ -96,6 +98,58 @@ export async function setUserStatusAction(payload: unknown): Promise<Result> {
     return { ok: true, message: 'Account updated.' }
   } catch (error) {
     return failure(error, 'The account could not be updated')
+  }
+}
+
+/**
+ * Sends the invitation link that lets a new account set its own password.
+ *
+ * The alternative — an administrator typing a temporary password and reading
+ * it out over the phone — means a real password travelling through a channel
+ * nobody controls, so this is the path the users screen offers.
+ */
+export async function sendUserInviteAction(payload: unknown): Promise<Result> {
+  try {
+    const ctx = await requireContext('users.edit')
+    const { id } = z.object({ id: z.string().min(1) }).parse(payload)
+    const result = await sendAccountLink(id, {
+      id: ctx.tenant.id,
+      slug: ctx.tenant.slug,
+      name: ctx.tenant.school?.name ?? ctx.tenant.name,
+    })
+    revalidatePath('/settings/users')
+    return result.ok
+      ? { ok: true, message: result.message }
+      : { ok: false, message: result.message }
+  } catch (error) {
+    return failure(error, 'The invitation could not be sent')
+  }
+}
+
+/**
+ * Issues a temporary password for the office to hand over in person.
+ *
+ * Returns the plaintext, which is the one place in the product that ever does.
+ * It is shown once, to the administrator who asked for it, and is not stored
+ * anywhere - the alternative is a support ticket for every parent whose email
+ * address was mistyped at enrolment.
+ */
+export async function setTemporaryPasswordAction(
+  payload: unknown,
+): Promise<Result & { password?: string; expiresAt?: string }> {
+  try {
+    const ctx = await requireContext('users.edit')
+    const { id } = z.object({ id: z.string().min(1) }).parse(payload)
+    const issued = await setTemporaryPassword(ctx, id)
+    revalidatePath('/settings/users')
+    return {
+      ok: true,
+      message: `Temporary password issued for ${issued.name}.`,
+      password: issued.password,
+      expiresAt: issued.expiresAt.toISOString(),
+    }
+  } catch (error) {
+    return failure(error, 'The temporary password could not be issued')
   }
 }
 

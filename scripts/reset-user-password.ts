@@ -7,8 +7,10 @@ import { tenantUrl } from '../src/server/tenant'
 /**
  * Reset a user's password when they forgot it or their account is locked.
  *
- * Intended for platform operators with database access — there is no self-service
- * forgot-password flow yet. Revokes every active session and clears lockout state.
+ * School users have a self-service path at /forgot-password; this script is the
+ * fallback for platform super admins (who have no school host to receive a link
+ * on) and for a school whose mailbox is not yet connected. Revokes every active
+ * session and clears lockout state.
  *
  * Local:
  *   npx tsx scripts/reset-user-password.ts \
