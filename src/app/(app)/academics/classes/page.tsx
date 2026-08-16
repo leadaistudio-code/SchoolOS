@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { cn } from '@/lib/utils'
-import { AddSectionButton, NewClassButton } from './class-forms'
+import { AddSectionButton, EditClassButton, EditSectionButton, NewClassButton } from './class-forms'
 
 export const metadata = { title: 'Classes & sections' }
 
@@ -81,7 +81,17 @@ export default async function ClassesPage() {
                       {enrolled}/{capacity} seats · {c._count.subjects} subjects
                     </p>
                   </div>
-                  {c.stream ? <Badge tone="neutral">{c.stream}</Badge> : null}
+                  <div className="flex items-center gap-1">
+                    {c.stream ? <Badge tone="neutral">{c.stream}</Badge> : null}
+                    {canManage ? (
+                      <EditClassButton
+                        id={c.id}
+                        name={c.name}
+                        numeric={c.numeric}
+                        stream={c.stream}
+                      />
+                    ) : null}
+                  </div>
                 </CardHeader>
                 <CardContent className="py-1 flex-1">
                   {c.sections.length === 0 ? (
@@ -105,13 +115,27 @@ export default async function ClassesPage() {
                               >
                                 Section {s.name}
                               </Link>
-                              <span
-                                className={cn(
-                                  'text-xs tnum',
-                                  full ? 'text-[var(--danger)] font-medium' : 'text-ink-muted',
-                                )}
-                              >
-                                {s._count.enrollments}/{s.capacity}
+                              <span className="flex items-center gap-1 shrink-0">
+                                <span
+                                  className={cn(
+                                    'text-xs tnum',
+                                    full ? 'text-[var(--danger)] font-medium' : 'text-ink-muted',
+                                  )}
+                                >
+                                  {s._count.enrollments}/{s.capacity}
+                                </span>
+                                {canManage ? (
+                                  <EditSectionButton
+                                    id={s.id}
+                                    classLabel={c.name}
+                                    name={s.name}
+                                    capacity={s.capacity}
+                                    roomName={s.roomName}
+                                    classTeacherId={s.classTeacher?.id ?? null}
+                                    enrolled={s._count.enrollments}
+                                    teachers={teachers}
+                                  />
+                                ) : null}
                               </span>
                             </div>
                             {/* Occupancy bar: capacity pressure is the thing an

@@ -17,6 +17,28 @@ export const sectionCreateSchema = z.object({
   classTeacherId: z.string().optional(),
 })
 
+/**
+ * Editing an existing class or section.
+ *
+ * Separate from the create schemas because the identifier is required and
+ * everything else is optional: a rename must not force an admin to restate the
+ * capacity and the room.
+ */
+export const classUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1, 'Class name is required').max(60).optional(),
+  numeric: z.coerce.number().int().min(0).max(20).optional(),
+  stream: z.string().trim().max(40).optional(),
+})
+
+export const sectionUpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1, 'Section name is required').max(20).optional(),
+  capacity: z.coerce.number().int().min(1).max(200).optional(),
+  roomName: z.string().trim().max(40).optional(),
+  classTeacherId: z.string().optional(),
+})
+
 export const subjectCreateSchema = z.object({
   code: z.string().trim().min(1).max(12).regex(/^[A-Z0-9_-]+$/i, 'Use letters and numbers only'),
   name: z.string().trim().min(1).max(80),
@@ -189,6 +211,116 @@ export async function createSection(
   return created
 }
 
+/**
+ * Renames a class or moves it on the ladder.
+ *
+ * Renaming is safe at any time: every other table points at the class by id,
+ * so attendance, timetables and fee structures follow the new name rather than
+ * being orphaned by it.
+ */
+export async function updateClassLevel(
+  ctx: AppContext,
+  input: z.infer<typeof classUpdateSchema>,
+) {
+  ctx.require('academics.manage')
+
+  const before = await ctx.db.classLevel.findFirst({
+    where: { id: input.id, deletedAt: null },
+  })
+  if (!before) throw notFound('Class')
+
+  if (input.name && input.name !== before.name) {
+    const clash = await ctx.db.classLevel.findFirst({
+      where: {
+        sessionId: before.sessionId,
+        name: input.name,
+        deletedAt: null,
+        id: { not: input.id },
+      },
+    })
+    if (clash) throw conflict(`${input.name} already exists in this session`)
+  }
+
+  const updated = await ctx.db.classLevel.update({
+    where: { id: input.id },
+    data: {
+      name: input.name,
+      numeric: input.numeric,
+      ...(input.stream !== undefined ? { stream: input.stream || null } : {}),
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'class.update',
+    module: 'academics',
+    entityType: 'ClassLevel',
+    entityId: input.id,
+    summary:
+      input.name && input.name !== before.name
+        ? `Renamed ${before.name} to ${updated.name}`
+        : `Updated ${updated.name}`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+/**
+ * Archives a class and its sections together.
+ *
+ * Refuses while anybody is enrolled: a class removed out from under its
+ * students would leave attendance, timetable and fee rows pointing at
+ * something no screen can show. The sections go with it in the same
+ * transaction, because a section whose class has vanished is unreachable but
+ * still counted.
+ */
+export async function archiveClassLevel(ctx: AppContext, id: string) {
+  ctx.require('academics.manage')
+
+  const classLevel = await ctx.db.classLevel.findFirst({
+    where: { id, deletedAt: null },
+    include: {
+      sections: {
+        where: { deletedAt: null },
+        include: { _count: { select: { enrollments: { where: { isCurrent: true } } } } },
+      },
+    },
+  })
+  if (!classLevel) throw notFound('Class')
+
+  const enrolled = classLevel.sections.reduce((sum, s) => sum + s._count.enrollments, 0)
+  if (enrolled > 0) {
+    throw conflict(
+      `Move the ${enrolled} student${enrolled === 1 ? '' : 's'} enrolled in ${classLevel.name} to another class first`,
+    )
+  }
+
+  const now = new Date()
+  await ctx.db.$transaction([
+    ctx.db.section.updateMany({
+      where: { classLevelId: id, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+    ctx.db.classLevel.update({ where: { id }, data: { deletedAt: now } }),
+  ])
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'class.archive',
+    module: 'academics',
+    entityType: 'ClassLevel',
+    entityId: id,
+    summary: `Archived ${classLevel.name}${classLevel.sections.length > 0 ? ` and its ${classLevel.sections.length} section(s)` : ''}`,
+    before: classLevel,
+  })
+  return { id, name: classLevel.name }
+}
+
 export async function updateSection(
   ctx: AppContext,
   id: string,
@@ -209,12 +341,28 @@ export async function updateSection(
     )
   }
 
+  // Caught here rather than left to the unique index, which would surface as a
+  // raw constraint violation instead of a sentence naming the clash.
+  if (input.name && input.name !== before.name) {
+    const clash = await ctx.db.section.findFirst({
+      where: {
+        classLevelId: before.classLevelId,
+        name: input.name,
+        deletedAt: null,
+        id: { not: id },
+      },
+    })
+    if (clash) throw conflict(`Section ${input.name} already exists in this class`)
+  }
+
   const updated = await ctx.db.section.update({
     where: { id },
     data: {
       name: input.name,
       capacity: input.capacity,
-      roomName: input.roomName,
+      // Clearing the field stores null rather than an empty string, so "no
+      // room" reads the same whether it was never set or later removed.
+      ...(input.roomName !== undefined ? { roomName: input.roomName || null } : {}),
       ...(input.classTeacherId !== undefined
         ? { classTeacherId: input.classTeacherId || null }
         : {}),

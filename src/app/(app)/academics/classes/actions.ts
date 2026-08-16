@@ -4,10 +4,16 @@ import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
+  archiveClassLevel,
+  archiveSection,
   classCreateSchema,
+  classUpdateSchema,
   createClassLevel,
   createSection,
   sectionCreateSchema,
+  sectionUpdateSchema,
+  updateClassLevel,
+  updateSection,
 } from '@/server/modules/academics/service'
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string }
@@ -51,5 +57,54 @@ export async function createSectionAction(payload: unknown): Promise<ActionResul
     return { ok: true, message: `Section ${created.name} added with ${created.capacity} seats.` }
   } catch (err) {
     return fail(err, 'The section could not be created')
+  }
+}
+
+export async function updateClassAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('academics.manage')
+  try {
+    const updated = await updateClassLevel(ctx, classUpdateSchema.parse(payload))
+    revalidateClassTree()
+    return { ok: true, message: `${updated.name} saved.` }
+  } catch (err) {
+    return fail(err, 'The class could not be updated')
+  }
+}
+
+export async function updateSectionAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('academics.manage')
+  try {
+    const { id, ...rest } = sectionUpdateSchema.parse(payload)
+    const updated = await updateSection(ctx, id, rest)
+    revalidateClassTree()
+    return { ok: true, message: `Section ${updated.name} saved.` }
+  } catch (err) {
+    return fail(err, 'The section could not be updated')
+  }
+}
+
+/**
+ * Removal is archival, not deletion. Last year's attendance and receipts still
+ * reference these rows, so the record stays and only stops being offered.
+ */
+export async function archiveClassAction(id: string): Promise<ActionResult> {
+  const ctx = await requireContext('academics.manage')
+  try {
+    const archived = await archiveClassLevel(ctx, id)
+    revalidateClassTree()
+    return { ok: true, message: `${archived.name} removed.` }
+  } catch (err) {
+    return fail(err, 'The class could not be removed')
+  }
+}
+
+export async function archiveSectionAction(id: string): Promise<ActionResult> {
+  const ctx = await requireContext('academics.manage')
+  try {
+    const archived = await archiveSection(ctx, id)
+    revalidateClassTree()
+    return { ok: true, message: `Section ${archived.name} removed.` }
+  } catch (err) {
+    return fail(err, 'The section could not be removed')
   }
 }
