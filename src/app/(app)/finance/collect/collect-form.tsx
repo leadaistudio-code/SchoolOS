@@ -53,9 +53,14 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
   const [amount, setAmount] = React.useState('')
   const [mode, setMode] = React.useState('CASH')
   const [reference, setReference] = React.useState('')
+  const [billBookNo, setBillBookNo] = React.useState('')
   const [notes, setNotes] = React.useState('')
   const [pending, startTransition] = React.useTransition()
-  const [receipt, setReceipt] = React.useState<{ number: string; advance: number } | null>(null)
+  const [receipt, setReceipt] = React.useState<{
+    number: string
+    advance: number
+    billBookNo: string | null
+  } | null>(null)
 
   // One key per attempt; regenerated only after a successful collection.
   const idempotencyKey = React.useRef(crypto.randomUUID())
@@ -136,6 +141,7 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
         amount: Number(amount),
         mode,
         reference: reference || undefined,
+        billBookNo: billBookNo || undefined,
         notes: notes || undefined,
         idempotencyKey: idempotencyKey.current,
       })
@@ -149,6 +155,7 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
       setReceipt({
         number: result.data?.receiptNumber ?? '',
         advance: result.data?.unallocatedMinor ?? 0,
+        billBookNo: billBookNo || null,
       })
       idempotencyKey.current = crypto.randomUUID()
       router.refresh()
@@ -161,6 +168,7 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
     setQuery('')
     setAmount('')
     setReference('')
+    setBillBookNo('')
     setNotes('')
     setReceipt(null)
   }
@@ -175,6 +183,9 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
           <p className="text-xl font-semibold text-ink">Payment recorded</p>
           <p className="text-base text-ink-muted mt-1">
             Receipt <span className="font-medium text-ink tnum">{receipt.number}</span>
+            {receipt.billBookNo
+              ? <> · bill book <span className="font-medium text-ink tnum">{receipt.billBookNo}</span></>
+              : null}
             {receipt.advance > 0
               ? ` · ${formatMoney(receipt.advance, currency)} held as advance`
               : ''}
@@ -297,19 +308,40 @@ export function CollectForm({ currency, initialStudentId }: { currency: string; 
                 </Field>
               </div>
 
-              {mode !== 'CASH' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {mode !== 'CASH' ? (
+                  <Field
+                    label="Reference"
+                    htmlFor="reference"
+                    hint="Cheque number, UPI reference or UTR"
+                  >
+                    <Input
+                      id="reference"
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                    />
+                  </Field>
+                ) : null}
+
+                {/* The serial off the paper receipt book. Left free-form and
+                    unvalidated on purpose: a school running two counters from
+                    two books will have numbers that repeat, and a cashier with
+                    a queue must never be blocked by this field. */}
                 <Field
-                  label="Reference"
-                  htmlFor="reference"
-                  hint="Cheque number, UPI reference or UTR"
+                  label="Bill book number"
+                  htmlFor="billBookNo"
+                  hint="Serial on the paper receipt, if one was issued"
                 >
                   <Input
-                    id="reference"
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
+                    id="billBookNo"
+                    value={billBookNo}
+                    onChange={(e) => setBillBookNo(e.target.value)}
+                    inputMode="text"
+                    autoComplete="off"
+                    maxLength={40}
                   />
                 </Field>
-              ) : null}
+              </div>
 
               <Field label="Notes" htmlFor="notes">
                 <Textarea

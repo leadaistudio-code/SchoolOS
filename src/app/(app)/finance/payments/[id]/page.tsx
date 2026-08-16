@@ -117,6 +117,13 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
                 {payment.mode.toLowerCase().replace('_', ' ')}
                 {payment.reference ? ` · ${payment.reference}` : ''}
               </p>
+              {/* Printed on the receipt so the paper slip and this document
+                  carry the same reference in the school's own numbering. */}
+              {payment.billBookNo ? (
+                <p className="text-xs text-ink-muted tnum">
+                  Bill book {payment.billBookNo}
+                </p>
+              ) : null}
             </div>
           </div>
 

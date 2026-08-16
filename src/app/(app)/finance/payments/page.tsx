@@ -36,7 +36,7 @@ export default async function PaymentsPage({
       />
 
       <Card className="overflow-hidden">
-        <SearchBar placeholder="Search receipt, reference, student or admission number">
+        <SearchBar placeholder="Search receipt, bill book, reference, student or admission number">
           <PaymentFilters />
         </SearchBar>
 
@@ -70,6 +70,11 @@ export default async function PaymentsPage({
                         {p.reference ? (
                           <span className="block text-xs text-ink-subtle">
                             {p.reference}
+                          </span>
+                        ) : null}
+                        {p.billBookNo ? (
+                          <span className="block text-xs text-ink-subtle">
+                            Bill book {p.billBookNo}
                           </span>
                         ) : null}
                       </TD>

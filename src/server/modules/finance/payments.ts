@@ -28,6 +28,8 @@ export const collectSchema = z.object({
   amount: rupees,
   mode: z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER', 'CARD', 'UPI', 'NET_BANKING']),
   reference: z.string().trim().max(60).optional(),
+  /** Serial from the school's paper receipt book, when one was also issued. */
+  billBookNo: z.string().trim().max(40).optional(),
   notes: z.string().trim().max(300).optional(),
   /** Specific invoices to settle; otherwise oldest-first across all dues. */
   invoiceIds: z.array(z.string()).optional(),
@@ -123,6 +125,7 @@ export async function collectPayment(
         status: 'SUCCESS',
         provider: 'manual',
         reference: input.reference,
+        billBookNo: input.billBookNo,
         notes: input.notes,
         idempotencyKey: input.idempotencyKey,
         paidAt: new Date(),
@@ -193,8 +196,13 @@ export async function collectPayment(
     module: 'fees',
     entityType: 'FeePayment',
     entityId: result.paymentId,
-    summary: `Collected ₹${input.amount / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${input.mode.toLowerCase()}, receipt ${result.receiptNumber}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
-    after: { amountMinor: input.amount, mode: input.mode, receipt: result.receiptNumber },
+    summary: `Collected ₹${input.amount / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${input.mode.toLowerCase()}, receipt ${result.receiptNumber}${input.billBookNo ? `, bill book ${input.billBookNo}` : ''}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
+    after: {
+      amountMinor: input.amount,
+      mode: input.mode,
+      receipt: result.receiptNumber,
+      billBookNo: input.billBookNo ?? null,
+    },
   })
 
   await notify(ctx, {
@@ -705,6 +713,7 @@ export async function listPayments(
       ? {
           OR: [
             { reference: { contains: query.q, mode: 'insensitive' } },
+            { billBookNo: { contains: query.q, mode: 'insensitive' } },
             { receipt: { number: { contains: query.q, mode: 'insensitive' } } },
             { student: { firstName: { contains: query.q, mode: 'insensitive' } } },
             { student: { lastName: { contains: query.q, mode: 'insensitive' } } },
@@ -726,6 +735,7 @@ export async function listPayments(
         mode: true,
         status: true,
         reference: true,
+        billBookNo: true,
         paidAt: true,
         createdAt: true,
         provider: true,
@@ -750,6 +760,7 @@ export async function listPayments(
       mode: p.mode,
       status: p.status,
       reference: p.reference,
+      billBookNo: p.billBookNo,
       provider: p.provider,
       paidAt: p.paidAt,
       createdAt: p.createdAt,
