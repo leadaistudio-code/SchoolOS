@@ -53,9 +53,16 @@ export function EditorialStatement() {
       <div className="mx-auto max-w-[76rem]">
         {/* Typed rather than masked: this one line is the section's claim, and
             watching it written holds the reader on it a beat longer. */}
+        {/* Authored as two lines rather than left to the measure, so the
+            accent word lands at the end of the sentence and not wherever the
+            wrap happens to fall. */}
         <Typewriter
-          text="Everything your school needs. Connected."
+          loop
           className="ed-display ed-display-md max-w-[22ch]"
+          lines={[
+            { text: 'Everything your school' },
+            { text: 'needs.', accent: 'Connected.' },
+          ]}
         />
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-20">

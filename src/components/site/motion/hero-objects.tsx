@@ -148,6 +148,8 @@ export function HeroObjects({
     const narrow = window.innerWidth < 768
     const coarse = window.matchMedia('(pointer: coarse)').matches
     const authored = ARRANGEMENTS[arrangement] ?? PIECES
+    // Only the hero has a curtain travelling over the top of it.
+    const covered = arrangement === 'hero'
     // The narrow trim exists to keep the hero's five off the type. An
     // arrangement that is already a single object has nothing to trim.
     const visiblePieces = narrow && authored.length > 3 ? authored.slice(0, 3) : authored
@@ -216,6 +218,15 @@ export function HeroObjects({
       meshes.push({ mesh, piece, base: new THREE.Vector3(...piece.position) })
     }
 
+    // Document-absolute top of the canvas. Re-measured on resize, and once
+    // after load, because web fonts landing change every offset above it.
+    let elementTop = 0
+    const measureTop = () => {
+      elementTop = node.getBoundingClientRect().top + window.scrollY
+    }
+    measureTop()
+    if (document.fonts?.ready) void document.fonts.ready.then(measureTop)
+
     const pointer = { x: 0, y: 0 }
     const onPointerMove = (event: PointerEvent) => {
       pointer.x = (event.clientX / window.innerWidth - 0.5) * 2
@@ -234,6 +245,7 @@ export function HeroObjects({
     observer.observe(node)
 
     const onResize = () => {
+      measureTop()
       const width = node.clientWidth
       const height = node.clientHeight
       if (!width || !height) return
@@ -267,19 +279,45 @@ export function HeroObjects({
        * Normalised scroll through THIS canvas, so the pieces part and sink as
        * the reader leaves rather than holding still behind the curtain.
        *
-       * Measured from the element's own rect, not from `window.scrollY`. The
-       * absolute version is only correct for a canvas that happens to live in
-       * the first viewport: anywhere further down the page `scrollY` is already
-       * past `innerHeight` before the section is even on screen, so `scrolled`
-       * arrives pinned at 1 and the pieces render permanently sunk and spread —
-       * dragged to the bottom of their column and clipped by its edge. This
-       * reads identically for the hero, whose top IS the top of the document.
+       * Measured against the canvas's own position, not `window.scrollY`
+       * outright. The absolute version is only correct for a canvas that
+       * happens to live in the first viewport: anywhere further down the page
+       * `scrollY` is already past `innerHeight` before the section is on
+       * screen, so `scrolled` arrives pinned at 1 and the pieces render
+       * permanently sunk and spread. This reads identically for the hero,
+       * whose top IS the top of the document.
+       *
+       * `elementTop` is cached rather than read per frame. Calling
+       * `getBoundingClientRect()` in here forces a synchronous layout on every
+       * frame, in the middle of the smooth-scrolling layer's own work on the
+       * same thread — which is layout thrashing, and it made scrolling seize
+       * up. The position only changes when the document reflows, so it is
+       * measured then and only then.
        */
-      const rect = node.getBoundingClientRect()
       const scrolled = Math.min(
         1,
-        Math.max(0, -rect.top / Math.max(window.innerHeight, 1)),
+        Math.max(0, (window.scrollY - elementTop) / Math.max(window.innerHeight, 1)),
       )
+
+      /*
+       * Stop drawing once the curtain has covered this canvas.
+       *
+       * The hero is `sticky top-0` inside a curtain stack, so the panel that
+       * slides over it never pushes it out of the viewport and the
+       * IntersectionObserver above goes on reporting it as visible for the
+       * whole of the next section. It is a full-screen canvas of five
+       * refracting solids — the most expensive thing on the page by a wide
+       * margin — and it was being drawn every frame underneath an opaque
+       * panel, on the same thread as the smooth scrolling. Measured here at
+       * 150ms a frame against 17ms with it stopped.
+       *
+       * `scrolled` reaching 1 means the reader has travelled a full viewport,
+       * which is exactly when the panel's top edge has climbed to the top of
+       * the screen and nothing of this is left showing. Only the hero is
+       * covered like this; the closing section's canvas is not behind
+       * anything, so it keeps drawing.
+       */
+      if (covered && scrolled >= 1) return
 
       for (const { mesh, piece, base } of meshes) {
         // Damped follow. The damping factor, not the pointer, is what decides

@@ -3,7 +3,8 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import { EditorialHeading, ScrollReveal } from '../motion/editorial-heading'
+import { ScrollReveal } from '../motion/editorial-heading'
+import { Typewriter } from '../motion/typewriter'
 import { Doodle } from '../motion/doodle'
 import { StoryFigure } from './story-figure'
 import { Parallax } from '../motion/parallax'
@@ -33,9 +34,9 @@ export function EditorialProof() {
     <div id="stories" className="relative overflow-hidden px-[var(--gutter)] py-24 sm:py-32">
       <div className="mx-auto max-w-[78rem]">
         <div className="relative w-fit max-w-full">
-          <EditorialHeading
-            size="md"
-            className="max-w-[20ch]"
+          <Typewriter
+            loop
+            className="ed-display ed-display-md max-w-[20ch]"
             lines={[
               { soft: 'What an', text: 'implementation', softFirst: true },
               { text: 'looks like.', soft: '' },

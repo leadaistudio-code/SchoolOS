@@ -2,7 +2,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import { Container, Section } from '../container'
-import { EditorialHeading } from '../motion/editorial-heading'
+import { Typewriter } from '../motion/typewriter'
 import { Doodle } from '../motion/doodle'
 import { DashboardRender } from '../product/dashboard-render'
 import { CORE_PRODUCTS } from '@/content/site/company'
@@ -31,9 +31,9 @@ export function EditorialFeatures() {
     <Section id="product">
       <Container wide>
         <div className="relative flex items-start justify-between gap-8">
-          <EditorialHeading
-            size="md"
-            className="max-w-[16ch]"
+          <Typewriter
+            loop
+            className="ed-display ed-display-md max-w-[16ch]"
             lines={[
               { text: 'One record.', soft: 'Three' },
               { soft: 'products that', text: 'read it.', softFirst: true },

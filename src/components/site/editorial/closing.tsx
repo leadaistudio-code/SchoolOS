@@ -4,7 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import { HeroObjects } from '../motion/hero-objects'
-import { EditorialHeading, ScrollReveal } from '../motion/editorial-heading'
+import { ScrollReveal } from '../motion/editorial-heading'
+import { Typewriter } from '../motion/typewriter'
 import { Doodle } from '../motion/doodle'
 
 /**
@@ -34,10 +35,10 @@ export function EditorialClosing() {
         <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:gap-20">
           <div>
             <div className="relative inline-block">
-              <EditorialHeading
+              <Typewriter
+                loop
                 as="h2"
-                size="md"
-                className="max-w-[14ch] text-[var(--ed-on-black)]"
+                className="ed-display ed-display-md max-w-[14ch]"
                 lines={[
                   { text: 'Ready to run', soft: 'your' },
                   { soft: 'school on', text: 'one platform?', softFirst: true },
