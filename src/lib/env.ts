@@ -87,6 +87,19 @@ const serverSchema = z.object({
   WHATSAPP_OTP_COPY_BUTTON: bool.default('true'),
 
   /**
+   * Gupshup, a WhatsApp Business Solution Provider, reached over its own REST
+   * API rather than Meta's. Using a BSP means Meta's app, system user and
+   * token setup is Gupshup's problem, not ours - but the wire format is
+   * entirely different, hence a separate driver.
+   */
+  GUPSHUP_API_KEY: z.string().optional(),
+  /** The app name in the Gupshup dashboard, sent as `src.name`. */
+  GUPSHUP_APP_NAME: z.string().optional(),
+  /** The registered sending number, digits only with country code. */
+  GUPSHUP_SOURCE_NUMBER: z.string().optional(),
+  GUPSHUP_API_URL: z.string().default('https://api.gupshup.io/wa/api/v1/template/msg'),
+
+  /**
    * Applied when somebody types a local number. Parents enter ten digits, the
    * school record holds E.164, and the lookup has to reconcile the two.
    */

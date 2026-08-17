@@ -263,27 +263,135 @@ function metaCloudWhatsApp(phoneNumberId: string, accessToken: string): WhatsApp
   }
 }
 
-export function whatsappProvider(): WhatsAppProvider {
-  if (env().WHATSAPP_DRIVER !== 'meta_cloud') return logWhatsApp
+/**
+ * Builds Gupshup's form body.
+ *
+ * Separated so the wire format can be asserted in a test: Gupshup takes
+ * `application/x-www-form-urlencoded` with a JSON string nested in one of the
+ * fields, which is easy to get subtly wrong and produces an opaque rejection
+ * when you do.
+ *
+ * `templateId` is Gupshup's own template identifier from their Templates tab,
+ * not Meta's template name — the same field carries a different kind of value
+ * depending on which driver is in play.
+ */
+export function gupshupPayload(input: {
+  appName: string
+  source: string
+  to: string
+  templateId?: string
+  variables?: Record<string, string>
+  text: string
+}): URLSearchParams {
+  const body = new URLSearchParams({
+    channel: 'whatsapp',
+    source: input.source.replace(/[^\d]/g, ''),
+    destination: input.to.replace(/[^\d]/g, ''),
+    'src.name': input.appName,
+  })
 
-  const phoneNumberId = env().WHATSAPP_PHONE_NUMBER_ID
-  const accessToken = env().WHATSAPP_ACCESS_TOKEN
-  if (!phoneNumberId || !accessToken) {
-    warnMissingWhatsApp()
-    return logWhatsApp
+  if (input.templateId) {
+    // Positional, ordered by the {{n}} slot they fill.
+    const params = Object.entries(input.variables ?? {})
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, value]) => value)
+
+    body.set('template', JSON.stringify({ id: input.templateId, params }))
+  } else {
+    // Only valid inside a 24-hour customer window, which a reset never has.
+    body.set('message', JSON.stringify({ type: 'text', text: input.text }))
   }
 
-  return metaCloudWhatsApp(phoneNumberId, accessToken)
+  return body
+}
+
+function gupshupWhatsApp(apiKey: string, appName: string, source: string): WhatsAppProvider {
+  const endpoint = env().GUPSHUP_API_URL
+
+  return {
+    name: 'gupshup',
+    async send(message) {
+      const to = message.to.replace(/[^\d]/g, '')
+      if (!to) return { ok: false, error: 'No recipient number' }
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            apikey: apiKey,
+            'content-type': 'application/x-www-form-urlencoded',
+            accept: 'application/json',
+          },
+          body: gupshupPayload({
+            appName,
+            source,
+            to,
+            templateId: message.templateName,
+            variables: message.variables,
+            text: message.body,
+          }).toString(),
+          signal: AbortSignal.timeout(12_000),
+        })
+
+        const raw = await response.text()
+        const json = safeJson(raw) as {
+          status?: string
+          messageId?: string
+          message?: string
+        } | null
+
+        // Gupshup answers 202 with status "submitted" on success, and puts the
+        // real reason in `message` on failure. A 200 is not on its own proof.
+        if (!response.ok || (json?.status && json.status !== 'submitted')) {
+          return {
+            ok: false,
+            error: json?.message ?? raw.slice(0, 300) ?? `HTTP ${response.status}`,
+          }
+        }
+
+        return { ok: true, providerMessageId: json?.messageId }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  }
+}
+
+export function whatsappProvider(): WhatsAppProvider {
+  const driver = env().WHATSAPP_DRIVER
+
+  if (driver === 'meta_cloud') {
+    const phoneNumberId = env().WHATSAPP_PHONE_NUMBER_ID
+    const accessToken = env().WHATSAPP_ACCESS_TOKEN
+    if (!phoneNumberId || !accessToken) {
+      warnMissingWhatsApp('WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN')
+      return logWhatsApp
+    }
+    return metaCloudWhatsApp(phoneNumberId, accessToken)
+  }
+
+  if (driver === 'gupshup') {
+    const apiKey = env().GUPSHUP_API_KEY
+    const appName = env().GUPSHUP_APP_NAME
+    const source = env().GUPSHUP_SOURCE_NUMBER
+    if (!apiKey || !appName || !source) {
+      warnMissingWhatsApp('GUPSHUP_API_KEY, GUPSHUP_APP_NAME and GUPSHUP_SOURCE_NUMBER')
+      return logWhatsApp
+    }
+    return gupshupWhatsApp(apiKey, appName, source)
+  }
+
+  return logWhatsApp
 }
 
 let warnedMissingWhatsApp = false
-function warnMissingWhatsApp() {
+function warnMissingWhatsApp(required: string) {
   if (warnedMissingWhatsApp) return
   warnedMissingWhatsApp = true
   console.warn(
-    '[whatsapp] WHATSAPP_DRIVER="meta_cloud" but WHATSAPP_PHONE_NUMBER_ID or ' +
-      'WHATSAPP_ACCESS_TOKEN is missing; falling back to the log driver. ' +
-      'Reset codes will not be delivered until both are set.',
+    `[whatsapp] WHATSAPP_DRIVER="${env().WHATSAPP_DRIVER}" needs ${required}; ` +
+      'falling back to the log driver. Reset codes will not be delivered until ' +
+      'they are set.',
   )
 }
 

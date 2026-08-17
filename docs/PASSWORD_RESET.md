@@ -9,7 +9,7 @@ page, because all three mint the same short-lived reset token.
 
 | Channel | Who it serves | Needs |
 | --- | --- | --- |
-| **WhatsApp code** (primary) | Everyone, especially parents | Meta Cloud API configured |
+| **WhatsApp code** (primary) | Everyone, especially parents | Gupshup or Meta Cloud API configured |
 | **Email link** | Staff with a working address | `SMTP_URL` configured |
 | **Counter password** | Anyone email and WhatsApp cannot reach | Nothing |
 | *Support ticket* (fallback) | Automatic when WhatsApp fails | Nothing |
@@ -52,6 +52,45 @@ On **Settings → Users**, each account has:
   whose email was mistyped at enrolment and whose number is not on WhatsApp.
 
 ---
+
+## Setting up WhatsApp — Gupshup (or any BSP)
+
+Going through a Business Solution Provider means Gupshup owns the Meta app,
+the system user and the access token. You skip all of the Meta section below.
+
+1. In the Gupshup dashboard, confirm **Account Status: Active** and
+   **Phone Status: Connected**.
+2. **Templates → Create**, category **Authentication**, one variable `{{1}}`
+   for the code. Submit and wait for approval.
+3. Copy the approved template's **ID** (a UUID) — not its name.
+4. Copy your **API key** from the Gupshup dashboard, and note the **app name**
+   shown in the breadcrumb and the **registered sender number**.
+5. Set:
+
+```bash
+WHATSAPP_DRIVER=gupshup
+WHATSAPP_OTP_TEMPLATE=<the template UUID>
+GUPSHUP_API_KEY=<your key>
+GUPSHUP_APP_NAME=<app name>
+GUPSHUP_SOURCE_NUMBER=<sender, digits only>
+DEFAULT_COUNTRY_CODE=+91
+```
+
+Verify the credentials with a direct call before wiring the app to them, so a
+failure is attributable to one thing:
+
+```bash
+curl -X POST https://api.gupshup.io/wa/api/v1/template/msg \
+  -H "apikey: $GUPSHUP_API_KEY" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "channel=whatsapp" \
+  --data-urlencode "source=<sender>" \
+  --data-urlencode "destination=<your own number>" \
+  --data-urlencode "src.name=<app name>" \
+  --data-urlencode 'template={"id":"<template uuid>","params":["123456"]}'
+```
+
+A successful call answers `{"status":"submitted","messageId":"..."}`.
 
 ## Setting up WhatsApp (Meta Cloud API)
 
