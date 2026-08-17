@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
-import { Hero } from '@/components/site/home/hero'
-import { Metrics } from '@/components/site/home/metrics'
-import { Platform } from '@/components/site/home/platform'
-import { CoreProducts } from '@/components/site/home/core-products'
-import { Showcase } from '@/components/site/home/showcase'
-import { Modules } from '@/components/site/home/modules'
+import { EditorialHero } from '@/components/site/editorial/hero'
+import { EditorialStatement } from '@/components/site/editorial/statement'
+import { EditorialFeatures } from '@/components/site/editorial/features'
+import { EditorialCapsules } from '@/components/site/editorial/capsules'
+import { EditorialProof } from '@/components/site/editorial/proof'
+import { EditorialClosing } from '@/components/site/editorial/closing'
+import { CurtainBase, CurtainPanel, CurtainStack } from '@/components/site/editorial/curtain'
+import { FloatingNav } from '@/components/site/motion/floating-nav'
 import { Admissions } from '@/components/site/home/admissions'
 import { Operations } from '@/components/site/home/operations'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
 import { Security } from '@/components/site/home/security'
-import { CaseStudies } from '@/components/site/home/stories'
 import { Journey } from '@/components/site/home/journey'
-import { ClosingCta } from '@/components/site/cta'
 import { organisationJsonLd, softwareJsonLd } from '@/components/site/seo'
 
 export const metadata: Metadata = {
@@ -23,56 +23,85 @@ export const metadata: Metadata = {
 }
 
 /**
- * The homepage.
+ * The homepage, as a narrative.
  *
- * The order is an argument, not a catalogue, and each section has a distinct
- * composition so the page never reads as the same block repeated:
+ * The argument is unchanged — it is the same fourteen sections' worth of
+ * content — but it is now told in six movements that alternate ground, because
+ * a page that switches between black and white is read as chapters rather than
+ * as a scroll:
  *
- *   1  the product, at the fold
- *   2  what is actually built, in numbers we can stand behind
- *   3  why one database is the whole point
- *   4  the three products, as substantial panels
- *   5  the dashboard, large, on navy
- *   6  the catalogue, behind category tabs
- *   7  admissions — including what is not built yet
- *   8  a Monday morning in the office
- *   9  parents and teachers
- *  10  integrations, with their real status
- *  11  security, ending with what we lack
- *  12  case studies, marked as samples until approved
- *  13  how an implementation runs
- *  14  the ask
+ *   1  dark    the promise, with the objects
+ *   2  paper   the claim, and the four figures we can stand behind
+ *   3  paper   the three products, pinned, one at a time
+ *   4  dark    every module that is built, arriving as a field
+ *   5  paper   how an implementation actually goes, and everything around it
+ *   6  dark    the ask
  *
- * The page was cut from eighteen sections to fourteen. The four that went —
- * the student-record walkthrough, transport, the school-type grid and the
- * differentiators — were the ones that restated an argument the sections
- * above them had already made, and the length was costing more attention
- * than the repetition bought. Quotations went with them: sample testimonials
- * read as filler to the kind of buyer this page is for.
+ * The sections that do not map onto a movement of their own — admissions, the
+ * Monday morning, parents, integrations, security, the implementation
+ * sequence — keep their content and sit inside movement five, where they are
+ * the detail behind the claim rather than a queue of equal-weight panels.
  *
- * Structured data is emitted here rather than in the layout: the homepage is
- * the only page that should describe the organisation and the product itself.
+ * Each ground arrives as a curtain over the last: the previous movement holds
+ * at the top of the viewport while the next travels over it. Built from sticky
+ * positioning rather than pinning, so there is nothing to recalculate on
+ * resize and no state that can be left stranded mid-transition.
  */
+
+const MARKS = [
+  { id: 'platform', label: 'Platform' },
+  { id: 'product', label: 'Product' },
+  { id: 'modules', label: 'Modules' },
+  { id: 'stories', label: 'Stories' },
+  { id: 'demo', label: 'Demo' },
+]
+
 export default function HomePage() {
   return (
     <>
       {organisationJsonLd()}
       {softwareJsonLd()}
 
-      <Hero />
-      <Metrics />
-      <Platform />
-      <CoreProducts />
-      <Showcase />
-      <Modules />
-      <Admissions />
-      <Operations />
-      <Parents />
-      <Integrations />
-      <Security />
-      <CaseStudies />
-      <Journey />
-      <ClosingCta />
+      <FloatingNav marks={MARKS} />
+
+      <CurtainStack>
+        <CurtainBase>
+          <EditorialHero />
+        </CurtainBase>
+
+        <CurtainPanel tone="paper">
+          <EditorialStatement />
+          <EditorialFeatures />
+        </CurtainPanel>
+      </CurtainStack>
+
+      <CurtainStack>
+        <CurtainBase className="h-0" />
+        <CurtainPanel tone="black">
+          <EditorialCapsules />
+        </CurtainPanel>
+      </CurtainStack>
+
+      <CurtainPanel tone="paper">
+        <EditorialProof />
+
+        {/*
+          The detail behind the claim. These keep their existing compositions:
+          they are argued in prose and tables, which the editorial register
+          would flatten rather than improve, and a director reads them after
+          the narrative has done its work.
+        */}
+        <div className="border-t border-[color-mix(in_srgb,var(--ed-ink)_8%,transparent)]">
+          <Admissions />
+          <Operations />
+          <Parents />
+          <Integrations />
+          <Security />
+          <Journey />
+        </div>
+      </CurtainPanel>
+
+      <EditorialClosing />
     </>
   )
 }

@@ -12,3 +12,9 @@ coverage
 
 # Crash logs the editor drops in the project root
 debug.log
+
+# Screenshots produced by the run skill's driver — regenerated on demand.
+.claude/skills/run-mycampusview/shots/
+
+# Design reference video — 9MB, not part of the build.
+original-*.mp4

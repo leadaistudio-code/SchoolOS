@@ -4,6 +4,7 @@ import '@/styles/site.css'
 import { SiteNav } from '@/components/site/nav'
 import { SiteFooter } from '@/components/site/footer'
 import { Reveal } from '@/components/site/reveal'
+import { SmoothScroll } from '@/components/site/motion/provider'
 import { env } from '@/lib/env'
 
 /**
@@ -51,7 +52,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         Skip to content
       </a>
       <Reveal />
-        <SiteNav />
+      <SmoothScroll />
+      <SiteNav />
       <main id="main">{children}</main>
       <SiteFooter />
     </div>

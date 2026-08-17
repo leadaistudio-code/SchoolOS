@@ -392,3 +392,233 @@
     opacity: 0.5;
   }
 }
+
+/* ==========================================================================
+   EDITORIAL LAYER
+   --------------------------------------------------------------------------
+   A second visual register for the homepage narrative: near-black grounds,
+   warm off-white, and typography set at poster scale. Added alongside the
+   tokens above rather than replacing them, so the interior pages keep the
+   document palette they were designed against while the narrative pages read
+   as art direction.
+
+   The accent hues appear in exactly two places — the hero objects and the
+   capsule field — and never as a gradient wash behind text.
+   ========================================================================== */
+
+.site {
+  --ed-black: #08080a;
+  --ed-black-soft: #101014;
+  --ed-paper: #f4f3ef;
+  --ed-paper-pure: #fbfaf8;
+  --ed-ink: #0b0b0d;
+  /* Contrast, not taste: the previous values measured 2.5:1 on paper and
+     4.3:1 on black. Both are below the 4.5:1 minimum for body text, and the
+     grey genuinely could not be read. These measure 5.4:1 and 8.5:1. */
+  --ed-ink-soft: #62626b;
+  --ed-on-black: #f6f5f2;
+  --ed-on-black-soft: #a8a8b2;
+
+  --ed-mint: #7fd6bd;
+  --ed-violet: #b57ff0;
+  --ed-amber: #f0a63c;
+  --ed-rose: #ef5ba8;
+  --ed-sky: #4ea3f5;
+
+  /* One easing for entrances, one for scroll-linked movement. */
+  --ed-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ed-ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Poster type.
+   Tracking tightens as the size grows, which is what stops a large headline
+   from reading as a shouted small one. */
+/*
+ * `.site h1, h2, h3` above sets a colour, unlayered, and unlayered CSS beats
+ * anything Tailwind emits into @layer utilities no matter how specific the
+ * utility is. An editorial heading therefore cannot be coloured from a class
+ * on the element — it has to take the colour of the ground it is standing on,
+ * which is what this does. Two classes beats one class and one element, so it
+ * also wins on specificity.
+ */
+.site .ed-display,
+.site h1.ed-display,
+.site h2.ed-display,
+.site h3.ed-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  color: inherit;
+}
+
+.site .ed-display-lg {
+  /* Sized so a seven-word promise sets on three lines inside the fold. The
+     reference's headline is five words; copying its 9vw put ours off the
+     bottom of the viewport. */
+  font-size: clamp(2.25rem, 6.2vw, 5.25rem);
+}
+.site .ed-display-md {
+  font-size: clamp(2.25rem, 6.4vw, 5.25rem);
+  line-height: 0.98;
+}
+.site .ed-display-sm {
+  font-size: clamp(1.75rem, 3.6vw, 3rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+/* The grey/black word mix that carries the hierarchy in the reference: the
+   sentence reads whole, but the argument is legible at a glance. */
+.site .ed-soft {
+  color: var(--ed-ink-soft);
+}
+.site .on-ed-black .ed-soft {
+  color: var(--ed-on-black-soft);
+}
+
+.site .ed-black-ground,
+.site .on-ed-black {
+  background: var(--ed-black);
+  color: var(--ed-on-black);
+}
+.site .on-ed-black {
+  /* Used on a panel that already has its ground from the curtain. */
+  background: transparent;
+}
+.site .ed-paper-ground {
+  background: var(--ed-paper);
+  color: var(--ed-ink);
+}
+
+/* Line masking.
+   Each line sits in its own overflow-hidden box, so the reveal reads as type
+   rising off a baseline rather than as a block fading in. */
+.site .ed-line {
+  display: block;
+  overflow: hidden;
+}
+/*
+ * The word-level variant, for headlines masked per word rather than per line.
+ * It exists as its own class because `.site .ed-line` is unlayered and would
+ * otherwise beat a Tailwind `inline-block` utility on the same element — which
+ * set every word of the hero on a line of its own.
+ */
+.site .ed-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.site .ed-line > span,
+.site .ed-word > span {
+  display: block;
+  will-change: transform;
+}
+
+/* The editorial link: a rule that draws itself, not a filled pill. */
+.site .ed-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7em;
+  padding-bottom: 0.28em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.site .ed-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform-origin: right;
+  transform: scaleX(1);
+  transition: transform 420ms var(--ed-ease);
+}
+.site .ed-link:hover::after {
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.site .ed-link svg {
+  transition: transform 420ms var(--ed-ease);
+}
+.site .ed-link:hover svg {
+  transform: translateX(0.35em);
+}
+
+/* Hand-drawn accents draw themselves once, on arrival. */
+.site .ed-doodle path,
+.site .ed-doodle circle,
+.site .ed-doodle ellipse,
+.site .ed-doodle line {
+  stroke-dasharray: var(--len, 260);
+  stroke-dashoffset: var(--len, 260);
+}
+.site .ed-doodle.is-drawn path,
+.site .ed-doodle.is-drawn circle,
+.site .ed-doodle.is-drawn ellipse,
+.site .ed-doodle.is-drawn line {
+  animation: ed-draw 900ms var(--ed-ease-soft) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+@keyframes ed-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Lenis. The library sets these itself, but declaring them here keeps the
+   page usable in the frame before it initialises. */
+.site html.lenis,
+html.lenis {
+  height: auto;
+}
+html.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site .ed-doodle path,
+  .site .ed-doodle circle,
+  .site .ed-doodle ellipse,
+  .site .ed-doodle line {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .site .ed-line > span {
+    transform: none !important;
+  }
+}
+
+/* The caret for the typed statement. Steady blink, stops when typing ends. */
+.site .ed-caret {
+  display: inline-block;
+  width: 0.06em;
+  height: 0.82em;
+  margin-left: 0.06em;
+  background: currentColor;
+  vertical-align: baseline;
+  animation: ed-blink 1s steps(1, end) infinite;
+}
+.site .ed-caret[data-done='true'] {
+  animation: none;
+  opacity: 0;
+}
+@keyframes ed-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site .ed-caret {
+    animation: none;
+  }
+}

@@ -31,12 +31,21 @@ export function SiteNav() {
   const headerRef = React.useRef<HTMLElement>(null)
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // The homepage hero carries its own wordmark and action, so the header stays
+  // out of the fold there and arrives once the reader is past it. Everywhere
+  // else it behaves as it always has.
+  const overHero = pathname === '/'
+  const [pastHero, setPastHero] = React.useState(!overHero)
+
   React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => {
+      setScrolled(window.scrollY > 8)
+      if (overHero) setPastHero(window.scrollY > window.innerHeight * 0.85)
+    }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [overHero])
 
   // A route change closes everything. Without this the panel survives the
   // navigation it caused.
@@ -88,10 +97,15 @@ export function SiteNav() {
     <header
       ref={headerRef}
       className={cn(
-        'sticky top-0 z-50 transition-[background-color,border-color,box-shadow] duration-200',
+        // Fixed rather than sticky over the hero: a sticky header occupies
+        // its own height in normal flow even when translated away, which
+        // opened the fold with a blank white band above the black ground.
+        overHero ? 'fixed inset-x-0 top-0' : 'sticky top-0',
+        'z-50 transition-[background-color,border-color,box-shadow,opacity,transform] duration-300',
         scrolled || open
           ? 'border-b border-[var(--rule)] bg-white/92 backdrop-blur-md'
           : 'border-b border-transparent bg-transparent',
+        overHero && !pastHero && 'pointer-events-none -translate-y-full opacity-0',
       )}
       onMouseLeave={hoverClose}
     >
