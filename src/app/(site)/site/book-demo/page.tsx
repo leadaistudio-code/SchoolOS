@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Container } from '@/components/site/container'
 import { DemoForm } from '@/components/site/demo-form'
-import { Wordmark } from '@/components/site/nav'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 import { breadcrumbJsonLd } from '@/components/site/seo'
 import { MODULE_COUNTS } from '@/content/site/modules'
 import { CONTACT } from '@/content/site/company'
@@ -73,7 +73,7 @@ export default function BookDemoPage() {
 
               {/* Trust, stated as facts rather than as badges. */}
               <div className="mt-10 rounded-xl border border-[var(--rule)] bg-white p-5">
-                <Wordmark />
+                <MyCampusViewLogo size="md" />
                 <ul className="mt-4 space-y-2 text-[14px] leading-[1.55] text-[var(--text-muted)]">
                   <li>
                     {MODULE_COUNTS.available} modules available today, with the rest labelled on the

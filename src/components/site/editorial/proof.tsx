@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import { EditorialHeading, ScrollReveal } from '../motion/editorial-heading'
 import { Doodle } from '../motion/doodle'
+import { StoryFigure } from './story-figure'
 import { Parallax } from '../motion/parallax'
 import { SampleMark } from '../ui'
 import { CASE_STUDIES } from '@/content/site/proof'
@@ -31,9 +32,10 @@ export function EditorialProof() {
   return (
     <div id="stories" className="relative overflow-hidden px-[var(--gutter)] py-24 sm:py-32">
       <div className="mx-auto max-w-[78rem]">
-        <div className="relative max-w-[20ch]">
+        <div className="relative w-fit max-w-full">
           <EditorialHeading
             size="md"
+            className="max-w-[20ch]"
             lines={[
               { soft: 'What an', text: 'implementation', softFirst: true },
               { text: 'looks like.', soft: '' },
@@ -67,13 +69,21 @@ export function EditorialProof() {
                   rearranging itself for as long as it is on screen. */}
               <Parallax speed={0.04 + index * 0.05}>
               <article className="relative">
-                {/* A tall figure block stands in for the reference's
-                    photography, carrying the school's shape instead of a face. */}
-                <div className="mb-7 flex aspect-[4/3] flex-col justify-end rounded-2xl bg-[color-mix(in_srgb,var(--ed-ink)_5%,transparent)] p-7">
-                  <p className="ed-display text-[clamp(1.4rem,2.2vw,1.9rem)] leading-[1.1] text-[var(--ed-ink)]">
+                {/* The figure stands in for the reference's photography,
+                    carrying the school's shape instead of a face. Drawn, not
+                    photographed — see `story-figure.tsx` for why. */}
+                <div className="relative mb-7 flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-2xl bg-[color-mix(in_srgb,var(--ed-ink)_5%,transparent)] p-7">
+                  <StoryFigure index={index} className="absolute inset-x-0 top-0 h-[78%]" />
+                  {/*
+                    The drawing is kept clear of the name by height alone, and
+                    then this fades whatever reaches the last quarter into the
+                    ground, so a figure can never sit behind a word.
+                  */}
+                  <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[color-mix(in_srgb,var(--ed-ink)_5%,var(--ed-paper))] to-transparent" />
+                  <p className="relative ed-display text-[clamp(1.4rem,2.2vw,1.9rem)] leading-[1.1] text-[var(--ed-ink)]">
                     {study.school}
                   </p>
-                  <p className="mt-2 text-[13.5px] text-[var(--ed-ink-soft)]">
+                  <p className="relative mt-2 text-[13.5px] text-[var(--ed-ink-soft)]">
                     {study.location} · {study.size}
                   </p>
                 </div>

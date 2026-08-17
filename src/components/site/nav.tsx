@@ -7,6 +7,7 @@ import { ChevronDown, Menu, Minus, Plus, X } from 'lucide-react'
 import { Container } from './container'
 import { cn } from '@/lib/utils'
 import { MEGA_MENUS, type MegaMenu } from '@/content/site/nav'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 
 /**
  * The header.
@@ -112,7 +113,9 @@ export function SiteNav() {
       <Container wide>
         <div className="flex h-[70px] items-center gap-6">
           <Link href="/" className="shrink-0" aria-label="MyCampusView home">
-            <Wordmark />
+            {/* The one navbar logo: preloaded, and the only entrance
+                animation on the header. */}
+            <MyCampusViewLogo size="md" animated priority />
           </Link>
 
           <nav className="hidden items-center lg:flex" aria-label="Main">
@@ -372,34 +375,5 @@ function MobileDrawer({ onNavigate }: { onNavigate: () => void }) {
         </div>
       </div>
     </div>
-  )
-}
-
-/**
- * The wordmark.
- *
- * A register page with a mark against the last line — the same shape the
- * application uses for a school without a logo. No graduation cap: every
- * education product on earth uses one.
- */
-export function Wordmark({ onDark }: { onDark?: boolean }) {
-  return (
-    <span className="flex items-center gap-2.5">
-      <svg viewBox="0 0 32 32" className="size-8 shrink-0" aria-hidden>
-        <rect width="32" height="32" rx="8" fill={onDark ? '#fff' : 'var(--ink)'} />
-        <g stroke={onDark ? 'var(--ink)' : '#fff'} strokeWidth="2" strokeLinecap="round">
-          <path d="M9 12h14M9 17h14M9 22h8" opacity="0.9" />
-        </g>
-        <circle cx="23.5" cy="22" r="2.5" fill={onDark ? 'var(--blue)' : '#7ea2f5'} />
-      </svg>
-      <span
-        className={cn(
-          'text-[19px] font-semibold tracking-[-0.02em]',
-          onDark ? 'text-white' : 'text-[var(--ink)]',
-        )}
-      >
-        MyCampusView
-      </span>
-    </span>
   )
 }

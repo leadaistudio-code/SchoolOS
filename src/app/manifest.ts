@@ -14,6 +14,18 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const themeColor = school?.pwaThemeHex || school?.primaryHex || '#E41F07'
   const icon = school?.faviconUrl || school?.logoUrl
 
+  // With no school resolved this is the marketing site or the platform
+  // console, and the product's own mark is the right icon to install.
+  const icons: MetadataRoute.Manifest['icons'] = icon
+    ? [
+        { src: icon, sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: icon, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      ]
+    : [
+        { src: '/brand/mycampusview-mark.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/brand/mycampusview-mark.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      ]
+
   return {
     name,
     short_name: shortName,
@@ -24,11 +36,6 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     orientation: 'portrait',
     background_color: '#ffffff',
     theme_color: themeColor,
-    icons: icon
-      ? [
-          { src: icon, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: icon, sizes: '512x512', type: 'image/png', purpose: 'any' },
-        ]
-      : [],
+    icons,
   }
 }

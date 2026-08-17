@@ -44,10 +44,21 @@ const OVERDUE = 420000_00
 export function DashboardRender({ view = 'all' }: { view?: 'all' | 'kpis' | 'charts' }) {
   const currency = 'INR'
 
+  /*
+   * Container queries, not viewport ones.
+   *
+   * This composition is dropped into columns of very different widths — the
+   * full width of the product page, half of the homepage hero, a 600px column
+   * beside the three products. Breaking on the viewport meant a 600px panel
+   * still went to four stat tiles across as soon as the WINDOW passed 1280,
+   * and the money figures were clipped mid-digit. Every break below is against
+   * this element's own width instead, so the panel lays itself out correctly
+   * wherever it is put and no caller has to pass a size.
+   */
   return (
-    <div className="bg-[var(--page)] p-3 sm:p-5">
+    <div className="@container bg-[var(--page)] p-3 sm:p-5">
       {view === 'charts' ? null : (
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 @[46rem]:grid-cols-4">
           <StatTile
             label="Total students"
             value="1,284"
@@ -87,7 +98,7 @@ export function DashboardRender({ view = 'all' }: { view?: 'all' | 'kpis' | 'cha
       {view !== 'kpis' ? (
         <div
           className={cn(
-            'grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]',
+            'grid gap-3 @[52rem]:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]',
             view === 'all' && 'mt-3',
           )}
         >
@@ -108,7 +119,7 @@ export function DashboardRender({ view = 'all' }: { view?: 'all' | 'kpis' | 'cha
             />
           </Widget>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 @[34rem]:grid-cols-2 @[52rem]:grid-cols-1">
             <Widget title="Fee collection" subtitle="Across all issued invoices">
               <MiniDonut
                 centreValue={formatMoney(COLLECTED, currency)}
@@ -131,9 +142,9 @@ export function DashboardRender({ view = 'all' }: { view?: 'all' | 'kpis' | 'cha
 
             {/* In the full dashboard this panel duplicates the attendance
                 figure in the band above once there is room for both, so it is
-                dropped at xl. In the reporting-only view it is the fourth
-                panel and always shown. */}
-            <div className={view === 'charts' ? 'block' : 'hidden sm:block xl:hidden'}>
+                dropped once the panel is wide. In the reporting-only view it is
+                the fourth panel and always shown. */}
+            <div className={view === 'charts' ? 'block' : 'hidden @[34rem]:block @[52rem]:hidden'}>
               <AttendanceRender />
             </div>
           </div>

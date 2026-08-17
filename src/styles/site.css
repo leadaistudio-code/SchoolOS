@@ -487,6 +487,23 @@
   /* Used on a panel that already has its ground from the curtain. */
   background: transparent;
 }
+/*
+ * Headings on the editorial black grounds, for the same reason `.on-navy` has
+ * this rule: `.site h1, h2, h3` above sets a colour unlayered, so a `text-white`
+ * utility on a heading inside a dark section is silently ignored and the
+ * heading renders in body ink on black. `.ed-display` escapes this by taking
+ * `color: inherit`, but a plain `<h3>` — a panel title, a list heading — has
+ * nothing to escape with. This is that escape.
+ */
+.site .ed-black-ground h1,
+.site .ed-black-ground h2,
+.site .ed-black-ground h3,
+.site .on-ed-black h1,
+.site .on-ed-black h2,
+.site .on-ed-black h3 {
+  color: var(--ed-on-black);
+}
+
 .site .ed-paper-ground {
   background: var(--ed-paper);
   color: var(--ed-ink);

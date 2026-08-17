@@ -6,6 +6,7 @@ import { Typewriter } from '../motion/typewriter'
 import { Doodle } from '../motion/doodle'
 import { Parallax, ScrubWords } from '../motion/parallax'
 import { METRICS } from '@/content/site/proof'
+import { cn } from '@/lib/utils'
 
 /**
  * The claim, set as a poster.
@@ -19,6 +20,24 @@ import { METRICS } from '@/content/site/proof'
  * modest, and scattering them as loose chips rather than ranking them in a row
  * stops the section from reading as a scoreboard we would lose.
  */
+
+/**
+ * A colour per figure, from the editorial accents.
+ *
+ * Assigned by position rather than picked per metric, so the run of four keeps
+ * its spread of hue no matter what the figures come to say — and so no figure
+ * can end up sharing a colour with the amber spark set just above it.
+ *
+ * The numerals stay ink rather than white. Ink clears 6:1 on all four of these
+ * where white manages 2.7:1 on the sky and 2.9:1 on the mint, which is under
+ * the threshold even at this size.
+ */
+const FIGURE_TONES = [
+  'bg-[var(--ed-sky)]',
+  'bg-[var(--ed-rose)]',
+  'bg-[var(--ed-amber)]',
+  'bg-[var(--ed-mint)]',
+]
 
 /** Placement is authored per chip: a grid here would flatten the composition. */
 const CHIP_PLACEMENT = [
@@ -72,7 +91,12 @@ export function EditorialStatement() {
                 className={CHIP_PLACEMENT[index] ?? ''}
               >
                 <div className="flex flex-col items-center text-center">
-                  <span className="grid aspect-square w-full max-w-[9.5rem] place-items-center rounded-full bg-[color-mix(in_srgb,var(--ed-ink)_5%,transparent)] px-4">
+                  <span
+                    className={cn(
+                      'grid aspect-square w-full max-w-[9.5rem] place-items-center rounded-full px-4',
+                      FIGURE_TONES[index % FIGURE_TONES.length],
+                    )}
+                  >
                     <span className="ed-display text-[clamp(1.8rem,3.4vw,2.9rem)] tabular-nums text-[var(--ed-ink)]">
                       {metric.value}
                     </span>

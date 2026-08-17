@@ -24,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: name, template: `%s · ${name}` },
     description: `${name} school management portal`,
     manifest: '/manifest.webmanifest',
+    // Undefined on purpose: Next then falls back to `src/app/icon.png` and
+    // `src/app/apple-icon.png`, which carry the MyCampusView symbol.
     icons: tenant?.school?.faviconUrl ? { icon: tenant.school.faviconUrl } : undefined,
     appleWebApp: { capable: true, title: name, statusBarStyle: 'default' },
   }

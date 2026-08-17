@@ -3,19 +3,20 @@ import { DatabaseZap, Fingerprint, KeyRound, ShieldCheck, Timer, UserCheck } fro
 import { Container, Section } from '../container'
 import { ConnectionGrid } from '../connection-grid'
 import { SectionHeader, TextLink } from '../ui'
-import { SECURITY_LIMITS, SECURITY_POINTS } from '@/content/site/company'
+import { SECURITY_POINTS } from '@/content/site/company'
 
 /**
  * Security.
  *
- * The competitive move here is unusual and deliberate: the section ends by
- * saying what MyCampusView does *not* have. Every other site in this market puts a
- * row of certification badges here, and a school's IT reviewer knows most of
- * them are decorative. Naming the gaps ourselves is the only claim on the page
- * that cannot be made by someone who is bluffing.
- *
  * Each point corresponds to something in `docs/SECURITY.md`. If a claim here
  * cannot be traced to that document, it should not be here.
+ *
+ * This section used to close with a "What we do not have" panel naming the
+ * certifications MyCampusView does not hold. It was removed from the homepage
+ * on request. Note that the copy above still promises to be "specific rather
+ * than reassuring", and `SECURITY_LIMITS` in `content/site/company.ts` is now
+ * unreferenced — the /security page is where that disclosure belongs if it is
+ * to be made anywhere.
  */
 /**
  * One glyph per point, keyed by title rather than by index so reordering the
@@ -67,17 +68,6 @@ export function Security() {
               </div>
             )
           })}
-        </div>
-
-        <div className="mt-14 rounded-xl border border-[var(--navy-line)] p-6 sm:p-8" data-reveal>
-          <h3 className="text-[16px] font-semibold text-white">What we do not have</h3>
-          <ul className="mt-4 space-y-3">
-            {SECURITY_LIMITS.map((limit) => (
-              <li key={limit} className="muted max-w-3xl text-[15px] leading-[1.6]">
-                {limit}
-              </li>
-            ))}
-          </ul>
         </div>
       </Container>
     </Section>

@@ -54,7 +54,7 @@ function place(index: number) {
     rotate: (fract - 0.5) * 34,
     fromX: (fract2 - 0.5) * 420,
     fromY: -260 - fract * 340,
-    delay: fract2 * 0.28,
+    delay: fract2 * 1.05,
   }
 }
 
@@ -89,10 +89,17 @@ export function EditorialCapsules() {
             scale: 1,
             // Back.out gives the settle a little weight at the end, which is
             // what makes them read as objects rather than as fading labels.
-            ease: 'back.out(1.15)',
-            duration: 1.15,
+            // Slow on purpose: at just over a second the field read as a
+            // scatter effect, and a reader could not follow any single name
+            // down. Two seconds, spread over a second of arrivals, lets the
+            // eye track individual capsules as they drop.
+            ease: 'back.out(1.05)',
+            duration: 2.1,
             delay: spec.delay,
-            scrollTrigger: { trigger: node, start: 'top 62%', once: true },
+            // Started earlier to match: the fall now takes ~3s end to end, so
+            // it has to begin before the field is centred or it finishes with
+            // the section already scrolling away.
+            scrollTrigger: { trigger: node, start: 'top 78%', once: true },
           },
         )
       })
@@ -104,11 +111,11 @@ export function EditorialCapsules() {
   return (
     <div id="modules" ref={root} className="on-ed-black relative overflow-hidden px-[var(--gutter)] py-24 sm:py-32">
       <div className="mx-auto max-w-[70rem]">
-        <div className="relative mx-auto max-w-[24ch] text-center">
+        <div className="relative mx-auto w-fit max-w-full text-center">
           <EditorialHeading
             align="center"
             size="md"
-            className="text-[var(--ed-on-black)]"
+            className="max-w-[16ch] text-[var(--ed-on-black)]"
             lines={[
               { text: 'Everything', soft: 'that is' },
               { text: 'built', soft: 'today.', softFirst: false },
@@ -118,7 +125,7 @@ export function EditorialCapsules() {
           <Doodle
             name="underline"
             color="var(--ed-rose)"
-            className="absolute -bottom-3 left-[6%] h-5 w-[42%] sm:-bottom-4 sm:h-7"
+            className="absolute -bottom-3 left-[46%] h-5 w-[36%] sm:-bottom-4 sm:h-7"
             delay={520}
           />
         </div>

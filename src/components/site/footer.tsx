@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { Container } from './container'
-import { Wordmark } from './nav'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 import { FOOTER_COLUMNS } from '@/content/site/nav'
 import { CONTACT } from '@/content/site/company'
 import { MODULE_COUNTS } from '@/content/site/modules'
@@ -23,7 +23,9 @@ export function SiteFooter() {
       <Container wide>
         <div className="grid gap-12 py-16 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] lg:gap-20">
           <div>
-            <Wordmark onDark />
+            {/* Restrained: the footer states the brand, it does not
+                perform it. No float, no tilt. */}
+            <MyCampusViewLogo size="md" onDark />
             <p className="muted mt-4 max-w-xs text-[15px] leading-[1.6]">
               One platform for admissions, student records, academics, fees, staff, parent
               communication and school operations — {MODULE_COUNTS.available} modules on one

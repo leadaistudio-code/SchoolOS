@@ -8,7 +8,6 @@ import { EditorialClosing } from '@/components/site/editorial/closing'
 import { CurtainBase, CurtainPanel, CurtainStack } from '@/components/site/editorial/curtain'
 import { FloatingNav } from '@/components/site/motion/floating-nav'
 import { Admissions } from '@/components/site/home/admissions'
-import { Operations } from '@/components/site/home/operations'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
 import { Security } from '@/components/site/home/security'
@@ -32,15 +31,19 @@ export const metadata: Metadata = {
  *
  *   1  dark    the promise, with the objects
  *   2  paper   the claim, and the four figures we can stand behind
- *   3  paper   the three products, pinned, one at a time
- *   4  dark    every module that is built, arriving as a field
- *   5  paper   how an implementation actually goes, and everything around it
- *   6  dark    the ask
+ *   3  dark    every module that is built, arriving as a field
+ *   4  paper   how an implementation actually goes, and everything around it
+ *   5  dark    the ask
  *
  * The sections that do not map onto a movement of their own — admissions, the
- * Monday morning, parents, integrations, security, the implementation
- * sequence — keep their content and sit inside movement five, where they are
+ * three products, parents, integrations, security, the implementation
+ * sequence — keep their content and sit inside movement four, where they are
  * the detail behind the claim rather than a queue of equal-weight panels.
+ *
+ * The three products used to be a movement of their own, pinned, between the
+ * claim and the modules. It is now a plain section standing where the Monday
+ * morning board stood: the same board, argued as the product rather than as an
+ * hour of the day.
  *
  * Each ground arrives as a curtain over the last: the previous movement holds
  * at the top of the viewport while the next travels over it. Built from sticky
@@ -48,11 +51,16 @@ export const metadata: Metadata = {
  * resize and no state that can be left stranded mid-transition.
  */
 
+/**
+ * In document order, which is the only order that works: the floating nav
+ * marks whichever section is on screen, so a mark listed before the section
+ * above it lights up out of sequence and reads as a bug in the page.
+ */
 const MARKS = [
   { id: 'platform', label: 'Platform' },
-  { id: 'product', label: 'Product' },
   { id: 'modules', label: 'Modules' },
   { id: 'stories', label: 'Stories' },
+  { id: 'product', label: 'Product' },
   { id: 'demo', label: 'Demo' },
 ]
 
@@ -71,7 +79,6 @@ export default function HomePage() {
 
         <CurtainPanel tone="paper">
           <EditorialStatement />
-          <EditorialFeatures />
         </CurtainPanel>
       </CurtainStack>
 
@@ -93,7 +100,7 @@ export default function HomePage() {
         */}
         <div className="border-t border-[color-mix(in_srgb,var(--ed-ink)_8%,transparent)]">
           <Admissions />
-          <Operations />
+          <EditorialFeatures />
           <Parents />
           <Integrations />
           <Security />
@@ -101,7 +108,21 @@ export default function HomePage() {
         </div>
       </CurtainPanel>
 
-      <EditorialClosing />
+      {/*
+        The ask arrives as its own curtain, like the modules do. It has to be
+        inside a black CurtainPanel and not merely placed after one: the
+        section is marked `on-ed-black`, and that class deliberately sets a
+        TRANSPARENT background because it is meant to sit on a ground a curtain
+        has already laid down. Standing on its own it took the paper ground
+        underneath instead and set white type on it, which left the whole
+        closing section — headline, copy and the demonstration list — invisible.
+      */}
+      <CurtainStack>
+        <CurtainBase className="h-0" />
+        <CurtainPanel tone="black">
+          <EditorialClosing />
+        </CurtainPanel>
+      </CurtainStack>
     </>
   )
 }

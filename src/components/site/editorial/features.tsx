@@ -1,84 +1,36 @@
-'use client'
-
 import * as React from 'react'
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import { gsap } from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { Container, Section } from '../container'
 import { EditorialHeading } from '../motion/editorial-heading'
 import { Doodle } from '../motion/doodle'
-import { useGsapReady, useReducedMotion } from '../motion/provider'
-import { DashboardRender, AttendanceRender } from '../product/dashboard-render'
+import { DashboardRender } from '../product/dashboard-render'
 import { CORE_PRODUCTS } from '@/content/site/company'
-import { cn } from '@/lib/utils'
 
 /**
  * The product, told rather than listed.
  *
- * The heading holds still while the composition beneath it changes: on the
- * left the interface being described, on the right the three products stacked,
- * with the one currently on screen in black and the others dropped back to
- * grey. Scrolling moves through them continuously — no slider, no dots, and no
- * state that can be reached by clicking something the eye has not arrived at.
+ * One board and the three products that read from it. The board is the real
+ * dashboard — the application's own components against sample figures — and the
+ * three products beside it are the argument the board is evidence for: one
+ * record, entered once, that admissions, records and the office all read.
  *
- * The pin is desktop-only. On a phone the same three products are simply read
- * in order at full contrast, because pinning a section on a short viewport
- * costs the reader control of the page and buys nothing.
+ * This was a pinned section that swapped one product at a time as you scrolled.
+ * It was removed rather than repaired. Pinning cost a reader three screens of
+ * scrolling to reach three paragraphs they could otherwise take in at a glance,
+ * it hid two thirds of the argument behind a scroll position at any moment, and
+ * it could not fit a laptop viewport without clipping its own headline. The
+ * three products are short enough to be read together, so they are.
+ *
+ * Nothing here is stateful, so the file carries no `use client` and the section
+ * ships no JavaScript of its own — only the heading and the doodle, which bring
+ * their own.
  */
-
-/** The visual for each product. Real renders — nothing mocked up for the page. */
-const VISUALS = [
-  () => <AttendanceRender />,
-  () => <DashboardRender view="all" />,
-  () => <DashboardRender view="charts" />,
-]
-
 export function EditorialFeatures() {
-  const root = React.useRef<HTMLDivElement>(null)
-  const [active, setActive] = React.useState(0)
-  const ready = useGsapReady()
-  const reduced = useReducedMotion()
-
-  React.useEffect(() => {
-    const node = root.current
-    if (!ready || !node) return
-    if (reduced || window.innerWidth < 1024) return
-
-    const context = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: node,
-        start: 'top top',
-        // One viewport of scroll per product after the first, so each gets the
-        // same dwell and the section cannot outrun the reader.
-        end: () => `+=${window.innerHeight * CORE_PRODUCTS.length}`,
-        pin: true,
-        pinSpacing: true,
-        // Snapping to thirds keeps a product from being left half-swapped when
-        // scrolling stops, which is where this pattern usually looks broken.
-        snap: {
-          snapTo: 1 / (CORE_PRODUCTS.length - 1),
-          duration: { min: 0.15, max: 0.4 },
-          delay: 0.05,
-          ease: 'power2.inOut',
-        },
-        onUpdate: (self) => {
-          const index = Math.min(
-            CORE_PRODUCTS.length - 1,
-            Math.floor(self.progress * CORE_PRODUCTS.length),
-          )
-          setActive((current) => (current === index ? current : index))
-        },
-        invalidateOnRefresh: true,
-      })
-    }, node)
-
-    return () => context.revert()
-  }, [ready, reduced])
-
   return (
-    <div id="product" ref={root} className="relative overflow-hidden px-[var(--gutter)] py-20 lg:h-screen lg:py-0">
-      <div className="mx-auto flex h-full max-w-[80rem] flex-col justify-center">
-        <div className="relative flex items-start justify-between gap-8 pt-8 lg:pt-0">
+    <Section id="product">
+      <Container wide>
+        <div className="relative flex items-start justify-between gap-8">
           <EditorialHeading
             size="md"
             className="max-w-[16ch]"
@@ -103,44 +55,21 @@ export function EditorialFeatures() {
           </div>
         </div>
 
-        <div className="mt-12 grid gap-10 lg:mt-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
-          {/* Left: the interface. Stacked, with only the active one visible. */}
-          <div className="relative aspect-[4/3] w-full lg:aspect-[16/11]">
-            {CORE_PRODUCTS.map((product, index) => {
-              const Visual = VISUALS[index] ?? VISUALS[0]!
-              return (
-                <div
-                  key={product.key}
-                  aria-hidden={active !== index}
-                  className={cn(
-                    'absolute inset-0 overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--ed-ink)_10%,transparent)] bg-white',
-                    'transition-[opacity,transform,clip-path] duration-[900ms]',
-                    'max-lg:relative max-lg:mb-6 max-lg:opacity-100',
-                    active === index
-                      ? 'z-10 translate-y-0 scale-100 opacity-100 [clip-path:inset(0_0_0_0_round_1rem)]'
-                      : 'z-0 translate-y-6 scale-[0.965] opacity-0 [clip-path:inset(0_0_14%_0_round_1rem)]',
-                  )}
-                  style={{ transitionTimingFunction: 'var(--ed-ease)' }}
-                >
-                  <Visual />
-                </div>
-              )
-            })}
+        <div className="mt-12 grid gap-10 lg:mt-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-16">
+          {/*
+            No fixed aspect ratio on the frame. The board used to sit in a
+            16/11 window with the overflow hidden, which cropped the charts
+            mid-axis at the bottom edge — a real dashboard cut off looks like a
+            rendering fault, not like a detail shot. It is given its own height
+            instead.
+          */}
+          <div className="overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--ed-ink)_10%,transparent)] bg-white">
+            <DashboardRender view="all" />
           </div>
 
-          {/* Right: the three, with the active one brought forward. */}
-          <ol className="space-y-8 lg:space-y-10">
-            {CORE_PRODUCTS.map((product, index) => (
-              <li
-                key={product.key}
-                className={cn(
-                  'transition-[opacity,transform] duration-[700ms]',
-                  active === index
-                    ? 'translate-y-0 opacity-100'
-                    : 'opacity-100 lg:translate-y-1 lg:opacity-35',
-                )}
-                style={{ transitionTimingFunction: 'var(--ed-ease)' }}
-              >
+          <ol className="space-y-10">
+            {CORE_PRODUCTS.map((product) => (
+              <li key={product.key}>
                 <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--ed-ink-soft)]">
                   {product.abbr}
                 </p>
@@ -161,7 +90,7 @@ export function EditorialFeatures() {
             ))}
           </ol>
         </div>
-      </div>
-    </div>
+      </Container>
+    </Section>
   )
 }

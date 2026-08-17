@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import { HeroObjects } from '../motion/hero-objects'
 import { useReducedMotion } from '../motion/provider'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 import { POSITIONING } from '@/content/site/company'
 import { MODULE_COUNTS } from '@/content/site/modules'
 import { cn } from '@/lib/utils'
@@ -146,17 +147,10 @@ function HeroChrome({ entered }: { entered: boolean }) {
         transition: 'opacity 800ms ease 1000ms, transform 800ms var(--ed-ease) 1000ms',
       }}
     >
-      <Link href="/" aria-label="MyCampusView home" className="flex items-center gap-2.5">
-        <svg viewBox="0 0 32 32" className="size-7 shrink-0" aria-hidden>
-          <rect width="32" height="32" rx="8" fill="#fff" />
-          <g stroke="var(--ed-black)" strokeWidth="2" strokeLinecap="round">
-            <path d="M9 12h14M9 17h14M9 22h8" opacity="0.9" />
-          </g>
-          <circle cx="23.5" cy="22" r="2.5" fill="var(--ed-mint)" />
-        </svg>
-        <span className="text-[17px] font-semibold tracking-[-0.02em] text-white">
-          MyCampusView
-        </span>
+      <Link href="/" aria-label="MyCampusView home" className="flex items-center">
+        {/* The fold is the one place the mark may drift and answer the
+            pointer — marketing can be more expressive than the header. */}
+        <MyCampusViewLogo size="lg" animated float tilt shimmer onDark priority />
       </Link>
 
       <div className="flex items-center gap-2">

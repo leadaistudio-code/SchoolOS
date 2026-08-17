@@ -27,11 +27,19 @@ const PATHS = {
     len: 340,
     d: 'M6 15c38-6 122-11 188-7M14 21c46-6 108-9 170-6',
   },
-  /** The smile from the reference's feature section. */
+  /**
+   * The smile from the reference's feature section.
+   *
+   * Head, then the two eyes, then the mouth — drawn in that order because a
+   * face that gets its mouth before its eyes reads as a bowl for the half
+   * second the stroke takes to arrive. `len` covers the whole path: the outer
+   * circle is ~352 units, the eyes ~57 and the mouth ~60, and a `len` short of
+   * the true length leaves the tail of the drawing permanently hidden.
+   */
   smile: {
     box: '0 0 120 120',
-    len: 460,
-    d: 'M60 4C29 4 4 29 4 60s25 56 56 56 56-25 56-56S91 4 60 4M38 74c6 12 16 18 27 18 12 0 21-7 26-19-17 3-36 3-53 1',
+    len: 520,
+    d: 'M60 4C29 4 4 29 4 60s25 56 56 56 56-25 56-56S91 4 60 4M37.5 48a4.5 4.5 0 109 0 4.5 4.5 0 10-9 0M73.5 48a4.5 4.5 0 109 0 4.5 4.5 0 10-9 0M38 74c6 12 16 18 27 18 12 0 21-7 26-19-17 3-36 3-53 1',
   },
   /** A sun, for the statement section. */
   spark: {

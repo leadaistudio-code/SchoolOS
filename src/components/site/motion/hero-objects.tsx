@@ -47,6 +47,26 @@ const PIECES: Piece[] = [
   { geometry: 'ring', position: [-4.6, -1.0, -2.4], rotation: [1.1, 0.2, 0.4], scale: 0.42, color: 0x4ea3f5, depth: 0.22, spin: 0.13, bob: 0.5 },
 ]
 
+/*
+ * The closing section's arrangement.
+ *
+ * Not `PIECES`. Those positions run from -4.6 to +4.1 because they were
+ * authored for a canvas the full width of the hero, with the headline down the
+ * middle. Reused inside the closing section's half-width column they land
+ * somewhere else entirely: the left-hand pieces drift over the copy and the
+ * right-hand ones are cut in half by the column's edge, which is what the
+ * closing looked like.
+ *
+ * One object, which is what that section's composition asks for anyway — the
+ * restraint is the point of it. Placed off to the lower left of its own column,
+ * in the space the copy does not reach.
+ */
+const CLOSING_PIECES: Piece[] = [
+  { geometry: 'torus', position: [-1.7, 0.35, 0], rotation: [0.55, 0.35, 0], scale: 0.78, color: 0x7fd6bd, depth: 0.5, spin: 0.14, bob: 0.6 },
+]
+
+const ARRANGEMENTS = { hero: PIECES, closing: CLOSING_PIECES }
+
 function buildGeometry(kind: Piece['geometry']): THREE.BufferGeometry {
   switch (kind) {
     case 'torus':
@@ -101,7 +121,14 @@ function environmentTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
   return target.texture
 }
 
-export function HeroObjects({ className }: { className?: string }) {
+export function HeroObjects({
+  className,
+  arrangement = 'hero',
+}: {
+  className?: string
+  /** Which authored placement to render. See `CLOSING_PIECES`. */
+  arrangement?: keyof typeof ARRANGEMENTS
+}) {
   const host = React.useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
 
@@ -120,7 +147,10 @@ export function HeroObjects({ className }: { className?: string }) {
 
     const narrow = window.innerWidth < 768
     const coarse = window.matchMedia('(pointer: coarse)').matches
-    const visiblePieces = narrow ? PIECES.slice(0, 3) : PIECES
+    const authored = ARRANGEMENTS[arrangement] ?? PIECES
+    // The narrow trim exists to keep the hero's five off the type. An
+    // arrangement that is already a single object has nothing to trim.
+    const visiblePieces = narrow && authored.length > 3 ? authored.slice(0, 3) : authored
 
     // Capped rather than device-native: at this scale the extra pixels of a 3x
     // screen buy nothing and cost a great deal.
@@ -233,9 +263,23 @@ export function HeroObjects({ className }: { className?: string }) {
       const delta = Math.min(clock.getDelta(), 0.05)
       const time = clock.elapsedTime
 
-      // Normalised scroll through the fold, so the pieces part and sink as
-      // the reader leaves rather than holding still behind the curtain.
-      const scrolled = Math.min(1, window.scrollY / Math.max(window.innerHeight, 1))
+      /*
+       * Normalised scroll through THIS canvas, so the pieces part and sink as
+       * the reader leaves rather than holding still behind the curtain.
+       *
+       * Measured from the element's own rect, not from `window.scrollY`. The
+       * absolute version is only correct for a canvas that happens to live in
+       * the first viewport: anywhere further down the page `scrollY` is already
+       * past `innerHeight` before the section is even on screen, so `scrolled`
+       * arrives pinned at 1 and the pieces render permanently sunk and spread —
+       * dragged to the bottom of their column and clipped by its edge. This
+       * reads identically for the hero, whose top IS the top of the document.
+       */
+      const rect = node.getBoundingClientRect()
+      const scrolled = Math.min(
+        1,
+        Math.max(0, -rect.top / Math.max(window.innerHeight, 1)),
+      )
 
       for (const { mesh, piece, base } of meshes) {
         // Damped follow. The damping factor, not the pointer, is what decides
@@ -270,7 +314,7 @@ export function HeroObjects({ className }: { className?: string }) {
       renderer.dispose()
       node.removeChild(renderer.domElement)
     }
-  }, [reduced])
+  }, [reduced, arrangement])
 
   return <div ref={host} className={className} aria-hidden />
 }

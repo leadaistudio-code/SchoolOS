@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { CheckCircle2, ShieldCheck } from 'lucide-react'
 import { LoginForm } from './login-form'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 import { resolveTenant } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
 import { env } from '@/lib/env'
@@ -51,17 +52,26 @@ export default async function LoginPage({
           and a phone user reach immediately. */}
       <div className="flex flex-col justify-center px-6 sm:px-12 py-10">
         <div className="w-full max-w-sm mx-auto">
-          <div className="flex items-center gap-2.5 mb-8">
-            {school?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={school.logoUrl} alt="" className="size-9 rounded object-contain" />
-            ) : (
-              <span className="size-9 rounded-[var(--radius-sm)] bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center font-semibold text-lg">
-                {title.charAt(0)}
-              </span>
-            )}
-            <span className="font-semibold text-lg text-ink">{title}</span>
-          </div>
+          {/* Whose page this is. A school's own mark on a school's address;
+              the product's own mark only on the platform console, where there
+              is no school to represent. */}
+          {tenant ? (
+            <div className="flex items-center gap-2.5 mb-8">
+              {school?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={school.logoUrl} alt="" className="size-9 rounded object-contain" />
+              ) : (
+                <span className="size-9 rounded-[var(--radius-sm)] bg-[var(--brand-500)] text-[var(--brand-contrast)] grid place-items-center font-semibold text-lg">
+                  {title.charAt(0)}
+                </span>
+              )}
+              <span className="font-semibold text-lg text-ink">{title}</span>
+            </div>
+          ) : (
+            <div className="mb-9">
+              <MyCampusViewLogo variant="full" size="xl" animated shimmer priority />
+            </div>
+          )}
 
           {bannerUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -72,23 +82,25 @@ export default async function LoginPage({
             />
           ) : null}
 
-          <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
-          <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
+          <div className={tenant ? undefined : 'mcv-auth-reveal'}>
+            <h1 className="text-2xl font-semibold text-ink">{headline}</h1>
+            <p className="text-base text-ink-muted mt-1 mb-6">{subtext}</p>
 
-          {notice ? (
-            <div
-              role="status"
-              className="mb-5 flex items-start gap-2.5 rounded-[var(--radius)] bg-success-bg border border-[color-mix(in_srgb,var(--success)_30%,transparent)] px-3.5 py-2.5"
-            >
-              <CheckCircle2
-                className="size-4.5 text-[var(--success)] mt-0.5 shrink-0"
-                aria-hidden
-              />
-              <p className="text-sm text-ink">{notice}</p>
-            </div>
-          ) : null}
+            {notice ? (
+              <div
+                role="status"
+                className="mb-5 flex items-start gap-2.5 rounded-[var(--radius)] bg-success-bg border border-[color-mix(in_srgb,var(--success)_30%,transparent)] px-3.5 py-2.5"
+              >
+                <CheckCircle2
+                  className="size-4.5 text-[var(--success)] mt-0.5 shrink-0"
+                  aria-hidden
+                />
+                <p className="text-sm text-ink">{notice}</p>
+              </div>
+            ) : null}
 
-          <LoginForm next={params.next} showForgotPassword={!!tenant} />
+            <LoginForm next={params.next} showForgotPassword={!!tenant} />
+          </div>
 
           <p className="mt-8 text-xs text-ink-subtle flex items-center gap-1.5">
             <ShieldCheck className="size-3.5" aria-hidden />
@@ -130,9 +142,11 @@ export default async function LoginPage({
           <p className="text-xl leading-snug">
             Attendance, fees, homework, results and transport in one record system.
           </p>
-          <p className="mt-3 text-base text-white/70">
-            {title} runs on {env().APP_NAME}
-          </p>
+          {tenant ? (
+            <p className="mt-3 text-base text-white/70">
+              {title} runs on {env().APP_NAME}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

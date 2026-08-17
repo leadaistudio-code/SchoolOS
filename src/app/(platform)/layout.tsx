@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { LogOut, Server } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { getPlatformContext } from '@/server/context'
+import { MyCampusViewLogo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { ToastProvider } from '@/components/ui/toast'
 import { env } from '@/lib/env'
@@ -37,9 +38,10 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         <header className="bg-surface border-b border-line sticky top-0 z-30">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-[var(--topbar-h)] flex items-center gap-4">
             <Link href="/platform" className="flex items-center gap-2 shrink-0">
-              <span className="size-7 rounded-[var(--radius-sm)] bg-ink text-bg grid place-items-center">
-                <Server className="size-4" aria-hidden />
-              </span>
+              {/* The console is the one authenticated surface that is ours
+                  rather than a school's, so it carries our mark. The symbol
+                  alone: a console topbar is not the place for a lockup. */}
+              <MyCampusViewLogo variant="mark" size="md" animated />
               <span className="font-semibold text-base text-ink">
                 {env().APP_NAME} <span className="text-ink-subtle font-normal">Platform</span>
               </span>

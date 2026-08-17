@@ -22,7 +22,13 @@ import { Doodle } from '../motion/doodle'
 export function EditorialClosing() {
   return (
     <div id="demo" className="on-ed-black relative isolate overflow-hidden px-[var(--gutter)] py-28 sm:py-36">
-      <HeroObjects className="pointer-events-none absolute inset-y-0 right-0 z-0 w-1/2 max-lg:hidden" />
+      {/* One object, in the closing's own arrangement — the hero's five are
+          authored for a full-width canvas and do not survive being put in a
+          half-width column. */}
+      <HeroObjects
+        arrangement="closing"
+        className="pointer-events-none absolute inset-y-0 right-0 z-0 w-1/2 max-lg:hidden"
+      />
 
       <div className="relative z-10 mx-auto max-w-[78rem]">
         <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:gap-20">
