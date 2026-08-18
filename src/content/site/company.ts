@@ -269,8 +269,8 @@ export const SECURITY_LIMITS = [
  * does not ring.
  */
 export const CONTACT = {
-  email: 'hello@schoolos.app',
-  sales: 'sales@schoolos.app',
+  email: 'contact@mycampusview.com',
+  sales: 'contact@mycampusview.com',
   /** Set to a real number before launch, or the footer omits it. */
   phone: '',
   /** Set to a real address before launch, or the footer omits it. */
