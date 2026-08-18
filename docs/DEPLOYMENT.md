@@ -141,11 +141,49 @@ Set these too, or you will get development behaviour in production:
 | `APP_NAME` | your product name | titles and email |
 | `RATE_LIMIT_DRIVER` | `redis` | see the warning above |
 | `REDIS_URL` | your Redis URL | required by the above |
-| `EMAIL_DRIVER` | `log` | leave as `log`; schools connect their own SMTP in Settings → Email |
+| `EMAIL_DRIVER` | `smtp` | needed for demo requests from the website; schools still connect their own SMTP in Settings → Email |
+| `SMTP_URL` | your mailbox | see below |
+| `EMAIL_FROM` | `"MyCampusView <contact@yourdomain.com>"` | must be the mailbox you authenticate as |
 
 `AUTH_SECRET` also encrypts the SMTP passwords schools save in Settings →
 Email. **Changing it later makes every stored mail password undecryptable** and
 each school will have to re-enter theirs.
+
+### The platform mailbox
+
+A demo request from the website is stored in the database and emailed to the
+sales inbox. The database copy is the durable one — the email is how anybody
+finds out it arrived, so an unconfigured mailbox loses no leads but answers
+none either.
+
+`SMTP_URL` is any mailbox that speaks SMTP. For one hosted with Hostinger:
+
+```
+SMTP_URL=smtps://contact%40yourdomain.com:PASSWORD@smtp.hostinger.com:465
+```
+
+- The username is the full address, and the password is the **mailbox**
+  password, not the Hostinger account password.
+- Percent-encode `@`, `/` and `+` in both (`%40`, `%2F`, `%2B`).
+- `smtps://` is implicit TLS on 465. If the host blocks outbound 465, use
+  `smtp://…@smtp.hostinger.com:587`, which is STARTTLS.
+- `EMAIL_FROM` must be that mailbox or an alias of it. Hostinger rejects a
+  From address it does not own.
+
+Enquiries go to `SALES_INBOX` if it is set, and otherwise to the address
+published on the site (`CONTACT.sales` in `src/content/site/company.ts`). Set
+it on staging so test submissions do not reach the sales team.
+
+Prove the whole path before you rely on it:
+
+```bash
+npm run mail:doctor              # sends a sample enquiry to the sales inbox
+npm run mail:doctor -- you@x.com # or somewhere else
+```
+
+It reports the configuration, authenticates, sends one real enquiry email, and
+names the thing to change when a step fails. Check the spam folder the first
+time — if it lands there, add SPF and DKIM for the sending domain.
 
 ## Step 7 — Deploy
 

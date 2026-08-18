@@ -67,6 +67,12 @@ const serverSchema = z.object({
   EMAIL_DRIVER: z.enum(['log', 'smtp', 'ses', 'resend']).default('log'),
   EMAIL_FROM: z.string().default('MyCampusView <no-reply@example.com>'),
   SMTP_URL: z.string().optional(),
+  /**
+   * Where website enquiries are emailed. Defaults to the address published on
+   * the site, so this only needs setting when a deployment should send them
+   * somewhere else — a staging environment that must not ring the sales phone.
+   */
+  SALES_INBOX: z.string().email().optional(),
 
   SMS_DRIVER: z.enum(['log', 'msg91', 'twilio']).default('log'),
   SMS_SENDER_ID: z.string().optional(),

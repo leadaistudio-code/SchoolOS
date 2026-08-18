@@ -3,6 +3,12 @@
 import * as React from 'react'
 import { AlertCircle, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  CONTACT_PREFERENCE_OPTIONS,
+  INTEREST_OPTIONS,
+  SCHOOL_TYPE_OPTIONS,
+  SIZE_OPTIONS,
+} from '@/content/site/demo-options'
 
 type Values = {
   name: string
@@ -36,37 +42,6 @@ const EMPTY: Values = {
   website: '',
 }
 
-const SCHOOL_TYPES = [
-  ['PRIVATE_SCHOOL', 'Private school'],
-  ['INTERNATIONAL_SCHOOL', 'International school'],
-  ['PRESCHOOL', 'Preschool'],
-  ['K12', 'K-12'],
-  ['SCHOOL_GROUP', 'School group'],
-  ['OTHER', 'Other'],
-] as const
-
-const SIZES = [
-  ['UNDER_300', 'Under 300'],
-  ['300_1000', '300 – 1,000'],
-  ['1000_3000', '1,000 – 3,000'],
-  ['3000_10000', '3,000 – 10,000'],
-  ['OVER_10000', 'More than 10,000'],
-] as const
-
-const INTERESTS = [
-  ['EVERYTHING', 'The whole system'],
-  ['STUDENT_RECORDS', 'Student records and academics'],
-  ['FEES', 'Fees and finance'],
-  ['TRANSPORT', 'Transport'],
-  ['COMMUNICATION', 'Parent communication'],
-  ['OTHER', 'Something else'],
-] as const
-
-const CONTACT = [
-  ['PHONE', 'Phone'],
-  ['EMAIL', 'Email'],
-  ['WHATSAPP', 'WhatsApp'],
-] as const
 
 /**
  * The demo request.
@@ -202,20 +177,20 @@ export function DemoForm() {
         </Field>
 
         <Field label="Type of school" required htmlFor="schoolType">
-          <Select id="schoolType" value={values.schoolType} onChange={(v) => set('schoolType', v)} options={SCHOOL_TYPES} />
+          <Select id="schoolType" value={values.schoolType} onChange={(v) => set('schoolType', v)} options={SCHOOL_TYPE_OPTIONS} />
         </Field>
         <Field label="Number of students" required htmlFor="size">
-          <Select id="size" value={values.size} onChange={(v) => set('size', v)} options={SIZES} />
+          <Select id="size" value={values.size} onChange={(v) => set('size', v)} options={SIZE_OPTIONS} />
         </Field>
         <Field label="Most interested in" htmlFor="interest">
-          <Select id="interest" value={values.interest} onChange={(v) => set('interest', v)} options={INTERESTS} />
+          <Select id="interest" value={values.interest} onChange={(v) => set('interest', v)} options={INTEREST_OPTIONS} />
         </Field>
         <Field label="Best way to reach you" htmlFor="contactPreference">
           <Select
             id="contactPreference"
             value={values.contactPreference}
             onChange={(v) => set('contactPreference', v)}
-            options={CONTACT}
+            options={CONTACT_PREFERENCE_OPTIONS}
           />
         </Field>
 
