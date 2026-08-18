@@ -7,28 +7,48 @@ import { cn } from '@/lib/utils'
 /**
  * The MyCampusView brand mark.
  *
- * One component, three crops of one master asset. Every surface that shows the
+ * One component, two cuts of one master asset. Every surface that shows the
  * product's own brand renders this rather than pasting an image tag, so a
  * future change to the lockup is a change to one file.
  *
  * Note what this is NOT for: the authenticated application is white-labelled
  * and shows each school's own logo (`school.logoUrl`). MyCampusView's mark
- * belongs on the marketing site and on the platform console — never in place
- * of a customer's identity.
+ * belongs on the marketing site, the platform console and the signed-out
+ * shell — never in place of a customer's identity.
+ *
+ * The assets are derived from `public/brand/mycampusview.svg` by
+ * `scripts/brand-assets.py`, which lifts the artwork off the navy card it
+ * ships on and crops it to its own bounds. They are therefore transparent and
+ * edge-to-edge: whatever is behind the logo is the logo's background, and the
+ * component adds no plate, padding or box of its own.
  *
  * Sizing is driven by height, with width derived from the asset's real pixel
  * ratio, so the mark can never stretch and never shifts the layout while it
  * loads.
  */
 
-/** The three crops of the approved master. Nothing else references these paths. */
+/**
+ * The two cuts, each on the two grounds. Nothing else references these paths.
+ *
+ * `dark` is the artwork as drawn, with the cream wordmark it carries on the
+ * master. `light` is the same lockup with those glyphs in the card's own navy,
+ * because cream measures 1.1:1 against white and simply disappears.
+ */
 const ASSET = {
-  /** The complete lockup: symbol, wordmark, tagline, five pillars. */
-  full: { src: '/brand/mycampusview-logo.png', w: 1285, h: 844 },
-  /** Symbol and wordmark. For rows too short to render the tagline legibly. */
-  compact: { src: '/brand/mycampusview-lockup.png', w: 1270, h: 700 },
-  /** The symbol alone, square. Favicons, avatars, anything small. */
-  mark: { src: '/brand/mycampusview-mark.png', w: 510, h: 510 },
+  /** Symbol and wordmark, side by side. The default everywhere. */
+  lockup: {
+    light: '/brand/mycampusview-lockup-dark.png',
+    dark: '/brand/mycampusview-lockup.png',
+    w: 2392,
+    h: 422,
+  },
+  /** The symbol alone. Console topbars, avatars, anything narrow. */
+  mark: {
+    light: '/brand/mycampusview-mark.png',
+    dark: '/brand/mycampusview-mark.png',
+    w: 958,
+    h: 1024,
+  },
 } as const
 
 export type LogoVariant = keyof typeof ASSET
@@ -37,17 +57,17 @@ export type LogoSize = 'sm' | 'md' | 'lg' | 'xl'
 /**
  * Rendered height, in pixels, per variant.
  *
- * Held apart per variant because the crops are different shapes: 44px is a
- * generous header mark and an illegible full lockup.
+ * Held apart per variant because the cuts are different shapes: the lockup is
+ * five and a half times wider than it is tall, so the height that makes a
+ * comfortable header mark would make an enormous lockup.
  */
 const HEIGHT: Record<LogoVariant, Record<LogoSize, number>> = {
-  full: { sm: 76, md: 104, lg: 140, xl: 180 },
-  compact: { sm: 38, md: 50, lg: 64, xl: 84 },
+  lockup: { sm: 22, md: 28, lg: 38, xl: 52 },
   mark: { sm: 24, md: 32, lg: 44, xl: 64 },
 }
 
 export function MyCampusViewLogo({
-  variant = 'compact',
+  variant = 'lockup',
   size = 'md',
   animated = false,
   float = false,
@@ -70,9 +90,9 @@ export function MyCampusViewLogo({
   /**
    * The mark sits on a dark ground.
    *
-   * The wordmark is navy and the master carries a soft light bloom, so on a
-   * dark surface it needs a light one of its own. The logo itself is untouched;
-   * what changes is what it is presented on.
+   * Selects the cream wordmark the artwork is drawn with. Nothing is placed
+   * behind the logo either way — the asset is transparent, so it composites
+   * straight onto whatever ground it is given.
    */
   onDark?: boolean
   priority?: boolean
@@ -93,12 +113,11 @@ export function MyCampusViewLogo({
       float={float}
       tilt={tilt}
       shimmer={shimmer}
-      onDark={onDark}
       height={height}
       className={className}
     >
       <Image
-        src={asset.src}
+        src={onDark ? asset.dark : asset.light}
         alt="MyCampusView"
         width={width}
         height={height}
@@ -127,7 +146,6 @@ function LogoFrame({
   float,
   tilt,
   shimmer,
-  onDark,
   height,
   className,
 }: {
@@ -136,7 +154,6 @@ function LogoFrame({
   float?: boolean
   tilt?: boolean
   shimmer?: boolean
-  onDark?: boolean
   height: number
   className?: string
 }) {
@@ -212,7 +229,6 @@ function LogoFrame({
         animated && 'mcv-logo-enter',
         float && 'mcv-logo-float',
         tilt && 'mcv-logo-tilt',
-        onDark && 'mcv-logo-plate',
         className,
       )}
     >
@@ -242,16 +258,16 @@ function FallbackWordmark({
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <svg viewBox="0 0 32 32" style={{ width: glyph, height: glyph }} className="shrink-0" aria-hidden>
-        <rect width="32" height="32" rx="8" fill={onDark ? '#fff' : 'var(--ink, #0a1024)'} />
-        <g stroke={onDark ? 'var(--ink, #0a1024)' : '#fff'} strokeWidth="2" strokeLinecap="round">
+        <rect width="32" height="32" rx="8" fill="#0a1a3f" />
+        <g stroke="#f8e8d5" strokeWidth="2" strokeLinecap="round">
           <path d="M9 12h14M9 17h14M9 22h8" opacity="0.9" />
         </g>
-        <circle cx="23.5" cy="22" r="2.5" fill={onDark ? 'var(--blue, #1d4ed8)' : '#7ea2f5'} />
+        <circle cx="23.5" cy="22" r="2.5" fill="#f46527" />
       </svg>
       <span
         className={cn(
           'font-semibold tracking-[-0.02em]',
-          onDark ? 'text-white' : 'text-[var(--ink,#0a1024)]',
+          onDark ? 'text-[#f8e8d5]' : 'text-[#0a1a3f]',
         )}
         style={{ fontSize: Math.round(height * 0.58) }}
       >

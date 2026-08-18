@@ -69,7 +69,7 @@ export default async function LoginPage({
             </div>
           ) : (
             <div className="mb-9">
-              <MyCampusViewLogo variant="full" size="xl" animated shimmer priority />
+              <MyCampusViewLogo size="xl" animated shimmer priority />
             </div>
           )}
 

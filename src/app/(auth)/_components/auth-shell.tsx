@@ -41,7 +41,7 @@ export function AuthShell({
           /* No school resolved: this is the platform console, and the mark
              above the form is the product's own. */
           <div className="mb-8">
-            <MyCampusViewLogo variant="compact" size="lg" animated />
+            <MyCampusViewLogo size="lg" animated />
           </div>
         )}
 
