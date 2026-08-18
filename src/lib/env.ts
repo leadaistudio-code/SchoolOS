@@ -68,6 +68,15 @@ const serverSchema = z.object({
   EMAIL_FROM: z.string().default('MyCampusView <no-reply@example.com>'),
   SMTP_URL: z.string().optional(),
   /**
+   * Resend's HTTPS API, used in preference to SMTP when EMAIL_DRIVER=resend.
+   *
+   * Most application hosts block outbound SMTP to stop their addresses being
+   * used for spam — Railway drops 25, 465, 587 and 2525 below the Pro plan —
+   * and no SMTP setting can work around packets that never leave the box.
+   * Port 443 is never blocked.
+   */
+  RESEND_API_KEY: z.string().optional(),
+  /**
    * Where website enquiries are emailed. Defaults to the address published on
    * the site, so this only needs setting when a deployment should send them
    * somewhere else — a staging environment that must not ring the sales phone.

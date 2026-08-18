@@ -112,14 +112,82 @@ function platformSmtp(url: string): EmailProvider {
   }
 }
 
+/**
+ * Resend over its HTTPS API rather than its SMTP endpoint.
+ *
+ * Exists because most application hosts block outbound SMTP - Railway drops
+ * 25, 465, 587 and 2525 below the Pro plan, and it is far from alone. The
+ * packets never leave the container, so the mailbox at the other end is
+ * irrelevant and no SMTP setting can help. Port 443 is never blocked, which
+ * makes this the only mail path that works everywhere.
+ *
+ * The receiving mailbox is unaffected: this changes how a message is handed
+ * over, not where it lands.
+ */
+function resendApi(apiKey: string): EmailProvider {
+  return {
+    name: 'resend_api',
+    async send(message) {
+      try {
+        // Fifteen seconds, because a caller is usually a person waiting on a
+        // form or a sign-in, and a hung request would hold the page open.
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: env().EMAIL_FROM,
+            to: Array.isArray(message.to) ? message.to : [message.to],
+            // Snake case: the camelCase spelling is the Node SDK's, and this
+            // is the REST endpoint. Sent under the wrong key it is dropped
+            // silently, which would quietly break replying to an enquiry.
+            reply_to: message.replyTo,
+            subject: message.subject,
+            html: message.html,
+            text: message.text,
+            attachments: message.attachments?.map((a) => ({
+              filename: a.filename,
+              content: a.content.toString('base64'),
+              content_type: a.contentType,
+            })),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        })
+
+        const body = (await response.json().catch(() => null)) as
+          | { id?: string; message?: string; name?: string }
+          | null
+
+        if (!response.ok) {
+          const description = body?.message ?? `Resend returned ${response.status}`
+          console.error('[email:resend] send failed', description)
+          return { ok: false, error: description }
+        }
+
+        return { ok: true, providerMessageId: body?.id }
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error)
+        console.error('[email:resend] send failed', description)
+        return { ok: false, error: description }
+      }
+    },
+  }
+}
+
 export function emailProvider(): EmailProvider {
   const driver = env().EMAIL_DRIVER
 
   if (driver === 'log') return logEmail
 
-  // `ses` and `resend` both speak SMTP; point SMTP_URL at their endpoint and
-  // this driver serves them too. A dedicated API client would buy richer
-  // delivery reporting and nothing else that matters here.
+  // Resend's HTTPS API when there is a key for it. Preferred over SMTP because
+  // it works on hosts that block outbound mail, which is most of them.
+  const resendKey = env().RESEND_API_KEY
+  if (driver === 'resend' && resendKey) return resendApi(resendKey)
+
+  // Otherwise SMTP. `ses` and `resend` both speak it, so pointing SMTP_URL at
+  // their endpoint serves them too, wherever the host permits it.
   const url = env().SMTP_URL
   if (!url) {
     warnMissingSmtp(driver)
@@ -142,8 +210,9 @@ function warnMissingSmtp(driver: string) {
   if (warnedMissingSmtp) return
   warnedMissingSmtp = true
   console.warn(
-    `[email] EMAIL_DRIVER="${driver}" but SMTP_URL is not set; falling back to the log driver. ` +
-      'Password reset links will not be delivered until it is configured.',
+    `[email] EMAIL_DRIVER="${driver}" but neither ${driver === 'resend' ? 'RESEND_API_KEY nor ' : ''}` +
+      'SMTP_URL is set; falling back to the log driver. ' +
+      'Password reset links and website enquiries will not be delivered until it is configured.',
   )
 }
 
