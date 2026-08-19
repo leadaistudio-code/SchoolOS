@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>MyCampusView</title>
+</head>
+
+<!--
+  MyCampusView — first-touch outreach, plain variant. USE THIS ONE FOR COLD.
+
+  The brand is here, but carried the way a real person's email carries it: a
+  small logo in the signature, not a banner across the top. That is deliberate.
+  A designed header announces itself as bulk mail before it is read, and filters
+  score image-to-text ratio and link count — a principal who has never heard of
+  you is exactly the recipient who can afford neither. One image, two links,
+  and it reads as though somebody typed it.
+
+  For recipients who have already engaged, use outreach-branded.html, which has
+  the full navy band and the three-part breakdown.
+
+  Replace: {{first_name}} {{school}} {{sender_name}} {{sender_title}}
+           {{postal_address}} {{unsubscribe_url}}
+-->
+
+<body style="margin:0;padding:0;background-color:#ffffff;">
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#ffffff;">
+  <tr>
+    <td align="left" style="padding:24px 20px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:600px;">
+        <tr>
+          <td style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:26px;color:#1a1a1a;">
+
+            <p style="margin:0 0 16px;">Dear {{first_name}},</p>
+
+            <p style="margin:0 0 16px;">
+              I am {{sender_name}} from MyCampusView. We build school management
+              software — admissions, student records, attendance, fees,
+              examinations and parent communication on one system, rather than
+              four that have to be reconciled against each other every month.
+            </p>
+
+            <p style="margin:0 0 16px;">
+              Most schools we speak to are running at least one critical thing on
+              a spreadsheet, and the office spends its week answering the same
+              three questions: what is outstanding, who was absent, and what did
+              my child score.
+            </p>
+
+            <p style="margin:0 0 16px;">
+              If that is familiar at {{school}}, would you be open to a
+              twenty-minute look at it — set up with your own classes and fee
+              structure, not a generic demo?
+            </p>
+
+            <p style="margin:0 0 24px;">
+              And if it is not the right fit for you, I would rather say so on
+              that call than sell you a year of it.
+            </p>
+
+            <!-- Signature. The logo lives here rather than in a header band:
+                 this is where a person's email carries a logo, so it reads as
+                 a signature instead of a masthead. -->
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-top:1px solid #e6e6e6;">
+              <tr>
+                <td style="padding:18px 0 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+                  <!-- Alt text is styled so a client that blocks images still
+                       shows the wordmark in brand navy rather than a broken icon. -->
+                  <a href="https://www.mycampusview.com" style="text-decoration:none;">
+                    <img src="https://www.mycampusview.com/brand/mycampusview-lockup-dark.png"
+                         width="150" height="26" alt="MyCampusView"
+                         style="display:block;border:0;outline:none;width:150px;height:26px;margin-bottom:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:-0.3px;color:#0a1a3f;text-decoration:none;">
+                  </a>
+
+                  <p style="margin:0 0 2px;font-size:15px;line-height:22px;font-weight:600;color:#1a1a1a;">
+                    {{sender_name}}
+                  </p>
+                  <p style="margin:0 0 2px;font-size:14px;line-height:21px;color:#555555;">
+                    {{sender_title}}, MyCampusView
+                  </p>
+                  <p style="margin:0;font-size:14px;line-height:21px;color:#555555;">
+                    <a href="mailto:contact@mycampusview.com" style="color:#4338ca;text-decoration:none;">contact@mycampusview.com</a>
+                    &nbsp;·&nbsp;
+                    <a href="https://www.mycampusview.com/book-demo" style="color:#4338ca;text-decoration:none;">mycampusview.com</a>
+                  </p>
+
+                </td>
+              </tr>
+            </table>
+
+            <!-- Footer. Required, not decorative: a bulk send without a postal
+                 address and an unsubscribe is a CAN-SPAM violation, and filters
+                 score the absence of both. -->
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td style="padding:20px 0 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#6b7488;">
+                  {{postal_address}}<br>
+                  <a href="{{unsubscribe_url}}" style="color:#6b7488;text-decoration:underline;">Unsubscribe</a>
+                </td>
+              </tr>
+            </table>
+
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

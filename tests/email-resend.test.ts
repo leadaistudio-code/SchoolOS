@@ -59,12 +59,14 @@ describe('the Resend HTTPS provider', () => {
 
     expect(result).toEqual({ ok: true, providerMessageId: 'abc-123' })
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('https://api.resend.com/emails')
 
-    const headers = calls[0].init.headers as Record<string, string>
+    const call = calls[0]!
+    expect(call.url).toBe('https://api.resend.com/emails')
+
+    const headers = call.init.headers as Record<string, string>
     expect(headers.authorization).toBe('Bearer re_test_key')
 
-    const body = JSON.parse(calls[0].init.body as string)
+    const body = JSON.parse(call.init.body as string)
     expect(body).toMatchObject({
       from: 'MyCampusView <contact@mycampusview.com>',
       to: ['contact@mycampusview.com'],
@@ -88,7 +90,7 @@ describe('the Resend HTTPS provider', () => {
       ],
     })
 
-    expect(JSON.parse(calls[0].init.body as string).attachments).toEqual([
+    expect(JSON.parse(calls[0]!.init.body as string).attachments).toEqual([
       { filename: 'receipt.pdf', content: Buffer.from('hello').toString('base64'), content_type: 'application/pdf' },
     ])
   })

@@ -87,12 +87,19 @@ export async function createSession(input: CreateSessionInput) {
   const jar = await cookies()
   jar.set(SESSION_COOKIE, token, await sessionCookieOptions(expiresAt))
 
-  return session
+  // The raw token is returned alongside the row so a native client can be
+  // handed the credential it will present as a bearer. It is the only moment
+  // it exists in plaintext — the database holds nothing but its SHA-256 — so
+  // the mobile sign-in route is the one caller that reads it. Web callers
+  // ignore it and keep using the cookie.
+  return Object.assign(session, { token })
 }
 
 export async function destroyCurrentSession() {
   const jar = await cookies()
-  const token = jar.get(SESSION_COOKIE)?.value
+  // Resolved from either transport, so signing out of the mobile app revokes
+  // the row rather than only clearing a cookie that was never set.
+  const token = await sessionToken()
   if (token) {
     await prisma.session.updateMany({
       where: { tokenHash: sha256(token), revokedAt: null },
@@ -114,13 +121,42 @@ export async function revokeAllSessions(userId: string, exceptSessionId?: string
 }
 
 /**
+ * The session token for this request, from either transport.
+ *
+ * The browser sends a cookie. A native client cannot: there is no cookie jar
+ * worth relying on, no shared subdomain to scope one to, and a `SameSite`
+ * policy written for a browser means nothing to an Android app. So mobile
+ * presents the same opaque token as a bearer credential instead.
+ *
+ * That works because sessions were never JWTs — the token is a random string
+ * whose SHA-256 is the primary key of a server-side row. Bearer and cookie are
+ * two envelopes around one credential, so revocation, expiry, "log out
+ * everywhere" and the device list keep working identically for both.
+ *
+ * The cookie is read first, so nothing about the web application changes: a
+ * browser request never reaches the header branch.
+ */
+async function sessionToken(): Promise<string | null> {
+  const jar = await cookies()
+  const cookieToken = jar.get(SESSION_COOKIE)?.value
+  if (cookieToken) return cookieToken
+
+  const authorization = (await headers()).get('authorization')
+  if (!authorization) return null
+
+  // Case-insensitive scheme, exactly one space, non-empty token. Anything else
+  // is not a bearer credential and must not be guessed at.
+  const match = /^Bearer[ ]+(\S+)$/i.exec(authorization.trim())
+  return match?.[1] ?? null
+}
+
+/**
  * Resolves the current session and materialises the effective permission set
  * by unioning every assigned role. Returns null for anonymous, expired or
  * revoked sessions - callers must never treat null as "allow".
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const jar = await cookies()
-  const token = jar.get(SESSION_COOKIE)?.value
+  const token = await sessionToken()
   if (!token) return null
 
   const session = await prisma.session.findUnique({

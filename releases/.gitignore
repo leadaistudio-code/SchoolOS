@@ -1,0 +1,5 @@
+# Build artefacts are large and regenerable. The APK is kept out of git history
+# on purpose — a 60MB binary per release bloats every future clone, and Play
+# distributes the real thing anyway. Build it with the steps in mobile/README.md.
+*.apk
+*.aab

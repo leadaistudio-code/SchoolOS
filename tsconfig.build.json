@@ -9,6 +9,7 @@
     "prisma",
     "scripts",
     "tests",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "mobile"
   ]
 }

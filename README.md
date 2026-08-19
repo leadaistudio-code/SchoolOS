@@ -199,8 +199,14 @@ docs/                   architecture, security, API, roadmap
 
 ## API
 
-Versioned, envelope-consistent, and the same services the web UI uses — so a
-native iOS/Android client can be built against it without touching the backend.
+Versioned, envelope-consistent, and the same services the web UI uses — which
+is how the Android client in [mobile/](mobile/README.md) is built: it calls
+these endpoints directly and shares no UI code with the web.
+
+A native client needs two things a browser gets for free, both added without
+changing web behaviour: `Authorization: Bearer <token>` (sessions were already
+opaque server-side tokens, not JWTs) and `X-Tenant-Slug` (an app installed once
+has no per-school Host). Cookie and Host are still tried first.
 
 ```bash
 # Sign in (the tenant comes from the Host header, never the body)
@@ -209,6 +215,13 @@ curl -c jar -X POST http://demo.lvh.me:3000/api/v1/auth/login \
   -d '{"identifier":"admin@demo.schoolos.dev","password":"Password@123"}'
 
 curl -b jar 'http://demo.lvh.me:3000/api/v1/students?page=1&pageSize=25&q=sharma&sort=admissionNo&dir=asc'
+```
+
+```bash
+# The same thing as a native client would: no Host, no cookie.
+TOKEN=$(curl -s -X POST http://lvh.me:3000/api/v1/auth/login   -H 'Content-Type: application/json'   -H 'X-Tenant-Slug: demo' -H 'X-Session-Transport: bearer'   -d '{"identifier":"admin@demo.schoolos.dev","password":"Password@123"}'   | python -c 'import sys,json;print(json.load(sys.stdin)["data"]["sessionToken"])')
+
+curl -H "Authorization: Bearer $TOKEN" -H 'X-Tenant-Slug: demo'   http://lvh.me:3000/api/v1/dashboard
 ```
 
 Every response has the same shape:

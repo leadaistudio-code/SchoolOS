@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>MyCampusView</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<style>
+  /* Gmail, Apple Mail and Outlook.com honour this; Outlook desktop ignores it
+     and falls back to the fixed 600px table, which is the intended behaviour. */
+  @media only screen and (max-width:620px) {
+    .mcv-shell { width:100% !important; }
+    .mcv-pad   { padding-left:24px !important; padding-right:24px !important; }
+    .mcv-h1    { font-size:24px !important; line-height:31px !important; }
+  }
+  /* Some clients invert light emails. Pin the two surfaces that must not move. */
+  @media (prefers-color-scheme: dark) {
+    .mcv-band { background-color:#0a1a3f !important; }
+    .mcv-body { background-color:#ffffff !important; }
+  }
+  a { text-decoration:none; }
+</style>
+</head>
+
+<!--
+  MyCampusView — first-touch outreach, branded variant.
+
+  For recipients who have opted in: a school that filled the demo form, a list
+  that asked to hear from you, a follow-up to someone already in conversation.
+  For genuinely cold outreach use outreach-plain.html instead, and read the
+  README for why.
+
+  Replace: {{first_name}} {{school}} {{sender_name}} {{sender_title}}
+           {{unsubscribe_url}}  ->  {{{RESEND_UNSUBSCRIBE_URL}}} in Resend
+  ASSET HOST: every image URL below is https://www.mycampusview.com/... — change
+  that one string throughout if the site is served from anywhere else.
+-->
+
+<body style="margin:0;padding:0;background-color:#fbfaf8;">
+
+  <!-- Preview line. Shown in the inbox list beside the subject; without it the
+       client scrapes the first words of the body, which is the logo alt text. -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;height:0;width:0;">
+    Admissions, records, attendance and fees on one system rather than four.
+    &#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;
+  </div>
+
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#fbfaf8;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" class="mcv-shell" style="width:600px;max-width:600px;border-collapse:collapse;">
+
+          <!-- Brand band. The logo sits on its own navy, so it renders
+               identically in every client instead of depending on the
+               surrounding background. -->
+          <tr>
+            <td class="mcv-band" align="left" bgcolor="#0a1a3f" style="background-color:#0a1a3f;padding:26px 40px;border-radius:14px 14px 0 0;">
+              <!-- The alt text is styled on purpose. Outlook and most corporate
+                   clients block external images until the recipient asks for
+                   them, so for a good share of readers this is the logo: cream
+                   on navy, at the right size, rather than a broken-image icon. -->
+              <img src="https://www.mycampusview.com/brand/mycampusview-lockup.png"
+                   width="180" height="32" alt="MyCampusView"
+                   style="display:block;border:0;outline:none;width:180px;height:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:21px;font-weight:700;letter-spacing:-0.3px;color:#f8e8d5;">
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="mcv-body" bgcolor="#ffffff" style="background-color:#ffffff;padding:0;">
+
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td class="mcv-pad" style="padding:40px 40px 0 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+                    <h1 class="mcv-h1" style="margin:0 0 18px;font-size:27px;line-height:34px;font-weight:700;color:#0a1024;letter-spacing:-0.4px;">
+                      One operating system for your entire school.
+                    </h1>
+
+                    <p style="margin:0 0 18px;font-size:16px;line-height:26px;color:#3d4759;">
+                      Dear {{first_name}}, most schools we speak to are running at least one
+                      critical thing on a spreadsheet — and the office spends its week
+                      answering the same three questions: what is outstanding, who was
+                      absent, and what did my child score.
+                    </p>
+
+                    <p style="margin:0 0 28px;font-size:16px;line-height:26px;color:#3d4759;">
+                      MyCampusView puts all of it on one system, so there is nothing to
+                      reconcile at the end of the month.
+                    </p>
+
+                  </td>
+                </tr>
+
+                <!-- What it covers. Three rows rather than icons in a grid: a
+                     principal reads a sentence, and an icon set is the thing
+                     that makes an email look like a brochure. -->
+                <tr>
+                  <td class="mcv-pad" style="padding:0 40px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #eceaf3;">
+
+                      <tr>
+                        <td style="padding:18px 0 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                          <p style="margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600;color:#0a1024;">
+                            Admissions &amp; enrolment
+                          </p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:23px;color:#5b6577;">
+                            Enquiries on the system from the first phone call, through to a
+                            student record nobody has to type twice.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                          <p style="margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600;color:#0a1024;">
+                            Records &amp; academics
+                          </p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:23px;color:#5b6577;">
+                            Attendance, marks, results and report cards on one student row —
+                            six years of a child's school life in one place.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                          <p style="margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600;color:#0a1024;">
+                            Fees &amp; the office
+                          </p>
+                          <p style="margin:0 0 22px;font-size:15px;line-height:23px;color:#5b6577;">
+                            Structures, invoices and receipts, with outstanding by class and
+                            by family read live. A payment taken at 11:04 changes the figure
+                            at 11:04.
+                          </p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Product facts. Checkable by opening the product, which is
+                     the only kind of number that belongs in a cold email. -->
+                <tr>
+                  <td class="mcv-pad" style="padding:0 40px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f6f5fb;border-radius:10px;">
+                      <tr>
+                        <td style="padding:16px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#3d4759;">
+                          <strong style="color:#0a1024;">50 modules working today.</strong>
+                          One database, not seven integrations. Eleven roles, so a parent
+                          reaches their own children and a teacher marks their own classes.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Call to action -->
+                <tr>
+                  <td class="mcv-pad" align="left" style="padding:28px 40px 0 40px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td bgcolor="#6c4bf4" style="background-color:#6c4bf4;border-radius:8px;">
+                          <a href="https://www.mycampusview.com/book-demo"
+                             style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;">
+                            Book a twenty-minute demo
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="mcv-pad" style="padding:20px 40px 0 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                    <p style="margin:0 0 26px;font-size:15px;line-height:24px;color:#5b6577;">
+                      We will set it up with {{school}}'s own classes and fee structure
+                      rather than show you a generic demonstration. And if it is not the
+                      right fit, we would rather say so on that first call.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Sign-off -->
+                <tr>
+                  <td class="mcv-pad" style="padding:0 40px 36px 40px;border-top:1px solid #eceaf3;border-radius:0 0 14px 14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                    <p style="margin:22px 0 2px;font-size:15px;line-height:22px;font-weight:600;color:#0a1024;">
+                      {{sender_name}}
+                    </p>
+                    <p style="margin:0 0 2px;font-size:14px;line-height:21px;color:#5b6577;">
+                      {{sender_title}}, MyCampusView
+                    </p>
+                    <p style="margin:0;font-size:14px;line-height:21px;">
+                      <a href="mailto:contact@mycampusview.com" style="color:#4338ca;text-decoration:none;">contact@mycampusview.com</a>
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer.
+               Carries its own bgcolor rather than sitting on the page's. A
+               footer that inherits its background is the first thing to vanish
+               when a client recolours the body, and it is the row that has to
+               survive: the unsubscribe link is what keeps a send compliant. -->
+          <tr>
+            <td class="mcv-foot" align="center" bgcolor="#fbfaf8" style="background-color:#fbfaf8;padding:20px 40px 8px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <p style="margin:0 0 7px;font-size:12px;line-height:19px;color:#6b7488;">
+                <strong style="color:#4a5468;font-weight:600;">MyCampusView</strong>
+                &nbsp;·&nbsp; Explore Today, Excel Tomorrow
+              </p>
+              <!-- A postal address is required by CAN-SPAM and expected by every
+                   filter that scores bulk mail. Fill it in before sending. -->
+              <p style="margin:0 0 7px;font-size:12px;line-height:19px;color:#6b7488;">
+                {{postal_address}}
+              </p>
+              <p style="margin:0;font-size:12px;line-height:19px;color:#6b7488;">
+                <a href="https://www.mycampusview.com" style="color:#6b7488;text-decoration:underline;">mycampusview.com</a>
+                &nbsp;·&nbsp;
+                <a href="{{unsubscribe_url}}" style="color:#6b7488;text-decoration:underline;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

@@ -66,36 +66,31 @@ export function hostToSlug(host: string | null): string | null {
 }
 
 /**
+ * How a native client names its school.
+ *
+ * The web resolves a tenant from the Host, because every school has its own
+ * subdomain or custom domain. An Android app has no such luxury — it is built
+ * once and points at a single API origin for every school — so it states the
+ * slug outright.
+ *
+ * This is not a security boundary and must never be treated as one. Anyone can
+ * set a header. What makes it safe is unchanged: `getContext` refuses to build
+ * a context unless `user.tenantId === tenant.id`, so naming another school's
+ * slug resolves that tenant and then fails the session check.
+ */
+export const TENANT_HEADER = 'x-tenant-slug'
+
+/**
  * Resolves the tenant for the current request from its Host header, first by
- * custom domain (erp.school.com) and then by subdomain (school.schoolos.app).
+ * custom domain (erp.school.com) and then by subdomain (school.schoolos.app),
+ * and failing that from the explicit header a native client sends.
  * Cached per request so the many server components on a page share one query.
  */
 export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host')
-  if (!host) return null
 
-  const bare = host.split(':')[0]!.toLowerCase()
-
-  // The platform console runs on app./admin./platform. subdomains (and the apex).
-  // Never bind those hosts to a school, even if a TenantDomain row exists.
-  if (isPlatformHost(host)) return null
-
-  const byDomain = await prisma.tenantDomain.findUnique({
-    where: { host: bare },
-    select: { tenantId: true, verified: true },
-  })
-
-  const slug = hostToSlug(host)
-  const tenant = await prisma.tenant.findFirst({
-    where: byDomain?.verified
-      ? { id: byDomain.tenantId }
-      : slug
-        ? { slug }
-        : { id: '__none__' },
-    include: { school: { include: { branding: true } } },
-  })
-
+  const tenant = (await fromHost(host)) ?? (await fromHeader(h.get(TENANT_HEADER)))
   if (!tenant || tenant.archivedAt) return null
 
   const b = tenant.school?.branding
@@ -131,6 +126,47 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
       : null,
   }
 })
+
+/** What the browser asks for: a school named by the address it was reached on. */
+async function fromHost(host: string | null) {
+  if (!host) return null
+
+  // The platform console runs on app./admin./platform. subdomains (and the
+  // apex). Never bind those hosts to a school, even if a TenantDomain row
+  // exists — a native client on the same origin uses the header instead.
+  if (isPlatformHost(host)) return null
+
+  const bare = host.split(':')[0]!.toLowerCase()
+
+  const byDomain = await prisma.tenantDomain.findUnique({
+    where: { host: bare },
+    select: { tenantId: true, verified: true },
+  })
+
+  const slug = hostToSlug(host)
+  return prisma.tenant.findFirst({
+    where: byDomain?.verified
+      ? { id: byDomain.tenantId }
+      : slug
+        ? { slug }
+        : { id: '__none__' },
+    include: { school: { include: { branding: true } } },
+  })
+}
+
+/** What a native client asks for: a school named outright. See TENANT_HEADER. */
+async function fromHeader(raw: string | null) {
+  const slug = raw?.trim().toLowerCase()
+  // Slugs are the same shape the subdomain path accepts. Anything else is not
+  // worth a query.
+  if (!slug || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(slug)) return null
+  if (RESERVED_SUBDOMAINS.has(slug)) return null
+
+  return prisma.tenant.findFirst({
+    where: { slug },
+    include: { school: { include: { branding: true } } },
+  })
+}
 
 export function tenantUrl(slug: string, path = '/'): string {
   const url = new URL(env().APP_URL)

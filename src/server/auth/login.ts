@@ -11,7 +11,17 @@ export type LoginInput = {
 }
 
 export type LoginOutcome =
-  | { ok: true; userId: string; mustChangePassword: boolean }
+  | {
+      ok: true
+      userId: string
+      mustChangePassword: boolean
+      /**
+       * The raw session token, for a caller that cannot use the cookie.
+       * Only the mobile sign-in route reads it, and only when the client
+       * asked for bearer transport — see the login route.
+       */
+      sessionToken: string
+    }
   | { ok: false; reason: 'error'; message: string; retryAfterSeconds?: number }
   | { ok: false; reason: 'mfa'; challengeToken: string }
 
@@ -126,7 +136,7 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     return { ok: false, reason: 'mfa', challengeToken }
   }
 
-  await createSession({
+  const session = await createSession({
     userId: user.id,
     tenantId: user.tenantId,
     ip: meta.ip,
@@ -145,7 +155,12 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     summary: 'Signed in',
   })
 
-  return { ok: true, userId: user.id, mustChangePassword: user.mustChangePassword }
+  return {
+    ok: true,
+    userId: user.id,
+    mustChangePassword: user.mustChangePassword,
+    sessionToken: session.token,
+  }
 }
 
 async function recordAttempt(

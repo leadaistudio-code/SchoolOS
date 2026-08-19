@@ -1,0 +1,25 @@
+Dear {{first_name}},
+
+I am {{sender_name}} from MyCampusView. We build school management software —
+admissions, student records, attendance, fees, examinations and parent
+communication on one system, rather than four that have to be reconciled
+against each other every month.
+
+Most schools we speak to are running at least one critical thing on a
+spreadsheet, and the office spends its week answering the same three questions:
+what is outstanding, who was absent, and what did my child score.
+
+If that is familiar at {{school}}, would you be open to a twenty-minute look at
+it — set up with your own classes and fee structure, not a generic demo?
+
+And if it is not the right fit for you, I would rather say so on that call than
+sell you a year of it.
+
+{{sender_name}}
+{{sender_title}}, MyCampusView
+contact@mycampusview.com
+https://www.mycampusview.com/book-demo
+
+--
+{{postal_address}}
+Unsubscribe: {{unsubscribe_url}}
