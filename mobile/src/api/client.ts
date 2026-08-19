@@ -160,7 +160,20 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     )
   }
 
-  return { data: (envelope?.data ?? null) as T, meta: envelope?.meta ?? null }
+  // A 2xx that is not our envelope means the request never reached the route
+  // it was aimed at — almost always a redirect that fetch followed silently to
+  // an HTML page. Returning null here would push a TypeError into whichever
+  // screen unwrapped it, and the user would read "please try again" forever
+  // about something retrying cannot fix. This says what actually happened.
+  if (!envelope || typeof envelope !== 'object' || !('data' in envelope)) {
+    throw new ApiError(
+      response.status,
+      'NOT_API',
+      `The server did not return data at ${path}. Check the app is pointed at the application server, not the marketing site.`,
+    )
+  }
+
+  return { data: envelope.data as T, meta: envelope.meta ?? null }
 }
 
 /** Said plainly, in words that suggest what to do next. */

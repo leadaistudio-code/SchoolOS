@@ -43,22 +43,45 @@ connected. In the service, go to **Settings → Source** and confirm it points a
 
 ### The school code to type
 
-Production has two schools:
+**`little-pathshala`** — with the hyphen.
+
+Production has three schools:
 
 | Code | Name |
 |---|---|
-| **`demo`** | Demo International School |
+| **`little-pathshala`** | Little Pathshala |
+| `demo` | Demo International School |
 | `test` | test |
 
-Type **`demo`**, then sign in with the same email and password you use on the
-web. The code is a school's short name — the part before `.mycampusview.com`
-in its address — and you can list them any time with:
+Then sign in with the same email and password you use on the web.
+
+Check any code with:
 
 ```bash
-curl -s https://www.mycampusview.com/api/v1/site/school/demo
+curl -s https://app.mycampusview.com/api/v1/site/school/little-pathshala
 ```
 
-Two things worth tidying when you get a moment, neither urgent:
+### Why the first attempt failed — `app.`, not `www.`
+
+The app originally pointed at `https://www.mycampusview.com/api/v1`. That host
+runs with `APP_ROLE=marketing`, and [middleware.ts](../src/middleware.ts)
+redirects every `/api/*` path except `/api/v1/site/*` to the front page in that
+mode.
+
+So the school lookup worked — it is under `/api/v1/site/` — and sign-in got a
+**307 redirect to `/`**, which `fetch` followed to an HTML page. The app then
+had no JSON to read and reported "Could not sign in. Please try again.", which
+is true and useless.
+
+Two fixes, both shipped:
+
+1. The app now points at **`app.mycampusview.com`**. `app` is a reserved
+   subdomain, so it never binds to one school by host and `X-Tenant-Slug`
+   decides — which is what a single app installed for every school needs.
+2. A 2xx response that is not the API envelope now raises a clear error naming
+   the path, instead of a `TypeError` surfacing as "please try again".
+
+Two things worth tidying, neither urgent:
 
 - The `test` school looks like leftover setup. Archive it before real schools
   are onboarded, so nobody signs into it by accident.

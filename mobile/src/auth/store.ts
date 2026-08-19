@@ -120,7 +120,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       { anonymous: true, headers: { 'x-tenant-slug': normalisedSlug, 'x-session-transport': 'bearer' } },
     )
 
-    if (!data.sessionToken || !data.user) {
+    if (!data?.sessionToken || !data.user) {
       throw new ApiError(500, 'NO_TOKEN', 'Sign-in succeeded but the server did not return a session. Please try again.')
     }
 

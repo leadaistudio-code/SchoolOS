@@ -33,10 +33,22 @@ const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL
 export const API_BASE_URL =
   ENV_API_URL && ENV_API_URL.length > 0
     ? ENV_API_URL
-    : 'https://www.mycampusview.com/api/v1'
+    : 'https://app.mycampusview.com/api/v1'
 
-/** Shown on the sign-in screen so a tester can see which server they are on. */
-export const IS_PRODUCTION_API = API_BASE_URL.includes('www.mycampusview.com')
+/**
+ * `app.`, not `www.`, and the distinction matters.
+ *
+ * The platform runs as two deployments off one repository. `www` is the
+ * marketing site (APP_ROLE=marketing), and that mode redirects every /api path
+ * except /api/v1/site/* to the front page — so a native client pointed there
+ * can look a school up and then fail at sign-in, with a 307 rather than an
+ * error it can explain.
+ *
+ * `app` is a reserved subdomain, so it never resolves to a school by host and
+ * the X-Tenant-Slug header decides which one. That is precisely what an app
+ * installed once for every school needs.
+ */
+export const IS_PRODUCTION_API = API_BASE_URL.includes('mycampusview.com')
 
 /**
  * A school's wifi at 8am is not a data centre link. Long enough for a slow
