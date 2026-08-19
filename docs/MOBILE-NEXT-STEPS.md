@@ -8,7 +8,7 @@ Two are already done — 2 and 5 — and are recorded here so you know why.
 
 ---
 
-## 1. Deploy the backend  ⚠️ do this first
+## 1. Deploy the backend  ✅ done
 
 **The problem.** The app talks to `https://www.mycampusview.com/api/v1`. The
 sign-in screen calls an endpoint that only exists in the code that was just
@@ -39,8 +39,32 @@ what tells you whether the code shipped, not the status.
 connected. In the service, go to **Settings → Source** and confirm it points at
 `leadaistudio-code/SchoolOS` on branch `master`. Otherwise press **Deploy**.
 
-**Then, in the app:** enter *your school's* code, not `demo`. It is the part
-before `.mycampusview.com` in your school's web address.
+**Confirmed deployed** on 19 August 2026 — the endpoint returns JSON.
+
+### The school code to type
+
+Production has two schools:
+
+| Code | Name |
+|---|---|
+| **`demo`** | Demo International School |
+| `test` | test |
+
+Type **`demo`**, then sign in with the same email and password you use on the
+web. The code is a school's short name — the part before `.mycampusview.com`
+in its address — and you can list them any time with:
+
+```bash
+curl -s https://www.mycampusview.com/api/v1/site/school/demo
+```
+
+Two things worth tidying when you get a moment, neither urgent:
+
+- The `test` school looks like leftover setup. Archive it before real schools
+  are onboarded, so nobody signs into it by accident.
+- On `demo`, the name is "Demo International School" but the sign-in headline
+  reads "Welcome to MyCampusView International School". Settings → Branding
+  fixes it.
 
 ---
 
