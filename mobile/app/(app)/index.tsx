@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useDashboard } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
-import { Avatar, Card, EmptyState, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
+import { Avatar, Card, EmptyState, ErrorState, IconTile, ModuleTile, Screen, SkeletonList, Springy, Txt } from '@/components/ui'
 import { count, friendlyDate, money, moneyShort } from '@/lib/format'
 import { visibleModules } from '@/navigation/modules'
 import { colors, radius, spacing } from '@/theme'
@@ -122,35 +122,25 @@ export default function HomeScreen() {
             </Card>
           ) : null}
 
-          {/* Quick actions, drawn from what this person can actually open. */}
-          <Txt variant="h3" style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>Quick actions</Txt>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-            {modules.slice(0, 6).map((m) => (
-              <Pressable
-                key={m.key}
-                onPress={() => router.push(m.href as never)}
-                accessibilityRole="button"
-                accessibilityLabel={m.title}
-                style={({ pressed }) => [
-                  {
-                    width: '47%',
-                    flexGrow: 1,
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: radius.base,
-                    padding: spacing.base,
-                    minHeight: 76,
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <Ionicons name={m.icon} size={20} color={colors.brand} />
-                <Txt variant="smallStrong" style={{ marginTop: spacing.sm }} numberOfLines={1}>{m.title}</Txt>
-              </Pressable>
-            ))}
-          </View>
+          {/* Everything this person can open, three across on one white card.
+              A grid of coloured tiles is scanned; a column of grey rows is
+              read, and reading is slower when you already know what you came
+              for. */}
+          <Txt variant="h3" style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>Tools</Txt>
+          <Card style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.xs }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {modules.map((m) => (
+                <ModuleTile
+                  key={m.key}
+                  icon={m.icon}
+                  label={m.title}
+                  tint={m.tint}
+                  width="33.33%"
+                  onPress={() => router.push(m.href as never)}
+                />
+              ))}
+            </View>
+          </Card>
 
           {/* Latest notices */}
           {data.recentNotices?.length ? (
@@ -187,6 +177,14 @@ export default function HomeScreen() {
   )
 }
 
+/**
+ * One figure.
+ *
+ * The number carries the module's colour and the icon sits on a soft chip of
+ * the same hue. Four grey cards were readable but gave the eye nothing to
+ * catch — colour here is what makes "outstanding" findable at a glance rather
+ * than read in sequence.
+ */
 function Stat({
   label,
   value,
@@ -201,14 +199,14 @@ function Stat({
   icon: React.ComponentProps<typeof Ionicons>['name']
 }) {
   return (
-    <Card style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-        <Ionicons name={icon} size={15} color={tint} />
-        <Txt variant="caption" color={colors.textSubtle} style={{ marginLeft: 6 }} numberOfLines={1}>
+    <Card style={{ flex: 1, borderColor: `${tint}26` }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+        <IconTile icon={icon} tint={tint} size={30} soft />
+        <Txt variant="caption" color={colors.textSubtle} style={{ marginLeft: spacing.sm, flex: 1 }} numberOfLines={2}>
           {label}
         </Txt>
       </View>
-      <Txt variant="metric" color={colors.text} numberOfLines={1}>{value}</Txt>
+      <Txt variant="metric" color={tint} numberOfLines={1}>{value}</Txt>
       {hint ? (
         <Txt variant="caption" color={colors.textSubtle} numberOfLines={1} style={{ marginTop: 3 }}>{hint}</Txt>
       ) : null}

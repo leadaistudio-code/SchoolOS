@@ -3,8 +3,8 @@ import { ScrollView, View } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/auth/store'
-import { Avatar, Badge, Card, ListRow, Screen, Txt } from '@/components/ui'
-import { MODULES, visibleModules, type Module } from '@/navigation/modules'
+import { Avatar, Badge, Card, IconTile, ListRow, ModuleTile, Screen, Txt } from '@/components/ui'
+import { MODULES, visibleModules } from '@/navigation/modules'
 import { colors, spacing } from '@/theme'
 
 /**
@@ -18,8 +18,6 @@ import { colors, spacing } from '@/theme'
  * "On the web" rather than hidden, so nobody hunts for a screen believing the
  * app has lost their data.
  */
-const GROUPS = ['People', 'Academics', 'Money', 'Operations', 'School'] as const
-
 export default function MoreScreen() {
   const session = useAuth((s) => s.session)
   const held = session?.permissions ?? []
@@ -52,18 +50,29 @@ export default function MoreScreen() {
           </Card>
         </View>
 
-        {GROUPS.map((group) => {
-          const rows = ready.filter((m) => m.group === group)
-          if (rows.length === 0) return null
-          return (
-            <View key={group} style={{ marginTop: spacing.lg }}>
-              <Txt variant="smallStrong" color={colors.textSubtle} style={{ paddingHorizontal: spacing.base, marginBottom: spacing.sm }}>
-                {group.toUpperCase()}
-              </Txt>
-              {rows.map((m) => <ModuleRow key={m.key} module={m} />)}
+        {/* One grid, not five.
+            Grouping is worth a heading when a group fills a row; with seven
+            modules spread over five groups it produced cards that were mostly
+            empty. Bring the headings back when the grid outgrows one card. */}
+        <View style={{ marginTop: spacing.lg, paddingHorizontal: spacing.base }}>
+          <Txt variant="smallStrong" color={colors.textSubtle} style={{ marginBottom: spacing.sm }}>
+            ALL TOOLS
+          </Txt>
+          <Card style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.xs }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {ready.map((m) => (
+                <ModuleTile
+                  key={m.key}
+                  icon={m.icon}
+                  label={m.title}
+                  tint={m.tint}
+                  width="33.33%"
+                  onPress={() => router.push(m.href as never)}
+                />
+              ))}
             </View>
-          )
-        })}
+          </Card>
+        </View>
 
         {notYet.length > 0 ? (
           <View style={{ marginTop: spacing.xl }}>
@@ -78,7 +87,7 @@ export default function MoreScreen() {
                 key={m.key}
                 title={m.title}
                 subtitle={m.blurb}
-                left={<Ionicons name={m.icon} size={20} color={colors.textSubtle} />}
+                left={<IconTile icon={m.icon} tint={m.tint} size={34} soft />}
                 right={<Badge label="Web" tone="neutral" />}
               />
             ))}
@@ -90,18 +99,6 @@ export default function MoreScreen() {
         </Txt>
       </ScrollView>
     </Screen>
-  )
-}
-
-function ModuleRow({ module }: { module: Module }) {
-  return (
-    <ListRow
-      title={module.title}
-      subtitle={module.blurb}
-      left={<Ionicons name={module.icon} size={20} color={colors.brand} />}
-      right={<Ionicons name="chevron-forward" size={17} color={colors.textSubtle} />}
-      onPress={() => router.push(module.href as never)}
-    />
   )
 }
 

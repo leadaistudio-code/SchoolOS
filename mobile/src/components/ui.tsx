@@ -1,6 +1,7 @@
 import React from 'react'
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,6 +14,8 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { colors, layout, radius, shadow, spacing, type } from '@/theme'
 
 /**
@@ -317,20 +320,47 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
 
 /* ----------------------------------------------------------------- avatar */
 
+/**
+ * Eight hues a name can land on.
+ *
+ * Chosen to be distinguishable at 40pt and to sit at a similar weight, so a
+ * list reads as one thing in several colours rather than a bag of sweets.
+ */
+const AVATAR_HUES = [
+  '#7C5CFC', '#2563EB', '#0891B2', '#10B981',
+  '#F59E0B', '#F43F5E', '#EC4899', '#8B5CF6',
+] as const
+
+/**
+ * Initials on a colour derived from the name.
+ *
+ * Deterministic, so the same child is the same colour on every screen and on
+ * every phone — which is what makes it useful rather than decorative: you
+ * start recognising a row before you have read it. A directory of 120 grey
+ * circles gives the eye nothing to hold on to.
+ */
 export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
-  const initials = name.trim().split(/\s+/).slice(0, 2).map((p) => p[0] ?? '').join('').toUpperCase()
+  const clean = name.trim()
+  const initials = clean.split(/\s+/).slice(0, 2).map((p) => p[0] ?? '').join('').toUpperCase()
+
+  let hash = 0
+  for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) >>> 0
+  const tint = AVATAR_HUES[hash % AVATAR_HUES.length]!
+
   return (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: radius.pill,
-        backgroundColor: colors.brandSoft,
+        backgroundColor: `${tint}1F`,
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Txt variant="smallStrong" color={colors.brandDeep}>{initials || '?'}</Txt>
+      <Txt variant="smallStrong" color={tint} style={{ fontSize: size * 0.34 }}>
+        {initials || '?'}
+      </Txt>
     </View>
   )
 }
@@ -414,3 +444,123 @@ const s = StyleSheet.create({
     borderBottomColor: colors.border,
   },
 })
+
+/* ------------------------------------------------------------------ tiles */
+
+/**
+ * A pressable that answers.
+ *
+ * A tap on a phone has no cursor and no hover, so without a visible reaction
+ * the only feedback is the next screen appearing — and on a slow connection
+ * that is a second of wondering whether the tap registered. This dips to 96%
+ * on press-in and returns on release, with a light haptic, so the answer is
+ * immediate and the same everywhere.
+ *
+ * The spring is `useNativeDriver`, so it runs on the UI thread and stays
+ * smooth while JavaScript is busy fetching whatever was just asked for.
+ */
+export function Springy({
+  onPress,
+  children,
+  style,
+  accessibilityLabel,
+  disabled,
+}: {
+  onPress: () => void
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+  accessibilityLabel?: string
+  disabled?: boolean
+}) {
+  const scale = React.useRef(new Animated.Value(1)).current
+
+  const to = (value: number) =>
+    Animated.spring(scale, {
+      toValue: value,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start()
+
+  return (
+    <Pressable
+      onPressIn={() => { if (!disabled) { to(0.96); Haptics.selectionAsync().catch(() => {}) } }}
+      onPressOut={() => to(1)}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={style}
+    >
+      <Animated.View style={{ transform: [{ scale }], opacity: disabled ? 0.5 : 1 }}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  )
+}
+
+/**
+ * The coloured square an icon sits in.
+ *
+ * Solid rather than tinted-at-10%: a wash of pastel reads as decoration, and
+ * the point of the colour is that it identifies the module. `soft` is for
+ * places where a full-strength block would shout — a list row rather than a
+ * grid tile.
+ */
+export function IconTile({
+  icon,
+  tint,
+  size = 52,
+  soft = false,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  tint: string
+  size?: number
+  soft?: boolean
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.3,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: soft ? `${tint}1A` : tint,
+      }}
+    >
+      <Ionicons name={icon} size={size * 0.46} color={soft ? tint : '#FFFFFF'} />
+    </View>
+  )
+}
+
+/** One module in a grid: coloured tile, label under it, whole thing tappable. */
+export function ModuleTile({
+  icon,
+  label,
+  tint,
+  onPress,
+  width,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  label: string
+  tint: string
+  onPress: () => void
+  width: string | number
+}) {
+  return (
+    <Springy onPress={onPress} accessibilityLabel={label} style={{ width } as ViewStyle}>
+      <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
+        <IconTile icon={icon} tint={tint} />
+        <Txt
+          variant="caption"
+          color={colors.textMuted}
+          numberOfLines={2}
+          style={{ marginTop: spacing.sm, textAlign: 'center', lineHeight: 14 }}
+        >
+          {label}
+        </Txt>
+      </View>
+    </Springy>
+  )
+}
