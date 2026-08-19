@@ -141,3 +141,74 @@ export function useAskAssistant() {
       api.post<T.AssistantReply>('/assistant', { question }).then((r) => r.data),
   })
 }
+
+/* ---------------------------------------------------------------- parents */
+
+export function useParents(search: string) {
+  return useInfiniteQuery({
+    queryKey: ['parents', search],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      api.get<T.Parent[]>('/parents', { q: search || undefined, page: pageParam, limit: PAGE_SIZE }),
+    getNextPageParam: (last, all) => (last.data.length < PAGE_SIZE ? undefined : all.length + 1),
+  })
+}
+
+/* ------------------------------------------------------------------ staff */
+
+export function useStaff(search: string) {
+  return useInfiniteQuery({
+    queryKey: ['staff', search],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      api.get<T.Staff[]>('/staff', { q: search || undefined, page: pageParam, limit: PAGE_SIZE }),
+    getNextPageParam: (last, all) => (last.data.length < PAGE_SIZE ? undefined : all.length + 1),
+  })
+}
+
+/* --------------------------------------------------------------- homework */
+
+export function useHomework() {
+  return useQuery({
+    queryKey: ['homework'],
+    queryFn: () => api.get<T.Homework[]>('/homework', { limit: 50 }).then((r) => r.data),
+  })
+}
+
+/* ------------------------------------------------------------------ leave */
+
+export function useLeave(status?: T.LeaveStatus) {
+  return useQuery({
+    queryKey: ['leave', status ?? 'all'],
+    queryFn: () => api.get<T.LeaveRequest[]>('/leave', { status }).then((r) => r.data),
+  })
+}
+
+/**
+ * Approve or reject.
+ *
+ * The list is invalidated rather than patched in place: deciding a request can
+ * change more than its own row — a staff absence writes an attendance record —
+ * and re-reading is cheaper than modelling every consequence on the client.
+ */
+export function useDecideLeave() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status, note }: { id: string; status: 'APPROVED' | 'REJECTED'; note?: string }) =>
+      api.patch(`/leave/${id}`, { status, decisionNote: note }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leave'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['attendance'] })
+    },
+  })
+}
+
+/* -------------------------------------------------------------- transport */
+
+export function useTransportRoutes() {
+  return useQuery({
+    queryKey: ['transport', 'routes'],
+    queryFn: () => api.get<T.TransportRoute[]>('/transport/routes').then((r) => r.data),
+  })
+}

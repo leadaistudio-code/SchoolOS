@@ -93,6 +93,11 @@ export default function AppLayout() {
           missing becomes a tab with a broken glyph, which is exactly what
           `student` and `register` did before they were listed here. */}
       <Tabs.Screen name="admissions" options={{ href: null }} />
+      <Tabs.Screen name="parents" options={{ href: null }} />
+      <Tabs.Screen name="staff" options={{ href: null }} />
+      <Tabs.Screen name="homework" options={{ href: null }} />
+      <Tabs.Screen name="transport" options={{ href: null }} />
+      <Tabs.Screen name="leave" options={{ href: null }} />
       <Tabs.Screen name="assistant" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
       <Tabs.Screen name="search" options={{ href: null }} />

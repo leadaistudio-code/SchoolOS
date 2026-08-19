@@ -146,10 +146,22 @@ means built and wired to the API; the rest are listed on the More screen under
 | Assistant | `assistant.tsx` | `POST /assistant` | Built |
 | Search | `search.tsx` | `GET /search` | Built |
 | Settings | `settings.tsx` | `/auth/me`, `/auth/logout` | Built |
-| Parents, Staff, Homework, Timetable, Exams, Assessments, Feedback, Transport, Library, Leave, Reports | — | mostly server-actions only | Web only |
+| Parents | `parents.tsx` | `GET /parents` | Built |
+| Staff | `staff.tsx` | `GET /staff` | Built |
+| Homework | `homework.tsx` | `GET /homework` | Built |
+| Leave | `leave.tsx` | `GET /leave`, `PATCH /leave/:id` | Built |
+| Transport | `transport.tsx` | `GET /transport/routes` | Built |
+| Timetable, Exams, Assessments, Feedback, Library, Reports | — | mostly server-actions only | Web only |
 
 The web application has 125 pages across ~39 permission namespaces. Everything
 above is genuinely wired to live data; nothing on this list is a mock.
+
+Leave is the only one of these that writes. Approving from a phone is the
+point of it — a thirty-second decision that blocks somebody else's day, made
+between classrooms — so the two buttons are on the card rather than behind a
+detail screen. Who may decide is the server's answer, not the app's:
+`canDecide` comes back per request and already accounts for self-approval,
+which the service refuses.
 
 ---
 

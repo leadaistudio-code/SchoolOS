@@ -47,12 +47,12 @@ export const MODULES: Module[] = [
   /* ------------------------------------------------------------- people */
   { key: 'students', title: 'Students', blurb: 'Directory, profiles, attendance and fees', href: '/(app)/students', icon: 'people-outline', permissions: ['students.view'], group: 'People', tint: '#7C5CFC', ready: true },
   { key: 'admissions', title: 'Admissions', blurb: 'Enquiries, follow-ups and conversion', href: '/(app)/admissions', icon: 'person-add-outline', permissions: ['admissions.view'], group: 'People', tint: '#6366F1', ready: true },
-  { key: 'parents', title: 'Parents', blurb: 'Guardians and their children', href: '/(app)/parents', icon: 'home-outline', permissions: ['parents.view'], group: 'People', tint: '#14B8A6', ready: false },
-  { key: 'staff', title: 'Staff', blurb: 'Employees, leave and approvals', href: '/(app)/staff', icon: 'briefcase-outline', permissions: ['staff.view'], group: 'People', tint: '#F59E0B', ready: false },
+  { key: 'parents', title: 'Parents', blurb: 'Guardians and their children', href: '/(app)/parents', icon: 'home-outline', permissions: ['parents.view'], group: 'People', tint: '#14B8A6', ready: true },
+  { key: 'staff', title: 'Staff', blurb: 'Employees, leave and approvals', href: '/(app)/staff', icon: 'briefcase-outline', permissions: ['staff.view'], group: 'People', tint: '#F59E0B', ready: true },
 
   /* ---------------------------------------------------------- academics */
   { key: 'attendance', title: 'Attendance', blurb: 'Mark a register in a few taps', href: '/(app)/attendance', icon: 'checkbox-outline', permissions: ['attendance.view', 'attendance.mark'], group: 'Academics', tint: '#10B981', ready: true },
-  { key: 'homework', title: 'Homework', blurb: 'Set work and review submissions', href: '/(app)/homework', icon: 'book-outline', permissions: ['homework.view'], group: 'Academics', tint: '#0EA5E9', ready: false },
+  { key: 'homework', title: 'Homework', blurb: 'Set work and review submissions', href: '/(app)/homework', icon: 'book-outline', permissions: ['homework.view'], group: 'Academics', tint: '#0EA5E9', ready: true },
   { key: 'timetable', title: 'Timetable', blurb: 'Today’s periods by class', href: '/(app)/timetable', icon: 'calendar-outline', permissions: ['timetable.view'], group: 'Academics', tint: '#8B5CF6', ready: false },
   { key: 'exams', title: 'Exams & results', blurb: 'Schedules, marks and report cards', href: '/(app)/exams', icon: 'school-outline', permissions: ['exams.view', 'results.view'], group: 'Academics', tint: '#F43F5E', ready: false },
   { key: 'assessments', title: 'Assessments', blurb: 'Question bank and papers', href: '/(app)/assessments', icon: 'document-text-outline', permissions: ['assessments.view', 'questionbank.view'], group: 'Academics', tint: '#C026D3', ready: false },
@@ -63,9 +63,9 @@ export const MODULES: Module[] = [
   /* --------------------------------------------------------- operations */
   { key: 'notices', title: 'Notices', blurb: 'What the school has announced', href: '/(app)/notices', icon: 'megaphone-outline', permissions: ['notices.view'], group: 'Operations', tint: '#F97316', ready: true },
   { key: 'feedback', title: 'Feedback', blurb: '360° feedback and concerns', href: '/(app)/feedback', icon: 'chatbubbles-outline', permissions: ['feedback.view', 'feedback.submit'], group: 'Operations', tint: '#EC4899', ready: false },
-  { key: 'transport', title: 'Transport', blurb: 'Routes, buses and tracking', href: '/(app)/transport', icon: 'bus-outline', permissions: ['transport.view'], group: 'Operations', tint: '#06B6D4', ready: false },
+  { key: 'transport', title: 'Transport', blurb: 'Routes, buses and tracking', href: '/(app)/transport', icon: 'bus-outline', permissions: ['transport.view'], group: 'Operations', tint: '#06B6D4', ready: true },
   { key: 'library', title: 'Library', blurb: 'Titles and loans', href: '/(app)/library', icon: 'library-outline', permissions: ['library.view'], group: 'Operations', tint: '#65A30D', ready: false },
-  { key: 'leave', title: 'Leave', blurb: 'Apply and approve', href: '/(app)/leave', icon: 'airplane-outline', permissions: ['leave.view', 'leave.apply'], group: 'Operations', tint: '#0891B2', ready: false },
+  { key: 'leave', title: 'Leave', blurb: 'Apply and approve', href: '/(app)/leave', icon: 'airplane-outline', permissions: ['leave.view', 'leave.apply'], group: 'Operations', tint: '#0891B2', ready: true },
 
   /* ------------------------------------------------------------- school */
   { key: 'reports', title: 'Reports', blurb: 'Enrolment, attendance and collection', href: '/(app)/reports', icon: 'stats-chart-outline', permissions: ['reports.view'], group: 'School', tint: '#0D9488', ready: false },

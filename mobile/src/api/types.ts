@@ -170,3 +170,102 @@ export type AssistantReply = {
   /** Set when the assistant has drafted an action it will not take unasked. */
   pendingAction?: { id: string; summary: string } | null
 }
+
+/* ---------------------------------------------------------------- parents */
+
+export type Parent = {
+  id: string
+  firstName: string
+  lastName: string
+  phone: string | null
+  email: string | null
+  occupation: string | null
+  hasLogin: boolean
+  childCount: number
+  children: string[]
+}
+
+/* ------------------------------------------------------------------ staff */
+
+export type Staff = {
+  id: string
+  employeeCode: string
+  firstName: string
+  lastName: string
+  staffType: string
+  designation: string | null
+  department: string | null
+  phone: string | null
+  email: string | null
+  hasLogin: boolean
+  classCount: number
+  isClassTeacherOf: string | null
+}
+
+/* --------------------------------------------------------------- homework */
+
+export type Homework = {
+  id: string
+  title: string
+  subject: string | null
+  className: string | null
+  sectionName: string | null
+  teacher: string | null
+  assignedOn: string
+  dueOn: string | null
+  isPublished: boolean
+  maxScore: number | null
+  attachmentCount: number
+  /** How many students it was set for, and how far they have got. */
+  expected: number
+  submitted: number
+  reviewed: number
+  isOverdue: boolean
+}
+
+/* ------------------------------------------------------------------ leave */
+
+export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+
+export type LeaveRequest = {
+  id: string
+  applicantType: 'STUDENT' | 'STAFF'
+  applicantName: string
+  applicantDetail: string | null
+  leaveType: string | null
+  fromDate: string
+  toDate: string
+  days: number
+  reason: string
+  status: LeaveStatus
+  decidedAt: string | null
+  decisionNote: string | null
+  createdAt: string
+  /** The server's own answer to "may this user decide it" — self-approval is refused. */
+  canDecide: boolean
+}
+
+/* -------------------------------------------------------------- transport */
+
+export type TransportStop = {
+  id: string
+  name: string
+  pickupTime: string | null
+  dropTime: string | null
+}
+
+export type TransportRoute = {
+  id: string
+  name: string
+  code: string | null
+  distanceKm: number | null
+  isActive: boolean
+  bus: {
+    id: string
+    code: string
+    registrationNo: string | null
+    capacity: number | null
+    driver: { firstName: string; lastName: string; phone: string | null } | null
+  } | null
+  stops: TransportStop[]
+}
