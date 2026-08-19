@@ -35,10 +35,12 @@ type AuthState = {
 
   restore: () => Promise<void>
   lookupSchool: (slug: string) => Promise<School>
-  signIn: (slug: string, identifier: string, password: string) => Promise<void>
+  signIn: (slug: string, identifier: string, password: string, primaryHex?: string | null) => Promise<void>
   signOut: () => Promise<void>
   can: (permission: string) => boolean
   canAny: (...permissions: string[]) => boolean
+  /** The school's colour, or null to use the product's. */
+  brandColor: () => string | null
 }
 
 // zustand v5 wants the curried form; without it the selector parameter in
@@ -75,6 +77,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
         permissions: data.user.permissions,
         tenantSlug: data.tenant.slug,
         tenantName: data.tenant.name,
+        // /auth/me has no branding, so keep what sign-in stored.
+        primaryHex: stored.primaryHex ?? null,
       }
       await setStoredSession(refreshed)
       set({ status: 'signedIn', session: refreshed })
@@ -96,7 +100,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     return data
   },
 
-  signIn: async (slug: string, identifier: string, password: string) => {
+  signIn: async (slug: string, identifier: string, password: string, primaryHex?: string | null) => {
     const normalisedSlug = slug.trim().toLowerCase()
 
     // The tenant header is sent explicitly here because there is no session to
@@ -135,6 +139,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       roles: data.user.roles,
       permissions: data.user.permissions,
       mustChangePassword: data.user.mustChangePassword,
+      primaryHex: primaryHex ?? null,
     }
 
     await setStoredSession(session)
@@ -150,6 +155,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
     await clearStoredSession()
     set({ status: 'signedOut', session: null, expiredMessage: null })
   },
+
+  brandColor: () => get().session?.primaryHex || null,
 
   can: (permission: string) => get().session?.permissions.includes(permission) ?? false,
   canAny: (...permissions: string[]) => {

@@ -3,6 +3,8 @@ import { FlatList, View } from 'react-native'
 import { useOutstanding } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { Card, EmptyState, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
+import { ScreenHeader } from '@/components/header'
+import { useAuth } from '@/auth/store'
 import { count, money, moneyShort } from '@/lib/format'
 import { colors, radius, spacing } from '@/theme'
 
@@ -15,6 +17,7 @@ import { colors, radius, spacing } from '@/theme'
  * glance and a column of right-aligned numbers does not.
  */
 export default function FeesScreen() {
+  const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const { data, isLoading, isRefetching, refetch, error } = useOutstanding()
 
   const totals = React.useMemo(() => {
@@ -29,13 +32,10 @@ export default function FeesScreen() {
   const worst = Math.max(1, ...(data ?? []).map((r) => r.outstandingMinor))
 
   return (
-    <Screen padded={false}>
-      <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md }}>
-        <Txt variant="h1" accessibilityRole="header">Fees</Txt>
-        <Txt variant="small" color={colors.textSubtle} style={{ marginTop: 2, marginBottom: spacing.base }}>
-          Outstanding by class, read live
-        </Txt>
-      </View>
+    <Screen
+      padded={false}
+      header={<ScreenHeader title="Fees" subtitle="Outstanding by class, read live" tint={brand} />}
+    >
 
       {isLoading ? (
         <View style={{ paddingHorizontal: spacing.base }}><SkeletonList rows={6} /></View>

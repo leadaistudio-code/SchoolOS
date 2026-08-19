@@ -4,6 +4,7 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/auth/store'
 import { Avatar, Badge, Card, IconTile, ListRow, ModuleTile, Screen, Txt } from '@/components/ui'
+import { ScreenHeader } from '@/components/header'
 import { MODULES, visibleModules } from '@/navigation/modules'
 import { colors, spacing } from '@/theme'
 
@@ -20,6 +21,7 @@ import { colors, spacing } from '@/theme'
  */
 export default function MoreScreen() {
   const session = useAuth((s) => s.session)
+  const brand = session?.primaryHex || colors.brand
   const held = session?.permissions ?? []
 
   const allowed = visibleModules(held)
@@ -27,11 +29,11 @@ export default function MoreScreen() {
   const notYet = allowed.filter((m) => !m.ready)
 
   return (
-    <Screen padded={false}>
+    <Screen
+      padded={false}
+      header={<ScreenHeader title="More" subtitle={session?.tenantName ?? ''} tint={brand} />}
+    >
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
-        <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md }}>
-          <Txt variant="h1" accessibilityRole="header">More</Txt>
-        </View>
 
         <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.base }}>
           <Card onPress={() => router.push('/(app)/settings')} accessibilityLabel="Your account">

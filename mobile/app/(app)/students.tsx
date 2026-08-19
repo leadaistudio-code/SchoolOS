@@ -4,6 +4,8 @@ import { router } from 'expo-router'
 import { useStudents } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { Avatar, Badge, EmptyState, ErrorState, Input, ListRow, Screen, SkeletonList, Txt } from '@/components/ui'
+import { ScreenHeader } from '@/components/header'
+import { useAuth } from '@/auth/store'
 import { money } from '@/lib/format'
 import { colors, spacing } from '@/theme'
 import type { StudentRow } from '@/api/types'
@@ -20,6 +22,7 @@ import type { StudentRow } from '@/api/types'
  * so typing does not pull the whole roll down to filter it locally.
  */
 export default function StudentsScreen() {
+  const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const [term, setTerm] = React.useState('')
   const [search, setSearch] = React.useState('')
 
@@ -44,9 +47,8 @@ export default function StudentsScreen() {
   const rows = React.useMemo(() => data?.pages.flatMap((p) => p.data) ?? [], [data])
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} header={<ScreenHeader title="Students" subtitle="Directory" tint={brand} />}>
       <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-        <Txt variant="h1" accessibilityRole="header">Students</Txt>
         <Input
           value={term}
           onChangeText={setTerm}
@@ -55,7 +57,6 @@ export default function StudentsScreen() {
           autoCorrect={false}
           returnKeyType="search"
           clearButtonMode="while-editing"
-          style={{ marginTop: spacing.md }}
           accessibilityLabel="Search students"
         />
       </View>

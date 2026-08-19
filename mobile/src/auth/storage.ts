@@ -26,6 +26,14 @@ export type StoredSession = {
   roles: string[]
   permissions: string[]
   mustChangePassword: boolean
+  /**
+   * The school's own brand colour, from `/site/school/:slug`.
+   *
+   * The platform already puts a school's colours on its documents and its
+   * website; this is the same promise kept on the phone, so two schools do not
+   * look at identical apps. Null falls back to the product violet.
+   */
+  primaryHex: string | null
 }
 
 /**

@@ -80,6 +80,7 @@ export function Screen({
   refreshing,
   onRefresh,
   padded = true,
+  header,
   style,
 }: {
   children: React.ReactNode
@@ -87,6 +88,12 @@ export function Screen({
   refreshing?: boolean
   onRefresh?: () => void
   padded?: boolean
+  /**
+   * The coloured band. Rendered full width, outside the screen padding and
+   * above the scroll, and it handles its own top inset — so a screen with one
+   * must not also claim the top safe area or the status bar is paid for twice.
+   */
+  header?: React.ReactNode
   style?: StyleProp<ViewStyle>
 }) {
   const inner = (
@@ -95,12 +102,20 @@ export function Screen({
     </View>
   )
 
+  const edges = header ? ([] as const) : (['top'] as const)
+
   if (!scroll) {
-    return <SafeAreaView edges={['top']} style={s.screen}>{inner}</SafeAreaView>
+    return (
+      <SafeAreaView edges={edges} style={s.screen}>
+        {header}
+        {inner}
+      </SafeAreaView>
+    )
   }
 
   return (
-    <SafeAreaView edges={['top']} style={s.screen}>
+    <SafeAreaView edges={edges} style={s.screen}>
+      {header}
       <ScrollView
         contentContainerStyle={{ paddingBottom: spacing.xxxl }}
         keyboardShouldPersistTaps="handled"
@@ -339,7 +354,16 @@ const AVATAR_HUES = [
  * start recognising a row before you have read it. A directory of 120 grey
  * circles gives the eye nothing to hold on to.
  */
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+export function Avatar({
+  name,
+  size = 40,
+  onLight = false,
+}: {
+  name: string
+  size?: number
+  /** Sitting on the coloured header, where a tinted circle would disappear. */
+  onLight?: boolean
+}) {
   const clean = name.trim()
   const initials = clean.split(/\s+/).slice(0, 2).map((p) => p[0] ?? '').join('').toUpperCase()
 
@@ -353,12 +377,14 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
         width: size,
         height: size,
         borderRadius: radius.pill,
-        backgroundColor: `${tint}1F`,
+        backgroundColor: onLight ? 'rgba(255,255,255,0.22)' : `${tint}1F`,
+        borderWidth: onLight ? 1.5 : 0,
+        borderColor: 'rgba(255,255,255,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Txt variant="smallStrong" color={tint} style={{ fontSize: size * 0.34 }}>
+      <Txt variant="smallStrong" color={onLight ? '#FFFFFF' : tint} style={{ fontSize: size * 0.34 }}>
         {initials || '?'}
       </Txt>
     </View>

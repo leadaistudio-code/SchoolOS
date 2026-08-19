@@ -74,7 +74,7 @@ export default function LoginScreen() {
 
     setBusy(true); setError(null)
     try {
-      await signIn(school.slug, identifier, password)
+      await signIn(school.slug, identifier, password, school.primaryHex)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not sign in. Please try again.')
       setPassword('')

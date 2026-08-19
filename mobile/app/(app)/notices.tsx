@@ -3,6 +3,8 @@ import { FlatList, View } from 'react-native'
 import { useNotices } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { Badge, Card, EmptyState, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
+import { ScreenHeader } from '@/components/header'
+import { useAuth } from '@/auth/store'
 import { friendlyDate } from '@/lib/format'
 import { colors, spacing } from '@/theme'
 
@@ -14,6 +16,7 @@ import { colors, spacing } from '@/theme'
  * back is worse than showing them.
  */
 export default function NoticesScreen() {
+  const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const { data, isLoading, isRefetching, refetch, error } = useNotices()
   const [open, setOpen] = React.useState<string | null>(null)
 
@@ -27,10 +30,10 @@ export default function NoticesScreen() {
   }, [data])
 
   return (
-    <Screen padded={false}>
-      <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-        <Txt variant="h1" accessibilityRole="header">Notices</Txt>
-      </View>
+    <Screen
+      padded={false}
+      header={<ScreenHeader title="Notice Board" subtitle="What the school has announced" tint={brand} />}
+    >
 
       {isLoading ? (
         <View style={{ paddingHorizontal: spacing.base }}><SkeletonList rows={5} /></View>
@@ -50,8 +53,18 @@ export default function NoticesScreen() {
           ListEmptyComponent={<EmptyState title="No notices" body="Announcements from the school will appear here." />}
           renderItem={({ item }) => {
             const expanded = open === item.id
+            const accent = noticeAccent(item.priority, item.isExpired)
             return (
-              <Card onPress={() => setOpen(expanded ? null : item.id)} accessibilityLabel={item.title}>
+              <Card
+                onPress={() => setOpen(expanded ? null : item.id)}
+                accessibilityLabel={item.title}
+                style={{
+                  backgroundColor: `${accent}0F`,
+                  borderColor: `${accent}33`,
+                  borderLeftWidth: 4,
+                  borderLeftColor: accent,
+                }}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: spacing.sm }}>
                   {item.pinned ? <Badge label="Pinned" tone="info" /> : null}
                   {item.priority === 'HIGH' ? <Badge label="Important" tone="danger" /> : null}
@@ -81,4 +94,18 @@ export default function NoticesScreen() {
       )}
     </Screen>
   )
+}
+
+/**
+ * A notice's colour, from its priority.
+ *
+ * The reference designs tint every notice card the same pale blue, which is
+ * pretty and says nothing. Here the tint is the one piece of information a
+ * parent scanning a list actually wants: whether this one matters today.
+ */
+function noticeAccent(priority: string, expired: boolean): string {
+  if (expired) return colors.textSubtle
+  if (priority === 'HIGH') return colors.overdue
+  if (priority === 'LOW') return colors.attendance
+  return colors.fees
 }

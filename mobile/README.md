@@ -153,6 +153,44 @@ above is genuinely wired to live data; nothing on this list is a mock.
 
 ---
 
+## The look
+
+Two rules, so colour carries meaning rather than decorating.
+
+**A screen starts with a coloured band.** A gradient header with the content
+curving over it on a rounded sheet — that curve is the whole trick, since a
+flat join reads as two stacked rectangles. Without it every screen was grey
+with a black heading, which gives the eye no anchor and reads as a
+spreadsheet.
+
+**The band takes the school's own colour**, from `primaryHex` on
+`/site/school/:slug`, stored with the session. The platform already promises a
+school's colours on its documents and its website; this keeps the same promise
+on the phone, so two schools' staff are not looking at identical violet apps.
+It falls back to the product violet when a school has set none.
+
+Everything else follows one palette, assigned once in
+[`src/navigation/modules.ts`](src/navigation/modules.ts):
+
+| Element | Colour means |
+|---|---|
+| Module tiles | the module — green is attendance, blue is fees, purple is students |
+| Stat figures | the same, so "outstanding" is found rather than read |
+| Notice cards | priority — red important, blue normal, green low, grey expired |
+| Avatars | a hash of the name, so the same child is the same colour everywhere |
+| Section titles | the school's colour, to break a long scroll into findable parts |
+
+Those module hues are the series colours the web charts already use, so
+somebody who reads a dashboard on a laptop and picks up a phone is looking at
+one language rather than learning a second.
+
+Every tile dips to 96% with a light haptic on press, on the native driver so
+it stays smooth while the fetch it triggered is in flight. A tap has no cursor
+and no hover; without a reaction the only feedback is the next screen
+arriving.
+
+---
+
 ## Mobile translations of desktop patterns
 
 | Web | Android |

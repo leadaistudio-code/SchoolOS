@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAttendanceSections } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { Badge, EmptyState, ErrorState, ListRow, Screen, SkeletonList, Txt } from '@/components/ui'
+import { ScreenHeader } from '@/components/header'
+import { useAuth } from '@/auth/store'
 import { apiDate, longDate } from '@/lib/format'
 import { colors, spacing } from '@/theme'
 
@@ -17,6 +19,7 @@ import { colors, spacing } from '@/theme'
  * alphabetically underneath the classes that are already finished.
  */
 export default function AttendanceScreen() {
+  const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const [date] = React.useState(() => new Date())
   const onDate = apiDate(date)
   const { data, isLoading, isRefetching, refetch, error } = useAttendanceSections(onDate)
@@ -34,14 +37,16 @@ export default function AttendanceScreen() {
   const pending = sections.filter((s) => s.marked < s.enrolled).length
 
   return (
-    <Screen padded={false}>
-      <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md, paddingBottom: spacing.md }}>
-        <Txt variant="h1" accessibilityRole="header">Attendance</Txt>
-        <Txt variant="small" color={colors.textSubtle} style={{ marginTop: 2 }}>
-          {longDate(date)}
-          {data ? ` · ${pending === 0 ? 'all registers taken' : `${pending} still to take`}` : ''}
-        </Txt>
-      </View>
+    <Screen
+      padded={false}
+      header={
+        <ScreenHeader
+          title="Attendance"
+          subtitle={`${longDate(date)}${data ? ` · ${pending === 0 ? 'all registers taken' : `${pending} still to take`}` : ''}`}
+          tint={brand}
+        />
+      }
+    >
 
       {isLoading ? (
         <View style={{ paddingHorizontal: spacing.base }}><SkeletonList rows={8} /></View>

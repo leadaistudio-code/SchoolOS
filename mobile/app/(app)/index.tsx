@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useDashboard } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
-import { Avatar, Card, EmptyState, ErrorState, IconTile, ModuleTile, Screen, SkeletonList, Springy, Txt } from '@/components/ui'
+import { Card, EmptyState, ErrorState, IconTile, ModuleTile, Screen, SkeletonList, Txt } from '@/components/ui'
+import { ScreenHeader, SectionTitle } from '@/components/header'
 import { count, friendlyDate, money, moneyShort } from '@/lib/format'
 import { visibleModules } from '@/navigation/modules'
 import { colors, radius, spacing } from '@/theme'
@@ -27,30 +28,22 @@ export default function HomeScreen() {
   const can = useAuth((s) => s.can)
   const { data, isLoading, isRefetching, refetch, error } = useDashboard()
 
+  const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const permitted = can('dashboard.view')
   const modules = visibleModules(session?.permissions ?? []).filter((m) => m.ready)
 
   return (
-    <Screen scroll refreshing={isRefetching} onRefresh={refetch}>
-      {/* Greeting */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: spacing.md, marginBottom: spacing.lg }}>
-        <Avatar name={`${session?.firstName ?? ''} ${session?.lastName ?? ''}`} size={44} />
-        <View style={{ flex: 1, marginLeft: spacing.md }}>
-          <Txt variant="h2" numberOfLines={1}>{greeting()}, {session?.firstName}</Txt>
-          <Txt variant="small" color={colors.textSubtle} numberOfLines={1}>
-            {session?.tenantName || 'MyCampusView'}
-          </Txt>
-        </View>
-        <Pressable
-          onPress={() => router.push('/(app)/search')}
-          accessibilityRole="button"
-          accessibilityLabel="Search"
-          hitSlop={10}
-          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Ionicons name="search-outline" size={22} color={colors.textMuted} />
-        </Pressable>
-      </View>
+    <Screen scroll refreshing={isRefetching} onRefresh={refetch} header={
+      <ScreenHeader
+        title={`${greeting()}, ${session?.firstName ?? ''}`}
+        subtitle={session?.tenantName || 'MyCampusView'}
+        tint={brand}
+        person={`${session?.firstName ?? ''} ${session?.lastName ?? ''}`}
+        onAction={() => router.push('/(app)/search')}
+        actionIcon="search-outline"
+        actionLabel="Search"
+      />
+    }>
 
       {!permitted ? (
         <Card>
@@ -126,7 +119,7 @@ export default function HomeScreen() {
               A grid of coloured tiles is scanned; a column of grey rows is
               read, and reading is slower when you already know what you came
               for. */}
-          <Txt variant="h3" style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>Tools</Txt>
+          <SectionTitle tint={brand}>Tools</SectionTitle>
           <Card style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.xs }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {modules.map((m) => (
@@ -145,7 +138,7 @@ export default function HomeScreen() {
           {/* Latest notices */}
           {data.recentNotices?.length ? (
             <>
-              <Txt variant="h3" style={{ marginBottom: spacing.md }}>Latest notices</Txt>
+              <SectionTitle tint={brand}>Latest notices</SectionTitle>
               <Card>
                 {data.recentNotices.slice(0, 3).map((n, i, arr) => (
                   <View
