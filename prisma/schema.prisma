@@ -3292,6 +3292,11 @@ model Document {
   sizeBytes    Int
   checksum     String?
   version      Int               @default(1)
+  // Set only for the papers that go stale - a medical certificate, an income
+  // certificate, a passport. Null means "does not expire", which is most of
+  // them, so the missing-document report can treat null as fine rather than
+  // as unknown.
+  expiresOn    DateTime?         @db.Date
   isVerified   Boolean           @default(false)
   verifiedById String?
   uploadedById String?

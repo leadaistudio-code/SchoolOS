@@ -19,6 +19,7 @@ import { EmptyState, Notice } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { formatMoney, fullName } from '@/lib/utils'
 import { Avatar, PersonCell } from '@/components/ui/identity'
+import { StudentDocumentsCard } from './student-documents-card'
 
 export const metadata = { title: 'Student profile' }
 
@@ -180,6 +181,12 @@ export default async function StudentDetailPage({
               )}
             </CardContent>
           </Card>
+
+          <StudentDocumentsCard
+            ctx={ctx}
+            studentId={student.id}
+            studentName={fullName(student)}
+          />
 
           <Card>
             <CardHeader>

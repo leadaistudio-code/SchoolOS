@@ -97,6 +97,14 @@ export async function createSession(ctx: AppContext, input: z.infer<typeof sessi
  * A locked session can still be made current — locking guards against edits
  * to its records, not against looking at it — but the two together are worth
  * warning about on screen.
+ *
+ * Enrolments move with the session. Promotions write next year's placements
+ * ahead of time and leave them dormant (`isCurrent: false`) precisely so that
+ * promoting in February does not move the whole school up a class mid-year;
+ * this is the moment those placements become the live ones. Doing it here, in
+ * the same transaction as the switch, is what keeps "the student's current
+ * class" answerable at every instant — there is no window in which a child has
+ * two live placements or none.
  */
 export async function setCurrentSession(ctx: AppContext, id: string) {
   ctx.require('academics.manage')
@@ -107,6 +115,20 @@ export async function setCurrentSession(ctx: AppContext, id: string) {
 
   const updated = await ctx.db.$transaction(async (tx) => {
     await tx.academicSession.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } })
+
+    // Close every placement outside the incoming session first, so the unique
+    // "one live placement per student" expectation never briefly breaks.
+    await tx.enrollment.updateMany({
+      where: { sessionId: { not: id }, isCurrent: true },
+      data: { isCurrent: false, leftOn: new Date() },
+    })
+    // `leftOn` is cleared as well: a placement that is live again has not been
+    // left, and a stale date there would read as a child who had gone.
+    await tx.enrollment.updateMany({
+      where: { sessionId: id },
+      data: { isCurrent: true, leftOn: null },
+    })
+
     return tx.academicSession.update({ where: { id }, data: { isCurrent: true } })
   })
 

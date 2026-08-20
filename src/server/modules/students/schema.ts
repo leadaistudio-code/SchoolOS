@@ -109,10 +109,89 @@ export const studentTransferSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 })
 
-export const studentPromoteSchema = z.object({
-  fromSectionId: z.string().min(1),
-  toSessionId: z.string().min(1),
-  toSectionId: z.string().min(1),
-  studentIds: z.array(z.string().min(1)).min(1, 'Select at least one student'),
-  markGraduating: z.boolean().default(false),
+/**
+ * What happens to one child at the end of a session.
+ *
+ * Modelled per student rather than per class because the exceptions are the
+ * whole point: a class of forty moves up, two repeat, one has already left for
+ * another city. A bulk "promote section A to section A" would force those
+ * three to be corrected by hand afterwards, which is the manual work this
+ * screen exists to remove.
+ */
+export const PROMOTION_DECISIONS = [
+  'PROMOTE',
+  'REPEAT',
+  'GRADUATE',
+  'TRANSFER_OUT',
+  'SKIP',
+] as const
+
+export type PromotionDecision = (typeof PROMOTION_DECISIONS)[number]
+
+export const promotionPlanSchema = z.object({
+  fromSessionId: z.string().min(1, 'Choose the session to promote from'),
+  toSessionId: z.string().min(1, 'Choose the session to promote into'),
+  fromClassLevelId: z.string().min(1, 'Choose a class'),
+  fromSectionId: z.string().optional(),
 })
+
+export type PromotionPlanInput = z.infer<typeof promotionPlanSchema>
+
+/**
+ * Roll numbers in the receiving section.
+ *
+ * `continue` never touches a roll already issued in the target section, so a
+ * section that has taken students from two different classes does not have the
+ * first batch renumbered when the second arrives.
+ */
+export const ROLL_POLICIES = ['continue', 'keep'] as const
+
+export const promotionApplySchema = z
+  .object({
+    fromSessionId: z.string().min(1),
+    toSessionId: z.string().min(1),
+    rollPolicy: z.enum(ROLL_POLICIES).default('continue'),
+    decisions: z
+      .array(
+        z.object({
+          studentId: z.string().min(1),
+          decision: z.enum(PROMOTION_DECISIONS),
+          toClassLevelId: z.string().optional(),
+          toSectionId: z.string().optional(),
+        }),
+      )
+      .min(1, 'Nothing to apply')
+      // A single class is the unit of work here. The cap is a guard against a
+      // crafted request, not a limit a real section ever reaches.
+      .max(500, 'Promote one class at a time'),
+  })
+  .refine((v) => v.fromSessionId !== v.toSessionId, {
+    path: ['toSessionId'],
+    message: 'Promote into a different session from the one you are promoting out of',
+  })
+
+export type PromotionApplyInput = z.infer<typeof promotionApplySchema>
+
+/** Uploading one paper against one student. */
+export const studentDocumentCreateSchema = z.object({
+  studentId: z.string().min(1, 'Choose a student'),
+  category: z.string().trim().min(1, 'Choose a document type').max(60),
+  title: z.string().trim().min(1, 'Give the document a name').max(160),
+  // Date-only, and only meaningful for the few categories that go stale.
+  expiresOn: z.coerce.date().optional(),
+})
+
+export type StudentDocumentCreateInput = z.infer<typeof studentDocumentCreateSchema>
+
+export const studentDocumentFilterSchema = z.object({
+  studentId: z.string().optional(),
+  category: z.string().optional(),
+  classLevelId: z.string().optional(),
+  sectionId: z.string().optional(),
+  verified: z.enum(['yes', 'no']).optional(),
+  expiry: z.enum(['expired', 'soon']).optional(),
+})
+
+export type StudentDocumentFilter = z.infer<typeof studentDocumentFilterSchema>
+
+export const STUDENT_DOCUMENT_SORT_FIELDS = ['createdAt', 'title', 'category'] as const
