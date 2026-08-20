@@ -56,6 +56,7 @@ export function BrandingForm({
   faviconUrl,
   darkLogoUrl,
   signatureUrl,
+  maxUploadMb,
 }: {
   initial: BrandingValues
   logoUrl: string | null
@@ -63,6 +64,8 @@ export function BrandingForm({
   faviconUrl: string | null
   darkLogoUrl: string | null
   signatureUrl: string | null
+  /** Stated on the panel, because nothing here is resized after upload. */
+  maxUploadMb: number
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -113,9 +116,17 @@ export function BrandingForm({
             <CardTitle>Logo &amp; banner</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6 sm:grid-cols-2">
+            <p className="sm:col-span-2 text-xs text-ink-muted">
+              JPEG, PNG or WebP, up to {maxUploadMb}MB. Images are stored exactly as uploaded and
+              are never resized for you, so matching the suggested size below is what keeps a logo
+              sharp instead of blurred or letterboxed.
+            </p>
+
             <AssetUploadField
               label="Header logo"
               hint="Sign-in page, sidebar and receipts"
+              size="512 × 512 px"
+              shape="Square PNG, transparent background"
               previewUrl={logoUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('logo', file)}
@@ -123,6 +134,8 @@ export function BrandingForm({
             <AssetUploadField
               label="Dark logo"
               hint="Optional logo for dark header strips"
+              size="512 × 512 px"
+              shape="Same square as the header logo, drawn light"
               previewUrl={darkLogoUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('darkLogo', file)}
@@ -130,6 +143,8 @@ export function BrandingForm({
             <AssetUploadField
               label="Login banner"
               hint="Sign-in page and dashboard welcome strip"
+              size="1600 × 1200 px"
+              shape="Landscape photo — keep the subject centred, the edges are cropped"
               previewUrl={bannerUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('banner', file)}
@@ -137,6 +152,8 @@ export function BrandingForm({
             <AssetUploadField
               label="Favicon / app icon"
               hint="Browser tab and PWA icon"
+              size="512 × 512 px"
+              shape="Square PNG or ICO — the home-screen icon is cut from this"
               previewUrl={faviconUrl}
               pending={assetPending}
               accept="image/png,image/jpeg,image/webp,image/x-icon,.ico"
@@ -145,6 +162,8 @@ export function BrandingForm({
             <AssetUploadField
               label="Signature"
               hint="Printed on certificates and report cards"
+              size="600 × 200 px"
+              shape="Wide PNG, transparent background, dark ink"
               previewUrl={signatureUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('signature', file)}
@@ -420,9 +439,19 @@ export function BrandingForm({
   )
 }
 
+/**
+ * One branding image.
+ *
+ * The suggested size is stated on the field rather than in a help article,
+ * because it is the one thing a school has to know before it opens the file
+ * picker — and getting it wrong is only visible later, on a receipt or a
+ * home-screen icon, where nobody is looking for it.
+ */
 function AssetUploadField({
   label,
   hint,
+  size,
+  shape,
   previewUrl,
   pending,
   onFile,
@@ -430,6 +459,10 @@ function AssetUploadField({
 }: {
   label: string
   hint: string
+  /** Pixel dimensions to aim for, e.g. `512 × 512 px`. */
+  size: string
+  /** What that shape is and why, in a few words. */
+  shape: string
   previewUrl: string | null
   pending: boolean
   onFile: (file: File | null | undefined) => void
@@ -439,6 +472,11 @@ function AssetUploadField({
     <div className="space-y-2">
       <p className="text-sm font-medium text-ink">{label}</p>
       <p className="text-xs text-ink-subtle">{hint}</p>
+      <p className="text-xs text-ink-muted">
+        <span className="font-medium text-ink tnum">Suggested size: {size}</span>
+        <br />
+        {shape}
+      </p>
       {previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

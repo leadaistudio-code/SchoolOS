@@ -1,4 +1,5 @@
 import { requireContext } from '@/server/context'
+import { env } from '@/lib/env'
 import { resolveBrandingAssetUrl } from '@/server/branding-assets'
 import { PageHeader } from '@/components/page-header'
 import { BrandingForm } from './branding-form'
@@ -25,6 +26,7 @@ export default async function BrandingPage() {
         faviconUrl={resolveBrandingAssetUrl(b?.faviconUrl, 'favicon')}
         darkLogoUrl={resolveBrandingAssetUrl(b?.darkLogoUrl, 'darkLogo')}
         signatureUrl={resolveBrandingAssetUrl(b?.signatureUrl, 'signature')}
+        maxUploadMb={env().MAX_UPLOAD_MB}
         initial={{
           primaryHex: b?.primaryHex ?? '#E41F07',
           accentHex: b?.accentHex ?? '#FFA201',
