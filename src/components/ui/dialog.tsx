@@ -30,21 +30,33 @@ export function Dialog({
 }) {
   const panelRef = React.useRef<HTMLDivElement>(null)
 
+  // Call sites pass an inline `() => setOpen(false)`, so `onClose` is a new
+  // function on every render. Held in a ref, the open effect below can depend
+  // on `open` alone instead of re-running — and re-stealing focus — on every
+  // keystroke inside the dialog.
+  const onCloseRef = React.useRef(onClose)
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  })
+
   React.useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
-    // Focus the panel so the keyboard lands inside the dialog, not behind it.
-    panelRef.current?.focus()
+    // Focus the panel so the keyboard lands inside the dialog, not behind it —
+    // unless a field has already claimed the caret with autoFocus, which is the
+    // better landing spot and must not be overruled.
+    const panel = panelRef.current
+    if (panel && !panel.contains(document.activeElement)) panel.focus()
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
