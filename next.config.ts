@@ -5,7 +5,17 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+  // An empty allowlist is a refusal, not a default: `microphone=()` disables
+  // the microphone for every origin including this one, and Chrome gates
+  // SpeechRecognition behind it — the assistant's voice button failed with
+  // "not-allowed" and the browser never showed a permission prompt, because
+  // the page had already answered for it. `self` restores the prompt while
+  // still refusing the microphone to anything embedded. The camera stays off
+  // because nothing asks for it.
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(self), geolocation=(self)',
+  },
   {
     key: 'Strict-Transport-Security',
     value: 'max-age=63072000; includeSubDomains; preload',

@@ -63,6 +63,19 @@ export function listen(options: {
     return () => {}
   }
 
+  // Speech recognition needs a secure context. Outside one the browser reports
+  // plain `not-allowed`, which reads as "you refused the microphone" when in
+  // fact it was never asked — and no amount of changing browser settings will
+  // fix it. A school reaching the portal over http:// on a LAN address lands
+  // here, so the message names the actual remedy.
+  if (!window.isSecureContext) {
+    options.onError(
+      'Voice needs a secure connection. Open the portal over https:// (or on localhost) to use the microphone.',
+    )
+    options.onEnd()
+    return () => {}
+  }
+
   const recognition = new Recognition()
   recognition.lang = options.lang ?? 'en-IN'
   // Single utterance: a question, then send. Continuous dictation in a chat box
@@ -81,7 +94,8 @@ export function listen(options: {
 
   recognition.onerror = (event) => {
     const messages: Record<string, string> = {
-      'not-allowed': 'Microphone access was blocked. Allow it in your browser settings to speak.',
+      'not-allowed':
+        'Microphone access was refused. Allow the microphone for this site — in Chrome, the icon at the right of the address bar.',
       'service-not-allowed': 'Microphone access was blocked by your browser or your school network.',
       'no-speech': 'I did not catch anything. Try again, or type it.',
       network: 'Speech recognition needs a network connection.',
