@@ -111,7 +111,10 @@ export function GeofenceCheckIn({ status }: { status: GeofenceStatus }) {
         </div>
         <p className="text-lg font-semibold text-ink">School location not configured</p>
         <p className="text-base text-ink-muted mt-1.5 max-w-sm mx-auto">
-          An administrator needs to set the school coordinates and geofence radius in Settings
+          An administrator needs to set the school coordinates and check-in radius in{' '}
+          <a href="/settings/location" className="text-[var(--brand-600)] hover:underline">
+            Settings &rarr; School location
+          </a>{' '}
           before attendance can be marked from a device.
         </p>
       </div>

@@ -295,6 +295,8 @@ export const NAVIGATION: NavItem[] = [
     // remaining areas as visibly not-yet-built rather than linking to a 404.
     children: [
       { label: 'School Profile', href: '/settings', icon: 'School', permission: 'settings.view' },
+      { label: 'School location', href: '/settings/location', icon: 'MapPin', permission: 'settings.view' },
+      { label: 'GPS trackers', href: '/settings/tracking', icon: 'Satellite', permission: 'transport.manage' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
       { label: 'Security', href: '/settings/security', icon: 'ShieldCheck', permission: 'settings.view' },
       { label: 'Custom Domains', href: '/settings/domains', icon: 'Globe', permission: 'settings.manage' },

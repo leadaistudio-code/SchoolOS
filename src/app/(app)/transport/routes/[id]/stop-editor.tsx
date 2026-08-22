@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { IconButton } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
-import { BusMap } from '@/components/transport/bus-map'
+import { RouteMap } from '@/components/transport/route-map'
 
 export type EditableStop = {
   id?: string
@@ -38,11 +38,14 @@ export function StopEditor({
   routeId,
   initial,
   school,
+  mapsKey,
   canManage,
 }: {
   routeId: string
   initial: EditableStop[]
   school: { name: string; latitude: number | null; longitude: number | null } | null
+  /** Null when no tile provider is configured. */
+  mapsKey?: string | null
   canManage: boolean
 }) {
   const toast = useToast()
@@ -256,7 +259,7 @@ export function StopEditor({
       </Card>
 
       <div className="space-y-2">
-        <BusMap className="h-[22rem]" stops={mapStops} school={school} />
+        <RouteMap apiKey={mapsKey} className="h-[22rem]" stops={mapStops} school={school} />
         <p className="text-xs text-ink-subtle">
           Stops without coordinates are left off the map and out of arrival estimates. On a phone,
           the crosshair button fills them in from where you are standing.

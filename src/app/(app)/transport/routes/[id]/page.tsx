@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { BusAvatar } from '@/components/transport/bus-glyph'
 import { RouteForm } from '../route-form'
 import { StopEditor } from './stop-editor'
+import { mapsClientKey } from '@/server/maps'
 
 export const metadata = { title: 'Route' }
 
@@ -117,6 +118,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
         routeId={route.id}
         canManage={canManage}
         school={school}
+        mapsKey={mapsClientKey()}
         initial={route.stops.map((stop) => ({
           id: stop.id,
           name: stop.name,

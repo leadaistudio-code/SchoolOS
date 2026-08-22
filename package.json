@@ -78,6 +78,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/google.maps": "^3.65.5",
     "@types/ioredis": "^4.28.10",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.5.23",

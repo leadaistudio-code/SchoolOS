@@ -44,6 +44,7 @@ export const TENANT_SCOPED_MODELS = [
   'ScoreWeight',
   'ScoreSnapshot',
   'RoiCalculation',
+  'GpsIngestToken',
   'LeaveType',
   'LeaveRequest',
   'FeeHead',

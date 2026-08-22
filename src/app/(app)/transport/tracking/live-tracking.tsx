@@ -13,7 +13,7 @@ import {
   Users,
   WifiOff,
 } from 'lucide-react'
-import { BusMap } from '@/components/transport/bus-map'
+import { RouteMap } from '@/components/transport/route-map'
 import { BusAvatar, BusGlyph } from '@/components/transport/bus-glyph'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,7 +25,14 @@ import type { TrackedBus, TrackingSnapshot } from '@/server/modules/transport/tr
 /** Fast enough to feel live, slow enough that a phone on mobile data survives it. */
 const POLL_MS = 15_000
 
-export function LiveTracking({ initial }: { initial: TrackingSnapshot }) {
+export function LiveTracking({
+  initial,
+  mapsKey,
+}: {
+  initial: TrackingSnapshot
+  /** Null when no tile provider is configured; the drawn map is used instead. */
+  mapsKey?: string | null
+}) {
   const [snapshot, setSnapshot] = React.useState(initial)
   const [selectedId, setSelectedId] = React.useState<string | null>(initial.buses[0]?.id ?? null)
   const [refreshing, setRefreshing] = React.useState(false)
@@ -117,7 +124,8 @@ export function LiveTracking({ initial }: { initial: TrackingSnapshot }) {
         <div className="space-y-3 min-w-0">
           {selected ? (
             <>
-              <BusMap
+              <RouteMap
+                apiKey={mapsKey}
                 className="h-[26rem] sm:h-[32rem]"
                 label={selected.code}
                 stops={selected.stops}

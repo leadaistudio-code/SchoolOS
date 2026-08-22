@@ -15,6 +15,18 @@ type Tile = {
 
 const TILES: Tile[] = [
   {
+    href: '/settings/location',
+    title: 'School location',
+    description: 'The point staff check-in and the transport map are measured from.',
+    permission: 'settings.view',
+  },
+  {
+    href: '/settings/tracking',
+    title: 'GPS trackers',
+    description: 'Connect hardware trackers so buses report without a driver’s phone.',
+    permission: 'transport.manage',
+  },
+  {
     href: '/settings/branding',
     title: 'Branding',
     description: 'School colours, sign-in page and document footers.',

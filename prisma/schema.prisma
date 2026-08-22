@@ -2951,6 +2951,10 @@ model Bus {
   capacity           Int       @default(40)
   driverId           String?
   attendantName      String?
+  /// Identifier the hardware tracker reports itself as — Traccar's uniqueId,
+  /// or the IMEI an AIS-140 device sends. Null for a bus tracked only by the
+  /// driver's phone.
+  gpsDeviceId        String?
   insuranceExpiresOn DateTime? @db.Date
   fitnessExpiresOn   DateTime? @db.Date
   pollutionExpiresOn DateTime? @db.Date
@@ -2966,6 +2970,9 @@ model Bus {
 
   @@unique([tenantId, code])
   @@unique([tenantId, registrationNo])
+  /// One device reports for one bus. Without this a mistyped id would silently
+  /// put two buses on the same dot.
+  @@unique([tenantId, gpsDeviceId])
   @@index([tenantId, isActive])
 }
 
@@ -3666,4 +3673,35 @@ model RoiCalculation {
   createdAt   DateTime @default(now())
 
   @@index([tenantId, createdAt])
+}
+
+
+/// A credential a GPS server or tracker vendor uses to post positions.
+///
+/// Machine-to-machine, so a session cookie is no use: the caller is a Traccar
+/// instance or a vendor's server, not a person. Only the hash is stored — the
+/// token itself is shown once at creation and is unrecoverable afterwards,
+/// because a credential an administrator can re-read is one an attacker can
+/// read too.
+model GpsIngestToken {
+  id String @id @default(cuid())
+
+  tenantId String
+  /// What it is for, in the administrator's words: "Traccar", "Vendor XYZ".
+  name     String
+
+  /// SHA-256 of the token. Never the token.
+  tokenHash String @unique
+  /// First few characters, so a token can be recognised in a list without
+  /// being reproducible from it.
+  prefix    String
+
+  lastUsedAt  DateTime?
+  /// Kept rather than deleted, so a revoked credential still explains the
+  /// positions it wrote while it was live.
+  revokedAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, revokedAt])
 }

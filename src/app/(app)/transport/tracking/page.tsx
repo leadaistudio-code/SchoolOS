@@ -1,4 +1,5 @@
 import { requireContext } from '@/server/context'
+import { mapsClientKey } from '@/server/maps'
 import { driverToday, trackingSnapshot } from '@/server/modules/transport/tracking'
 import { PageHeader } from '@/components/page-header'
 import { DriverConsole } from './driver-console'
@@ -33,7 +34,7 @@ export default async function TrackingPage() {
 
       {driver ? <DriverConsole initial={driver} className="mb-3" /> : null}
 
-      <LiveTracking initial={snapshot} />
+      <LiveTracking initial={snapshot} mapsKey={mapsClientKey()} />
     </div>
   )
 }
