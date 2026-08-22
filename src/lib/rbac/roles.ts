@@ -81,6 +81,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('sports'),
       ...all('events'),
       ...all('reports'),
+      ...all('score'),
       'documents.view',
       'audit.view',
       'assistant.use',

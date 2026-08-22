@@ -266,6 +266,19 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'Health score',
+    href: '/score',
+    icon: 'Gauge',
+    section: 'INSIGHTS' as const,
+    permission: 'score.view',
+    children: [
+      { label: 'School', href: '/score', icon: 'Gauge', permission: 'score.view' },
+      { label: 'Students', href: '/score/students', icon: 'GraduationCap', permission: 'score.view' },
+      { label: 'Staff', href: '/score/staff', icon: 'Briefcase', permission: 'staff.view' },
+      { label: 'Weighting', href: '/score/weights', icon: 'SlidersHorizontal', permission: 'score.manage' },
+    ],
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: 'Settings',

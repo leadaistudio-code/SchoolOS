@@ -175,6 +175,10 @@ export const PERMISSIONS: PermissionDef[] = [
 
   ...mod('reports', [['view', 'View reports'], ['export', 'Export reports']]),
   ...mod('documents', [['view', 'View documents'], ['manage', 'Upload and delete documents']]),
+  ...mod('score', [
+    ['view', 'View the health score'],
+    ['manage', 'Set the score weightings'],
+  ]),
   ...mod('audit', [['view', 'View audit log']]),
 
   // The in-app assistant. A separate right from the records it reads: holding

@@ -3557,3 +3557,79 @@ model StaffAppraisalRating {
   @@unique([tenantId, appraisalId, competency])
   @@index([tenantId, appraisalId])
 }
+
+// ===========================================================================
+// HEALTH SCORE
+// ===========================================================================
+
+enum ScoreSubject {
+  STUDENT
+  SECTION
+  CLASS
+  SCHOOL
+  STAFF
+}
+
+/// One metric's share of a population's score.
+///
+/// Rows exist only for metrics a school has changed; anything absent falls back
+/// to the default in `lib/score.ts`. That keeps a school on the shipped
+/// defaults until it deliberately moves off them, and means adding a metric in
+/// a later release does not require a data migration to give every tenant a
+/// weight for it.
+model ScoreWeight {
+  id String @id @default(cuid())
+
+  tenantId String
+  /// STUDENT or STAFF. Each population has its own metric set and its own
+  /// weights: attendance means something different for a child and a teacher.
+  population String
+  metric     String
+  /// Relative, not a percentage. Weights are normalised at read time, so a
+  /// school can enter 3/2/1 without having to make them add up to anything.
+  weight     Int     @default(0)
+  isEnabled  Boolean @default(true)
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, population, metric])
+  @@index([tenantId, population])
+}
+
+/// A score as it stood on one day.
+///
+/// Scores are derived, so they are recomputed live wherever they are shown —
+/// this table exists only to answer "is it getting better?", which no amount of
+/// recomputation can answer after the fact. Captured deliberately rather than
+/// on every page view, so the trend is a record of the school's own checkpoints
+/// rather than an artefact of who happened to open a screen.
+model ScoreSnapshot {
+  id String @id @default(cuid())
+
+  tenantId    String
+  sessionId   String?
+  subjectType ScoreSubject
+  /// Empty string for the school as a whole, which has no id of its own.
+  subjectId   String       @default("")
+  /// Denormalised so a snapshot still reads correctly after a rename, or after
+  /// a student leaves.
+  subjectName String
+
+  score Float
+  band  String
+  /// 0-1: the share of enabled weight that actually had data behind it. A high
+  /// score built on a quarter of the weight is not the same claim as one built
+  /// on all of it, and the difference has to survive into the history.
+  coverage Float @default(1)
+  /// Per-metric sub-scores and weights as they stood, so an old snapshot can be
+  /// explained without guessing what the weights were that day.
+  breakdown Json
+
+  capturedOn   DateTime @db.Date
+  capturedById String?
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, subjectType, subjectId, capturedOn])
+  @@index([tenantId, subjectType, capturedOn])
+}
