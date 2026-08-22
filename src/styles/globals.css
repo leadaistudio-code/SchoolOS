@@ -343,12 +343,26 @@ h6 {
   background-clip: content-box;
 }
 
+/* Shown only on paper — a report header the screen has no need for. */
+.print-only {
+  display: none;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
+  .print-only {
+    display: block;
+  }
   body {
     background: #fff;
+  }
+  /* A figure split across a page break stops being evidence and starts being
+     a puzzle, so panels and table rows stay whole. */
+  .card-print,
+  tr {
+    break-inside: avoid;
   }
 }
 

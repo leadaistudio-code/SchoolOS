@@ -3633,3 +3633,37 @@ model ScoreSnapshot {
   @@unique([tenantId, subjectType, subjectId, capturedOn])
   @@index([tenantId, subjectType, capturedOn])
 }
+
+/// A saved ROI calculation.
+///
+/// Inputs and assumptions are stored beside the results, not instead of them:
+/// a figure quoted in a meeting has to be re-derivable months later, and a
+/// stored total alone cannot be defended when a school comes back with
+/// questions about how it was reached.
+model RoiCalculation {
+  id String @id @default(cuid())
+
+  tenantId String
+
+  schoolName  String
+  contactName String?
+  email       String?
+  phone       String?
+
+  studentCount   Int
+  scenario       String
+  includeRevenue Boolean @default(false)
+
+  inputs      Json
+  assumptions Json
+  results     Json
+
+  /// Denormalised so the list can be read and sorted without parsing the blob.
+  netMonthlyBenefit Float
+  roiPercent        Float?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}

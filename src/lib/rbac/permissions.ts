@@ -175,6 +175,7 @@ export const PERMISSIONS: PermissionDef[] = [
 
   ...mod('reports', [['view', 'View reports'], ['export', 'Export reports']]),
   ...mod('documents', [['view', 'View documents'], ['manage', 'Upload and delete documents']]),
+  ...mod('roi', [['view', 'Use the ROI calculator']]),
   ...mod('score', [
     ['view', 'View the health score'],
     ['manage', 'Set the score weightings'],

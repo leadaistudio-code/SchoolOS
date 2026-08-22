@@ -266,6 +266,13 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'ROI calculator',
+    href: '/roi',
+    icon: 'Calculator',
+    section: 'INSIGHTS' as const,
+    permission: 'roi.view',
+  },
+  {
     label: 'Health score',
     href: '/score',
     icon: 'Gauge',

@@ -43,6 +43,7 @@ export const TENANT_SCOPED_MODELS = [
   'StaffAppraisalRating',
   'ScoreWeight',
   'ScoreSnapshot',
+  'RoiCalculation',
   'LeaveType',
   'LeaveRequest',
   'FeeHead',
