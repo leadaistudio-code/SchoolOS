@@ -124,6 +124,20 @@ export function TileMap({
   React.useEffect(() => {
     let cancelled = false
 
+    // Google reports a rejected key by calling this global rather than by
+    // throwing: the map still constructs, then renders grey under a "for
+    // development purposes only" watermark. Left unhandled it looks like our
+    // bug, when it is almost always the Maps JavaScript API not being enabled,
+    // billing being off, or the key's referrer restriction not covering this
+    // domain.
+    const authWindow = window as Window & { gm_authFailure?: () => void }
+    authWindow.gm_authFailure = () => {
+      setStatus('failed')
+      onUnavailable?.(
+        'Google rejected the API key — check that the Maps JavaScript API is enabled, billing is on, and the key allows this domain',
+      )
+    }
+
     loadGoogleMaps(apiKey)
       .then((maps) => {
         if (cancelled || !container.current) return
@@ -154,6 +168,7 @@ export function TileMap({
 
     return () => {
       cancelled = true
+      delete authWindow.gm_authFailure
     }
     // Deliberately once: the SDK cannot be reloaded and the map instance is
     // reused for the life of the component.

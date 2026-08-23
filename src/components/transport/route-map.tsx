@@ -53,15 +53,28 @@ export function RouteMap({
   if (apiKey && !unavailable) {
     // TileMap renders nothing once it has failed, and reports why through
     // `onUnavailable` — the state change below then swaps in the drawn map.
-    return <TileMap apiKey={apiKey} {...shared} onUnavailable={setUnavailable} />
+    return (
+      <TileMap
+        apiKey={apiKey}
+        {...shared}
+        onUnavailable={(reason) => {
+          console.warn('[MyCampusView] Google Maps unavailable:', reason)
+          setUnavailable(reason)
+        }}
+      />
+    )
   }
 
   return (
     <div className="space-y-1.5">
       <BusMap {...shared} />
       {unavailable ? (
+        // A plain sentence, not the raw error. Minified builds produce things
+        // like "e.Map is not a constructor", which tells a school office
+        // nothing and reads as though the page is broken — the real text goes
+        // to the console for whoever is actually debugging it.
         <p className="text-xs text-ink-subtle">
-          Showing the schematic map — {unavailable.toLowerCase()}
+          Showing the schematic map — the satellite map could not load here.
         </p>
       ) : null}
     </div>
