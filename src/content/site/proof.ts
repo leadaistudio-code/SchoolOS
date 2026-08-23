@@ -25,10 +25,18 @@ import { MODULE_COUNTS } from './modules'
 export const PROOF_FLAGS = {
   /** Trusted-by strip. Turn on only with written permission from each school. */
   customerLogos: false,
-  /** Case studies. Sample layout until a real implementation is written up. */
-  caseStudies: true,
-  /** Testimonials. Sample layout until a school has approved a quotation. */
-  testimonials: true,
+  /**
+   * Case studies. Off: the entries below are layout, not implementations, and
+   * a visitor cannot tell the difference once the sample marking is gone.
+   * Turn on when a named school has approved its own write-up.
+   */
+  caseStudies: false,
+  /**
+   * Testimonials. Off for the same reason, and more sharply — a quotation
+   * attributed to a principal who did not say it is the one mistake on a site
+   * like this that cannot be walked back.
+   */
+  testimonials: false,
 }
 
 /**

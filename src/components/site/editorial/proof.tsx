@@ -9,7 +9,7 @@ import { Doodle } from '../motion/doodle'
 import { StoryFigure } from './story-figure'
 import { Parallax } from '../motion/parallax'
 import { SampleMark } from '../ui'
-import { CASE_STUDIES } from '@/content/site/proof'
+import { CASE_STUDIES, PROOF_FLAGS } from '@/content/site/proof'
 import { cn } from '@/lib/utils'
 
 /**
@@ -30,6 +30,10 @@ const OFFSET = ['lg:mt-0', 'lg:mt-24', 'lg:mt-10']
 const FROM = ['left', 'up', 'right'] as const
 
 export function EditorialProof() {
+  // The home page was rendering these regardless of the flag the rest of the
+  // site respects, which is how unapproved write-ups reached the front page.
+  if (!PROOF_FLAGS.caseStudies || CASE_STUDIES.length === 0) return null
+
   return (
     <div id="stories" className="relative overflow-hidden px-[var(--gutter)] py-24 sm:py-32">
       <div className="mx-auto max-w-[78rem]">
