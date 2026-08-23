@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Container } from './container'
 import { MyCampusViewLogo } from '@/components/brand/logo'
 import { FOOTER_COLUMNS } from '@/content/site/nav'
-import { CONTACT } from '@/content/site/company'
+import { CONTACT, PARENT_COMPANY } from '@/content/site/company'
 import { MODULE_COUNTS } from '@/content/site/modules'
 
 /**
@@ -82,7 +82,24 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-[var(--navy-line)] py-6 text-[14px] text-[var(--on-dark-muted)] sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} MyCampusView. All rights reserved.</p>
+          <div className="space-y-1">
+            <p>© {new Date().getFullYear()} MyCampusView. All rights reserved.</p>
+            {/* Ownership, stated plainly and linked. A visitor deciding whether
+                to trust a school's data to this product should not have to
+                search for who stands behind it. */}
+            <p>
+              MyCampusView is a product of{' '}
+              <a
+                href={PARENT_COMPANY.url}
+                target="_blank"
+                rel="noopener"
+                className="text-white underline underline-offset-2 transition-colors hover:text-[var(--on-dark-muted)]"
+              >
+                {PARENT_COMPANY.name}
+              </a>
+              .
+            </p>
+          </div>
           <p>
             School management software for private schools, international schools, preschools and
             multi-campus groups.

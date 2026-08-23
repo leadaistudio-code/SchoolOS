@@ -276,3 +276,20 @@ export const CONTACT = {
   /** Set to a real address before launch, or the footer omits it. */
   address: '',
 }
+
+/**
+ * Who owns the product.
+ *
+ * Stated in the footer because a visitor — and a platform reviewing the
+ * business behind an app — should be able to establish who is actually
+ * responsible for MyCampusView without leaving the page. Meta and Google both
+ * look for exactly this when verifying that a developer account and a website
+ * belong to the same company.
+ *
+ * `name` must match the business name on those verification records. If the
+ * registered entity is spelled differently, this is the one place to change it.
+ */
+export const PARENT_COMPANY = {
+  name: 'Leadaistudio Private Limited',
+  url: 'https://leadaistudio.com',
+}
