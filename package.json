@@ -26,6 +26,7 @@
     "rbac:sync": "tsx scripts/sync-permissions.ts",
     "assistant:doctor": "tsx scripts/assistant-doctor.ts",
     "mail:doctor": "tsx scripts/mail-doctor.ts",
+    "whatsapp:doctor": "tsx scripts/whatsapp-doctor.ts",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest",
