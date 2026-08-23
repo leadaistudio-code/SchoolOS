@@ -1,3 +1,8 @@
+import {
+  normaliseLanguageTag,
+  speechLanguage,
+  type SpeechLanguage,
+} from '@/lib/speech-languages'
 import { zodToJsonSchema } from './json-schema'
 import { findTool, toolsFor, type AssistantTool, type ToolOutput } from './tools'
 import { assistantModel, type ModelTurn } from './providers'
@@ -36,7 +41,7 @@ export type AssistantTurn = { role: 'user' | 'assistant'; text: string }
  * balance is worse than no assistant: the number looks exactly as authoritative
  * as a correct one, and a principal may repeat it to a parent.
  */
-function systemPrompt(ctx: AppContext, tools: AssistantTool[]): string {
+function systemPrompt(ctx: AppContext, tools: AssistantTool[], language: SpeechLanguage): string {
   const roleNames = ctx.user.roleKeys.join(', ') || 'staff'
   const schoolName = ctx.tenant.school?.name ?? ctx.tenant.name
 
@@ -58,6 +63,12 @@ You answer questions about this school's own records — attendance, fees, stude
 - Short prose. No headings for a one-number answer, no bullet list of three words, no restating the question.
 - Ranges and totals: say what period the figure covers, because "collected" means nothing without it.
 - You are speaking to someone who may be listening rather than reading — the reply may be read aloud. Write sentences that survive being spoken: no tables, no markdown, spell out what an abbreviation means the first time.
+${
+  language.tag === 'en-IN'
+    ? ''
+    : `- Answer in ${language.english}, because that is the language ${ctx.user.firstName} is asking in. Keep names of people, classes and sections exactly as the tools return them — a parent's name transliterated into another script stops matching the register. Numbers, money and dates stay in the digits the tools gave you.
+`
+}
 - If the user's question is ambiguous in a way that changes the answer (which class, which month), ask the one question that resolves it instead of guessing.
 
 # Actions
@@ -89,10 +100,13 @@ export async function* runAssistant(options: {
   ctx: AppContext
   question: string
   history: AssistantTurn[]
+  /** BCP-47 tag the question was asked in. The answer comes back in it. */
+  language?: string
   /** Records drafts so a later request can execute them after approval. */
   onDraft: (draft: NonNullable<ToolOutput['draft']>) => Promise<string>
 }): AsyncGenerator<AgentEvent> {
   const { ctx, question, history, onDraft } = options
+  const language = speechLanguage(normaliseLanguageTag(options.language))
   const tools = toolsFor(ctx)
 
   if (tools.length === 0) {
@@ -105,7 +119,7 @@ export async function* runAssistant(options: {
   }
 
   const model = assistantModel()
-  const system = systemPrompt(ctx, tools)
+  const system = systemPrompt(ctx, tools, language)
   const specs = tools.map((tool) => ({
     name: tool.name,
     description: tool.description,

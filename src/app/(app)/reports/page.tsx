@@ -4,6 +4,8 @@ import { requireContext } from '@/server/context'
 import { attendanceDate } from '@/lib/dates'
 import { formatMoney, formatNumber } from '@/lib/utils'
 import { REPORTS } from '@/lib/reports'
+import { scoreSchool } from '@/server/modules/score/service'
+import { bandMeta } from '@/lib/score'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Metric, MetricRow } from '@/components/ui/metric'
@@ -14,35 +16,46 @@ export const metadata = { title: 'Reports & analytics' }
 /**
  * The reports hub.
  *
- * Opens with the four figures a head of school checks before anything else,
- * then lists what can be asked in more depth. The figures are live rather
- * than illustrative, so the hub is useful on its own and the catalogue below
- * it reads as "and here is how to go deeper" rather than as a menu.
+ * Opens with the figures a head of school checks before anything else —
+ * including the health score when they can see it — then lists every analytic
+ * report and the day-to-day working views that sit beside them.
  */
 export default async function ReportsPage() {
   const ctx = await requireContext('reports.view')
   const currency = ctx.tenant.currency
   const today = attendanceDate(new Date())
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+  const canScore = ctx.can('score.view')
+  const canFeedback = ctx.can('feedback.view')
 
-  const [students, attendance, collected, outstanding, session] = await Promise.all([
-    ctx.db.student.count({ where: { status: 'ACTIVE', deletedAt: null } }),
-    ctx.db.studentAttendance.groupBy({
-      by: ['status'],
-      where: { onDate: { gte: monthStart, lte: today } },
-      _count: { _all: true },
-    }),
-    ctx.db.feePayment.aggregate({
-      where: { status: 'SUCCESS', paidAt: { gte: monthStart } },
-      _sum: { amountMinor: true },
-    }),
-    ctx.db.feeInvoice.aggregate({
-      where: { cancelledAt: null, balanceMinor: { gt: 0 } },
-      _sum: { balanceMinor: true },
-      _count: { _all: true },
-    }),
-    ctx.db.academicSession.findFirst({ where: { isCurrent: true }, select: { name: true } }),
-  ])
+  const [students, attendance, collected, outstanding, session, health, openCampaigns] =
+    await Promise.all([
+      ctx.db.student.count({ where: { status: 'ACTIVE', deletedAt: null } }),
+      ctx.db.studentAttendance.groupBy({
+        by: ['status'],
+        where: { onDate: { gte: monthStart, lte: today } },
+        _count: { _all: true },
+      }),
+      ctx.db.feePayment.aggregate({
+        where: { status: 'SUCCESS', paidAt: { gte: monthStart } },
+        _sum: { amountMinor: true },
+      }),
+      ctx.db.feeInvoice.aggregate({
+        where: { cancelledAt: null, balanceMinor: { gt: 0 } },
+        _sum: { balanceMinor: true },
+        _count: { _all: true },
+      }),
+      ctx.db.academicSession.findFirst({
+        where: { isCurrent: true },
+        select: { name: true },
+      }),
+      canScore ? scoreSchool(ctx).catch(() => null) : Promise.resolve(null),
+      canFeedback
+        ? ctx.db.feedbackCampaign.count({
+            where: { status: { in: ['ACTIVE', 'SCHEDULED'] } },
+          })
+        : Promise.resolve(0),
+    ])
 
   const count = (status: string) =>
     attendance.find((a) => a.status === status)?._count._all ?? 0
@@ -50,6 +63,45 @@ export default async function ReportsPage() {
     count('PRESENT') + count('LATE') + count('HALF_DAY') + count('ABSENT') + count('LEAVE')
   const attended = count('PRESENT') + count('LATE') + count('HALF_DAY')
   const rate = marked > 0 ? Math.round((attended / marked) * 1000) / 10 : null
+
+  const workingViews = [
+    {
+      href: '/attendance/reports',
+      label: 'Attendance register',
+      note: 'Per-student attendance with class and date filters',
+      show: ctx.can('attendance.report'),
+    },
+    {
+      href: '/finance/outstanding',
+      label: 'Fee arrears',
+      note: 'Chase list with contact details and balances',
+      show: ctx.can('fees.view'),
+    },
+    {
+      href: '/exams/report-cards',
+      label: 'Report cards',
+      note: 'Generate and print individual report cards',
+      show: ctx.can('exams.view'),
+    },
+    {
+      href: '/score',
+      label: 'Health score',
+      note: 'School, class and student scores from live records',
+      show: canScore,
+    },
+    {
+      href: '/feedback',
+      label: 'Feedback campaigns',
+      note: 'Parent and teacher feedback with moderation',
+      show: canFeedback,
+    },
+    {
+      href: '/library/loans',
+      label: 'Library loans',
+      note: 'Books out, overdue and returns',
+      show: ctx.can('library.view'),
+    },
+  ].filter((link) => link.show)
 
   return (
     <div>
@@ -90,11 +142,27 @@ export default async function ReportsPage() {
           emphasis={(outstanding._sum.balanceMinor ?? 0) > 0 ? 'warning' : undefined}
           href="/reports/collection"
         />
+        {health && health.score !== null ? (
+          <Metric
+            label="Health score"
+            value={String(Math.round(health.score * 10) / 10)}
+            sub={`${bandMeta(health.band!).label} · ${formatNumber(health.studentsScored)} students scored`}
+            href="/score"
+          />
+        ) : null}
+        {canFeedback ? (
+          <Metric
+            label="Feedback campaigns"
+            value={formatNumber(openCampaigns)}
+            sub="Active or scheduled"
+            href="/feedback"
+          />
+        ) : null}
       </MetricRow>
 
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>Reports</CardTitle>
+          <CardTitle>Analytic reports</CardTitle>
           <span className="text-xs text-ink-subtle">
             Every report exports to CSV and prints
           </span>
@@ -129,38 +197,26 @@ export default async function ReportsPage() {
         </ul>
       </Card>
 
-      <Card className="mt-4 overflow-hidden">
-        <CardHeader>
-          <CardTitle>Working views</CardTitle>
-          <span className="text-xs text-ink-subtle">Day-to-day screens, not summaries</span>
-        </CardHeader>
-        <ul className="grid gap-px bg-line sm:grid-cols-3">
-          {[
-            {
-              href: '/attendance/reports',
-              label: 'Attendance register',
-              note: 'Per-student attendance with class and date filters',
-            },
-            {
-              href: '/finance/outstanding',
-              label: 'Fee arrears',
-              note: 'Chase list with contact details and balances',
-            },
-            {
-              href: '/exams/report-cards',
-              label: 'Report cards',
-              note: 'Generate and print individual report cards',
-            },
-          ].map((link) => (
-            <li key={link.href} className="bg-surface">
-              <Link href={link.href} className="block p-4 transition-colors hover:bg-surface-2">
-                <span className="block text-base font-medium text-ink">{link.label}</span>
-                <span className="mt-0.5 block text-sm text-ink-muted">{link.note}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {workingViews.length > 0 ? (
+        <Card className="mt-4 overflow-hidden">
+          <CardHeader>
+            <CardTitle>Working views</CardTitle>
+            <span className="text-xs text-ink-subtle">
+              Day-to-day screens that sit beside the summaries
+            </span>
+          </CardHeader>
+          <ul className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
+            {workingViews.map((link) => (
+              <li key={link.href} className="bg-surface">
+                <Link href={link.href} className="block p-4 transition-colors hover:bg-surface-2">
+                  <span className="block text-base font-medium text-ink">{link.label}</span>
+                  <span className="mt-0.5 block text-sm text-ink-muted">{link.note}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   )
 }

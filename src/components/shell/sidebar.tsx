@@ -135,6 +135,35 @@ export function Sidebar({
       </div>
 
       {!collapsed ? <PromoCard /> : null}
+
+      {onToggleCollapse ? (
+        <div
+          className={cn(
+            'shrink-0 border-t border-[var(--sidebar-border)] p-2',
+            collapsed && 'flex justify-center',
+          )}
+        >
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={cn(
+              'flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-sm text-[var(--sidebar-fg)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-fg-strong)]',
+              collapsed && 'w-auto justify-center px-0',
+            )}
+            aria-label={collapsed ? 'Expand navigation' : 'Minimise navigation'}
+            title={collapsed ? 'Expand navigation' : 'Minimise navigation'}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-[18px] shrink-0" aria-hidden />
+            ) : (
+              <>
+                <PanelLeftClose className="size-[18px] shrink-0" aria-hidden />
+                <span>Minimise</span>
+              </>
+            )}
+          </button>
+        </div>
+      ) : null}
     </nav>
   )
 }

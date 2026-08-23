@@ -8,6 +8,7 @@ import { EditorialClosing } from '@/components/site/editorial/closing'
 import { CurtainBase, CurtainPanel, CurtainStack } from '@/components/site/editorial/curtain'
 import { FloatingNav } from '@/components/site/motion/floating-nav'
 import { Admissions } from '@/components/site/home/admissions'
+import { Capabilities } from '@/components/site/home/capabilities'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
 import { Security } from '@/components/site/home/security'
@@ -60,6 +61,7 @@ const MARKS = [
   { id: 'platform', label: 'Platform' },
   { id: 'modules', label: 'Modules' },
   { id: 'stories', label: 'Stories' },
+  { id: 'capabilities', label: 'Capabilities' },
   { id: 'product', label: 'Product' },
   { id: 'demo', label: 'Demo' },
 ]
@@ -100,6 +102,7 @@ export default function HomePage() {
         */}
         <div className="border-t border-[color-mix(in_srgb,var(--ed-ink)_8%,transparent)]">
           <Admissions />
+          <Capabilities />
           <EditorialFeatures />
           <Parents />
           <Integrations />

@@ -418,6 +418,33 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
         route: '/',
       },
       {
+        name: 'Ask Me',
+        blurb:
+          'Voice or typed questions answered from live school records — attendance, fees, students — in Indian English and regional languages the browser recognises. Drafts notices for approval; never sends on its own.',
+        status: 'available',
+      },
+      {
+        name: 'Reports & analytics',
+        blurb:
+          'Fee collection, attendance, exams, enrolment, admissions funnel and staff — with CSV export and print on every report.',
+        status: 'available',
+        route: '/reports',
+      },
+      {
+        name: 'Health score',
+        blurb:
+          'One number per student, class and school from attendance, marks, homework and fees already recorded. Missing data is dropped, not scored as zero.',
+        status: 'available',
+        route: '/score',
+      },
+      {
+        name: 'Feedback',
+        blurb:
+          'Parent campaigns to teachers, school and PTMs; structured teacher notes on students; moderation and action items.',
+        status: 'available',
+        route: '/feedback',
+      },
+      {
         name: 'Roles & permissions',
         blurb: 'Built-in roles plus custom ones, permission by permission, per school.',
         status: 'available',

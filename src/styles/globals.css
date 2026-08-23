@@ -92,6 +92,7 @@
      wants a slate, not the near-black a label needs. */
   --sidebar-ill-ink: #475569;
   --topbar-bg: #ffffff;
+  color-scheme: light;
 
   /* Shape ---------------------------------------------------------------- */
   --radius: 12px;
@@ -105,7 +106,36 @@
   --shadow-pop: 0 12px 28px -6px rgba(16, 24, 40, 0.16), 0 4px 10px -4px rgba(16, 24, 40, 0.08);
 }
 
+/*
+ * Light theme is restated under the attribute, not only on bare :root.
+ * ThemeToggle sets data-theme=light|dark; without this block, a prior dark
+ * visit can leave the rail looking stuck when the page body has already
+ * switched — the dark selector is more specific than bare :root alone.
+ */
+:root[data-theme='light'] {
+  --bg: #f6f8fc;
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --surface-3: #eef1f8;
+  --border: #e4e8f1;
+  --border-strong: #d2d8e6;
+  --text: #101828;
+  --text-muted: #4a5568;
+  --text-subtle: #737f93;
+  --sidebar-bg: #ffffff;
+  --sidebar-bg-deep: #f2f5fb;
+  --sidebar-border: #e4e8f1;
+  --sidebar-fg: #4a5568;
+  --sidebar-fg-strong: #101828;
+  --sidebar-hover: rgba(16, 24, 40, 0.05);
+  --sidebar-caption: #737f93;
+  --sidebar-ill-ink: #475569;
+  --topbar-bg: #ffffff;
+  color-scheme: light;
+}
+
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --brand-50: color-mix(in srgb, var(--brand-500) 18%, #0e1420);
   --brand-100: color-mix(in srgb, var(--brand-500) 32%, #0e1420);
 

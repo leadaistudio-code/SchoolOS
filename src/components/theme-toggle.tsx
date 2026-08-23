@@ -13,6 +13,7 @@ function apply(mode: Mode) {
   const dark =
     mode === 'dark' ||
     (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  // Always set an explicit value so :root[data-theme='light'] / dark both match.
   root.setAttribute('data-theme', dark ? 'dark' : 'light')
 }
 
@@ -23,6 +24,14 @@ export function ThemeToggle({ className }: { className?: string }) {
     const stored = (localStorage.getItem(STORAGE_KEY) as Mode | null) ?? 'system'
     setMode(stored)
     apply(stored)
+
+    const query = window.matchMedia('(prefers-color-scheme: dark)')
+    const onSystem = () => {
+      const current = (localStorage.getItem(STORAGE_KEY) as Mode | null) ?? 'system'
+      if (current === 'system') apply('system')
+    }
+    query.addEventListener('change', onSystem)
+    return () => query.removeEventListener('change', onSystem)
   }, [])
 
   const choose = (next: Mode) => {

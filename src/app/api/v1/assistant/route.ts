@@ -32,6 +32,8 @@ const bodySchema = z.object({
     )
     .max(20)
     .default([]),
+  /** Validated against the known list server-side; a stray tag is ignored. */
+  language: z.string().max(12).optional(),
 })
 
 export const POST = route(
@@ -73,6 +75,7 @@ export const POST = route(
             ctx,
             question: body.question,
             history: body.history,
+            language: body.language,
             onDraft: (draft) => storeDraft(ctx, draft),
           })) {
             send(event)

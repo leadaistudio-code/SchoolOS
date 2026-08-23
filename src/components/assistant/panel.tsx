@@ -17,6 +17,11 @@ import { cn } from '@/lib/utils'
 import { Button, IconButton } from '@/components/ui/button'
 import { listen, speak, speechSupported, stopSpeaking } from './speech'
 import { parseAgentEvent } from '@/lib/assistant-events'
+import {
+  DEFAULT_SPEECH_LANGUAGE,
+  SPEECH_LANGUAGES,
+  normaliseLanguageTag,
+} from '@/lib/speech-languages'
 
 /**
  * The assistant panel.
@@ -67,6 +72,25 @@ export function AssistantPanel({
   const [activity, setActivity] = React.useState<string | null>(null)
   const [listening, setListening] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
+  const [language, setLanguage] = React.useState(DEFAULT_SPEECH_LANGUAGE)
+
+  React.useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('mycampusview.assistant.lang')
+      if (stored) setLanguage(normaliseLanguageTag(stored))
+    } catch {
+      // Blocked storage: English is a reasonable place to start.
+    }
+  }, [])
+
+  const chooseLanguage = (tag: string) => {
+    setLanguage(tag)
+    try {
+      window.localStorage.setItem('mycampusview.assistant.lang', tag)
+    } catch {
+      // Not worth interrupting anybody over.
+    }
+  }
 
   const stopListening = React.useRef<(() => void) | null>(null)
   const scroller = React.useRef<HTMLDivElement>(null)
@@ -114,7 +138,7 @@ export function AssistantPanel({
       const response = await fetch('/api/v1/assistant', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question: trimmed, history }),
+        body: JSON.stringify({ question: trimmed, history, language }),
       })
 
       if (!response.ok || !response.body) {
@@ -205,6 +229,7 @@ export function AssistantPanel({
     setNotice(null)
     setListening(true)
     stopListening.current = listen({
+      lang: language,
       onResult: ({ transcript, final }) => {
         setQuestion(transcript)
         // Send on the final result: a spoken question ends when speaking stops,
@@ -369,7 +394,7 @@ export function AssistantPanel({
                 {turn.text && !busy ? (
                   <button
                     type="button"
-                    onClick={() => speak(turn.text)}
+                    onClick={() => speak(turn.text, language)}
                     className="inline-flex items-center gap-1 text-xs text-ink-subtle transition-colors hover:text-ink"
                   >
                     <Volume2 className="size-3.5" aria-hidden />
@@ -431,6 +456,22 @@ export function AssistantPanel({
           />
 
           {canSpeak ? (
+            <select
+              value={language}
+              onChange={(e) => chooseLanguage(e.target.value)}
+              aria-label="Language to speak in"
+              title="Language to speak and hear answers in"
+              className="h-8 shrink-0 rounded-[var(--radius-sm)] border border-line-strong bg-surface px-1.5 text-xs text-ink-muted"
+            >
+              {SPEECH_LANGUAGES.map((option) => (
+                <option key={option.tag} value={option.tag}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
+
+          {canSpeak ? (
             <IconButton
               label={listening ? 'Stop listening' : 'Ask by voice'}
               onClick={toggleMic}
@@ -487,7 +528,7 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
         aria-expanded={open}
       >
         <Sparkle className="size-3.5 text-[var(--product-600)]" aria-hidden />
-        Ask
+        Ask Me
         <kbd className="hidden rounded border border-line px-1 text-[10px] text-ink-subtle sm:inline">
           ⌘K
         </kbd>

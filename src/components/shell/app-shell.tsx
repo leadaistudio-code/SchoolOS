@@ -91,6 +91,11 @@ export function AppShell({
 
   React.useEffect(() => {
     setDrawerOpen(false)
+    // On tablet-width desktops the full rail eats the content; after a
+    // navigation, fold it so the page the user asked for gets the width.
+    if (typeof window !== 'undefined' && window.matchMedia(AUTO_COLLAPSE).matches) {
+      setCollapsed(true)
+    }
   }, [pathname])
 
   React.useEffect(() => {
