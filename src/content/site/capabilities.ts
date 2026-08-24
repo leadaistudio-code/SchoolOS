@@ -18,12 +18,44 @@ export const CAPABILITY_SECTION = {
   lead: 'Ask Me answers from live records. Feedback runs both ways. The health score is built from attendance, marks, homework and fees already in the system — not from a survey nobody fills in.',
 } as const
 
-/** Voice questions Ask Me can actually answer today. */
+/**
+ * Voice questions Ask Me can actually answer today, with a demonstration of
+ * the *shape* of a reply. Figures here are labelled as a demo — they are not
+ * a live school. The tool names match tools.ts.
+ */
 export const ASK_ME_PROMPTS = [
-  { spoken: 'How many fee invoices are still unpaid?', tool: 'fees_outstanding' },
-  { spoken: 'Which sections have not marked attendance today?', tool: 'unmarked_registers' },
-  { spoken: 'Give me today’s school overview.', tool: 'school_overview' },
-  { spoken: 'Find students named Sharma in Class 9.', tool: 'find_students' },
+  {
+    spoken: 'How many fee invoices are still unpaid?',
+    tool: 'fees_outstanding',
+    lookingUp: 'Reading outstanding invoices…',
+    answer:
+      'Forty-one invoices still have a balance, totalling ₹2,48,600. Class 9 holds the largest share. Open Outstanding to chase them — I have not changed anything.',
+    verify: 'Outstanding fees',
+  },
+  {
+    spoken: 'Which sections have not marked attendance today?',
+    tool: 'unmarked_registers',
+    lookingUp: 'Checking unmarked registers…',
+    answer:
+      'Three sections have not marked today: Class 6-B, Class 8-A and Class 11-Commerce. The rest of the register is complete.',
+    verify: 'Attendance reports',
+  },
+  {
+    spoken: 'Give me today’s school overview.',
+    tool: 'school_overview',
+    lookingUp: 'Reading today’s headline figures…',
+    answer:
+      'Four hundred and twelve students on roll, thirty-eight teaching staff. Attendance marked for most sections today. Collection this month is on the fee ledger; outstanding is still open on forty-one invoices.',
+    verify: 'Administrator dashboard',
+  },
+  {
+    spoken: 'Find students named Sharma in Class 9.',
+    tool: 'find_students',
+    lookingUp: 'Searching the roll…',
+    answer:
+      'Two students match Sharma in Class 9: Ananya Sharma, admission 24091, and Rohan Sharma, admission 24118. There is a Class 9 in this school — those are the only two.',
+    verify: 'Student records',
+  },
 ] as const
 
 /** Human labels for the tools the model may call. Kept in sync with tools.ts. */
