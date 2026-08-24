@@ -59,8 +59,9 @@ export async function submitRefresherAttempt(
 
   const attemptAnswers = assessment.questions.map(rq => {
     const answer = answers.find(a => a.refreshQuestionId === rq.id)
-    const isCorrect = answer && answer.selectedIndexes.length > 0 
-      ? rq.question.options[answer.selectedIndexes[0]]?.isCorrect ?? false 
+    const selectedIndex = answer ? answer.selectedIndexes[0] : undefined
+    const isCorrect = selectedIndex !== undefined 
+      ? rq.question.options[selectedIndex]?.isCorrect ?? false 
       : false
 
     if (isCorrect) score += 1
