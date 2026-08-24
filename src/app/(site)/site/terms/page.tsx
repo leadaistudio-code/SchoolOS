@@ -12,36 +12,39 @@ export default function TermsPage() {
     <>
       <PageIntro
         eyebrow="Terms"
-        title="Website terms"
-        lead="These terms cover this website. Use of the MyCampusView application is governed by the separate agreement a school signs."
+        title="mycampusview.com Website Terms"
+        lead="These terms cover the mycampusview.com website. Use of the MyCampusView application to manage a campus with many students is governed by the separate agreement a school signs."
       />
 
       <ProseSection>
-        <Prose title="What is on this site">
+        <Prose title="Data and content for your school on one platform">
           <p>
-            The descriptions here reflect the product as it stands. Where a capability is still
-            being built we say so on the page rather than in a footnote. Screens shown use sample
-            data and are not any school&rsquo;s records.
+            The descriptions here reflect the product as it stands. Where a capability—such as migrating
+            spreadsheets—is still being built we say so on the page rather than in a footnote. Screens
+            shown use sample data and are not any real school&rsquo;s student records.
           </p>
         </Prose>
 
-        <Prose title="Enquiries">
+        <Prose title="Enquiries to book a demonstration">
           <p>
-            Submitting the demo form does not create an agreement or oblige either side to
-            anything. It asks us to contact you.
+            Submitting the form to book a demonstration does not create an agreement or oblige either side to
+            anything. It simply asks us to contact you to show how the system handles everything from the
+            academic calendar to daily operations.
           </p>
         </Prose>
 
-        <Prose title="Trade marks and content">
+        <Prose title="Managing staff and examinations">
           <p>
-            The MyCampusView name, the wordmark and the contents of this site belong to us. You are
-            welcome to quote or link to it; please do not reproduce it as your own.
+            The MyCampusView name, the wordmark and the contents of this site belong to us. Whether you are
+            researching a system for a single student or looking to overhaul how your staff handles
+            examinations, you are welcome to quote or link to our site; please do not reproduce it as your own.
           </p>
         </Prose>
 
-        <Prose title="Changes">
+        <Prose title="Updates to attendance features">
           <p>
-            The site and these terms change as the product does. The current version is always the
+            The site and these terms change as the product does. Even as we add new tools for tracking
+            staff attendance and daily attendance, the current version of these terms is always the
             one published here.
           </p>
           <p className="text-[15px] text-[var(--text-subtle)]">Last updated: August 2026.</p>
