@@ -121,6 +121,13 @@ export const NAVIGATION: NavItem[] = [
     mobile: true,
   },
   {
+    label: 'Knowledge Refresh',
+    href: '/teacher/refresh',
+    icon: 'BrainCircuit',
+    section: 'ACADEMICS' as const,
+    permission: 'teacher_refresh.view_self',
+  },
+  {
     label: 'Assessments',
     href: '/assessments',
     icon: 'FilePlus2',
@@ -286,6 +293,13 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: 'Faculty Readiness',
+    href: '/admin/faculty-development',
+    icon: 'HeartHandshake',
+    section: 'INSIGHTS' as const,
+    permission: 'teacher_refresh.view_school',
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: 'Settings',
@@ -298,6 +312,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'School location', href: '/settings/location', icon: 'MapPin', permission: 'settings.view' },
       { label: 'GPS trackers', href: '/settings/tracking', icon: 'Satellite', permission: 'transport.manage' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
+      { label: 'Teacher knowledge refresh', href: '/settings/teacher-refresh', icon: 'BrainCircuit', permission: 'teacher_refresh.configure' },
       { label: 'Security', href: '/settings/security', icon: 'ShieldCheck', permission: 'settings.view' },
       { label: 'Custom Domains', href: '/settings/domains', icon: 'Globe', permission: 'settings.manage' },
       { label: 'Message templates', href: '/settings/templates', icon: 'FileText', permission: 'settings.manage' },

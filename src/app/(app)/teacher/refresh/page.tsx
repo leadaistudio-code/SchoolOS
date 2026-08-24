@@ -1,95 +1,263 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { requireContext } from '@/server/context'
+import { ApiException } from '@/server/api/response'
+import {
+  listMyRefreshers,
+  getMyKnowledgeProfile,
+  listMyTeachingSubjects,
+  resolveConfig,
+} from '@/server/modules/teacher-refresh/service'
+import { PageHeader } from '@/components/page-header'
+import { Card, CardContent, Section } from '@/components/ui/card'
+import { Badge, type BadgeTone } from '@/components/ui/badge'
+import { EmptyState, Notice } from '@/components/ui/states'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
+import { BeforeYouTeach } from './before-you-teach'
 
-export default function KnowledgeRefreshDashboard() {
-  const [pending, setPending] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+export const metadata = { title: 'My Knowledge Refresh' }
 
-  useEffect(() => {
-    fetch('/api/v1/teacher-refresh/pending')
-      .then(res => res.json())
-      .then(data => {
-        setPending(data.pending || [])
-        setLoading(false)
-      })
-  }, [])
+const DATE = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' })
+
+const TYPE_LABEL: Record<string, string> = {
+  WEEKLY: 'Weekly refresh',
+  MONTHLY: 'Monthly review',
+  PRE_LECTURE: 'Before you teach',
+  MANUAL: 'Brush-up',
+}
+
+/** Maps a readiness label to a badge tone, kept in step with the scoring bands. */
+function readinessTone(label: string | null): BadgeTone {
+  switch (label) {
+    case 'Ready to teach':
+      return 'success'
+    case 'Good':
+      return 'info'
+    case 'Refresh recommended':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+}
+
+const PROFICIENCY: Record<string, { label: string; tone: BadgeTone }> = {
+  STRONG: { label: 'Strong', tone: 'success' },
+  GOOD: { label: 'Good', tone: 'info' },
+  REFRESH_RECOMMENDED: { label: 'Refresh recommended', tone: 'warning' },
+  DEVELOPING: { label: 'Developing', tone: 'neutral' },
+}
+
+/**
+ * A teacher's own knowledge-refresh home.
+ *
+ * The stance is set by the layout: what is due comes first and reads as a short,
+ * doable list; the knowledge profile below is framed as the teacher's own map of
+ * where they are strong, not a scorecard someone else is keeping. Everything here
+ * is the signed-in teacher's alone — the service re-checks ownership on every
+ * call, and no principal or peer view is reachable from this page.
+ */
+export default async function TeacherRefreshPage() {
+  const ctx = await requireContext('teacher_refresh.view_self')
+
+  // The account holds the permission but is not on the teaching-staff roll: show
+  // a plain explanation rather than letting the service's 403 become a 500.
+  let data: Awaited<ReturnType<typeof listMyRefreshers>>
+  try {
+    data = await listMyRefreshers(ctx)
+  } catch (error) {
+    if (error instanceof ApiException && error.code === 'NOT_TEACHING_STAFF') {
+      return (
+        <div>
+          <PageHeader title="My Knowledge Refresh" />
+          <Card>
+            <EmptyState
+              title="Knowledge refreshers are for teaching staff"
+              description="This space fills up once you are assigned classes to teach."
+            />
+          </Card>
+        </div>
+      )
+    }
+    throw error
+  }
+
+  const canTake = ctx.can('teacher_refresh.take')
+  const [config, profile, subjects] = await Promise.all([
+    resolveConfig(ctx),
+    getMyKnowledgeProfile(ctx),
+    canTake ? listMyTeachingSubjects(ctx) : Promise.resolve([]),
+  ])
+  const showBeforeYouTeach = canTake && config.preLectureEnabled && subjects.length > 0
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">My Knowledge Refresh</h1>
-        <p className="text-gray-500 mt-2">
-          Keep your subject knowledge fresh. Complete these quick refreshers to ensure you're ready for your upcoming lessons.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="My Knowledge Refresh"
+        description="Short, private refreshers to keep you confident walking into every lesson"
+      />
 
-      <div className="space-y-6">
-        <section>
-          <h2 className="text-xl font-semibold mb-4">Due Now</h2>
-          {loading ? (
-            <div className="animate-pulse flex space-x-4">
-              <div className="h-20 bg-gray-200 rounded w-full"></div>
-            </div>
-          ) : pending.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {pending.map((assessment) => (
-                <div key={assessment.id} className="border border-gray-200 rounded-xl p-5 shadow-sm bg-white">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 mb-2">
-                        {assessment.type.replace('_', ' ')}
-                      </span>
-                      <h3 className="text-lg font-medium">{assessment.classSubject?.subject?.name || 'Subject'}</h3>
-                      <p className="text-sm text-gray-500">{assessment.classSubject?.classLevel?.name}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-500">
-                      {assessment.questionCount} questions &bull; ~{Math.ceil(assessment.questionCount * 1.5)} minutes
-                    </div>
-                    <Link 
-                      href={`/teacher/refresh/${assessment.id}/take`}
-                      className="rounded-md bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                    >
-                      Start Refresher
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-10 bg-gray-50 rounded-xl border border-gray-100">
-              <h3 className="mt-2 text-sm font-semibold text-gray-900">You're all caught up!</h3>
-              <p className="mt-1 text-sm text-gray-500">No pending refreshers at the moment. Keep up the great work.</p>
-            </div>
-          )}
-        </section>
+      {!data.enabled ? (
+        <Notice tone="info" title="Refreshers are paused">
+          Your school has not switched on scheduled refreshers yet. You can still pull up a quick
+          Before You Teach refresher on any topic below.
+        </Notice>
+      ) : null}
 
-        <section className="mt-12">
-          <h2 className="text-xl font-semibold mb-4">Knowledge Profile</h2>
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <p className="text-gray-500 text-sm mb-4">Your personalized topic readiness based on recent refreshers.</p>
-            {/* Placeholder for topic strengths */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Newton's Laws</span>
-                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Strong</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Force calculations</span>
-                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Strong</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Friction coefficients</span>
-                <span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">Refresh Recommended</span>
-              </div>
-            </div>
+      <Section title="Due now" description="Quick to finish — a few minutes each.">
+        {data.dueNow.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="You’re all caught up"
+              description="Nothing is waiting for you right now. Nicely done."
+            />
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {data.dueNow.map((r) => (
+              <RefresherCard key={r.id} r={r} />
+            ))}
           </div>
-        </section>
-      </div>
+        )}
+      </Section>
+
+      {data.overdue.length > 0 ? (
+        <Section
+          title="Past the window"
+          description="Still worth doing — no penalty, just a nudge. Ask for more time if you need it."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            {data.overdue.map((r) => (
+              <RefresherCard key={r.id} r={r} overdue />
+            ))}
+          </div>
+        </Section>
+      ) : null}
+
+      {showBeforeYouTeach ? (
+        <Section
+          title="Before You Teach"
+          description="About to teach a topic? Pull up a quick refresher on just that material."
+        >
+          <BeforeYouTeach subjects={subjects} />
+        </Section>
+      ) : null}
+
+      {data.completed.length > 0 ? (
+        <Section title="Completed" description="Your recent refreshers and how they went.">
+          <Card>
+            <TableWrap>
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Refresher</TH>
+                    <TH>Subject</TH>
+                    <TH align="right">Score</TH>
+                    <TH>Readiness</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {data.completed.map((r) => (
+                    <TR key={r.id}>
+                      <TD className="text-ink">{TYPE_LABEL[r.type] ?? 'Refresher'}</TD>
+                      <TD>
+                        {r.subjectLabel}
+                        <span className="text-ink-subtle"> · {r.className}</span>
+                      </TD>
+                      <TD align="right" className="text-ink">
+                        {r.latestPercent == null ? '—' : `${r.latestPercent}%`}
+                      </TD>
+                      <TD>
+                        {r.readinessLabel ? (
+                          <Badge tone={readinessTone(r.readinessLabel)}>{r.readinessLabel}</Badge>
+                        ) : (
+                          '—'
+                        )}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </TableWrap>
+          </Card>
+        </Section>
+      ) : null}
+
+      <Section
+        title="Your knowledge profile"
+        description="Where recent refreshers say you’re strongest — yours to see, and to steer what comes next."
+      >
+        {profile.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="No profile yet"
+              description="Complete a refresher and your topic-by-topic map builds itself here."
+            />
+          </Card>
+        ) : (
+          <Card>
+            <TableWrap>
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Topic</TH>
+                    <TH>Subject</TH>
+                    <TH>Standing</TH>
+                    <TH align="right">Last refreshed</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {profile.map((p) => {
+                    const prof = PROFICIENCY[p.proficiency] ?? PROFICIENCY.DEVELOPING!
+                    return (
+                      <TR key={p.topicId}>
+                        <TD className="text-ink">{p.topicName}</TD>
+                        <TD>
+                          {p.subjectName}
+                          <span className="text-ink-subtle"> · {p.chapterName}</span>
+                        </TD>
+                        <TD>
+                          <Badge tone={prof.tone}>{prof.label}</Badge>
+                        </TD>
+                        <TD align="right">
+                          {p.lastTestedAt ? DATE.format(new Date(p.lastTestedAt)) : '—'}
+                        </TD>
+                      </TR>
+                    )
+                  })}
+                </TBody>
+              </Table>
+            </TableWrap>
+          </Card>
+        )}
+      </Section>
     </div>
+  )
+}
+
+type ListItem = Awaited<ReturnType<typeof listMyRefreshers>>['dueNow'][number]
+
+/** One due (or overdue) refresher, with the estimate that makes it feel doable. */
+function RefresherCard({ r, overdue }: { r: ListItem; overdue?: boolean }) {
+  const minutes = Math.max(2, Math.ceil(r.questionCount * 1.5))
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-base font-medium text-ink truncate">{r.subjectLabel}</p>
+            <p className="text-sm text-ink-subtle">{r.className}</p>
+          </div>
+          <Badge tone={overdue ? 'warning' : 'brand'}>{TYPE_LABEL[r.type] ?? 'Refresher'}</Badge>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-ink-muted">
+            {r.questionCount} questions · about {minutes} min
+          </p>
+          <Link href={`/teacher/refresh/${r.id}/take`} className={buttonVariants({ size: 'sm' })}>
+            {overdue ? 'Catch up' : 'Start'}
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

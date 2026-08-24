@@ -316,6 +316,7 @@ function describeCall(name: string): string {
     fees_invoices: 'Invoices',
     find_students: 'Student records',
     list_classes: 'Classes and sections',
+    faculty_readiness: 'Faculty readiness',
     draft_notice: 'Notice draft',
   }
   return labels[name] ?? 'Records'

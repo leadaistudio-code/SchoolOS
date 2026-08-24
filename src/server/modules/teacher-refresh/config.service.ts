@@ -1,12 +1,10 @@
 import { AppContext } from '@/server/context'
+import { audit } from '@/server/audit'
 import { UpdateTeacherRefreshConfigInput } from './schema'
 
 export async function getTeacherRefreshConfig(ctx: AppContext) {
-  // Requires admin settings access or a specific permission
-  if (!ctx.canAny('settings.manage', 'school.manage')) {
-    ctx.require('settings.manage') // Throws the correct ForbiddenError if both fail
-  }
-  
+  ctx.require('teacher_refresh.configure')
+
   let config = await ctx.db.teacherRefreshConfig.findUnique({
     where: { tenantId: ctx.tenant.id },
   })
@@ -21,9 +19,13 @@ export async function getTeacherRefreshConfig(ctx: AppContext) {
 }
 
 export async function updateTeacherRefreshConfig(ctx: AppContext, input: UpdateTeacherRefreshConfigInput) {
-  ctx.require('settings.manage')
+  ctx.require('teacher_refresh.configure')
 
-  return ctx.db.teacherRefreshConfig.upsert({
+  const before = await ctx.db.teacherRefreshConfig.findUnique({
+    where: { tenantId: ctx.tenant.id },
+  })
+
+  const config = await ctx.db.teacherRefreshConfig.upsert({
     where: { tenantId: ctx.tenant.id },
     update: input,
     create: {
@@ -31,4 +33,19 @@ export async function updateTeacherRefreshConfig(ctx: AppContext, input: UpdateT
       ...input,
     },
   })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'teacher_refresh.configure',
+    module: 'teacher_refresh',
+    entityType: 'TeacherRefreshConfig',
+    entityId: config.id,
+    summary: 'Updated teacher knowledge refresh settings',
+    before: before ?? undefined,
+    after: config,
+  })
+
+  return config
 }

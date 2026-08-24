@@ -5,6 +5,7 @@ import { attendanceReport, unmarkedSections } from '@/server/modules/attendance/
 import { outstandingByClass, listInvoices } from '@/server/modules/finance/service'
 import { listPayments } from '@/server/modules/finance/payments'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
+import { facultyReadinessOverview } from '@/server/modules/teacher-refresh/analytics'
 import { formatMoney } from '@/lib/utils'
 import { formatDay } from '@/lib/dates'
 
@@ -376,6 +377,56 @@ const classes: AssistantTool = {
   },
 }
 
+/* -------------------------------------------------------- faculty readiness */
+
+/**
+ * Faculty knowledge-refresh readiness, for oversight roles only.
+ *
+ * This is internal professional-development information, so the tool is gated on
+ * `teacher_refresh.view_school` (a principal / owner permission) and hidden from
+ * everyone else by `toolsFor`. It deliberately hands the model only the *summary*
+ * a principal asks about in conversation — the completion rate, the department
+ * roll-up, and the supportive alerts that already name who could use a hand —
+ * not every teacher's raw score. Minimising what crosses to the AI provider is
+ * the point: the full per-teacher table lives on the dashboard behind `href`,
+ * not in the model's context, and nothing here is phrased as a ranking.
+ */
+const facultyReadiness: AssistantTool = {
+  name: 'faculty_readiness',
+  description:
+    'How the school\'s teacher knowledge refreshers are going: the overall completion rate, how many teachers are up to date, a per-department roll-up, and a short list of supportive alerts (who has overdue refreshers or could use a review). Use this for "how is faculty development going", "who is behind on their refreshers", "which department needs support". This is internal professional-development information — never repeat it to a parent or student, and frame it as support, not a ranking.',
+  permission: 'teacher_refresh.view_school',
+  input: z.object({}),
+  async run(ctx) {
+    const overview = await facultyReadinessOverview(ctx)
+    return {
+      href: '/admin/faculty-development',
+      data: {
+        enabled: overview.enabled,
+        teachers: overview.headline.teacherCount,
+        completionRate:
+          overview.headline.completionRate == null
+            ? 'No refreshers assigned yet'
+            : `${overview.headline.completionRate}%`,
+        teachersUpToDate: overview.headline.teachersUpToDate,
+        teachersWithRefreshers: overview.headline.teachersWithWork,
+        byDepartment: overview.departments.map((d) => ({
+          department: d.department,
+          teachers: d.teacherCount,
+          completionRate: d.completionRate == null ? 'n/a' : `${d.completionRate}%`,
+          averageReadiness: d.averagePercent == null ? 'n/a' : `${d.averagePercent}%`,
+        })),
+        support: overview.alerts.map((a) => ({
+          teacher: a.teacherName,
+          kind: a.kind === 'OVERDUE' ? 'Has overdue refreshers' : 'Additional review suggested',
+          suggestion: a.message,
+        })),
+        note: 'Internal professional-development information. Do not share individual results with parents or students; use it to offer support, not to rank teachers.',
+      },
+    }
+  },
+}
+
 /* ------------------------------------------------------------- action drafts */
 
 /**
@@ -451,6 +502,7 @@ const ALL_TOOLS: AssistantTool[] = [
   invoices,
   students,
   classes,
+  facultyReadiness,
   draftNotice,
 ]
 

@@ -144,6 +144,15 @@ const serverSchema = z.object({
 
   RATE_LIMIT_DRIVER: z.enum(['memory', 'redis']).default('memory'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  /**
+   * Shared secret that guards the scheduled-job endpoint (`/api/cron/*`). No
+   * scheduler ships with the app; an external trigger (a platform cron, a
+   * GitHub Action, `npm run jobs:refresh`) calls the endpoint and must present
+   * this. Unset means the HTTP trigger is refused outright — the tsx script,
+   * which runs with database credentials already, still works.
+   */
+  CRON_SECRET: z.string().min(16).optional(),
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>

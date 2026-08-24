@@ -8,7 +8,7 @@ export const GET = route(
     const config = await getTeacherRefreshConfig(ctx)
     return ok(config)
   },
-  { permission: 'settings.manage' }
+  { permission: 'teacher_refresh.configure' },
 )
 
 export const PUT = route(
@@ -18,5 +18,5 @@ export const PUT = route(
     const config = await updateTeacherRefreshConfig(ctx, input)
     return ok(config)
   },
-  { permission: 'settings.manage', rateLimitKey: 'mutation' }
+  { permission: 'teacher_refresh.configure', rateLimitKey: 'mutation' },
 )

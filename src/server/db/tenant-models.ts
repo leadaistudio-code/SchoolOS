@@ -126,6 +126,14 @@ export const TENANT_SCOPED_MODELS = [
   'SupportTicket',
   'PushSubscription',
   'TenantDomain',
+
+  // Teacher Knowledge Refresh & Readiness
+  'TeacherRefreshConfig',
+  'TeacherKnowledgeProfile',
+  'TeacherRefreshAssessment',
+  'TeacherRefreshQuestion',
+  'TeacherRefreshAttempt',
+  'TeacherRefreshAttemptAnswer',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]

@@ -148,6 +148,20 @@ export const PERMISSIONS: PermissionDef[] = [
     ['settings_manage', 'Manage feedback settings'],
   ]),
 
+  // Teacher Knowledge Refresh & Readiness. Professional development, not
+  // surveillance: an individual teacher's results are internal PD data (never
+  // exposed to parents or students), and the module never drives employment
+  // decisions on its own. Oversight roles see readiness to offer support.
+  ...mod('teacher_refresh', [
+    ['view_self', 'View and track own knowledge refreshers'],
+    ['take', 'Take an assigned knowledge refresher'],
+    ['manage', 'Assign, extend and exempt refreshers'],
+    ['view_department', 'View department readiness'],
+    ['view_school', 'View school-wide faculty readiness'],
+    ['configure', 'Configure knowledge refresh settings'],
+    ['question_review', 'Review AI-generated refresh questions'],
+  ]),
+
   ...mod('library', [
     ['view', 'View library'],
     ['manage', 'Manage books'],
