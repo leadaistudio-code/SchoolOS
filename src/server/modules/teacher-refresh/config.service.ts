@@ -3,7 +3,9 @@ import { UpdateTeacherRefreshConfigInput } from './schema'
 
 export async function getTeacherRefreshConfig(ctx: AppContext) {
   // Requires admin settings access or a specific permission
-  ctx.requireAny(['settings.manage', 'school.manage'])
+  if (!ctx.canAny('settings.manage', 'school.manage')) {
+    ctx.require('settings.manage') // Throws the correct ForbiddenError if both fail
+  }
   
   let config = await ctx.db.teacherRefreshConfig.findUnique({
     where: { tenantId: ctx.tenant.id },
