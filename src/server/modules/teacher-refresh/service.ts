@@ -109,7 +109,7 @@ export async function submitRefresherAttempt(
       score,
       maxScore,
       submittedAt: new Date(),
-      feedback,
+      feedback || { note: '' }, // Provide a default value if feedback is null
       answers: {
         create: attemptAnswers.map(a => ({
           tenantId: ctx.tenant.id,
