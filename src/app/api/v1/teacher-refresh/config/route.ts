@@ -1,18 +1,22 @@
-import { nextContext } from '@/server/context/next'
+import { route } from '@/server/api/handler'
 import { getTeacherRefreshConfig, updateTeacherRefreshConfig } from '@/server/modules/teacher-refresh/config.service'
 import { updateTeacherRefreshConfigSchema } from '@/server/modules/teacher-refresh/schema'
-import { NextResponse } from 'next/server'
+import { ok } from '@/server/api/response'
 
-export async function GET(req: Request) {
-  const ctx = await nextContext(req)
-  const config = await getTeacherRefreshConfig(ctx)
-  return NextResponse.json(config)
-}
+export const GET = route(
+  async (_req, ctx) => {
+    const config = await getTeacherRefreshConfig(ctx)
+    return ok(config)
+  },
+  { permission: 'settings.manage' }
+)
 
-export async function PUT(req: Request) {
-  const ctx = await nextContext(req)
-  const body = await req.json()
-  const input = updateTeacherRefreshConfigSchema.parse(body)
-  const config = await updateTeacherRefreshConfig(ctx, input)
-  return NextResponse.json(config)
-}
+export const PUT = route(
+  async (req, ctx) => {
+    const body = await req.json()
+    const input = updateTeacherRefreshConfigSchema.parse(body)
+    const config = await updateTeacherRefreshConfig(ctx, input)
+    return ok(config)
+  },
+  { permission: 'settings.manage', rateLimitKey: 'mutation' }
+)

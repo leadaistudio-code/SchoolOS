@@ -1,6 +1,6 @@
-import { nextContext } from '@/server/context/next'
+import { route } from '@/server/api/handler'
 import { submitRefresherAttempt } from '@/server/modules/teacher-refresh/service'
-import { NextResponse } from 'next/server'
+import { ok } from '@/server/api/response'
 import { z } from 'zod'
 
 const submitSchema = z.object({
@@ -10,10 +10,12 @@ const submitSchema = z.object({
   }))
 })
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const ctx = await nextContext(req)
-  const body = await req.json()
-  const input = submitSchema.parse(body)
-  const attempt = await submitRefresherAttempt(ctx, params.id, input.answers)
-  return NextResponse.json(attempt)
-}
+export const POST = route(
+  async (req, ctx, params) => {
+    const body = await req.json()
+    const input = submitSchema.parse(body)
+    const attempt = await submitRefresherAttempt(ctx, params.id!, input.answers)
+    return ok(attempt)
+  },
+  { rateLimitKey: 'mutation' }
+)

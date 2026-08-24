@@ -25,7 +25,7 @@ export default function FacultyDevelopmentDashboard() {
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <h3 className="text-sm font-medium text-gray-500 mb-1">Priority Intervention Topics</h3>
           <p className="text-3xl font-bold text-gray-900">3</p>
-          <span className="text-xs text-gray-500 font-medium">Topics where >20% teachers need refresh</span>
+          <span className="text-xs text-gray-500 font-medium">Topics where &gt;20% teachers need refresh</span>
         </div>
       </div>
 

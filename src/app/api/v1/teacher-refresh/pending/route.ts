@@ -1,14 +1,15 @@
-import { nextContext } from '@/server/context/next'
+import { route } from '@/server/api/handler'
 import { getPendingRefreshers } from '@/server/modules/teacher-refresh/service'
-import { NextResponse } from 'next/server'
+import { ok } from '@/server/api/response'
 
-export async function GET(req: Request) {
-  const ctx = await nextContext(req)
-  const staff = await ctx.db.staff.findFirst({ 
-    where: { userId: ctx.user.userId, tenantId: ctx.tenant.id, deletedAt: null } 
-  })
-  if (!staff) return NextResponse.json({ pending: [] })
+export const GET = route(
+  async (_req, ctx) => {
+    const staff = await ctx.db.staff.findFirst({ 
+      where: { userId: ctx.user.userId, tenantId: ctx.tenant.id, deletedAt: null } 
+    })
+    if (!staff) return ok({ pending: [] })
 
-  const pending = await getPendingRefreshers(ctx, staff.id)
-  return NextResponse.json({ pending })
-}
+    const pending = await getPendingRefreshers(ctx, staff.id)
+    return ok({ pending })
+  }
+)
