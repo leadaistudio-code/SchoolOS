@@ -89,7 +89,8 @@ export async function submitRefresherAttempt(
         const result = await model.turn({
           system: 'You are a supportive academic mentor for teachers.',
           turns: [{ role: 'user', text: prompt }],
-          onText: () => {},
+          tools: [],
+          onText: (_delta) => {},
         })
         feedback = { note: result.text }
       } else {
