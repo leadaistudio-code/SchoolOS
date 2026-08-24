@@ -78,7 +78,7 @@ export async function submitRefresherAttempt(
   if (assistantConfigured()) {
     try {
       const model = assistantModel()
-      const incorrectQuestions = assessment.questions.filter((rq, i) => !attemptAnswers[i].isCorrect)
+      const incorrectQuestions = assessment.questions.filter((rq, i) => !attemptAnswers[i]?.isCorrect)
       
       if (incorrectQuestions.length > 0) {
         const prompt = `You are a helpful teacher trainer. The teacher just completed a quick knowledge refresh and missed these concepts:
