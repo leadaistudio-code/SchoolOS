@@ -174,32 +174,32 @@ model UsageMetric {
 }
 
 model SupportTicket {
-  id          String   @id @default(cuid())
-  tenantId    String
-  subject     String
-  body        String
-  category    String?
-  priority    String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
-  status      String   @default("OPEN") // OPEN | PENDING | RESOLVED | CLOSED
-  openedById  String?
-  assigneeId  String?
-  resolvedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  messages    SupportTicketMessage[]
+  id         String                 @id @default(cuid())
+  tenantId   String
+  subject    String
+  body       String
+  category   String?
+  priority   String                 @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  status     String                 @default("OPEN") // OPEN | PENDING | RESOLVED | CLOSED
+  openedById String?
+  assigneeId String?
+  resolvedAt DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages   SupportTicketMessage[]
 
   @@index([tenantId, status])
   @@index([assigneeId])
 }
 
 model SupportTicketMessage {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   ticketId   String
   authorId   String?
-  authorKind String   @default("TENANT") // PLATFORM | TENANT
+  authorKind String        @default("TENANT") // PLATFORM | TENANT
   body       String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime      @default(now())
   ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId, createdAt])
@@ -321,7 +321,7 @@ model User {
   mfaEnabled Boolean @default(false)
   mfaSecret  String?
 
-  mustChangePassword Boolean @default(false)
+  mustChangePassword    Boolean   @default(false)
   // Set when an administrator issues a temporary password over the phone or
   // counter. Such a password is read aloud and often written down, so it is
   // given a deadline rather than living until somebody happens to use it.
@@ -331,15 +331,15 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  roles         UserRole[]
-  sessions      Session[]
-  tokens        VerificationToken[]
-  loginEvents   LoginEvent[]
-  notifications Notification[]
-  staff         Staff?
-  student       Student?
-  parent        Parent?
-  sentMessages  Message[]           @relation("MessageSender")
+  roles             UserRole[]
+  sessions          Session[]
+  tokens            VerificationToken[]
+  loginEvents       LoginEvent[]
+  notifications     Notification[]
+  staff             Staff?
+  student           Student?
+  parent            Parent?
+  sentMessages      Message[]           @relation("MessageSender")
   pushSubscriptions PushSubscription[]
 
   @@unique([tenantId, email])
@@ -580,16 +580,17 @@ model ClassSubject {
   subjectId    String
   teacherId    String?
 
-  classLevel   ClassLevel      @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
-  subject      Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher      Staff?          @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  timetable    TimetableSlot[]
-  homework     Homework[]
-  classwork    Classwork[]
-  examSubjects ExamSubject[]
-  curricula    Curriculum[]
-  questions    Question[]
-  assessments  Assessment[]
+  classLevel                ClassLevel                 @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  subject                   Subject                    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher                   Staff?                     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  timetable                 TimetableSlot[]
+  homework                  Homework[]
+  classwork                 Classwork[]
+  examSubjects              ExamSubject[]
+  curricula                 Curriculum[]
+  questions                 Question[]
+  assessments               Assessment[]
+  teacherRefreshAssessments TeacherRefreshAssessment[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
@@ -686,9 +687,10 @@ model Topic {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  chapter   Chapter           @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  outcomes  LearningOutcome[]
-  questions QuestionTopic[]
+  chapter                  Chapter                   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  outcomes                 LearningOutcome[]
+  questions                QuestionTopic[]
+  teacherKnowledgeProfiles TeacherKnowledgeProfile[]
 
   @@index([tenantId, chapterId, position])
 }
@@ -795,11 +797,12 @@ model Question {
   updatedAt      DateTime           @updatedAt
   deletedAt      DateTime?
 
-  classSubject ClassSubject         @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
-  options      QuestionOption[]
-  topics       QuestionTopic[]
-  placements   AssessmentQuestion[]
-  usages       QuestionUsage[]
+  classSubject            ClassSubject             @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  options                 QuestionOption[]
+  topics                  QuestionTopic[]
+  placements              AssessmentQuestion[]
+  usages                  QuestionUsage[]
+  teacherRefreshQuestions TeacherRefreshQuestion[]
 
   @@index([tenantId, classSubjectId, status])
   @@index([tenantId, fingerprint])
@@ -1347,25 +1350,28 @@ model Staff {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  user                    User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  classSubjects           ClassSubject[]
-  classTeacherOf          Section[]                @relation("SectionClassTeacher")
-  attendance              StaffAttendance[]
-  leaveRequests           LeaveRequest[]
-  timetableSlots          TimetableSlot[]
-  homework                Homework[]
-  classwork               Classwork[]
-  documents               Document[]
-  drivenBuses             Bus[]
-  trips                   BusTrip[]
-  markedStudentAttendance StudentAttendance[]      @relation("AttendanceMarker")
-  salaryStructures        StaffSalaryStructure[]
-  payslips                StaffPayslip[]
-  appraisals              StaffAppraisal[]         @relation("AppraisalSubject")
-  appraisalsReviewed      StaffAppraisal[]         @relation("AppraisalReviewer")
-  feedbackTargets         FeedbackAssignment[]     @relation("FeedbackTargetStaff")
-  teacherStudentFeedback  TeacherStudentFeedback[] @relation("TeacherStudentFeedbackAuthor")
-  assignedFeedbackActions FeedbackActionItem[]     @relation("FeedbackActionAssignee")
+  user                      User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  classSubjects             ClassSubject[]
+  classTeacherOf            Section[]                  @relation("SectionClassTeacher")
+  attendance                StaffAttendance[]
+  leaveRequests             LeaveRequest[]
+  timetableSlots            TimetableSlot[]
+  homework                  Homework[]
+  classwork                 Classwork[]
+  documents                 Document[]
+  drivenBuses               Bus[]
+  trips                     BusTrip[]
+  markedStudentAttendance   StudentAttendance[]        @relation("AttendanceMarker")
+  salaryStructures          StaffSalaryStructure[]
+  payslips                  StaffPayslip[]
+  appraisals                StaffAppraisal[]           @relation("AppraisalSubject")
+  appraisalsReviewed        StaffAppraisal[]           @relation("AppraisalReviewer")
+  feedbackTargets           FeedbackAssignment[]       @relation("FeedbackTargetStaff")
+  teacherStudentFeedback    TeacherStudentFeedback[]   @relation("TeacherStudentFeedbackAuthor")
+  assignedFeedbackActions   FeedbackActionItem[]       @relation("FeedbackActionAssignee")
+  teacherKnowledgeProfiles  TeacherKnowledgeProfile[]
+  teacherRefreshAssessments TeacherRefreshAssessment[]
+  teacherRefreshAttempts    TeacherRefreshAttempt[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType])
@@ -2563,6 +2569,151 @@ model NoticeTarget {
   @@index([tenantId, noticeId])
 }
 
+// ===========================================================================
+// TEACHER KNOWLEDGE REFRESH & READINESS
+// ===========================================================================
+
+enum TeacherRefreshFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+model TeacherRefreshConfig {
+  id                    String                  @id @default(cuid())
+  tenantId              String                  @unique
+  enabled               Boolean                 @default(false)
+  frequency             TeacherRefreshFrequency @default(WEEKLY)
+  weeklyQuestionCount   Int                     @default(10)
+  monthlyQuestionCount  Int                     @default(25)
+  passingThreshold      Float                   @default(70.0) // percentage
+  maxAttempts           Int                     @default(2)
+  preLectureEnabled     Boolean                 @default(true)
+  preLectureCount       Int                     @default(5)
+  completionWindowHours Int                     @default(48)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ProficiencyLevel {
+  STRONG
+  GOOD
+  REFRESH_RECOMMENDED
+  DEVELOPING
+}
+
+model TeacherKnowledgeProfile {
+  id           String           @id @default(cuid())
+  tenantId     String
+  teacherId    String
+  topicId      String
+  proficiency  ProficiencyLevel @default(GOOD)
+  lastTestedAt DateTime?
+  // Stores historical trend data
+  history      Json?
+
+  teacher Staff @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  topic   Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, teacherId, topicId])
+  @@index([tenantId, teacherId])
+}
+
+enum TeacherRefreshType {
+  WEEKLY
+  MONTHLY
+  PRE_LECTURE
+  MANUAL
+}
+
+enum TeacherRefreshStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+  EXEMPTED
+}
+
+model TeacherRefreshAssessment {
+  id             String               @id @default(cuid())
+  tenantId       String
+  teacherId      String
+  classSubjectId String
+  type           TeacherRefreshType
+  status         TeacherRefreshStatus @default(PENDING)
+  scheduledAt    DateTime
+  dueAt          DateTime
+  questionCount  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher      Staff                    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject             @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  questions    TeacherRefreshQuestion[]
+  attempts     TeacherRefreshAttempt[]
+
+  @@index([tenantId, teacherId, status])
+  @@index([tenantId, dueAt])
+}
+
+model TeacherRefreshQuestion {
+  id           String @id @default(cuid())
+  tenantId     String
+  assessmentId String
+  questionId   String
+  position     Int    @default(0)
+
+  assessment TeacherRefreshAssessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question   Question                      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers    TeacherRefreshAttemptAnswer[]
+
+  @@unique([tenantId, assessmentId, questionId])
+  @@index([tenantId, assessmentId, position])
+}
+
+model TeacherRefreshAttempt {
+  id           String    @id @default(cuid())
+  tenantId     String
+  assessmentId String
+  teacherId    String
+  startedAt    DateTime  @default(now())
+  submittedAt  DateTime?
+  score        Float?
+  maxScore     Float?
+
+  // Topic-level breakdown of performance during this attempt
+  topicBreakdown Json?
+  // AI-generated concise refresher notes based on weaknesses
+  feedback       Json?
+
+  assessment TeacherRefreshAssessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  teacher    Staff                         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  answers    TeacherRefreshAttemptAnswer[]
+
+  @@index([tenantId, assessmentId])
+  @@index([tenantId, teacherId])
+}
+
+model TeacherRefreshAttemptAnswer {
+  id                String @id @default(cuid())
+  tenantId          String
+  attemptId         String
+  refreshQuestionId String
+
+  // Selected option index or text
+  selectedIndexes Json?
+  responseText    String?
+  isCorrect       Boolean?
+
+  attempt         TeacherRefreshAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  refreshQuestion TeacherRefreshQuestion @relation(fields: [refreshQuestionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, attemptId, refreshQuestionId])
+  @@index([tenantId, attemptId])
+}
+
 model Conversation {
   id            String   @id @default(cuid())
   tenantId      String
@@ -3587,7 +3738,7 @@ enum ScoreSubject {
 model ScoreWeight {
   id String @id @default(cuid())
 
-  tenantId String
+  tenantId   String
   /// STUDENT or STAFF. Each population has its own metric set and its own
   /// weights: attendance means something different for a child and a teacher.
   population String
@@ -3623,12 +3774,12 @@ model ScoreSnapshot {
   /// a student leaves.
   subjectName String
 
-  score Float
-  band  String
+  score     Float
+  band      String
   /// 0-1: the share of enabled weight that actually had data behind it. A high
   /// score built on a quarter of the weight is not the same claim as one built
   /// on all of it, and the difference has to survive into the history.
-  coverage Float @default(1)
+  coverage  Float  @default(1)
   /// Per-metric sub-scores and weights as they stood, so an old snapshot can be
   /// explained without guessing what the weights were that day.
   breakdown Json
@@ -3674,7 +3825,6 @@ model RoiCalculation {
 
   @@index([tenantId, createdAt])
 }
-
 
 /// A credential a GPS server or tracker vendor uses to post positions.
 ///
