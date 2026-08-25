@@ -90,6 +90,7 @@ export default async function ParentDetailPage({ params }: { params: Promise<{ i
                         firstName={link.student.firstName}
                         lastName={link.student.lastName}
                         href={`/students/${link.student.id}`}
+                        avatarUrl={link.student.photoUrl}
                         secondary={`${link.student.admissionNo}${
                           enrollment
                             ? ` · ${enrollment.classLevel.name} ${enrollment.section.name}`

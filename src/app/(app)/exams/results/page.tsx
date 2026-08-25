@@ -101,6 +101,7 @@ export default async function ResultsPage({
                         firstName={result.student.firstName}
                         lastName={result.student.lastName}
                         secondary={result.student.admissionNo}
+                        avatarUrl={result.student.photoUrl}
                       />
                     </TD>
                     <TD>{result.student.enrollments[0]?.classLevel.name ?? '—'}</TD>

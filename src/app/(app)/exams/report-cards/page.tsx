@@ -75,6 +75,7 @@ export default async function ReportCardsPage({
                         lastName={card.student.lastName}
                         secondary={card.student.admissionNo}
                         href={`/exams/report-cards/${card.id}`}
+                        avatarUrl={card.student.photoUrl}
                       />
                     </TD>
                     <TD>{card.exam.name}</TD>

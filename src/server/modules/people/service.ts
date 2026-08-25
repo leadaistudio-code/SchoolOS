@@ -152,6 +152,7 @@ export async function getParent(ctx: AppContext, id: string) {
           student: {
             select: {
               id: true,
+              photoUrl: true,
               firstName: true,
               lastName: true,
               admissionNo: true,

@@ -104,6 +104,7 @@ export function StudentTable({
                     lastName={s.lastName}
                     secondary={s.rollNumber ? `Roll ${s.rollNumber}` : undefined}
                     href={`/students/${s.id}`}
+                    avatarUrl={s.photoUrl}
                   />
                 </TD>
                 <TD className="tnum">{s.admissionNo}</TD>

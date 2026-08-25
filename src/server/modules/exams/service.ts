@@ -551,7 +551,7 @@ export async function listResults(ctx: AppContext, examId?: string) {
   return ctx.db.result.findMany({
     where: { ...(examId ? { examId } : {}), ...(ids === null ? {} : { studentId: { in: ids }, publishedAt: { not: null } }) },
     orderBy: [{ exam: { createdAt: 'desc' } }, { rankInClass: 'asc' }],
-    select: { id: true, totalMax: true, totalObtained: true, percentage: true, grade: true, rankInClass: true, isPass: true, publishedAt: true, exam: { select: { id: true, name: true, status: true } }, student: { select: { id: true, firstName: true, lastName: true, admissionNo: true, enrollments: { where: { isCurrent: true }, take: 1, select: { classLevel: { select: { name: true } } } } } } },
+    select: { id: true, totalMax: true, totalObtained: true, percentage: true, grade: true, rankInClass: true, isPass: true, publishedAt: true, exam: { select: { id: true, name: true, status: true } }, student: { select: { id: true, photoUrl: true, firstName: true, lastName: true, admissionNo: true, enrollments: { where: { isCurrent: true }, take: 1, select: { classLevel: { select: { name: true } } } } } } },
   })
 }
 
@@ -563,7 +563,7 @@ export async function listPublishedReportCards(ctx: AppContext, examId?: string)
   return ctx.db.result.findMany({
     where: { publishedAt: { not: null }, ...(examId ? { examId } : {}), ...(ids === null ? {} : { studentId: { in: ids } }) },
     orderBy: [{ exam: { createdAt: 'desc' } }, { rankInClass: 'asc' }],
-    select: { id: true, percentage: true, grade: true, rankInClass: true, isPass: true, exam: { select: { id: true, name: true } }, student: { select: { firstName: true, lastName: true, admissionNo: true } } },
+    select: { id: true, percentage: true, grade: true, rankInClass: true, isPass: true, exam: { select: { id: true, name: true } }, student: { select: { photoUrl: true, firstName: true, lastName: true, admissionNo: true } } },
   })
 }
 

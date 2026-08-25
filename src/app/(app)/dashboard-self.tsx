@@ -111,6 +111,7 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
             firstName={active.firstName}
             lastName={active.lastName}
             secondary={`Admission no. ${active.admissionNo}`}
+            avatarUrl={active.photoUrl}
           />
           <span className="text-sm text-ink-muted">
             {active.className ?? 'Class not assigned'}

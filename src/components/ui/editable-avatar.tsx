@@ -49,7 +49,7 @@ export function EditableAvatar({
         firstName={firstName}
         lastName={lastName}
         avatarUrl={photoUrl}
-        className="size-16 text-xl"
+        className="size-20 text-2xl"
       />
     )
   }
@@ -86,23 +86,23 @@ export function EditableAvatar({
   return (
     <div className="flex items-center gap-2">
       <label
-        className="group relative size-16 shrink-0 cursor-pointer rounded-full"
+        className="group relative size-20 shrink-0 cursor-pointer rounded-full"
         title="Upload or replace photo"
       >
         <Avatar
           firstName={firstName}
           lastName={lastName}
           avatarUrl={photoUrl}
-          className="size-16 text-xl"
+          className="size-20 text-2xl"
         />
         <span
           className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100"
           aria-hidden
         >
           {pending ? (
-            <Loader2 className="size-5 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           ) : (
-            <Camera className="size-5" />
+            <Camera className="size-6" />
           )}
         </span>
         <input
