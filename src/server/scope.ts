@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import type { AppContext } from '@/server/context'
+import { ForbiddenError, type AppContext } from '@/server/context'
 import { ROLE } from '@/lib/rbac/roles'
 
 export type ScopedStudent = {
@@ -83,9 +83,7 @@ export async function assertClassSubjectAccess(ctx: AppContext, classSubjectId: 
   const ids = await teachingClassSubjectIds(ctx)
   if (ids === null) return
   if (!ids.includes(classSubjectId)) {
-    const err = new Error('You do not teach this subject')
-    ;(err as { status?: number }).status = 403
-    throw err
+    throw new ForbiddenError('You do not teach this subject')
   }
 }
 
@@ -108,9 +106,7 @@ export async function assertStudentAccess(ctx: AppContext, studentId: string) {
   const ids = await accessibleStudentIds(ctx)
   if (ids === null) return
   if (!ids.includes(studentId)) {
-    const err = new Error('You do not have access to this student')
-    ;(err as { status?: number }).status = 403
-    throw err
+    throw new ForbiddenError('You do not have access to this student')
   }
 }
 

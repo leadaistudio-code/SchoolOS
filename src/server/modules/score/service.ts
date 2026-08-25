@@ -115,7 +115,7 @@ async function currentPeriod(ctx: AppContext): Promise<Period | null> {
 
 export async function scoreStudents(
   ctx: AppContext,
-  filter: { classLevelId?: string; sectionId?: string } = {},
+  filter: { classLevelId?: string; sectionId?: string; studentId?: string } = {},
 ): Promise<{ students: ScoredStudent[]; weights: WeightSetting[]; period: Period | null }> {
   ctx.require('score.view')
 
@@ -131,6 +131,7 @@ export async function scoreStudents(
       isCurrent: true,
       ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
       ...(filter.sectionId ? { sectionId: filter.sectionId } : {}),
+      ...(filter.studentId ? { studentId: filter.studentId } : {}),
       student: { deletedAt: null, status: 'ACTIVE', ...scope },
     },
     select: {

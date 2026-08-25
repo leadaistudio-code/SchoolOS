@@ -77,6 +77,35 @@ export const STUDENT_DOCUMENT_CATEGORIES: StudentDocumentCategory[] = [
   { key: 'OTHER', label: 'Other' },
 ]
 
+/**
+ * The category a profile photo is stored under.
+ *
+ * Deliberately NOT in `STUDENT_DOCUMENT_CATEGORIES`: the avatar is not a piece
+ * of the admission file, so it must never appear in the register, the upload
+ * picker or the missing-document report. It is separate from `PHOTOGRAPH` (the
+ * passport-size ID-card photo, which IS a required document) — the two answer
+ * different questions and a school may hold one without the other.
+ */
+export const PROFILE_PHOTO_CATEGORY = 'PROFILE_PHOTO'
+
+/**
+ * The image types a profile photo may be.
+ *
+ * `uploadFile`'s allow-list is deliberately broader — it also accepts PDFs and
+ * Office documents, because it backs every attachment in the app — so the
+ * avatar setters narrow it to real images with this list. Without it a PDF sent
+ * through the avatar control (the `accept` attribute is only a client hint) is
+ * accepted and then renders as a broken `<img>` on every roster, score page and
+ * the parent portal. The bytes are still checked against the declared type
+ * downstream in `uploadFile`, so a document mislabelled `image/png` is caught
+ * there; this list is what refuses one honestly labelled `application/pdf`.
+ */
+export const PROFILE_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
+export function isProfilePhotoMime(mime: string): boolean {
+  return (PROFILE_PHOTO_MIME_TYPES as readonly string[]).includes(mime)
+}
+
 /** The categories the missing-document report checks for. */
 export const REQUIRED_DOCUMENT_KEYS = STUDENT_DOCUMENT_CATEGORIES.filter((c) => c.required).map(
   (c) => c.key,

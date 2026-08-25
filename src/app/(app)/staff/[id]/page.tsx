@@ -23,13 +23,16 @@ import { EmptyState, Notice } from '@/components/ui/states'
 import { Metric, MetricRow } from '@/components/ui/metric'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { Avatar } from '@/components/ui/identity'
+import { EditableAvatar } from '@/components/ui/editable-avatar'
 import { BarList } from '@/components/reports/primitives'
 import { GeneratePayslipButton, OpenAppraisalButton, PayslipStatusControl, SetSalaryButton } from './panels'
 import { AppraisalEditor } from '../appraisal-editor'
+import { Staff360 } from './staff-360'
+import { uploadStaffPhotoAction, removeStaffPhotoAction } from './photo-actions'
 
 export const metadata = { title: 'Staff profile' }
 
-const TABS = ['overview', 'salary', 'performance', 'feedback', 'appraisals'] as const
+const TABS = ['360', 'overview', 'salary', 'performance', 'feedback', 'appraisals'] as const
 type Tab = (typeof TABS)[number]
 
 const PAYSLIP_TONE: Record<string, BadgeTone> = {
@@ -65,7 +68,7 @@ export default async function StaffDetailPage({
   const ctx = await requireContext('staff.view')
   const staff = await getStaff(ctx, id)
 
-  const tab: Tab = TABS.includes(query.tab as Tab) ? (query.tab as Tab) : 'overview'
+  const tab: Tab = TABS.includes(query.tab as Tab) ? (query.tab as Tab) : '360'
   const canPayroll = ctx.can('staff.payroll')
   const canPayrollManage = ctx.can('staff.payroll_manage')
   const canAppraise = ctx.can('staff.appraise')
@@ -81,6 +84,16 @@ export default async function StaffDetailPage({
         title={name}
         description={`${staff.employeeCode}${staff.designation ? ` · ${staff.designation}` : ''}${staff.department ? ` · ${staff.department}` : ''}`}
         breadcrumbs={[{ label: 'Teachers & staff', href: '/staff' }, { label: name }]}
+        media={
+          <EditableAvatar
+            firstName={staff.firstName}
+            lastName={staff.lastName}
+            photoUrl={staff.photoUrl}
+            canEdit={ctx.can('staff.edit')}
+            uploadAction={uploadStaffPhotoAction.bind(null, id)}
+            removeAction={removeStaffPhotoAction.bind(null, id)}
+          />
+        }
         actions={
           ctx.can('staff.edit') ? (
             <Link href={`/staff/${id}/edit`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
@@ -101,6 +114,7 @@ export default async function StaffDetailPage({
       <LinkTabs
         label="Staff record"
         items={[
+          { label: '360°', href: href('360'), active: tab === '360' },
           { label: 'Overview', href: href('overview'), active: tab === 'overview' },
           ...(canPayroll ? [{ label: 'Salary', href: href('salary'), active: tab === 'salary' }] : []),
           { label: 'Performance', href: href('performance'), active: tab === 'performance' },
@@ -109,6 +123,7 @@ export default async function StaffDetailPage({
         ]}
       />
 
+      {tab === '360' ? <Staff360 ctx={ctx} staff={staff} /> : null}
       {tab === 'overview' ? <Overview staff={staff} money={money} canPayroll={canPayroll} /> : null}
       {tab === 'salary' && canPayroll ? (
         <SalaryTab
@@ -157,7 +172,7 @@ function Overview({
       <Card className="lg:col-span-1">
         <CardContent>
           <div className="flex items-center gap-3">
-            <Avatar firstName={staff.firstName} lastName={staff.lastName} />
+            <Avatar firstName={staff.firstName} lastName={staff.lastName} avatarUrl={staff.photoUrl} />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-ink">
                 {staff.firstName} {staff.lastName}

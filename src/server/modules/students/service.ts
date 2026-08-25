@@ -5,6 +5,7 @@ import { assertWithinLimit, FEATURE } from '@/server/entitlements'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { studentScopeWhere, assertStudentAccess } from '@/server/scope'
 import { ApiException, conflict, notFound } from '@/server/api/response'
+import { PROFILE_PHOTO_CATEGORY } from '@/lib/student-documents'
 import {
   STUDENT_SORT_FIELDS,
   type StudentCreateInput,
@@ -164,7 +165,10 @@ export async function getStudent(ctx: AppContext, id: string) {
         },
       },
       guardians: { include: { parent: true } },
-      documents: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+      documents: {
+        where: { deletedAt: null, NOT: { category: PROFILE_PHOTO_CATEGORY } },
+        orderBy: { createdAt: 'desc' },
+      },
       invoices: {
         where: { status: { notIn: ['CANCELLED'] } },
         orderBy: { dueOn: 'desc' },

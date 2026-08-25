@@ -4,6 +4,7 @@ import { env } from '@/lib/env'
 import { ApiException } from '@/server/api/response'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
+import { PROFILE_PHOTO_CATEGORY } from '@/lib/student-documents'
 
 /**
  * Upload handling.
@@ -149,7 +150,7 @@ export async function readFileForCaller(
     }),
     ctx.db.document.findFirst({
       where: { storageKey, deletedAt: null },
-      select: { title: true, mimeType: true, studentId: true, staffId: true, parentId: true },
+      select: { title: true, mimeType: true, category: true, studentId: true, staffId: true, parentId: true },
     }),
   ])
 
@@ -164,12 +165,29 @@ export async function readFileForCaller(
     }
   }
 
-  if (!ctx.can('documents.view')) {
-    throw new ApiException(403, 'FORBIDDEN', 'You cannot view this document')
-  }
-  if (document!.studentId) {
-    const { assertStudentAccess } = await import('@/server/scope')
-    await assertStudentAccess(ctx, document!.studentId)
+  // A profile photo is authorised by who it is OF, not by the documents right:
+  // rosters, the score pages and the parent portal all render avatars, and none
+  // of those readers necessarily hold `documents.view`. Every other document
+  // category keeps the stricter rule unchanged.
+  if (document!.category === PROFILE_PHOTO_CATEGORY) {
+    if (document!.studentId) {
+      const { assertStudentAccess } = await import('@/server/scope')
+      await assertStudentAccess(ctx, document!.studentId)
+    } else if (document!.staffId) {
+      if (!ctx.can('staff.view')) {
+        throw new ApiException(403, 'FORBIDDEN', 'You cannot view this photo')
+      }
+    } else {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this photo')
+    }
+  } else {
+    if (!ctx.can('documents.view')) {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this document')
+    }
+    if (document!.studentId) {
+      const { assertStudentAccess } = await import('@/server/scope')
+      await assertStudentAccess(ctx, document!.studentId)
+    }
   }
 
   return {

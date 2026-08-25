@@ -17,6 +17,7 @@ export function PageHeader({
   description,
   breadcrumbs,
   actions,
+  media,
   className,
 }: {
   title: string
@@ -27,6 +28,11 @@ export function PageHeader({
   description?: React.ReactNode
   breadcrumbs?: Crumb[]
   actions?: React.ReactNode
+  /**
+   * A visual sitting to the left of the title — a record's avatar, say. Optional
+   * so every existing header is unchanged; where present it stays on every tab.
+   */
+  media?: React.ReactNode
   className?: string
 }) {
   return (
@@ -51,9 +57,12 @@ export function PageHeader({
       ) : null}
 
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-ink truncate">{title}</h1>
-          {description ? <p className="text-sm text-ink-muted mt-0.5">{description}</p> : null}
+        <div className="flex min-w-0 items-center gap-3">
+          {media ? <div className="shrink-0">{media}</div> : null}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-ink truncate">{title}</h1>
+            {description ? <p className="text-sm text-ink-muted mt-0.5">{description}</p> : null}
+          </div>
         </div>
         {actions ? (
           <div className="flex items-center gap-2 shrink-0">{actions}</div>

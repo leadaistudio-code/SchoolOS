@@ -50,7 +50,10 @@ function pct(numerator: number, denominator: number): number | null {
   return (numerator / denominator) * 100
 }
 
-export async function scoreStaff(ctx: AppContext): Promise<StaffScoreSummary> {
+export async function scoreStaff(
+  ctx: AppContext,
+  filter: { staffId?: string } = {},
+): Promise<StaffScoreSummary> {
   ctx.require('score.view')
   // Staff scores are personnel data, not school-performance data: seeing the
   // school's health card does not entitle anyone to a ranked list of teachers.
@@ -64,7 +67,7 @@ export async function scoreStaff(ctx: AppContext): Promise<StaffScoreSummary> {
   })
 
   const people = await ctx.db.staff.findMany({
-    where: { deletedAt: null, leftOn: null },
+    where: { deletedAt: null, leftOn: null, ...(filter.staffId ? { id: filter.staffId } : {}) },
     select: {
       id: true,
       employeeCode: true,

@@ -2,8 +2,10 @@ import Link from 'next/link'
 import { formatDay } from '@/lib/dates'
 import { Pencil } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import type { AppContext } from '@/server/context'
 import { getStudent } from '@/server/modules/students/service'
 import { PageHeader } from '@/components/page-header'
+import { LinkTabs } from '@/components/ui/tabs'
 import {
   Card,
   CardContent,
@@ -19,22 +21,41 @@ import { EmptyState, Notice } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { formatMoney, fullName } from '@/lib/utils'
 import { Avatar, PersonCell } from '@/components/ui/identity'
+import { EditableAvatar } from '@/components/ui/editable-avatar'
 import { StudentDocumentsCard } from './student-documents-card'
+import { Student360 } from './student-360'
+import { uploadStudentPhotoAction, removeStudentPhotoAction } from './photo-actions'
 
 export const metadata = { title: 'Student profile' }
 
+const TABS = ['360', 'profile'] as const
+type Tab = (typeof TABS)[number]
+
+/**
+ * One student's whole record.
+ *
+ * The 360° dashboard leads — a RAG read of attendance, marks, feedback and the
+ * health score — with the identity/guardians/fees/documents detail a click away
+ * on the Profile tab. Tabs share the header, the person and the single
+ * `students.view` check; a query parameter rather than nested routes keeps all
+ * three from being repeated. The header avatar is the upload control, present on
+ * both tabs and editable only with `students.edit`.
+ */
 export default async function StudentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { id } = await params
+  const query = await searchParams
   const ctx = await requireContext('students.view')
   const student = await getStudent(ctx, id)
 
+  const tab: Tab = TABS.includes(query.tab as Tab) ? (query.tab as Tab) : '360'
   const current = student.enrollments.find((e) => e.isCurrent)
-  const dueMinor = student.invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
-  const currency = ctx.tenant.currency
+  const href = (t: Tab) => `/students/${id}?tab=${t}`
 
   return (
     <div className="space-y-4">
@@ -43,6 +64,16 @@ export default async function StudentDetailPage({
         description={`Admission no. ${student.admissionNo}${
           current ? ` · ${current.classLevel.name} ${current.section.name}` : ''
         }`}
+        media={
+          <EditableAvatar
+            firstName={student.firstName}
+            lastName={student.lastName}
+            photoUrl={student.photoUrl}
+            canEdit={ctx.can('students.edit')}
+            uploadAction={uploadStudentPhotoAction.bind(null, student.id)}
+            removeAction={removeStudentPhotoAction.bind(null, student.id)}
+          />
+        }
         actions={
           ctx.can('students.edit') ? (
             <Link
@@ -56,6 +87,37 @@ export default async function StudentDetailPage({
         }
       />
 
+      <LinkTabs
+        label="Student record"
+        items={[
+          { label: '360°', href: href('360'), active: tab === '360' },
+          { label: 'Profile', href: href('profile'), active: tab === 'profile' },
+        ]}
+      />
+
+      {tab === '360' ? (
+        <Student360 ctx={ctx} student={student} />
+      ) : (
+        <StudentProfile ctx={ctx} student={student} />
+      )}
+    </div>
+  )
+}
+
+type StudentRecord = Awaited<ReturnType<typeof getStudent>>
+
+/**
+ * The record proper: identity, guardians, fees, documents and enrolment
+ * history. Lifted verbatim from the old single-scroll page into the Profile
+ * tab, with the header avatar now carrying the photo.
+ */
+function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRecord }) {
+  const current = student.enrollments.find((e) => e.isCurrent)
+  const dueMinor = student.invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
+  const currency = ctx.tenant.currency
+
+  return (
+    <div className="space-y-4">
       {student.allergies || student.medicalNotes ? (
         <Notice tone="warning" title="Medical information">
           {student.allergies ? <p>Allergies: {student.allergies}</p> : null}
@@ -67,7 +129,11 @@ export default async function StudentDetailPage({
         <Card className="lg:col-span-1">
           <CardContent>
             <div className="flex items-center gap-3">
-              <Avatar firstName={student.firstName} lastName={student.lastName} />
+              <Avatar
+                firstName={student.firstName}
+                lastName={student.lastName}
+                avatarUrl={student.photoUrl}
+              />
               <div className="min-w-0">
                 <p className="text-base font-semibold text-ink truncate">{fullName(student)}</p>
                 <StatusBadge status={student.status} className="mt-1" />
@@ -213,4 +279,3 @@ export default async function StudentDetailPage({
     </div>
   )
 }
-

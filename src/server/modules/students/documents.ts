@@ -6,7 +6,7 @@ import { uploadFile } from '@/server/files'
 import { storageProvider } from '@/server/providers'
 import { assertStudentAccess, studentScopeWhere } from '@/server/scope'
 import { skipTake, type ListQuery } from '@/lib/query'
-import { REQUIRED_DOCUMENT_KEYS, EXPIRY_WARNING_DAYS } from '@/lib/student-documents'
+import { REQUIRED_DOCUMENT_KEYS, EXPIRY_WARNING_DAYS, PROFILE_PHOTO_CATEGORY } from '@/lib/student-documents'
 import type { StudentDocumentCreateInput, StudentDocumentFilter } from './schema'
 
 /**
@@ -72,6 +72,10 @@ export async function listStudentDocuments(
     ownerType: 'STUDENT',
     deletedAt: null,
     studentId: { not: null },
+    // The profile avatar is a Document too, but it is not part of the admission
+    // file. Kept out of the register with a NOT clause rather than a category
+    // equality so it never collides with the optional `filter.category` below.
+    NOT: { category: PROFILE_PHOTO_CATEGORY },
     student: {
       deletedAt: null,
       ...scope,
@@ -185,7 +189,7 @@ export async function listDocumentsForStudent(ctx: AppContext, studentId: string
   await assertStudentAccess(ctx, studentId)
 
   return ctx.db.document.findMany({
-    where: { ownerType: 'STUDENT', studentId, deletedAt: null },
+    where: { ownerType: 'STUDENT', studentId, deletedAt: null, NOT: { category: PROFILE_PHOTO_CATEGORY } },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -395,7 +399,7 @@ export async function documentCoverage(
         },
       },
       documents: {
-        where: { ownerType: 'STUDENT', deletedAt: null },
+        where: { ownerType: 'STUDENT', deletedAt: null, NOT: { category: PROFILE_PHOTO_CATEGORY } },
         select: { category: true, expiresOn: true },
       },
     },
