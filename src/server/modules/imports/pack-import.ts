@@ -99,6 +99,21 @@ function cell(row: Record<string, string>, header: string): string {
   return (row[header] ?? '').trim()
 }
 
+function readStaffName(row: Record<string, string>): { firstName: string; lastName: string } {
+  const full =
+    cell(row, 'Name') ||
+    cell(row, 'Staff name') ||
+    cell(row, 'Employee name') ||
+    ''
+  if (full) return splitPersonName(full)
+
+  const first = cell(row, 'First name')
+  const last = cell(row, 'Last name')
+  if (first && !last) return splitPersonName(first)
+  if (first || last) return splitPersonName([first, last].filter(Boolean).join(' '))
+  return { firstName: '', lastName: '' }
+}
+
 function readParentName(row: Record<string, string>): { firstName: string; lastName: string } {
   const full =
     cell(row, 'Parent name') ||
@@ -262,12 +277,19 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
   }
 
   const staffSheet = findSheet(workbook, 'Staff')
+  const staffCodesOnSheet = new Set<string>()
+  if (staffSheet) {
+    for (const row of staffSheet.rows) {
+      const code = cell(row, 'Employee code')
+      if (code) staffCodesOnSheet.add(code.toLowerCase())
+    }
+  }
+
   if (staffSheet) {
     for (let i = 0; i < staffSheet.rows.length; i++) {
       const row = staffSheet.rows[i]!
       const code = cell(row, 'Employee code')
-      const first = cell(row, 'First name')
-      const last = cell(row, 'Last name')
+      const { firstName } = readStaffName(row)
       if (!code) {
         errors.push({ sheet: 'Staff', row: i + 2, message: 'Employee code is missing' })
         continue
@@ -276,17 +298,17 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
         errors.push({ sheet: 'Staff', row: i + 2, message: `Employee code ${code} is duplicated` })
         continue
       }
-      if (!first || !last) {
-        errors.push({ sheet: 'Staff', row: i + 2, message: 'First and last name are required' })
+      if (!firstName) {
+        errors.push({ sheet: 'Staff', row: i + 2, message: 'Name is required' })
         continue
       }
       staffCodes.add(code.toLowerCase())
     }
-    // Cross-check section class teachers
+    // Cross-check section class teachers against codes listed on the Staff sheet.
     if (sectionsSheet) {
       for (let i = 0; i < sectionsSheet.rows.length; i++) {
         const code = cell(sectionsSheet.rows[i]!, 'Class teacher employee code')
-        if (code && !staffCodes.has(code.toLowerCase())) {
+        if (code && !staffCodesOnSheet.has(code.toLowerCase())) {
           errors.push({
             sheet: 'Sections',
             row: i + 2,
@@ -344,7 +366,7 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
           message: `Unknown subject code ${code}`,
         })
       }
-      if (teacherCode && staffSheet && !staffCodes.has(teacherCode.toLowerCase())) {
+      if (teacherCode && staffSheet && !staffCodesOnSheet.has(teacherCode.toLowerCase())) {
         errors.push({
           sheet: 'Class subjects',
           row: i + 2,
@@ -547,6 +569,9 @@ export async function commitPackStructure(
       const code = cell(row, 'Employee code')
       if (!code) continue
 
+      const { firstName, lastName } = readStaffName(row)
+      if (!firstName) continue
+
       const existing = await ctx.db.staff.findFirst({
         where: { employeeCode: code },
         select: { id: true, deletedAt: true },
@@ -555,8 +580,8 @@ export async function commitPackStructure(
       const data: Prisma.StaffUncheckedCreateInput = {
         tenantId: ctx.tenant.id,
         employeeCode: code,
-        firstName: cell(row, 'First name'),
-        lastName: cell(row, 'Last name'),
+        firstName,
+        lastName,
         staffType: (cell(row, 'Staff type').toUpperCase() || 'TEACHING') as Prisma.StaffCreateInput['staffType'],
         designation: cell(row, 'Designation') || null,
         department: cell(row, 'Department') || null,

@@ -148,8 +148,7 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
     purpose: 'Teachers and non-teaching staff',
     headers: [
       'Employee code',
-      'First name',
-      'Last name',
+      'Name',
       'Staff type',
       'Designation',
       'Department',
@@ -166,8 +165,7 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
     rows: [
       [
         'EMP-T01',
-        'Priya',
-        'Iyer',
+        'Priya Iyer',
         'TEACHING',
         'Class teacher',
         'Primary',
@@ -183,8 +181,7 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
       ],
       [
         'EMP-D01',
-        'Suresh',
-        'Patil',
+        'Suresh Patil',
         'DRIVER',
         'Driver',
         'Transport',
