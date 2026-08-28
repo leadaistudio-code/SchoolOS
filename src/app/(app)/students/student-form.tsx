@@ -198,22 +198,11 @@ export function StudentForm({
 
       {mode === 'create' ? (
         <FormSection
-          title="Primary guardian"
+          title="Primary parent"
           description="Needed before fee notices and the parent portal can be used."
         >
-            <Field label="Guardian first name" htmlFor="guardian.firstName">
-              <Input id="guardian.firstName" name="guardian.firstName" />
-            </Field>
-            <Field label="Guardian last name" htmlFor="guardian.lastName">
-              <Input id="guardian.lastName" name="guardian.lastName" />
-            </Field>
-            <Field label="Relation" htmlFor="guardian.relation">
-              <Select id="guardian.relation" name="guardian.relation" defaultValue="GUARDIAN">
-                <option value="FATHER">Father</option>
-                <option value="MOTHER">Mother</option>
-                <option value="GUARDIAN">Guardian</option>
-                <option value="OTHER">Other</option>
-              </Select>
+            <Field label="Parent name" htmlFor="guardian.name" className="sm:col-span-2">
+              <Input id="guardian.name" name="guardian.name" placeholder="Full name" />
             </Field>
             <Field label="Phone" htmlFor="guardian.phone" error={err('guardian.phone')}>
               <Input id="guardian.phone" name="guardian.phone" type="tel" />

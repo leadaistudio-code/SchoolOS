@@ -1,4 +1,5 @@
 import { toCsv } from '@/lib/csv'
+import { splitPersonName } from '@/lib/person-name'
 import { gridToTable, parseSpreadsheet } from '@/lib/spreadsheet'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
@@ -769,6 +770,23 @@ async function validateAndPersist(
   return toSummary(updated)
 }
 
+function legacyParentName(raw: Record<string, string>): string {
+  for (const key of [
+    'Parent name',
+    'Guardian name',
+    'Guardian first name',
+    'Parent first name',
+    'Father name',
+    'Mother name',
+  ]) {
+    const first = (raw[key] ?? '').trim()
+    if (!first) continue
+    const last = (raw['Guardian last name'] ?? raw['Parent last name'] ?? '').trim()
+    return last ? `${first} ${last}` : first
+  }
+  return ''
+}
+
 function buildRow(
   raw: Record<string, string>,
   mapping: Record<ImportFieldKey, string | null>,
@@ -833,11 +851,6 @@ function buildRow(
   const gender = normalizeGender(get('gender'))
   if (get('gender') && !gender) messages.push('Gender must be Male, Female or Other')
 
-  const relation = normalizeRelation(get('guardianRelation'))
-  if (get('guardianRelation') && !relation) {
-    messages.push('Guardian relation must be Father, Mother, Guardian or Other')
-  }
-
   const dateOfBirth = parseFlexibleDate(get('dateOfBirth'))
   if (get('dateOfBirth') && !dateOfBirth) {
     messages.push('Date of birth must be YYYY-MM-DD or DD/MM/YYYY')
@@ -859,10 +872,8 @@ function buildRow(
     }
   }
 
-  const guardianFirst = get('guardianFirstName')
-  const guardianLast = get('guardianLastName')
-  if (guardianFirst && !guardianLast) messages.push('Guardian last name is required when a guardian is provided')
-  if (guardianLast && !guardianFirst) messages.push('Guardian first name is required when a guardian is provided')
+  const parentNameRaw = get('parentName') || legacyParentName(raw)
+  const parentName = parentNameRaw ? splitPersonName(parentNameRaw) : null
 
   if (messages.length || !resolved.ok) {
     return { ok: false, admissionNo: admissionNo || undefined, messages }
@@ -895,11 +906,11 @@ function buildRow(
     allergies: emptyToUndef(get('allergies')),
   }
 
-  if (guardianFirst && guardianLast && !ctx.skipInlineGuardian) {
+  if (parentName?.firstName && !ctx.skipInlineGuardian) {
     payload.guardian = {
-      firstName: guardianFirst,
-      lastName: guardianLast,
-      relation: relation ?? 'GUARDIAN',
+      firstName: parentName.firstName,
+      lastName: parentName.lastName,
+      relation: 'GUARDIAN',
       phone: emptyToUndef(get('guardianPhone')),
       email: emptyToUndef(get('guardianEmail')) ?? '',
       occupation: emptyToUndef(get('guardianOccupation')),

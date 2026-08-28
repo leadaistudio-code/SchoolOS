@@ -94,6 +94,14 @@ describe('student validation', () => {
     expect(() => studentCreateSchema.parse({ ...valid, dateOfBirth: future })).toThrow()
   })
 
+  it('accepts a parent with a single-word name and no last name', () => {
+    const parsed = studentCreateSchema.parse({
+      ...valid,
+      guardian: { firstName: 'Manoj', lastName: '', email: 'manoj@example.com' },
+    })
+    expect(parsed.guardian?.lastName).toBe('')
+  })
+
   it('rejects a malformed guardian email', () => {
     expect(() =>
       studentCreateSchema.parse({

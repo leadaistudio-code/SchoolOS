@@ -60,7 +60,7 @@ describe('import column auto-map', () => {
     expect(new Set(used).size).toBe(used.length)
   })
 
-  it('maps Father Name to the guardian, not the student', () => {
+  it('maps Father Name to parent name, not the student', () => {
     const mapping = autoMapHeaders([
       'Admission No',
       'First Name',
@@ -70,7 +70,7 @@ describe('import column auto-map', () => {
       'Father Name',
     ])
     expect(mapping.firstName).toBe('First Name')
-    expect(mapping.guardianFirstName).toBe('Father Name')
+    expect(mapping.parentName).toBe('Father Name')
   })
 
   it('covers every declared import field key', () => {
@@ -138,7 +138,7 @@ describe('spreadsheet grid', () => {
     expect(mapping.admissionNo).toBe('Admission number')
     expect(mapping.firstName).toBe('First name')
     expect(mapping.className).toBe('Class')
-    expect(mapping.guardianPhone).toBe('Guardian phone')
+    expect(mapping.guardianPhone).toBe('Parent phone')
     expect(table.rows[0]?.['Admission number']).toBe('ADM-2026-001')
   })
 })

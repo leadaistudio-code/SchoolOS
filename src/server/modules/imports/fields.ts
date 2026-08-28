@@ -31,9 +31,7 @@ export type ImportFieldKey =
   | 'emergencyContactPhone'
   | 'medicalNotes'
   | 'allergies'
-  | 'guardianFirstName'
-  | 'guardianLastName'
-  | 'guardianRelation'
+  | 'parentName'
   | 'guardianPhone'
   | 'guardianEmail'
   | 'guardianOccupation'
@@ -172,30 +170,23 @@ export const IMPORT_FIELDS: ImportFieldDef[] = [
     aliases: ['allergies', 'allergy'],
   },
   {
-    key: 'guardianFirstName',
-    label: 'Guardian first name',
+    key: 'parentName',
+    label: 'Parent name',
     aliases: [
-      'guardian first name',
-      'parent first name',
+      'parent name',
+      'guardian name',
+      'parent',
+      'guardian',
       'father name',
       'mother name',
-      'guardian name',
-      'parent name',
+      'parent/guardian name',
+      'guardian first name',
+      'parent first name',
     ],
   },
   {
-    key: 'guardianLastName',
-    label: 'Guardian last name',
-    aliases: ['guardian last name', 'parent last name', 'guardian surname'],
-  },
-  {
-    key: 'guardianRelation',
-    label: 'Guardian relation',
-    aliases: ['relation', 'guardian relation', 'relationship', 'parent relation'],
-  },
-  {
     key: 'guardianPhone',
-    label: 'Guardian phone',
+    label: 'Parent phone',
     aliases: [
       'guardian phone',
       'parent phone',
@@ -208,12 +199,12 @@ export const IMPORT_FIELDS: ImportFieldDef[] = [
   },
   {
     key: 'guardianEmail',
-    label: 'Guardian email',
+    label: 'Parent email',
     aliases: ['guardian email', 'parent email', 'email'],
   },
   {
     key: 'guardianOccupation',
-    label: 'Guardian occupation',
+    label: 'Parent occupation',
     aliases: ['guardian occupation', 'parent occupation', 'occupation'],
   },
 ]
@@ -282,11 +273,9 @@ export const SAMPLE_CSV_HEADERS = [
   'Class',
   'Section',
   'Roll Number',
-  'Guardian First Name',
-  'Guardian Last Name',
-  'Relation',
-  'Guardian Phone',
-  'Guardian Email',
+  'Parent Name',
+  'Parent Phone',
+  'Parent Email',
   'City',
   'State',
 ] as const
@@ -301,9 +290,7 @@ export const SAMPLE_CSV_ROWS: string[][] = [
     'Class 1',
     'A',
     '1',
-    'Ravi',
-    'Sharma',
-    'Father',
+    'Ravi Sharma',
     '9876543210',
     'ravi@example.com',
     'Mumbai',
@@ -318,9 +305,7 @@ export const SAMPLE_CSV_ROWS: string[][] = [
     'Class 1',
     'A',
     '2',
-    'Meera',
-    'Patel',
-    'Mother',
+    'Meera Patel',
     '9876501234',
     '',
     'Pune',

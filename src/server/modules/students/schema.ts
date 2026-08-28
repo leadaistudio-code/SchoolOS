@@ -64,7 +64,7 @@ export const studentCreateSchema = z.object({
   guardian: z
     .object({
       firstName: z.string().trim().min(1).max(60),
-      lastName: z.string().trim().min(1).max(60),
+      lastName: z.string().trim().max(60).default(''),
       relation: z.enum(['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER']).default('GUARDIAN'),
       phone: phone,
       email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),

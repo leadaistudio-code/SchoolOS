@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Prisma } from '@prisma/client'
+import { splitPersonName } from '@/lib/person-name'
 import { gridToTable } from '@/lib/spreadsheet'
 import { attendanceDate } from '@/lib/dates'
 import type { AppContext } from '@/server/context'
@@ -96,6 +97,14 @@ export function parsePackWorkbook(buffer: Buffer): PackWorkbook {
 
 function cell(row: Record<string, string>, header: string): string {
   return (row[header] ?? '').trim()
+}
+
+function readParentName(row: Record<string, string>): { firstName: string; lastName: string } {
+  const full =
+    cell(row, 'Parent name') ||
+    cell(row, 'Guardian name') ||
+    [cell(row, 'First name'), cell(row, 'Last name')].filter(Boolean).join(' ')
+  return splitPersonName(full)
 }
 
 function parseYesNo(value: string): boolean {
@@ -393,9 +402,7 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
       const row = parentsSheet.rows[i]!
       const admission =
         cell(row, 'Student admission no') || cell(row, 'Student admission number')
-      const first = cell(row, 'First name')
-      const last = cell(row, 'Last name')
-      const relation = cell(row, 'Relation')
+      const parentName = readParentName(row)
       if (!admission) {
         errors.push({ sheet: 'Parents', row: i + 2, message: 'Student admission no is missing' })
         continue
@@ -407,15 +414,8 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
           message: `No student with admission ${admission} on the Students sheet`,
         })
       }
-      if (!first || !last) {
-        errors.push({ sheet: 'Parents', row: i + 2, message: 'First and last name are required' })
-      }
-      if (relation && !parseRelation(relation)) {
-        errors.push({
-          sheet: 'Parents',
-          row: i + 2,
-          message: 'Relation must be Father, Mother, Guardian or Other',
-        })
+      if (!parentName.firstName) {
+        errors.push({ sheet: 'Parents', row: i + 2, message: 'Parent name is required' })
       }
     }
   }
@@ -770,11 +770,12 @@ export async function commitPackParents(
     const studentId = admissionToStudentId.get(admission.toLowerCase())
     if (!studentId) continue
 
-    const first = cell(row, 'First name')
-    const last = cell(row, 'Last name')
+    const { firstName, lastName } = readParentName(row)
+    if (!firstName) continue
+
     const phone = cell(row, 'Phone') || null
     const email = cell(row, 'Email') || null
-    const relation = parseRelation(cell(row, 'Relation')) ?? 'GUARDIAN'
+    const relation = 'GUARDIAN' as const
     const isPrimary = parseYesNo(cell(row, 'Is primary'))
     const canPickup = cell(row, 'Can pickup') ? parseYesNo(cell(row, 'Can pickup')) : true
     const isEmergency = parseYesNo(cell(row, 'Is emergency contact'))
@@ -800,8 +801,8 @@ export async function commitPackParents(
       const created = await ctx.db.parent.create({
         data: {
           tenantId: ctx.tenant.id,
-          firstName: first,
-          lastName: last,
+          firstName,
+          lastName,
           phone,
           email,
           occupation: cell(row, 'Occupation') || null,
@@ -817,8 +818,8 @@ export async function commitPackParents(
       await ctx.db.parent.update({
         where: { id: parentId },
         data: {
-          firstName: first,
-          lastName: last,
+          firstName,
+          lastName,
           occupation: cell(row, 'Occupation') || null,
           addressLine1: cell(row, 'Address line 1') || null,
           city: cell(row, 'City') || null,

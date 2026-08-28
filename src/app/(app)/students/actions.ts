@@ -10,6 +10,7 @@ import {
   updateStudent,
 } from '@/server/modules/students/service'
 import { studentCreateSchema, studentUpdateSchema } from '@/server/modules/students/schema'
+import { splitPersonName } from '@/lib/person-name'
 import type { FormState } from '@/lib/form-state'
 
 
@@ -20,12 +21,13 @@ function readForm(formData: FormData) {
     if (raw[key] === '') delete raw[key]
   }
 
-  const guardianFirst = raw['guardian.firstName']
-  if (guardianFirst) {
+  const parentName = raw['guardian.name'] ?? raw['guardian.firstName']
+  if (parentName) {
+    const { firstName, lastName } = splitPersonName(String(parentName))
     raw.guardian = {
-      firstName: raw['guardian.firstName'],
-      lastName: raw['guardian.lastName'] ?? '-',
-      relation: raw['guardian.relation'] ?? 'GUARDIAN',
+      firstName,
+      lastName,
+      relation: 'GUARDIAN',
       phone: raw['guardian.phone'],
       email: raw['guardian.email'],
       occupation: raw['guardian.occupation'],
