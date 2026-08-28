@@ -29,6 +29,10 @@ import { conflict } from '@/server/api/response'
  *     conflictMsg: `${input.name} already exists in ${session.name}`,
  *   })
  */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPrismaDelegate = any
+
 export async function findOrRestore<
   TRecord extends { id: string; deletedAt: Date | null },
 >({
@@ -39,11 +43,7 @@ export async function findOrRestore<
   conflictMsg,
 }: {
   /** Prisma delegate (e.g. ctx.db.classLevel) */
-  model: {
-    findFirst: (args: { where: Record<string, unknown> }) => Promise<TRecord | null>
-    create: (args: { data: Record<string, unknown> }) => Promise<TRecord>
-    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<TRecord>
-  }
+  model: AnyPrismaDelegate
   /** Unique constraint fields to search by (do NOT include deletedAt) */
   where: Record<string, unknown>
   /** Full data for creating a brand-new record */
@@ -53,7 +53,7 @@ export async function findOrRestore<
   /** Human-readable message for the conflict error */
   conflictMsg: string
 }): Promise<TRecord> {
-  const existing = await model.findFirst({ where })
+  const existing: TRecord | null = await model.findFirst({ where })
 
   // Active record → conflict
   if (existing && !existing.deletedAt) {
