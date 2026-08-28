@@ -1,4 +1,5 @@
 import { toCsv } from '@/lib/csv'
+import { inferClassSection, normalizeImportGender, parseImportDate } from '@/lib/import-values'
 import { splitPersonName } from '@/lib/person-name'
 import { gridToTable, parseSpreadsheet } from '@/lib/spreadsheet'
 import type { AppContext } from '@/server/context'
@@ -825,6 +826,14 @@ function buildRow(
   let className = get('className')
   let sectionName = get('sectionName')
   ;({ className, sectionName } = applyClassAliases(className, sectionName, ctx.classAliases))
+  ;({ className, sectionName } = inferClassSection(className, sectionName))
+
+  if (!sectionName && className) {
+    const cls = findClass(classes, className)
+    if (cls?.sections.length === 1) {
+      sectionName = cls.sections[0]!.name
+    }
+  }
 
   if (!admissionNo) messages.push('Admission number is missing')
   if (!firstName) messages.push('First name is missing')
@@ -848,18 +857,11 @@ function buildRow(
     }
   }
 
-  const gender = normalizeGender(get('gender'))
-  if (get('gender') && !gender) messages.push('Gender must be Male, Female or Other')
+  const gender = normalizeImportGender(get('gender'))
 
-  const dateOfBirth = parseFlexibleDate(get('dateOfBirth'))
-  if (get('dateOfBirth') && !dateOfBirth) {
-    messages.push('Date of birth must be YYYY-MM-DD or DD/MM/YYYY')
-  }
+  const dateOfBirth = parseImportDate(get('dateOfBirth'))
 
-  const admissionDate = parseFlexibleDate(get('admissionDate'))
-  if (get('admissionDate') && !admissionDate) {
-    messages.push('Admission date must be YYYY-MM-DD or DD/MM/YYYY')
-  }
+  const admissionDate = parseImportDate(get('admissionDate'))
 
   const rollRaw = get('rollNumber')
   let rollNumber: number | undefined
@@ -974,55 +976,6 @@ function findClass(classes: ClassLookup[], className: string): ClassLookup | und
 
   const normalized = className.toLowerCase().replace(/\s+/g, '')
   return classes.find((c) => c.name.toLowerCase().replace(/\s+/g, '') === normalized)
-}
-
-function normalizeGender(value: string): 'MALE' | 'FEMALE' | 'OTHER' | undefined {
-  if (!value) return undefined
-  const v = value.trim().toLowerCase()
-  if (['m', 'male', 'boy', 'b'].includes(v)) return 'MALE'
-  if (['f', 'female', 'girl', 'g'].includes(v)) return 'FEMALE'
-  if (['o', 'other', 'others', 'non-binary', 'nb'].includes(v)) return 'OTHER'
-  return undefined
-}
-
-function normalizeRelation(
-  value: string,
-): 'FATHER' | 'MOTHER' | 'GUARDIAN' | 'OTHER' | undefined {
-  if (!value) return undefined
-  const v = value.trim().toLowerCase()
-  if (['father', 'dad', 'papa', 'f'].includes(v)) return 'FATHER'
-  if (['mother', 'mom', 'mum', 'mama', 'm'].includes(v)) return 'MOTHER'
-  if (['guardian', 'g'].includes(v)) return 'GUARDIAN'
-  if (['other', 'o'].includes(v)) return 'OTHER'
-  return undefined
-}
-
-function parseFlexibleDate(value: string): Date | undefined {
-  if (!value) return undefined
-  const v = value.trim()
-
-  // ISO / HTML date
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    const d = new Date(`${v}T00:00:00.000Z`)
-    return Number.isNaN(d.getTime()) ? undefined : d
-  }
-
-  // DD/MM/YYYY or DD-MM-YYYY
-  const m = v.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
-  if (m) {
-    const day = Number(m[1])
-    const month = Number(m[2])
-    const year = Number(m[3])
-    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined
-    const d = new Date(Date.UTC(year, month - 1, day))
-    if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
-      return undefined
-    }
-    return d
-  }
-
-  const parsed = new Date(v)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
 }
 
 function emptyToUndef(value: string): string | undefined {
