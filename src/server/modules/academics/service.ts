@@ -140,19 +140,32 @@ export async function createClassLevel(
   const session = await currentSession(ctx)
 
   const existing = await ctx.db.classLevel.findFirst({
-    where: { sessionId: session.id, name: input.name, deletedAt: null },
+    where: { tenantId: ctx.tenant.id, sessionId: session.id, name: input.name },
   })
-  if (existing) throw conflict(`${input.name} already exists in ${session.name}`)
+  if (existing && !existing.deletedAt) {
+    throw conflict(`${input.name} already exists in ${session.name}`)
+  }
 
-  const created = await ctx.db.classLevel.create({
-    data: {
-      tenantId: ctx.tenant.id,
-      sessionId: session.id,
-      name: input.name,
-      numeric: input.numeric,
-      stream: input.stream,
-    },
-  })
+  // If a soft-deleted record exists with the same name, restore it with updated data
+  // instead of creating a new row (which would violate the unique constraint)
+  const created = existing
+    ? await ctx.db.classLevel.update({
+        where: { id: existing.id },
+        data: {
+          numeric: input.numeric,
+          stream: input.stream,
+          deletedAt: null,
+        },
+      })
+    : await ctx.db.classLevel.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          sessionId: session.id,
+          name: input.name,
+          numeric: input.numeric,
+          stream: input.stream,
+        },
+      })
 
   await audit({
     tenantId: ctx.tenant.id,
