@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
+import { findOrRestore } from '@/server/db/soft-delete'
 
 export const classCreateSchema = z.object({
   name: z.string().trim().min(1, 'Class name is required').max(60),
@@ -139,33 +140,19 @@ export async function createClassLevel(
   ctx.require('academics.manage')
   const session = await currentSession(ctx)
 
-  const existing = await ctx.db.classLevel.findFirst({
+  const created = await findOrRestore({
+    model: ctx.db.classLevel,
     where: { tenantId: ctx.tenant.id, sessionId: session.id, name: input.name },
+    createData: {
+      tenantId: ctx.tenant.id,
+      sessionId: session.id,
+      name: input.name,
+      numeric: input.numeric,
+      stream: input.stream,
+    },
+    restoreData: { numeric: input.numeric, stream: input.stream },
+    conflictMsg: `${input.name} already exists in ${session.name}`,
   })
-  if (existing && !existing.deletedAt) {
-    throw conflict(`${input.name} already exists in ${session.name}`)
-  }
-
-  // If a soft-deleted record exists with the same name, restore it with updated data
-  // instead of creating a new row (which would violate the unique constraint)
-  const created = existing
-    ? await ctx.db.classLevel.update({
-        where: { id: existing.id },
-        data: {
-          numeric: input.numeric,
-          stream: input.stream,
-          deletedAt: null,
-        },
-      })
-    : await ctx.db.classLevel.create({
-        data: {
-          tenantId: ctx.tenant.id,
-          sessionId: session.id,
-          name: input.name,
-          numeric: input.numeric,
-          stream: input.stream,
-        },
-      })
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -192,15 +179,10 @@ export async function createSection(
   })
   if (!classLevel) throw notFound('Class')
 
-  const existing = await ctx.db.section.findFirst({
-    where: { classLevelId: input.classLevelId, name: input.name, deletedAt: null },
-  })
-  if (existing) {
-    throw conflict(`Section ${input.name} already exists in ${classLevel.name}`)
-  }
-
-  const created = await ctx.db.section.create({
-    data: {
+  const created = await findOrRestore({
+    model: ctx.db.section,
+    where: { tenantId: ctx.tenant.id, classLevelId: input.classLevelId, name: input.name },
+    createData: {
       tenantId: ctx.tenant.id,
       classLevelId: input.classLevelId,
       name: input.name,
@@ -208,6 +190,12 @@ export async function createSection(
       roomName: input.roomName,
       classTeacherId: input.classTeacherId || null,
     },
+    restoreData: {
+      capacity: input.capacity,
+      roomName: input.roomName,
+      classTeacherId: input.classTeacherId || null,
+    },
+    conflictMsg: `Section ${input.name} already exists in ${classLevel.name}`,
   })
 
   await audit({
