@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { inferClassSection, normalizeImportGender, parseImportDate } from '../src/lib/import-values'
+import {
+  inferClassSection,
+  normalizeImportGender,
+  parseImportDate,
+  readImportDate,
+  readMappedCell,
+} from '../src/lib/import-values'
 
 describe('import value parsing', () => {
   it('parses Indian and ISO dates', () => {
@@ -13,6 +19,18 @@ describe('import value parsing', () => {
     const d = parseImportDate('45321')
     expect(d).toBeInstanceOf(Date)
     expect(d!.getUTCFullYear()).toBeGreaterThan(2020)
+  })
+
+  it('parses two-digit year dates', () => {
+    expect(parseImportDate('12/08/14')?.toISOString().slice(0, 10)).toBe('2014-08-12')
+  })
+
+  it('reads DOB from alternate column headers', () => {
+    const raw = { 'Date of Birth': '15/04/2012', 'Admission number': 'ADM-1' }
+    expect(readImportDate(raw, null, 'date of birth', 'dob')?.toISOString().slice(0, 10)).toBe(
+      '2012-04-15',
+    )
+    expect(readMappedCell(raw, 'DOB', 'date of birth')).toBe('15/04/2012')
   })
 
   it('normalises common gender values', () => {

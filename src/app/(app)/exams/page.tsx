@@ -4,7 +4,9 @@ import { requireContext } from '@/server/context'
 import { listExams } from '@/server/modules/exams/service'
 import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
-import { PageHeader } from '@/components/page-header'
+import { formatNumber } from '@/lib/utils'
+import { PageBanner } from '@/components/page-banner'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { Card } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -24,11 +26,16 @@ export default async function ExamsPage({
   const params = await searchParams
   const query = parseListQuery(params)
   const { rows, total } = await listExams(ctx, query)
+  const activeExams = rows.filter((e) =>
+    ['SCHEDULED', 'ONGOING', 'MARKS_ENTRY'].includes(e.status),
+  ).length
 
   return (
-    <div>
-      <PageHeader
+    <div className="space-y-4">
+      <PageBanner
         title="Examinations"
+        description={`${formatNumber(total)} exams in the catalogue`}
+        tone="late"
         actions={
           ctx.can('exams.manage') ? (
             <Link href="/exams/new" className={buttonVariants({ size: 'sm' })}>
@@ -39,7 +46,35 @@ export default async function ExamsPage({
         }
       />
 
-      <Card className="overflow-hidden">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="Total exams"
+          value={formatNumber(total)}
+          icon="FileCheck"
+          tone="late"
+          sub="All examination records"
+          delayMs={40}
+        />
+        <StatCard
+          label="Upcoming / active"
+          value={formatNumber(activeExams)}
+          icon="Calendar"
+          tone="admissions"
+          sub="On this page of results"
+          delayMs={80}
+        />
+        <StatCard
+          label="Report cards"
+          value="Open"
+          icon="ScrollText"
+          tone="students"
+          sub="Generate and print cards"
+          href="/exams/report-cards"
+          delayMs={120}
+        />
+      </div>
+
+      <Card variant="elevated" className="overflow-hidden">
         <SearchBar placeholder="Search exams" />
 
         {rows.length === 0 ? (

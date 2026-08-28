@@ -1,15 +1,14 @@
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { attendanceDate } from '@/lib/dates'
 import { formatMoney, formatNumber } from '@/lib/utils'
 import { REPORTS } from '@/lib/reports'
+import { REPORT_TONE } from '@/lib/chart-tones'
 import { scoreSchool } from '@/server/modules/score/service'
 import { bandMeta } from '@/lib/score'
-import { PageHeader } from '@/components/page-header'
+import { PageBanner } from '@/components/page-banner'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Metric, MetricRow } from '@/components/ui/metric'
-import { Icon } from '@/components/shell/icon'
+import { HubTile, HubTileGrid } from '@/components/ui/hub-tile'
 
 export const metadata = { title: 'Reports & analytics' }
 
@@ -104,63 +103,79 @@ export default async function ReportsPage() {
   ].filter((link) => link.show)
 
   return (
-    <div>
-      <PageHeader
+    <div className="space-y-4">
+      <PageBanner
         title="Reports & analytics"
         description={
           session
             ? `${session.name} · figures below cover the month to date`
             : 'Figures below cover the month to date'
         }
-        breadcrumbs={[{ label: 'Reports' }]}
+        tone="attendance"
       />
 
-      <MetricRow className="mb-5">
-        <Metric
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
           label="Students on roll"
           value={formatNumber(students)}
+          icon="Users"
+          tone="students"
           sub="Active enrolments"
           href="/reports/enrolment"
+          delayMs={40}
         />
-        <Metric
+        <StatCard
           label="Attendance this month"
           value={rate === null ? 'No data' : `${rate}%`}
+          icon="CalendarCheck"
+          tone="attendance"
           sub={`${formatNumber(marked)} day-records marked`}
-          emphasis={rate !== null && rate < 85 ? 'warning' : undefined}
           href="/reports/attendance"
+          delayMs={80}
         />
-        <Metric
+        <StatCard
           label="Collected this month"
           value={formatMoney(collected._sum.amountMinor ?? 0, currency)}
+          icon="BadgeIndianRupee"
+          tone="fees"
           sub="Payments confirmed"
           href="/reports/collection"
+          delayMs={120}
         />
-        <Metric
+        <StatCard
           label="Outstanding"
           value={formatMoney(outstanding._sum.balanceMinor ?? 0, currency)}
+          icon="Wallet"
+          tone={(outstanding._sum.balanceMinor ?? 0) > 0 ? 'overdue' : 'pending'}
           sub={`${formatNumber(outstanding._count._all)} invoices unpaid`}
-          emphasis={(outstanding._sum.balanceMinor ?? 0) > 0 ? 'warning' : undefined}
           href="/reports/collection"
+          delayMs={160}
         />
         {health && health.score !== null ? (
-          <Metric
+          <StatCard
             label="Health score"
             value={String(Math.round(health.score * 10) / 10)}
+            icon="Activity"
+            tone="admissions"
             sub={`${bandMeta(health.band!).label} · ${formatNumber(health.studentsScored)} students scored`}
             href="/score"
+            delayMs={200}
           />
         ) : null}
         {canFeedback ? (
-          <Metric
+          <StatCard
             label="Feedback campaigns"
             value={formatNumber(openCampaigns)}
+            icon="MessageSquare"
+            tone="parents"
             sub="Active or scheduled"
             href="/feedback"
+            delayMs={240}
           />
         ) : null}
-      </MetricRow>
+      </div>
 
-      <Card className="overflow-hidden">
+      <Card variant="elevated" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Analytic reports</CardTitle>
           <span className="text-xs text-ink-subtle">
@@ -168,53 +183,44 @@ export default async function ReportsPage() {
           </span>
         </CardHeader>
 
-        <ul className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-3">
-          {REPORTS.map((report) => (
-            <li key={report.key} className="bg-surface">
-              <Link
+        <div className="p-4 pt-0">
+          <HubTileGrid>
+            {REPORTS.map((report) => (
+              <HubTile
+                key={report.key}
                 href={report.href}
-                className="group flex h-full gap-3 p-4 transition-colors hover:bg-surface-2"
-              >
-                <span
-                  className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-[var(--product-50)] text-[var(--product-600)]"
-                  aria-hidden
-                >
-                  <Icon name={report.icon} className="size-[18px]" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-base font-medium text-ink">
-                    {report.title}
-                    <ArrowRight
-                      className="size-3.5 text-ink-subtle transition-transform group-hover:translate-x-0.5"
-                      aria-hidden
-                    />
-                  </span>
-                  <span className="mt-0.5 block text-sm text-ink-muted">{report.summary}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                title={report.title}
+                description={report.summary}
+                icon={report.icon}
+                tone={REPORT_TONE[report.key] ?? 'students'}
+              />
+            ))}
+          </HubTileGrid>
+        </div>
       </Card>
 
       {workingViews.length > 0 ? (
-        <Card className="mt-4 overflow-hidden">
+        <Card variant="elevated" className="overflow-hidden">
           <CardHeader>
             <CardTitle>Working views</CardTitle>
             <span className="text-xs text-ink-subtle">
               Day-to-day screens that sit beside the summaries
             </span>
           </CardHeader>
-          <ul className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
-            {workingViews.map((link) => (
-              <li key={link.href} className="bg-surface">
-                <Link href={link.href} className="block p-4 transition-colors hover:bg-surface-2">
-                  <span className="block text-base font-medium text-ink">{link.label}</span>
-                  <span className="mt-0.5 block text-sm text-ink-muted">{link.note}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <div className="p-4 pt-0">
+            <HubTileGrid>
+              {workingViews.map((link) => (
+                <HubTile
+                  key={link.href}
+                  href={link.href}
+                  title={link.label}
+                  description={link.note}
+                  icon="ArrowUpRight"
+                  tone="transport"
+                />
+              ))}
+            </HubTileGrid>
+          </div>
         </Card>
       ) : null}
     </div>

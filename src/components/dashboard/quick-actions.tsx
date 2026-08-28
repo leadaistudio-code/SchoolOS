@@ -2,6 +2,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/shell/icon'
 import { cn } from '@/lib/utils'
+import { seriesToneClass } from '@/lib/chart-tones'
 import type { SeriesKey } from './charts'
 
 export type QuickAction = {
@@ -32,20 +33,6 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Transport', href: '/transport/tracking', icon: 'Bus', tone: 'transport', permission: 'transport.track' },
 ]
 
-const TONE: Record<SeriesKey, string> = {
-  students: 'bg-[var(--chart-students)]/12 text-[var(--chart-students)]',
-  staff: 'bg-[var(--chart-staff)]/12 text-[var(--chart-staff)]',
-  parents: 'bg-[var(--chart-parents)]/12 text-[var(--chart-parents)]',
-  attendance: 'bg-[var(--chart-attendance)]/12 text-[var(--chart-attendance)]',
-  fees: 'bg-[var(--chart-fees)]/12 text-[var(--chart-fees)]',
-  pending: 'bg-[var(--chart-pending)]/12 text-[var(--chart-pending)]',
-  overdue: 'bg-[var(--chart-overdue)]/12 text-[var(--chart-overdue)]',
-  admissions: 'bg-[var(--chart-admissions)]/12 text-[var(--chart-admissions)]',
-  transport: 'bg-[var(--chart-transport)]/12 text-[var(--chart-transport)]',
-  late: 'bg-[var(--chart-late)]/12 text-[var(--chart-late)]',
-  leave: 'bg-[var(--chart-leave)]/12 text-[var(--chart-leave)]',
-}
-
 export function QuickActions({ actions }: { actions: QuickAction[] }) {
   if (actions.length === 0) return null
 
@@ -60,7 +47,7 @@ export function QuickActions({ actions }: { actions: QuickAction[] }) {
           <span
             className={cn(
               'grid size-10 place-items-center rounded-[12px] transition-transform duration-150 group-hover:scale-105',
-              TONE[action.tone],
+              seriesToneClass(action.tone),
             )}
           >
             <Icon name={action.icon} className="size-5" />

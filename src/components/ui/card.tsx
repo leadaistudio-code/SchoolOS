@@ -1,17 +1,28 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
+type CardVariant = 'flat' | 'elevated'
+
 /**
  * Panel: a bordered working surface.
  *
- * Grouping is communicated by a hairline border and a heading, not by
- * elevation. Panels do not nest — if content inside a panel needs its own
- * grouping, use <Section>.
+ * `elevated` adds the dashboard widget shadow and larger radius — use on hub
+ * pages where the panel is the main focus. `flat` stays the default for dense
+ * tables and forms.
  */
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function Card({
+  className,
+  variant = 'flat',
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }) {
   return (
     <div
-      className={cn('bg-surface border border-line rounded-[var(--radius)]', className)}
+      className={cn(
+        'bg-surface border border-line',
+        variant === 'flat' && 'rounded-[var(--radius)]',
+        variant === 'elevated' && 'widget rounded-[var(--radius-lg)]',
+        className,
+      )}
       {...props}
     />
   )

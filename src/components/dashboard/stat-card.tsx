@@ -4,20 +4,7 @@ import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Icon } from '@/components/shell/icon'
 import { Sparkline, type SeriesKey } from './charts'
 import { cn } from '@/lib/utils'
-
-const TONE: Record<SeriesKey, string> = {
-  students: 'bg-[var(--chart-students)]/12 text-[var(--chart-students)]',
-  staff: 'bg-[var(--chart-staff)]/12 text-[var(--chart-staff)]',
-  parents: 'bg-[var(--chart-parents)]/12 text-[var(--chart-parents)]',
-  attendance: 'bg-[var(--chart-attendance)]/12 text-[var(--chart-attendance)]',
-  fees: 'bg-[var(--chart-fees)]/12 text-[var(--chart-fees)]',
-  pending: 'bg-[var(--chart-pending)]/12 text-[var(--chart-pending)]',
-  overdue: 'bg-[var(--chart-overdue)]/12 text-[var(--chart-overdue)]',
-  admissions: 'bg-[var(--chart-admissions)]/12 text-[var(--chart-admissions)]',
-  transport: 'bg-[var(--chart-transport)]/12 text-[var(--chart-transport)]',
-  late: 'bg-[var(--chart-late)]/12 text-[var(--chart-late)]',
-  leave: 'bg-[var(--chart-leave)]/12 text-[var(--chart-leave)]',
-}
+import { seriesToneClass } from '@/lib/chart-tones'
 
 export type StatCardProps = {
   label: string
@@ -71,7 +58,7 @@ export function StatCard({
           <p className="text-xs font-medium text-ink-muted">{label}</p>
           <p className="mt-1.5 text-3xl font-semibold tnum leading-none text-ink">{value}</p>
         </div>
-        <span className={cn('grid size-10 shrink-0 place-items-center rounded-[12px]', TONE[tone])}>
+        <span className={cn('grid size-10 shrink-0 place-items-center rounded-[12px]', seriesToneClass(tone))}>
           <Icon name={icon} className="size-5" />
         </span>
       </div>

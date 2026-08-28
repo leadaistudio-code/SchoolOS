@@ -3,7 +3,7 @@ import { requireContext } from '@/server/context'
 import { markableSections } from '@/server/modules/academics/service'
 import { getRegister, unmarkedSections } from '@/server/modules/attendance/service'
 import { toDateInput } from '@/lib/dates'
-import { PageHeader } from '@/components/page-header'
+import { PageBanner } from '@/components/page-banner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -26,10 +26,11 @@ export default async function AttendancePage({
   const sectionId = params.sectionId ?? sections[0]?.id
 
   return (
-    <div>
-      <PageHeader
+    <div className="space-y-4">
+      <PageBanner
         title="Student attendance"
         description={onDate === today ? 'Today’s register' : `Register for ${onDate}`}
+        tone="attendance"
         actions={
           ctx.can('attendance.report') ? (
             <Link
@@ -43,7 +44,7 @@ export default async function AttendancePage({
       />
 
       {sections.length === 0 ? (
-        <Card>
+        <Card variant="elevated">
           <EmptyState
             title="No sections assigned to you"
             description="You can mark attendance for sections where you are the class teacher or teach a subject."
@@ -51,7 +52,7 @@ export default async function AttendancePage({
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px] items-start">
-          <Card className="overflow-hidden">
+          <Card variant="elevated" className="overflow-hidden">
             <SectionPicker
               sections={sections}
               sectionId={sectionId}
@@ -78,7 +79,7 @@ async function PendingSections({ onDate }: { onDate: string }) {
   const pending = await unmarkedSections(ctx, onDate)
 
   return (
-    <Card>
+    <Card variant="elevated">
       <CardHeader>
         <CardTitle>Not yet marked</CardTitle>
       </CardHeader>

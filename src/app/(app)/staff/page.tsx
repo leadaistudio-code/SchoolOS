@@ -3,7 +3,9 @@ import { Plus } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStaff } from '@/server/modules/people/service'
 import { parseListQuery } from '@/lib/query'
-import { PageHeader } from '@/components/page-header'
+import { formatNumber } from '@/lib/utils'
+import { PageBanner } from '@/components/page-banner'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
@@ -25,13 +27,23 @@ export default async function StaffPage({
   const ctx = await requireContext('staff.view')
   const params = await searchParams
   const query = parseListQuery(params)
-  const { rows, total } = await listStaff(ctx, query, { staffType: params.staffType })
+
+  const [staffCounts, staffList] = await Promise.all([
+    Promise.all([
+      ctx.db.staff.count({ where: { deletedAt: null } }),
+      ctx.db.staff.count({ where: { deletedAt: null, staffType: 'TEACHING' } }),
+    ]),
+    listStaff(ctx, query, { staffType: params.staffType }),
+  ])
+  const [totalStaff, teachingStaff] = staffCounts
+  const { rows, total } = staffList
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <PageBanner
         title="Teachers & staff"
-        description={`${total} staff records`}
+        description={`${formatNumber(totalStaff)} staff records on file`}
+        tone="staff"
         actions={
           ctx.can('staff.create') ? (
             <Link href="/staff/new" className={buttonVariants({ size: 'sm' })}>
@@ -40,6 +52,34 @@ export default async function StaffPage({
           ) : null
         }
       />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="Total staff"
+          value={formatNumber(totalStaff)}
+          icon="Briefcase"
+          tone="staff"
+          sub="All staff types"
+          delayMs={40}
+        />
+        <StatCard
+          label="Teaching"
+          value={formatNumber(teachingStaff)}
+          icon="BookOpen"
+          tone="admissions"
+          sub="Teaching staff"
+          delayMs={80}
+        />
+        <StatCard
+          label="Payroll & leave"
+          value="Open"
+          icon="CalendarDays"
+          tone="leave"
+          sub="Appraisals, payroll and leave"
+          href="/staff/payroll"
+          delayMs={120}
+        />
+      </div>
 
       <StaffTabs
         active="directory"
@@ -50,7 +90,7 @@ export default async function StaffPage({
         }}
       />
 
-      <Card className="overflow-hidden">
+      <Card variant="elevated" className="overflow-hidden">
         <SearchBar placeholder="Search name, employee code, phone or designation">
           <StaffTypeFilter />
         </SearchBar>

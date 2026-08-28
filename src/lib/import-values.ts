@@ -2,6 +2,40 @@
  * Normalise messy spreadsheet values before student import validation.
  */
 
+function normalizeHeaderKey(key: string): string {
+  return key.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/** Read a cell when the mapped header or a known alias differs by capitalisation / wording. */
+export function readMappedCell(
+  raw: Record<string, string>,
+  mappedHeader: string | null | undefined,
+  ...aliases: string[]
+): string {
+  if (mappedHeader) {
+    const direct = (raw[mappedHeader] ?? '').trim()
+    if (direct) return direct
+  }
+
+  const wanted = new Set(aliases.map(normalizeHeaderKey))
+  for (const [key, value] of Object.entries(raw)) {
+    const n = normalizeHeaderKey(key)
+    if (wanted.has(n)) return value.trim()
+    for (const alias of wanted) {
+      if (n.includes(alias) || alias.includes(n)) return value.trim()
+    }
+  }
+  return ''
+}
+
+export function readImportDate(
+  raw: Record<string, string>,
+  mappedHeader: string | null | undefined,
+  ...aliases: string[]
+): Date | undefined {
+  return parseImportDate(readMappedCell(raw, mappedHeader, ...aliases))
+}
+
 export function normalizeImportGender(value: string): 'MALE' | 'FEMALE' | 'OTHER' | undefined {
   if (!value) return undefined
   const v = value.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -47,10 +81,25 @@ export function parseImportDate(value: string): Date | undefined {
     return d
   }
 
-  // Excel serial (e.g. 45321 or 45321.0)
-  if (/^\d{4,5}(\.0+)?$/.test(v)) {
+  // DD/MM/YY — common on school exports
+  const dmy2 = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2})$/)
+  if (dmy2) {
+    const day = Number(dmy2[1])
+    const month = Number(dmy2[2])
+    let year = Number(dmy2[3])
+    year += year >= 30 ? 1900 : 2000
+    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined
+    const d = new Date(Date.UTC(year, month - 1, day))
+    if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
+      return undefined
+    }
+    return d
+  }
+
+  // Excel serial (e.g. 40179 from a date cell exported as a number)
+  if (/^\d{4,5}(\.\d*)?$/.test(v)) {
     const serial = Math.floor(Number(v))
-    if (serial >= 20_000 && serial <= 80_000) {
+    if (serial >= 8_000 && serial <= 80_000) {
       const d = new Date(Date.UTC(1899, 11, 30 + serial))
       return Number.isNaN(d.getTime()) ? undefined : d
     }

@@ -4,13 +4,13 @@ import { requireContext } from '@/server/context'
 import { outstandingByClass } from '@/server/modules/finance/service'
 import { attendanceDate, formatDay } from '@/lib/dates'
 import { isSelfScoped } from '@/lib/rbac/roles'
-import { PageHeader } from '@/components/page-header'
-import { Metric, MetricRow } from '@/components/ui/metric'
+import { PageBanner } from '@/components/page-banner'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatNumber } from '@/lib/utils'
 import { ParentFinance } from './parent-finance'
 import { cn } from '@/lib/utils'
 
@@ -75,9 +75,10 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <PageBanner
         title="Finance"
-        description={`${billed._count._all} invoices this session · ${collectionRate}% collected`}
+        description={`${formatNumber(billed._count._all)} invoices this session · ${collectionRate}% collected`}
+        tone="fees"
         actions={
           <>
             {ctx.can('fees.invoice') ? (
@@ -97,36 +98,46 @@ export default async function FinancePage() {
         }
       />
 
-      <MetricRow>
-        <Metric
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
           label="Collected today"
           value={formatMoney(collectedToday._sum.amountMinor ?? 0, currency)}
-          sub={`${collectedToday._count._all} payments`}
+          icon="BadgeIndianRupee"
+          tone="fees"
+          sub={`${formatNumber(collectedToday._count._all)} payments`}
           href="/finance/payments"
+          delayMs={40}
         />
-        <Metric
+        <StatCard
           label="Collected this month"
           value={formatMoney(collectedMonth._sum.amountMinor ?? 0, currency)}
+          icon="TrendingUp"
+          tone="attendance"
           sub={`of ${formatMoney(billedMinor, currency)} billed`}
+          delayMs={80}
         />
-        <Metric
+        <StatCard
           label="Outstanding"
           value={formatMoney(outstandingMinor, currency)}
+          icon="Wallet"
+          tone="pending"
           sub={`${collectionRate}% of billing collected`}
-          emphasis={outstandingMinor > 0 ? 'warning' : undefined}
           href="/finance/outstanding"
+          delayMs={120}
         />
-        <Metric
+        <StatCard
           label="Overdue"
           value={formatMoney(overdue._sum.balanceMinor ?? 0, currency)}
-          sub={`${overdue._count._all} invoices past due`}
-          emphasis={(overdue._count._all ?? 0) > 0 ? 'danger' : undefined}
+          icon="AlertCircle"
+          tone="overdue"
+          sub={`${formatNumber(overdue._count._all)} invoices past due`}
           href="/finance/outstanding"
+          delayMs={160}
         />
-      </MetricRow>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="overflow-hidden">
+        <Card variant="elevated" className="overflow-hidden">
           <CardHeader>
             <CardTitle>Outstanding by class</CardTitle>
             <Link
@@ -183,7 +194,7 @@ export default async function FinancePage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="elevated">
           <CardHeader>
             <CardTitle>Recent receipts</CardTitle>
             <Link

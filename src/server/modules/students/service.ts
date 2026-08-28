@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
+import { attendanceDate } from '@/lib/dates'
 import { audit } from '@/server/audit'
 import { assertWithinLimit, FEATURE } from '@/server/entitlements'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
@@ -231,14 +232,16 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
         admissionNo: input.admissionNo,
         firstName: input.firstName,
         lastName: input.lastName,
-        dateOfBirth: input.dateOfBirth,
+        dateOfBirth: input.dateOfBirth ? attendanceDate(input.dateOfBirth) : null,
         gender: input.gender,
         bloodGroup: input.bloodGroup,
         category: input.category,
         religion: input.religion,
         nationality: input.nationality,
         motherTongue: input.motherTongue,
-        admissionDate: input.admissionDate ?? new Date(),
+        admissionDate: input.admissionDate
+          ? attendanceDate(input.admissionDate)
+          : attendanceDate(new Date()),
         previousSchool: input.previousSchool,
         addressLine1: input.addressLine1,
         addressLine2: input.addressLine2,
@@ -325,6 +328,9 @@ export async function updateStudent(
   }
 
   const { classLevelId, sectionId, rollNumber, ...fields } = input
+
+  if (fields.dateOfBirth) fields.dateOfBirth = attendanceDate(fields.dateOfBirth)
+  if (fields.admissionDate) fields.admissionDate = attendanceDate(fields.admissionDate)
 
   const updated = await ctx.db.$transaction(async (tx) => {
     const student = await tx.student.update({

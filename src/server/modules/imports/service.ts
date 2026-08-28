@@ -1,5 +1,6 @@
 import { toCsv } from '@/lib/csv'
-import { inferClassSection, normalizeImportGender, parseImportDate } from '@/lib/import-values'
+import { inferClassSection, normalizeImportGender, readImportDate, readMappedCell } from '@/lib/import-values'
+import { attendanceDate } from '@/lib/dates'
 import { splitPersonName } from '@/lib/person-name'
 import { gridToTable, parseSpreadsheet } from '@/lib/spreadsheet'
 import type { AppContext } from '@/server/context'
@@ -857,11 +858,19 @@ function buildRow(
     }
   }
 
-  const gender = normalizeImportGender(get('gender'))
+  const gender = normalizeImportGender(
+    readMappedCell(raw, mapping.gender, 'gender', 'sex'),
+  )
 
-  const dateOfBirth = parseImportDate(get('dateOfBirth'))
+  const dateOfBirth = readImportDate(raw, mapping.dateOfBirth, 'date of birth', 'dob', 'birth date')
 
-  const admissionDate = parseImportDate(get('admissionDate'))
+  const admissionDate = readImportDate(
+    raw,
+    mapping.admissionDate,
+    'admission date',
+    'date of admission',
+    'admitted on',
+  )
 
   const rollRaw = get('rollNumber')
   let rollNumber: number | undefined
@@ -888,8 +897,8 @@ function buildRow(
     classLevelId: resolved.classLevelId,
     sectionId: resolved.sectionId,
     rollNumber,
-    dateOfBirth: dateOfBirth ?? undefined,
-    admissionDate: admissionDate ?? undefined,
+    dateOfBirth: dateOfBirth ? attendanceDate(dateOfBirth) : undefined,
+    admissionDate: admissionDate ? attendanceDate(admissionDate) : undefined,
     gender: gender ?? undefined,
     bloodGroup: emptyToUndef(get('bloodGroup')),
     category: emptyToUndef(get('category')),
