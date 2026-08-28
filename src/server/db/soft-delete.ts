@@ -33,9 +33,7 @@ import { conflict } from '@/server/api/response'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPrismaDelegate = any
 
-export async function findOrRestore<
-  TRecord extends { id: string; deletedAt: Date | null },
->({
+export async function findOrRestore({
   model,
   where,
   createData,
@@ -52,8 +50,8 @@ export async function findOrRestore<
   restoreData: Record<string, unknown>
   /** Human-readable message for the conflict error */
   conflictMsg: string
-}): Promise<TRecord> {
-  const existing: TRecord | null = await model.findFirst({ where })
+}) {
+  const existing: { id: string; deletedAt: Date | null } | null = await model.findFirst({ where })
 
   // Active record → conflict
   if (existing && !existing.deletedAt) {
