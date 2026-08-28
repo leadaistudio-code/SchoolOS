@@ -93,6 +93,43 @@ describe('school pack validation', () => {
     expect(result.hasParentsSheet).toBe(true)
     expect(result.packErrors).toHaveLength(0)
   })
+
+  it('matches employee codes when Staff headers use different capitalisation', async () => {
+    const XLSX = await import('xlsx')
+    const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
+      'School',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Employee Code', 'Name'],
+        ['EMP-T01', 'Priya Iyer'],
+      ]),
+      'Staff',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Class', 'Section', 'Capacity', 'Class Teacher Employee Code'],
+        ['Class 1', 'A', '40', 'EMP-T01'],
+      ]),
+      'Sections',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
+      'Students',
+    )
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    const result = validatePack(parsePackWorkbook(buffer))
+    expect(result.packErrors.filter((e) => e.sheet === 'Sections')).toHaveLength(0)
+  })
 })
 
 describe('spreadsheet grid', () => {

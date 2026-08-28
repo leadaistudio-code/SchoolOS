@@ -67,9 +67,25 @@ function formatCell(value: string | number | boolean | Date | null | undefined):
   return String(value).trim()
 }
 
+function detectHeaderRow(grid: string[][]): number {
+  for (let i = 0; i < Math.min(grid.length, 10); i++) {
+    const row = grid[i] ?? []
+    const text = row.join(' ').toLowerCase()
+    if (
+      (text.includes('employee') && text.includes('code')) ||
+      text.includes('admission') ||
+      (text.includes('class') && text.includes('section')) ||
+      (text.includes('subject') && text.includes('code'))
+    ) {
+      return i
+    }
+  }
+  return 0
+}
+
 function sheetTable(name: string, grid: string[][]): PackSheetTable | null {
   if (grid.length === 0) return null
-  const table = gridToTable(grid, 0)
+  const table = gridToTable(grid, detectHeaderRow(grid))
   if (table.rows.length === 0) return null
   return table
 }
@@ -95,8 +111,45 @@ export function parsePackWorkbook(buffer: Buffer): PackWorkbook {
   return { sheetNames: workbook.SheetNames, sheets }
 }
 
-function cell(row: Record<string, string>, header: string): string {
-  return (row[header] ?? '').trim()
+function normalizeHeaderKey(key: string): string {
+  return key.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/** Case-insensitive column lookup — Excel often capitalises headers differently from the template. */
+function cell(row: Record<string, string>, header: string, ...aliases: string[]): string {
+  const wanted = new Set([header, ...aliases].map(normalizeHeaderKey))
+  for (const [key, value] of Object.entries(row)) {
+    if (wanted.has(normalizeHeaderKey(key))) return value.trim()
+  }
+  for (const want of wanted) {
+    for (const [key, value] of Object.entries(row)) {
+      const nk = normalizeHeaderKey(key)
+      if (nk.includes(want) || want.includes(nk)) return value.trim()
+    }
+  }
+  return ''
+}
+
+function normalizeEmpCode(code: string): string {
+  return code.trim().toLowerCase()
+}
+
+function readEmployeeCode(row: Record<string, string>): string {
+  return cell(row, 'Employee code', 'Emp code', 'Employee ID', 'Staff code', 'Emp. code')
+}
+
+function readClassTeacherCode(row: Record<string, string>): string {
+  return cell(
+    row,
+    'Class teacher employee code',
+    'Class teacher code',
+    'Teacher employee code',
+    'Teacher code',
+  )
+}
+
+function readSubjectTeacherCode(row: Record<string, string>): string {
+  return cell(row, 'Teacher employee code', 'Teacher code', 'Subject teacher code')
 }
 
 function readStaffName(row: Record<string, string>): { firstName: string; lastName: string } {
@@ -164,7 +217,7 @@ function findSheet(workbook: PackWorkbook, ...names: string[]): PackSheetTable |
     const hit = workbook.sheets[name]
     if (hit) return hit
     const ci = Object.entries(workbook.sheets).find(
-      ([k]) => k.toLowerCase() === name.toLowerCase(),
+      ([k]) => k.toLowerCase().trim() === name.toLowerCase().trim(),
     )
     if (ci) return ci[1]
   }
@@ -236,7 +289,7 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
       const className = cell(row, 'Class')
       const sectionName = cell(row, 'Section')
       const capacityRaw = cell(row, 'Capacity') || '40'
-      const teacherCode = cell(row, 'Class teacher employee code')
+      const teacherCode = readClassTeacherCode(row)
       if (!className || !sectionName) {
         errors.push({ sheet: 'Sections', row: i + 2, message: 'Class and Section are required' })
         continue
@@ -276,25 +329,25 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
     }
   }
 
-  const staffSheet = findSheet(workbook, 'Staff')
+  const staffSheet = findSheet(workbook, 'Staff', 'Teachers', 'Employees')
   const staffCodesOnSheet = new Set<string>()
   if (staffSheet) {
     for (const row of staffSheet.rows) {
-      const code = cell(row, 'Employee code')
-      if (code) staffCodesOnSheet.add(code.toLowerCase())
+      const code = readEmployeeCode(row)
+      if (code) staffCodesOnSheet.add(normalizeEmpCode(code))
     }
   }
 
   if (staffSheet) {
     for (let i = 0; i < staffSheet.rows.length; i++) {
       const row = staffSheet.rows[i]!
-      const code = cell(row, 'Employee code')
+      const code = readEmployeeCode(row)
       const { firstName } = readStaffName(row)
       if (!code) {
         errors.push({ sheet: 'Staff', row: i + 2, message: 'Employee code is missing' })
         continue
       }
-      if (staffCodes.has(code.toLowerCase())) {
+      if (staffCodes.has(normalizeEmpCode(code))) {
         errors.push({ sheet: 'Staff', row: i + 2, message: `Employee code ${code} is duplicated` })
         continue
       }
@@ -302,13 +355,13 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
         errors.push({ sheet: 'Staff', row: i + 2, message: 'Name is required' })
         continue
       }
-      staffCodes.add(code.toLowerCase())
+      staffCodes.add(normalizeEmpCode(code))
     }
     // Cross-check section class teachers against codes listed on the Staff sheet.
     if (sectionsSheet) {
       for (let i = 0; i < sectionsSheet.rows.length; i++) {
-        const code = cell(sectionsSheet.rows[i]!, 'Class teacher employee code')
-        if (code && !staffCodesOnSheet.has(code.toLowerCase())) {
+        const code = readClassTeacherCode(sectionsSheet.rows[i]!)
+        if (code && !staffCodesOnSheet.has(normalizeEmpCode(code))) {
           errors.push({
             sheet: 'Sections',
             row: i + 2,
@@ -343,7 +396,7 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
       const row = classSubjectsSheet.rows[i]!
       const className = cell(row, 'Class')
       const code = cell(row, 'Subject code').toUpperCase()
-      const teacherCode = cell(row, 'Teacher employee code')
+      const teacherCode = readSubjectTeacherCode(row)
       if (!className || !code) {
         errors.push({
           sheet: 'Class subjects',
@@ -366,7 +419,7 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
           message: `Unknown subject code ${code}`,
         })
       }
-      if (teacherCode && staffSheet && !staffCodesOnSheet.has(teacherCode.toLowerCase())) {
+      if (teacherCode && staffSheet && !staffCodesOnSheet.has(normalizeEmpCode(teacherCode))) {
         errors.push({
           sheet: 'Class subjects',
           row: i + 2,
@@ -563,10 +616,10 @@ export async function commitPackStructure(
   const subjectByCode = new Map<string, string>()
 
   // Staff first — sections and class subjects reference employee codes.
-  const staffSheet = findSheet(workbook, 'Staff')
+  const staffSheet = findSheet(workbook, 'Staff', 'Teachers', 'Employees')
   if (staffSheet) {
     for (const row of staffSheet.rows) {
-      const code = cell(row, 'Employee code')
+      const code = readEmployeeCode(row)
       if (!code) continue
 
       const { firstName, lastName } = readStaffName(row)
@@ -602,17 +655,17 @@ export async function commitPackStructure(
 
       if (existing && !existing.deletedAt) {
         await ctx.db.staff.update({ where: { id: existing.id }, data })
-        staffByCode.set(code.toLowerCase(), existing.id)
+        staffByCode.set(normalizeEmpCode(code), existing.id)
       } else if (existing?.deletedAt) {
         const restored = await ctx.db.staff.update({
           where: { id: existing.id },
           data: { ...data, deletedAt: null },
         })
-        staffByCode.set(code.toLowerCase(), restored.id)
+        staffByCode.set(normalizeEmpCode(code), restored.id)
         stats.staff++
       } else {
         const created = await ctx.db.staff.create({ data })
-        staffByCode.set(code.toLowerCase(), created.id)
+        staffByCode.set(normalizeEmpCode(code), created.id)
         stats.staff++
       }
     }
@@ -666,8 +719,8 @@ export async function commitPackStructure(
       const classLevelId = classByName.get(className.toLowerCase())
       if (!classLevelId) continue
 
-      const teacherCode = cell(row, 'Class teacher employee code')
-      const classTeacherId = teacherCode ? staffByCode.get(teacherCode.toLowerCase()) : undefined
+      const teacherCode = readClassTeacherCode(row)
+      const classTeacherId = teacherCode ? staffByCode.get(normalizeEmpCode(teacherCode)) : undefined
       const capacity = Number(cell(row, 'Capacity') || '40')
       const roomName = cell(row, 'Room') || null
 
@@ -743,14 +796,14 @@ export async function commitPackStructure(
     for (const row of classSubjectsSheet.rows) {
       const className = cell(row, 'Class')
       const code = cell(row, 'Subject code').toUpperCase()
-      const teacherCode = cell(row, 'Teacher employee code')
+      const teacherCode = readSubjectTeacherCode(row)
       if (!className || !code) continue
 
       const classLevelId = classByName.get(className.toLowerCase())
       const subjectId = subjectByCode.get(code)
       if (!classLevelId || !subjectId) continue
 
-      const teacherId = teacherCode ? staffByCode.get(teacherCode.toLowerCase()) : undefined
+      const teacherId = teacherCode ? staffByCode.get(normalizeEmpCode(teacherCode)) : undefined
 
       const existing = await ctx.db.classSubject.findFirst({
         where: { classLevelId, subjectId },
