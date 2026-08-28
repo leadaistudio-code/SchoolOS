@@ -194,9 +194,9 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
                 <div>
                   <p className="text-base font-semibold text-ink">Drop the school pack or a student file</p>
                   <p className="mt-1 max-w-lg text-sm text-ink-muted">
-                    Use the Excel onboarding pack for a new school — students, parents, staff,
-                    classes, attendance, fees, exams and transport. CSV still works for students
-                    only. Nothing is written until you confirm.
+                    Use the Excel onboarding pack for a new school — classes, staff, students,
+                    parents, attendance, fees, exams and transport import together when you commit.
+                    CSV still works for students only. Nothing is written until you confirm.
                   </p>
                 </div>
                 {smartImportAvailable ? (
@@ -340,7 +340,9 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
               ) : null}
               {batch.status === 'READY' ? (
                 <Button size="sm" loading={pending} disabled={batch.validRows === 0} onClick={commit}>
-                  Import {batch.validRows} student{batch.validRows === 1 ? '' : 's'}
+                  {batch.isPack
+                    ? 'Import school pack'
+                    : `Import ${batch.validRows} student${batch.validRows === 1 ? '' : 's'}`}
                 </Button>
               ) : null}
               {batch.status === 'COMMITTED' ? (
@@ -356,6 +358,82 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
               ) : null}
             </div>
           </div>
+
+          {batch.isPack ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>School pack</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-ink-muted">
+                  This workbook imports together: classes and sections, staff (by employee code),
+                  students, and parents linked by admission number. Class teachers and subject
+                  teachers tie to staff codes on the Sections and Class subjects sheets.
+                </p>
+                {batch.packSheetStats && batch.packSheetStats.length > 0 ? (
+                  <TableWrap>
+                    <Table>
+                      <THead>
+                        <tr>
+                          <TH>Sheet</TH>
+                          <TH align="right">Rows</TH>
+                          <TH align="right">Valid</TH>
+                          <TH align="right">Errors</TH>
+                        </tr>
+                      </THead>
+                      <TBody>
+                        {batch.packSheetStats.map((row) => (
+                          <TR key={row.sheet}>
+                            <TD className="text-sm font-medium text-ink">{row.sheet}</TD>
+                            <TD align="right" className="tabular-nums text-sm text-ink-muted">
+                              {row.rows}
+                            </TD>
+                            <TD align="right" className="tabular-nums text-sm text-ink-muted">
+                              {row.valid}
+                            </TD>
+                            <TD align="right" className="tabular-nums text-sm text-ink-muted">
+                              {row.errors}
+                            </TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  </TableWrap>
+                ) : null}
+                {batch.packErrors && batch.packErrors.length > 0 ? (
+                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                      <AlertTriangle className="size-4 text-warning" aria-hidden />
+                      Pack validation issues
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-ink-muted">
+                      {batch.packErrors.slice(0, 12).map((err, i) => (
+                        <li key={`${err.sheet}-${err.row}-${i}`}>
+                          {err.sheet} row {err.row}: {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {batch.packCommitStats ? (
+                  <p className="text-sm text-ink-muted">
+                    Imported{' '}
+                    {[
+                      batch.packCommitStats.classes > 0 && `${batch.packCommitStats.classes} classes`,
+                      batch.packCommitStats.sections > 0 && `${batch.packCommitStats.sections} sections`,
+                      batch.packCommitStats.staff > 0 && `${batch.packCommitStats.staff} staff`,
+                      batch.packCommitStats.subjects > 0 && `${batch.packCommitStats.subjects} subjects`,
+                      batch.packCommitStats.parentLinks > 0 &&
+                        `${batch.packCommitStats.parentLinks} parent links`,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                    .
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {batch.aiSummary ? (
             <Card>
@@ -411,12 +489,16 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
                 <div>
                   <p className="text-sm font-semibold text-ink">
                     {batch.status === 'COMMITTED'
-                      ? `${batch.committedCount || batch.validRows} students are on the roll`
+                      ? batch.isPack
+                        ? 'School pack imported'
+                        : `${batch.committedCount || batch.validRows} students are on the roll`
                       : 'This import was rolled back'}
                   </p>
                   <p className="mt-1 text-sm text-ink-muted">
                     {batch.status === 'COMMITTED'
-                      ? 'You can still roll back this batch to archive everyone it created.'
+                      ? batch.isPack
+                        ? 'Classes, staff, students and parents from this file are in the system. You can roll back student rows this batch created.'
+                        : 'You can still roll back this batch to archive everyone it created.'
                       : 'The students from this file were archived. Upload a corrected CSV to try again.'}
                   </p>
                 </div>

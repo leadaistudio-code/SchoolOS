@@ -18,7 +18,7 @@ export default async function StudentImportPage() {
     <div>
       <PageHeader
         title="Bulk import"
-        description="Download the school pack, send it to the office, and upload the filled workbook. Students import first; the other sheets are the rest of onboarding."
+        description="Download the school pack, send it to the office, and upload the filled workbook. Classes, staff, students and parents import together and link by admission number and employee code."
         breadcrumbs={[
           { label: 'Students', href: '/students' },
           { label: 'Bulk Import' },

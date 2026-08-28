@@ -32,7 +32,7 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
       ['6', 'Optional history: attendance, leave, marks, fees, transport. Leave a sheet blank if you do not have it yet.'],
       ['7', 'Dates are YYYY-MM-DD. Money is rupees (not paise). Gender is Male / Female / Other.'],
       ['8', 'Do not rename sheets. You may add rows. Do not insert a title row above the header.'],
-      ['9', 'Upload this file on Students → Bulk import. The Students sheet is imported first; keep the other sheets filled for the rest of onboarding.'],
+      ['9', 'Upload this file on Students → Bulk import. The whole pack imports in one go — classes, staff, students and parents are linked automatically.'],
       ['10', 'Delete the sample rows before you send the real school data.'],
     ],
   },

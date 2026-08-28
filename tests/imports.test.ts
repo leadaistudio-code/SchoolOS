@@ -81,6 +81,20 @@ describe('import column auto-map', () => {
   })
 })
 
+describe('school pack validation', () => {
+  it('validates linked sheets in the onboarding workbook', async () => {
+    const { buildOnboardingWorkbook } = await import('../src/server/modules/imports/onboarding-pack')
+    const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
+
+    const workbook = parsePackWorkbook(buildOnboardingWorkbook())
+    const result = validatePack(workbook)
+    expect(result.isPack).toBe(true)
+    expect(result.projectedClasses.length).toBeGreaterThan(0)
+    expect(result.hasParentsSheet).toBe(true)
+    expect(result.packErrors).toHaveLength(0)
+  })
+})
+
 describe('spreadsheet grid', () => {
   it('converts a grid with a title row into a table', () => {
     const grid = [

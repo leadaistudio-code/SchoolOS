@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { IMPORT_FIELDS, type ImportFieldKey } from './fields'
 import type { ImportAiAnalysis, ImportClassAlias, ImportClarification } from './ai-map'
+import type { PackCommitStats, PackRowError, PackSheetStat } from './pack-import'
 
 const fieldKeys = IMPORT_FIELDS.map((f) => f.key) as [ImportFieldKey, ...ImportFieldKey[]]
 
@@ -66,4 +67,10 @@ export type ImportBatchMeta = {
   clarificationAnswers?: Record<string, string>
   pendingQuestions?: ImportClarification[]
   fileKind?: 'csv' | 'xlsx'
+  /** Full onboarding workbook — structure + parents import on commit. */
+  isPack?: boolean
+  hasParentsSheet?: boolean
+  packSheetStats?: PackSheetStat[]
+  packErrors?: PackRowError[]
+  packCommitStats?: PackCommitStats
 }

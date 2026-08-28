@@ -7,7 +7,7 @@ import { assertWithinLimit, FEATURE, hasFeature } from '@/server/entitlements'
 import { assistantConfigured } from '@/server/assistant/providers'
 import { storageProvider } from '@/server/providers'
 import { uploadFile } from '@/server/files'
-import { createStudent } from '@/server/modules/students/service'
+import { createStudent, updateStudent } from '@/server/modules/students/service'
 import { studentCreateSchema, type StudentCreateInput } from '@/server/modules/students/schema'
 import {
   analyzeImportWithAi,
@@ -16,7 +16,16 @@ import {
   unresolvedQuestions,
   type ImportClassAlias,
 } from './ai-map'
-import { buildOnboardingWorkbook } from './onboarding-pack'
+import { buildOnboardingWorkbook, isOnboardingPack } from './onboarding-pack'
+import {
+  commitPackParents,
+  commitPackStructure,
+  mergeClassLookups,
+  parsePackWorkbook,
+  validatePack,
+  type PackCommitStats,
+  type PackSheetStat,
+} from './pack-import'
 import {
   IMPORT_FIELDS,
   REQUIRED_IMPORT_FIELDS,
@@ -72,12 +81,20 @@ export type ImportBatchSummary = {
   splitFullNameColumn?: string | null
   fileKind?: 'csv' | 'xlsx'
   smartImportAvailable: boolean
+  isPack?: boolean
+  packSheetStats?: PackSheetStat[]
+  packErrors?: ImportBatchMeta['packErrors']
+  packCommitStats?: PackCommitStats
 }
 
 type RowBuildContext = {
   splitFullNameColumn?: string | null
   classAliases?: ImportClassAlias[]
   headerRowIndex?: number
+  /** Pack re-import: update rows whose admission number already exists. */
+  allowExistingAdmission?: boolean
+  /** Parents sheet handles guardians — skip inline guardian on student rows. */
+  skipInlineGuardian?: boolean
 }
 
 /**
@@ -117,7 +134,10 @@ export async function uploadStudentImport(
 
   const uploaded = await uploadFile(ctx, normalized, 'imports')
   const buffer = Buffer.from(await storageProvider().get(uploaded.storageKey))
-  const { grid, fileKind } = parseSpreadsheet(buffer, uploaded.fileName, uploadMime)
+  const { grid, fileKind, sheetNames } = parseSpreadsheet(buffer, uploaded.fileName, uploadMime)
+
+  const isPack =
+    fileKind === 'xlsx' && sheetNames != null && isOnboardingPack(sheetNames)
 
   if (grid.length === 0) {
     throw new ApiException(400, 'BAD_REQUEST', 'The file is empty')
@@ -134,6 +154,7 @@ export async function uploadStudentImport(
     sourceGrid: grid,
     headerRowIndex: 0,
     fileKind,
+    isPack,
   }
 
   if (useAi) {
@@ -363,19 +384,53 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
   }
 
   const meta = readMeta(batch.errors)
+  if (meta.isPack) {
+    ctx.require('students.edit')
+    ctx.require('academics.manage')
+    ctx.require('staff.create')
+    ctx.require('parents.create')
+  }
+
   const table = await readTable(batch.storageKey, meta, batch.fileName)
-  const classes = await loadClasses(ctx)
+
+  let packCommitStats: PackCommitStats | undefined
+  if (meta.isPack && batch.storageKey) {
+    const workbook = await loadPackWorkbook(batch.storageKey)
+    const { stats } = await commitPackStructure(ctx, workbook)
+    packCommitStats = stats
+  }
+
+  let classes = await loadClasses(ctx)
   const existingAdmissions = await loadAdmissionSet(ctx)
+  const admissionToStudentId = new Map<string, string>()
+  const existingStudents = await ctx.db.student.findMany({
+    where: { deletedAt: null },
+    select: { id: true, admissionNo: true },
+  })
+  for (const s of existingStudents) {
+    admissionToStudentId.set(s.admissionNo.toLowerCase(), s.id)
+  }
+
   const rowContext: RowBuildContext = {
     splitFullNameColumn: meta.splitFullNameColumn,
     classAliases: meta.classAliases,
     headerRowIndex: meta.headerRowIndex,
+    allowExistingAdmission: meta.isPack === true,
+    skipInlineGuardian: meta.hasParentsSheet === true,
   }
 
   const activeCount = await ctx.db.student.count({
     where: { status: 'ACTIVE', deletedAt: null },
   })
-  await assertWithinLimit(ctx.tenant.id, FEATURE.LIMIT_STUDENTS, activeCount, batch.validRows)
+  const newStudentRows = meta.isPack
+    ? table.rows.filter((raw) => {
+        const admission = valueOf(raw, meta.mapping.admissionNo)?.toLowerCase()
+        return admission && !admissionToStudentId.has(admission)
+      }).length
+    : batch.validRows
+  if (newStudentRows > 0) {
+    await assertWithinLimit(ctx.tenant.id, FEATURE.LIMIT_STUDENTS, activeCount, newStudentRows)
+  }
 
   const capacityUsed = new Map<string, number>()
   for (const cls of classes) {
@@ -385,6 +440,7 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
   const committedIds: string[] = []
   const rowErrors: ImportRowError[] = []
   let created = 0
+  let updatedCount = 0
 
   for (let i = 0; i < table.rows.length; i++) {
     const raw = table.rows[i]!
@@ -401,12 +457,31 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
     }
 
     try {
-      const student = await createStudent(ctx, built.input)
-      committedIds.push(student.id)
-      existingAdmissions.add(built.input.admissionNo.toLowerCase())
+      const key = built.input.admissionNo.toLowerCase()
+      const existingId = admissionToStudentId.get(key)
+      let studentId: string
+
+      if (existingId && meta.isPack) {
+        const { guardian: _g, ...updateFields } = built.input
+        const updatedStudent = await updateStudent(ctx, existingId, {
+          ...updateFields,
+          classLevelId: built.input.classLevelId,
+          sectionId: built.input.sectionId,
+          rollNumber: built.input.rollNumber,
+        })
+        studentId = updatedStudent.id
+        updatedCount++
+      } else {
+        const student = await createStudent(ctx, built.input)
+        studentId = student.id
+        existingAdmissions.add(key)
+        created++
+      }
+
+      committedIds.push(studentId)
+      admissionToStudentId.set(key, studentId)
       const used = capacityUsed.get(built.input.sectionId) ?? 0
       capacityUsed.set(built.input.sectionId, used + 1)
-      created++
     } catch (err) {
       rowErrors.push({
         row: rowNumber,
@@ -416,20 +491,33 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
     }
   }
 
+  if (meta.isPack && batch.storageKey) {
+    const workbook = await loadPackWorkbook(batch.storageKey)
+    const parentStats = await commitPackParents(ctx, workbook, admissionToStudentId)
+    if (packCommitStats) {
+      packCommitStats.parents = parentStats.parents
+      packCommitStats.parentLinks = parentStats.parentLinks
+    }
+  }
+
   const nextMeta: ImportBatchMeta = {
     ...meta,
     rowErrors,
     committedIds,
     preview: meta.preview,
+    packCommitStats,
   }
 
   const updated = await ctx.db.importBatch.update({
     where: { id },
     data: {
-      status: created > 0 ? IMPORT_STATUS.COMMITTED : IMPORT_STATUS.FAILED,
-      validRows: created,
+      status:
+        created > 0 || updatedCount > 0 || packCommitStats
+          ? IMPORT_STATUS.COMMITTED
+          : IMPORT_STATUS.FAILED,
+      validRows: created + updatedCount,
       errorRows: rowErrors.length,
-      committedAt: created > 0 ? new Date() : null,
+      committedAt: created > 0 || updatedCount > 0 || packCommitStats ? new Date() : null,
       errors: nextMeta,
     },
   })
@@ -442,8 +530,10 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
     module: 'students',
     entityType: 'ImportBatch',
     entityId: id,
-    summary: `Imported ${created} student${created === 1 ? '' : 's'} from ${batch.fileName}`,
-    after: { created, skipped: rowErrors.length },
+    summary: meta.isPack
+      ? `School pack: ${created} students added, ${updatedCount} updated${packCommitStats ? `; ${packCommitStats.staff} staff, ${packCommitStats.parentLinks} parent links` : ''}`
+      : `Imported ${created} student${created === 1 ? '' : 's'} from ${batch.fileName}`,
+    after: { created, updated: updatedCount, skipped: rowErrors.length, packCommitStats },
   })
 
   return toSummary(updated)
@@ -551,8 +641,22 @@ async function validateAndPersist(
   }
 
   const table = await readTable(batch.storageKey, meta, batch.fileName)
-  const classes = await loadClasses(ctx)
+
+  let packValidation = meta.isPack && batch.storageKey
+    ? validatePack(await loadPackWorkbook(batch.storageKey))
+    : null
+
+  let classes = await loadClasses(ctx)
+  if (packValidation?.isPack && packValidation.projectedClasses.length > 0) {
+    classes = mergeClassLookups(classes, packValidation.projectedClasses)
+  }
+
   const existingAdmissions = await loadAdmissionSet(ctx)
+  const packRowContext: RowBuildContext = {
+    ...rowContext,
+    allowExistingAdmission: meta.isPack === true,
+    skipInlineGuardian: packValidation?.hasParentsSheet === true,
+  }
 
   const capacityUsed = new Map<string, number>()
   for (const cls of classes) {
@@ -567,7 +671,14 @@ async function validateAndPersist(
   for (let i = 0; i < table.rows.length; i++) {
     const raw = table.rows[i]!
     const rowNumber = dataRowNumber(i, meta.headerRowIndex)
-    const built = buildRow(raw, mapping, classes, existingAdmissions, capacityUsed, rowContext)
+    const built = buildRow(
+      raw,
+      mapping,
+      classes,
+      existingAdmissions,
+      capacityUsed,
+      packRowContext,
+    )
 
     if (built.ok && built.input) {
       const key = built.input.admissionNo.toLowerCase()
@@ -624,6 +735,7 @@ async function validateAndPersist(
     }
   }
 
+  const packBlocking = (packValidation?.packErrors.length ?? 0) > 0
   const nextMeta: ImportBatchMeta = {
     ...meta,
     headers: meta.headers.length ? meta.headers : table.headers,
@@ -633,6 +745,9 @@ async function validateAndPersist(
     splitFullNameColumn: rowContext.splitFullNameColumn,
     classAliases: rowContext.classAliases,
     pendingQuestions: [],
+    hasParentsSheet: packValidation?.hasParentsSheet,
+    packSheetStats: packValidation?.sheetStats,
+    packErrors: packValidation?.packErrors,
   }
 
   if (opts.saveAsTemplate) {
@@ -645,7 +760,8 @@ async function validateAndPersist(
       totalRows: table.rows.length,
       validRows,
       errorRows: rowErrors.length,
-      status: validRows > 0 ? IMPORT_STATUS.READY : IMPORT_STATUS.FAILED,
+      status:
+        validRows > 0 && !packBlocking ? IMPORT_STATUS.READY : IMPORT_STATUS.FAILED,
       errors: nextMeta,
     },
   })
@@ -697,7 +813,7 @@ function buildRow(
   if (!className) messages.push('Class is missing')
   if (!sectionName) messages.push('Section is missing')
 
-  if (admissionNo && existingAdmissions.has(admissionNo.toLowerCase())) {
+  if (admissionNo && existingAdmissions.has(admissionNo.toLowerCase()) && !ctx.allowExistingAdmission) {
     messages.push(`Admission number ${admissionNo} is already in use`)
   }
 
@@ -779,7 +895,7 @@ function buildRow(
     allergies: emptyToUndef(get('allergies')),
   }
 
-  if (guardianFirst && guardianLast) {
+  if (guardianFirst && guardianLast && !ctx.skipInlineGuardian) {
     payload.guardian = {
       firstName: guardianFirst,
       lastName: guardianLast,
@@ -999,6 +1115,11 @@ async function loadAdmissionSet(ctx: AppContext): Promise<Set<string>> {
   return new Set(rows.map((r) => r.admissionNo.toLowerCase()))
 }
 
+async function loadPackWorkbook(storageKey: string) {
+  const buffer = Buffer.from(await storageProvider().get(storageKey))
+  return parsePackWorkbook(buffer)
+}
+
 async function readTable(
   storageKey: string | null,
   meta: ImportBatchMeta,
@@ -1069,6 +1190,14 @@ function readMeta(errors: unknown): ImportBatchMeta {
     clarificationAnswers: e.clarificationAnswers,
     pendingQuestions: Array.isArray(e.pendingQuestions) ? e.pendingQuestions : undefined,
     fileKind: e.fileKind,
+    isPack: e.isPack === true,
+    hasParentsSheet: e.hasParentsSheet === true,
+    packSheetStats: Array.isArray(e.packSheetStats) ? e.packSheetStats : undefined,
+    packErrors: Array.isArray(e.packErrors) ? e.packErrors : undefined,
+    packCommitStats:
+      e.packCommitStats && typeof e.packCommitStats === 'object'
+        ? (e.packCommitStats as PackCommitStats)
+        : undefined,
   }
 }
 
@@ -1104,6 +1233,10 @@ function toSummary(batch: {
     splitFullNameColumn: meta.splitFullNameColumn,
     fileKind: meta.fileKind,
     smartImportAvailable: assistantConfigured(),
+    isPack: meta.isPack,
+    packSheetStats: meta.packSheetStats,
+    packErrors: meta.packErrors,
+    packCommitStats: meta.packCommitStats,
   }
 }
 
