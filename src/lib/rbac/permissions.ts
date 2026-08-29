@@ -113,6 +113,9 @@ export const PERMISSIONS: PermissionDef[] = [
     ['manage', 'Create and schedule exams'],
     ['marks', 'Enter marks'],
     ['publish', 'Publish results'],
+    ['delete', 'Delete exams'],
+    ['admit_cards', 'Generate admit cards'],
+    ['admit_approve', 'Approve admit cards after fee check'],
   ]),
   ...mod('results', [
     ['view', 'View results'],

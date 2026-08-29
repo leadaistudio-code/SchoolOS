@@ -655,3 +655,35 @@ export async function exportResultsCsv(ctx: AppContext, examId: string) {
   )
   return [header.join(','), ...lines].join('\n')
 }
+
+export async function deleteExam(ctx: AppContext, examId: string) {
+  ctx.require('exams.delete')
+
+  const exam = await ctx.db.exam.findFirst({
+    where: { id: examId, tenantId: ctx.tenant.id },
+    select: { id: true, name: true, status: true },
+  })
+  if (!exam) throw notFound('Exam')
+
+  if (exam.status === 'PUBLISHED') {
+    throw conflict(
+      'Published exams cannot be deleted. Archive the exam first, then delete it from the archived list.',
+    )
+  }
+
+  await ctx.db.exam.delete({ where: { id: examId } })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'exam.delete',
+    module: 'exams',
+    entityType: 'Exam',
+    entityId: examId,
+    summary: `Deleted exam ${exam.name}`,
+    before: exam,
+  })
+
+  return { deleted: true }
+}

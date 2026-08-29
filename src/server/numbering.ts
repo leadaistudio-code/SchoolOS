@@ -9,13 +9,14 @@ export type RawCapableClient = {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>
 }
 
-export type DocumentKind = 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'LEAD'
+export type DocumentKind = 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD'
 
 const PREFIX: Record<DocumentKind, string> = {
   INVOICE: 'INV',
   RECEIPT: 'RCP',
   REFUND: 'REF',
   CERTIFICATE: 'CRT',
+  ADMIT_CARD: 'ADM',
   LEAD: 'LEAD',
 }
 
@@ -47,9 +48,11 @@ export async function nextDocumentNumber(
       ? 'FeeReceipt'
       : params.kind === 'CERTIFICATE'
         ? 'Certificate'
-        : params.kind === 'LEAD'
-          ? 'AdmissionLead'
-          : 'FeeInvoice'
+        : params.kind === 'ADMIT_CARD'
+          ? 'AdmitCard'
+          : params.kind === 'LEAD'
+            ? 'AdmissionLead'
+            : 'FeeInvoice'
 
   const column = params.kind === 'LEAD' ? 'reference' : 'number'
 

@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { ExamMetaForm, ExamPapersForm } from './exam-detail-forms'
+import { ExamMetaForm, ExamPapersForm, DeleteExamButton } from './exam-detail-forms'
 
 export const metadata = { title: 'Exam detail' }
 
@@ -25,6 +25,9 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
           All exams
         </Link>
         <div className="flex flex-wrap gap-2">
+          <Link href={`/exams/${exam.id}/admit-cards`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
+            Admit cards
+          </Link>
           {ctx.can('exams.marks') ? (
             <Link href={`/exams/${exam.id}/marks`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
               Enter marks
@@ -34,6 +37,9 @@ export default async function ExamDetailPage({ params }: { params: Promise<{ id:
             <Link href={`/exams/results?exam=${exam.id}`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
               Results
             </Link>
+          ) : null}
+          {ctx.can('exams.delete') ? (
+            <DeleteExamButton examId={exam.id} examName={exam.name} status={exam.status} />
           ) : null}
         </div>
       </div>

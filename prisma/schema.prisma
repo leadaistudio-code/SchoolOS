@@ -1214,6 +1214,7 @@ model Student {
   marks               Mark[]
   results             Result[]
   certificates        Certificate[]
+  admitCards          AdmitCard[]
   homeworkSubmissions HomeworkSubmission[]
   libraryLoans        LibraryLoan[]
   transport           TransportAssignment[]
@@ -2226,6 +2227,7 @@ model Exam {
   classes      ExamClass[]
   subjects     ExamSubject[]
   results      Result[]
+  admitCards   AdmitCard[]
 
   @@unique([tenantId, sessionId, name])
   @@index([tenantId, status])
@@ -2304,6 +2306,36 @@ model Result {
 
   @@unique([tenantId, examId, studentId])
   @@index([tenantId, studentId])
+}
+
+enum AdmitCardStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AdmitCard {
+  id             String          @id @default(cuid())
+  tenantId       String
+  examId         String
+  studentId      String
+  number         String
+  status         AdmitCardStatus @default(PENDING)
+  feeDueMinor    Int             @default(0)
+  issuedById     String?
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  verifyToken    String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, examId, studentId])
+  @@unique([tenantId, number])
+  @@index([tenantId, examId, status])
 }
 
 model ReportCardTemplate {

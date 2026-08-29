@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState } from 'react'
-import { Save } from 'lucide-react'
-import { updateExamMetaAction, updateExamPapersAction } from '../actions'
+import { useActionState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Save, Trash2 } from 'lucide-react'
+import { updateExamMetaAction, updateExamPapersAction, deleteExamAction } from '../actions'
 import { emptyFormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { Field, FormSection, Input, Select } from '@/components/ui/input'
@@ -191,5 +192,39 @@ export function ExamPapersForm({ examId, papers, locked }: { examId: string; pap
         <p className="text-sm text-ink-muted">Published exams cannot change paper settings.</p>
       )}
     </form>
+  )
+}
+
+export function DeleteExamButton({ examId, examName, status }: { examId: string; examName: string; status: string }) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+
+  const remove = () => {
+    if (status === 'PUBLISHED') {
+      window.alert('Archive this exam first, then delete it.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Delete "${examName}"? All papers, marks and admit cards for this exam will be permanently removed.`,
+      )
+    ) {
+      return
+    }
+    startTransition(async () => {
+      const result = await deleteExamAction(examId)
+      if (!result.ok) {
+        window.alert(result.message)
+        return
+      }
+      router.push('/exams')
+      router.refresh()
+    })
+  }
+
+  return (
+    <Button size="sm" variant="danger" disabled={pending} onClick={remove}>
+      <Trash2 aria-hidden /> {pending ? 'Deleting…' : 'Delete exam'}
+    </Button>
   )
 }

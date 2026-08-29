@@ -18,6 +18,7 @@ import {
   setExamGradingScale,
   updateExamMeta,
   updateExamPapers,
+  deleteExam,
 } from '@/server/modules/exams/service'
 import type { FormState } from '@/lib/form-state'
 
@@ -172,5 +173,15 @@ export async function setExamGradingScaleAction(
     return { ok: true, message: 'Grading scale updated. Calculate results to apply it.' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Could not update the grading scale' }
+  }
+}
+
+export async function deleteExamAction(examId: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    await deleteExam(await requireContext('exams.delete'), examId)
+    revalidatePath('/exams')
+    return { ok: true, message: 'Exam deleted.' }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Could not delete the exam' }
   }
 }
