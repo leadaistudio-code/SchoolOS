@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +30,9 @@ export function Dialog({
   children: React.ReactNode
 }) {
   const panelRef = React.useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => setMounted(true), [])
 
   // Call sites pass an inline `() => setOpen(false)`, so `onClose` is a new
   // function on every render. Held in a ref, the open effect below can depend
@@ -58,11 +62,11 @@ export function Dialog({
     }
   }, [open])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-60 grid place-items-center p-4 bg-black/40"
+      className="fixed inset-0 z-[100] grid place-items-center p-4 bg-black/40"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -78,7 +82,7 @@ export function Dialog({
           size === 'lg' && 'max-w-2xl',
         )}
       >
-        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-line">
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-line shrink-0">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink">{title}</h2>
             {description ? (
@@ -95,14 +99,15 @@ export function Dialog({
           </button>
         </div>
 
-        <div className="px-4 py-3 min-h-0 flex-1 overflow-y-auto overflow-x-visible scroll-thin">
-          {children}
-        </div>
+        <div className="px-4 py-3 overflow-y-auto scroll-thin min-h-0">{children}</div>
 
         {footer ? (
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-line">{footer}</div>
+          <div className="flex items-center gap-2 px-4 py-3 border-t border-line shrink-0">
+            {footer}
+          </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

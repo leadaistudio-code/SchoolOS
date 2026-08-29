@@ -114,9 +114,11 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
             <Input
               id="subject-code"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setPreset('')
+                setCode(e.target.value.toUpperCase())
+              }}
               placeholder="MATH"
-              autoFocus
             />
           </Field>
 
@@ -124,13 +126,22 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
             <Input
               id="subject-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setPreset('')
+                setName(e.target.value)
+              }}
               placeholder="Mathematics"
             />
           </Field>
 
           <label className="flex items-center gap-2 sm:col-span-2">
-            <Checkbox checked={isElective} onChange={(e) => setIsElective(e.target.checked)} />
+            <Checkbox
+              checked={isElective}
+              onChange={(e) => {
+                setPreset('')
+                setIsElective(e.target.checked)
+              }}
+            />
             <span className="text-sm text-ink">
               Elective — students choose it rather than all taking it
             </span>
@@ -301,7 +312,6 @@ export function AssignSubjectButton({
     setSubjectId('')
     setTeacherId('')
     setOpen(true)
-    router.refresh()
   }
 
   const submit = () =>

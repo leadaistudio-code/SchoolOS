@@ -1,7 +1,7 @@
 /** Common school subjects — used to pre-fill the new-subject form. */
 export const SUBJECT_PRESETS = [
   { code: 'ENG', name: 'English', isElective: false },
-  { code: 'MAT', name: 'Mathematics', isElective: false },
+  { code: 'MATH', name: 'Mathematics', isElective: false },
   { code: 'HIN', name: 'Hindi', isElective: false },
   { code: 'EVS', name: 'EVS', isElective: false },
   { code: 'SCI', name: 'Science', isElective: false },
