@@ -208,53 +208,16 @@ export type ConflictReport = {
 }
 
 /**
- * Checks a proposed slot before writing it.
+ * Pre-flight check before writing a slot.
  *
- * Two things must hold, and the database enforces both with unique
- * constraints. This function exists so the user gets a sentence explaining
- * WHICH class the teacher is already with, rather than a constraint violation.
+ * Section occupancy is enforced by a unique constraint (one lesson per section
+ * per period per day). Teachers may teach parallel sections in the same period.
  */
 export async function checkConflicts(
-  ctx: AppContext,
-  input: SlotInput,
-  teacherId: string | null,
+  _ctx: AppContext,
+  _input: SlotInput,
+  _teacherId: string | null,
 ): Promise<ConflictReport> {
-  const sectionClash = await ctx.db.timetableSlot.findFirst({
-    where: {
-      sectionId: input.sectionId,
-      dayOfWeek: input.dayOfWeek,
-      periodId: input.periodId,
-    },
-    select: { id: true, classSubject: { select: { subject: { select: { name: true } } } } },
-  })
-
-  // Replacing the existing lesson in this cell is the normal case, not a clash.
-  if (sectionClash && !teacherId) return { ok: true }
-
-  if (teacherId) {
-    const teacherClash = await ctx.db.timetableSlot.findFirst({
-      where: {
-        teacherId,
-        dayOfWeek: input.dayOfWeek,
-        periodId: input.periodId,
-        sectionId: { not: input.sectionId },
-      },
-      select: {
-        section: { select: { name: true, classLevel: { select: { name: true } } } },
-        classSubject: { select: { subject: { select: { name: true } } } },
-      },
-    })
-
-    if (teacherClash) {
-      const where = `${teacherClash.section.classLevel.name} ${teacherClash.section.name}`
-      return {
-        ok: false,
-        reason: `That teacher is already taking ${teacherClash.classSubject?.subject.name ?? 'a lesson'} with ${where} in this period.`,
-        clashWith: where,
-      }
-    }
-  }
-
   return { ok: true }
 }
 

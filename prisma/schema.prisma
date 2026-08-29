@@ -2475,9 +2475,6 @@ model TimetableSlot {
 
   // A section can hold only one lesson per period per day.
   @@unique([tenantId, sectionId, dayOfWeek, periodId])
-  // A teacher cannot be in two rooms at once (partial-unique via app check for
-  // null teacherId; the DB constraint covers the assigned case).
-  @@unique([tenantId, teacherId, dayOfWeek, periodId])
   @@index([tenantId, teacherId, dayOfWeek])
 }
 

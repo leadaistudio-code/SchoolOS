@@ -837,8 +837,7 @@ async function seedTeaching(tenantId: string, staff: { id: string }[], rand: Ran
               roomName: section.roomName,
             },
           })
-          // A teacher clash is expected while filling a demo grid; the unique
-          // constraint is doing its job, so skip and move on.
+          // Skip if this section/period/day cell was already filled.
           .catch(() => undefined)
       }
     }

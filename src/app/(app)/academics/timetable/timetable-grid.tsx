@@ -220,8 +220,8 @@ export function TimetableGrid({
 
       {editable ? (
         <p className="px-4 py-3 text-xs text-ink-subtle border-t border-line">
-          Click a lesson to change the subject, or the × to clear it. A teacher already taking
-          another class in that period is refused, so the grid cannot double-book anyone.
+          Click a lesson to change the subject, or the × to clear it. The same teacher may appear
+          in multiple sections during one period when parallel streams share a teacher.
         </p>
       ) : null}
     </div>
