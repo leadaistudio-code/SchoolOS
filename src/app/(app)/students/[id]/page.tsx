@@ -87,6 +87,14 @@ export default async function StudentDetailPage({
         }
       />
 
+      {query.welcome ? (
+        <Notice tone="success" title="Parent portal login created">
+          One-time password for the guardian:{' '}
+          <strong className="tnum">{query.welcome}</strong>. Share it now — it cannot be shown
+          again. Username is their phone; they will change the password at first sign-in.
+        </Notice>
+      ) : null}
+
       <LinkTabs
         label="Student record"
         items={[

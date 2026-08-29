@@ -8,6 +8,8 @@ import { ApiException } from '@/server/api/response'
 import { findOrRestore } from '@/server/db/soft-delete'
 import { assignSubjectToClass } from '@/server/modules/academics/service'
 import { createSession } from '@/server/modules/settings/sessions'
+import { issueParentPortalLogin, issueStaffPortalLogin } from '@/server/modules/people/service'
+import { phoneLookupCandidates, storePhone } from '@/server/auth/phone'
 import { isOnboardingPack } from './onboarding-pack'
 
 const SKIP_SHEETS = new Set(['read me', 'allowed values'])
@@ -644,7 +646,7 @@ export async function commitPackStructure(
         dateOfBirth: parseIsoDate(cell(row, 'Date of birth'))
           ? attendanceDate(parseIsoDate(cell(row, 'Date of birth'))!)
           : null,
-        phone: cell(row, 'Phone') || null,
+        phone: storePhone(cell(row, 'Phone')),
         email: cell(row, 'Email') || null,
         joinedOn: parseIsoDate(cell(row, 'Joined on'))
           ? attendanceDate(parseIsoDate(cell(row, 'Joined on'))!)
@@ -653,20 +655,39 @@ export async function commitPackStructure(
         state: cell(row, 'State') || null,
       }
 
+      let staffId: string
       if (existing && !existing.deletedAt) {
         await ctx.db.staff.update({ where: { id: existing.id }, data })
+        staffId = existing.id
         staffByCode.set(normalizeEmpCode(code), existing.id)
       } else if (existing?.deletedAt) {
         const restored = await ctx.db.staff.update({
           where: { id: existing.id },
           data: { ...data, deletedAt: null },
         })
+        staffId = restored.id
         staffByCode.set(normalizeEmpCode(code), restored.id)
         stats.staff++
       } else {
         const created = await ctx.db.staff.create({ data })
+        staffId = created.id
         staffByCode.set(normalizeEmpCode(code), created.id)
         stats.staff++
+      }
+
+      // Portal login: phone + employee code as first password.
+      if (data.phone) {
+        const current = await ctx.db.staff.findFirst({
+          where: { id: staffId },
+          select: { userId: true },
+        })
+        if (!current?.userId) {
+          try {
+            await issueStaffPortalLogin(ctx, staffId)
+          } catch (err) {
+            console.error('[pack] staff portal login skipped', code, err)
+          }
+        }
       }
     }
   }
@@ -851,7 +872,7 @@ export async function commitPackParents(
     const { firstName, lastName } = readParentName(row)
     if (!firstName) continue
 
-    const phone = cell(row, 'Phone') || null
+    const phone = storePhone(cell(row, 'Phone'))
     const email = cell(row, 'Email') || null
     const relation = 'GUARDIAN' as const
     const isPrimary = parseYesNo(cell(row, 'Is primary'))
@@ -862,7 +883,7 @@ export async function commitPackParents(
     let parentId: string | undefined
     if (phone) {
       const hit = await ctx.db.parent.findFirst({
-        where: { phone, deletedAt: null },
+        where: { phone: { in: phoneLookupCandidates(phone) }, deletedAt: null },
         select: { id: true },
       })
       parentId = hit?.id
@@ -898,6 +919,7 @@ export async function commitPackParents(
         data: {
           firstName,
           lastName,
+          phone: phone ?? undefined,
           occupation: cell(row, 'Occupation') || null,
           addressLine1: cell(row, 'Address line 1') || null,
           city: cell(row, 'City') || null,
@@ -936,6 +958,21 @@ export async function commitPackParents(
         },
       })
       parentLinks++
+    }
+
+    // Portal login: phone + childFirstName + DOB once a child is linked.
+    if (phone) {
+      const current = await ctx.db.parent.findFirst({
+        where: { id: parentId },
+        select: { userId: true },
+      })
+      if (!current?.userId) {
+        try {
+          await issueParentPortalLogin(ctx, parentId)
+        } catch (err) {
+          console.error('[pack] parent portal login skipped', phone, err)
+        }
+      }
     }
   }
 

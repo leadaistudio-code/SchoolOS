@@ -268,12 +268,13 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
     })
 
     if (input.guardian) {
+      const { storePhone } = await import('@/server/auth/phone')
       const parent = await tx.parent.create({
         data: {
           tenantId: ctx.tenant.id,
           firstName: input.guardian.firstName,
           lastName: input.guardian.lastName,
-          phone: input.guardian.phone,
+          phone: storePhone(input.guardian.phone),
           email: input.guardian.email || null,
           occupation: input.guardian.occupation,
         },
@@ -293,6 +294,23 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
     return student
   })
 
+  let temporaryPassword: string | undefined
+  if (input.guardian?.createLogin && input.guardian.phone && input.dateOfBirth) {
+    const link = await ctx.db.studentGuardian.findFirst({
+      where: { studentId: created.id, isPrimary: true },
+      select: { parentId: true },
+    })
+    if (link) {
+      try {
+        const { issueParentPortalLogin } = await import('@/server/modules/people/service')
+        const issued = await issueParentPortalLogin(ctx, link.parentId)
+        temporaryPassword = issued.temporaryPassword
+      } catch (err) {
+        console.error('[students] parent portal login not created', err)
+      }
+    }
+  }
+
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
@@ -305,7 +323,9 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
     after: created,
   })
 
-  return created
+  return Object.assign(created, { temporaryPassword }) as typeof created & {
+    temporaryPassword?: string
+  }
 }
 
 export async function updateStudent(

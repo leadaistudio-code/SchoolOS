@@ -1,5 +1,6 @@
 import { prisma } from '@/server/db/prisma'
 import { verifyPassword } from './password'
+import { phoneLookupCandidates } from './phone'
 import { createSession, requestMeta } from './session'
 import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
 import { audit } from '@/server/audit'
@@ -25,7 +26,7 @@ export type LoginOutcome =
   | { ok: false; reason: 'error'; message: string; retryAfterSeconds?: number }
   | { ok: false; reason: 'mfa'; challengeToken: string }
 
-const GENERIC_FAILURE = 'Email or password is incorrect'
+const GENERIC_FAILURE = 'Phone number or password is incorrect'
 const MAX_FAILED = 8
 const LOCK_MINUTES = 15
 
@@ -65,13 +66,15 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
   }
 
   const isEmail = identifier.includes('@')
-  const user = await prisma.user.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      deletedAt: null,
-      ...(isEmail ? { email: identifier } : { phone: identifier }),
-    },
-  })
+  const user = isEmail
+    ? await prisma.user.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          deletedAt: null,
+          email: identifier,
+        },
+      })
+    : await findUserByPhone(input.tenantId, input.identifier.trim())
 
   if (!user || !user.passwordHash) {
     await recordAttempt(null, input.tenantId, identifier, false, 'no_such_user', meta)
@@ -111,9 +114,6 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     return { ok: false, reason: 'error', message: GENERIC_FAILURE }
   }
 
-  // A temporary password issued at the counter has a deadline. Checked after
-  // the password itself, so an expired one cannot be used to probe which
-  // accounts have had a reset issued.
   if (user.tempPasswordExpiresAt && user.tempPasswordExpiresAt < new Date()) {
     await recordAttempt(user.id, input.tenantId, identifier, false, 'temp_password_expired', meta)
     return {
@@ -161,6 +161,19 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
     mustChangePassword: user.mustChangePassword,
     sessionToken: session.token,
   }
+}
+
+async function findUserByPhone(tenantId: string | null, rawPhone: string) {
+  const candidates = phoneLookupCandidates(rawPhone)
+  if (candidates.length === 0) return null
+
+  return prisma.user.findFirst({
+    where: {
+      tenantId,
+      deletedAt: null,
+      phone: { in: candidates },
+    },
+  })
 }
 
 async function recordAttempt(

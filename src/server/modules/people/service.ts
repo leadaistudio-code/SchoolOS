@@ -6,7 +6,8 @@ import { conflict, notFound, ApiException } from '@/server/api/response'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { assertWithinLimit, FEATURE } from '@/server/entitlements'
 import { hashPassword } from '@/server/auth/password'
-import { randomToken } from '@/server/crypto'
+import { parentInitialPassword, staffInitialPassword } from '@/server/auth/initial-password'
+import { phoneLookupCandidates, storePhone } from '@/server/auth/phone'
 import { ROLE } from '@/lib/rbac/roles'
 
 const optional = (max: number) =>
@@ -179,6 +180,10 @@ export async function getParent(ctx: AppContext, id: string) {
 /**
  * Creates a parent, optionally with a portal login.
  *
+ * Portal logins need a linked child (for the first-name + DOB password). When
+ * `createLogin` is set at create time with no children yet, the account is not
+ * created here — call `issueParentPortalLogin` after linking a student.
+ *
  * The generated password is returned exactly once, to be handed over out of
  * band, and the account is flagged `mustChangePassword` so the school never
  * knows the parent's working password.
@@ -186,54 +191,36 @@ export async function getParent(ctx: AppContext, id: string) {
 export async function createParent(
   ctx: AppContext,
   input: z.infer<typeof parentCreateSchema>,
+  opts?: { passwordStudentId?: string },
 ): Promise<{ parent: { id: string }; temporaryPassword?: string }> {
   ctx.require('parents.create')
 
-  if (input.email) {
+  const phone = storePhone(input.phone)
+  const email = input.email?.trim().toLowerCase() || undefined
+
+  if (email) {
     const clash = await ctx.db.parent.findFirst({
-      where: { email: input.email, deletedAt: null },
+      where: { email, deletedAt: null },
       select: { id: true },
     })
-    if (clash) throw conflict(`A parent with the email ${input.email} already exists`)
+    if (clash) throw conflict(`A parent with the email ${email} already exists`)
   }
 
-  let userId: string | undefined
-  let temporaryPassword: string | undefined
-
-  if (input.createLogin) {
-    if (!input.email && !input.phone) {
-      throw new ApiException(
-        400,
-        'BAD_REQUEST',
-        'An email address or phone number is needed to create a login',
-      )
-    }
-    temporaryPassword = `${randomToken(6).replace(/[^a-zA-Z0-9]/g, '')}A1`
-    const role = await ctx.db.role.findFirst({ where: { tenantId: null, key: ROLE.PARENT } })
-
-    const user = await ctx.db.user.create({
-      data: {
-        tenantId: ctx.tenant.id,
-        email: input.email ?? null,
-        phone: input.phone ?? null,
-        passwordHash: await hashPassword(temporaryPassword),
-        firstName: input.firstName,
-        lastName: input.lastName,
-        mustChangePassword: true,
-        ...(role ? { roles: { create: { roleId: role.id } } } : {}),
-      },
+  if (phone) {
+    const clash = await ctx.db.parent.findFirst({
+      where: { phone: { in: phoneLookupCandidates(phone) }, deletedAt: null },
+      select: { id: true },
     })
-    userId = user.id
+    if (clash) throw conflict(`A parent with this phone number already exists`)
   }
 
   const parent = await ctx.db.parent.create({
     data: {
       tenantId: ctx.tenant.id,
-      userId,
       firstName: input.firstName,
       lastName: input.lastName,
-      phone: input.phone,
-      email: input.email,
+      phone,
+      email: email ?? null,
       occupation: input.occupation,
       annualIncome: input.annualIncome,
       addressLine1: input.addressLine1,
@@ -243,6 +230,29 @@ export async function createParent(
     },
   })
 
+  let temporaryPassword: string | undefined
+  if (input.createLogin) {
+    if (!opts?.passwordStudentId) {
+      throw new ApiException(
+        400,
+        'BAD_REQUEST',
+        'Link a child with a date of birth before creating a parent portal login',
+      )
+    }
+    await ctx.db.studentGuardian.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        parentId: parent.id,
+        studentId: opts.passwordStudentId,
+        relation: 'GUARDIAN',
+        isPrimary: true,
+        isEmergencyContact: true,
+      },
+    })
+    const issued = await issueParentPortalLogin(ctx, parent.id)
+    temporaryPassword = issued.temporaryPassword
+  }
+
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
@@ -251,11 +261,141 @@ export async function createParent(
     module: 'parents',
     entityType: 'Parent',
     entityId: parent.id,
-    summary: `Added parent ${parent.firstName} ${parent.lastName}${userId ? ' with a portal login' : ''}`,
+    summary: `Added parent ${parent.firstName} ${parent.lastName}${temporaryPassword ? ' with a portal login' : ''}`,
     after: parent,
   })
 
   return { parent, temporaryPassword }
+}
+
+/**
+ * Issues (or re-issues) a parent portal login.
+ *
+ * Username = phone. Password = childFirstName + YYYYMMDD from the primary
+ * linked student (else earliest link). Does not overwrite an account that
+ * already exists unless `reset: true`.
+ */
+export async function issueParentPortalLogin(
+  ctx: AppContext,
+  parentId: string,
+  opts?: { reset?: boolean },
+): Promise<{ temporaryPassword: string; userId: string }> {
+  if (!ctx.can('users.create') && !ctx.can('parents.create') && !ctx.can('parents.edit')) {
+    ctx.require('users.create')
+  }
+
+  const parent = await ctx.db.parent.findFirst({
+    where: { id: parentId, deletedAt: null },
+    include: {
+      children: {
+        orderBy: [{ isPrimary: 'desc' }],
+        take: 5,
+        include: {
+          student: { select: { firstName: true, dateOfBirth: true, deletedAt: true } },
+        },
+      },
+    },
+  })
+  if (!parent) throw notFound('Parent')
+
+  const phone = storePhone(parent.phone)
+  if (!phone) {
+    throw new ApiException(
+      400,
+      'BAD_REQUEST',
+      'A phone number is needed to create a parent portal login',
+    )
+  }
+
+  const child = parent.children.find((c) => !c.student.deletedAt)?.student
+  if (!child?.dateOfBirth) {
+    throw new ApiException(
+      400,
+      'BAD_REQUEST',
+      'Link a child with a date of birth before creating a parent portal login',
+    )
+  }
+
+  let temporaryPassword: string
+  try {
+    temporaryPassword = parentInitialPassword(child.firstName, child.dateOfBirth)
+  } catch (err) {
+    throw new ApiException(
+      400,
+      'BAD_REQUEST',
+      err instanceof Error ? err.message : 'Could not build the parent password',
+    )
+  }
+
+  if (parent.userId && !opts?.reset) {
+    throw conflict('This parent already has a portal login')
+  }
+
+  await assertPhoneAvailable(ctx, phone, parent.userId ?? undefined)
+
+  const role = await ctx.db.role.findFirst({ where: { tenantId: null, key: ROLE.PARENT } })
+  const passwordHash = await hashPassword(temporaryPassword)
+
+  let userId = parent.userId
+  if (userId) {
+    await ctx.db.user.update({
+      where: { id: userId },
+      data: {
+        phone,
+        passwordHash,
+        mustChangePassword: true,
+        tempPasswordExpiresAt: null,
+        status: 'ACTIVE',
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    })
+  } else {
+    const user = await ctx.db.user.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        email: parent.email,
+        phone,
+        passwordHash,
+        firstName: parent.firstName,
+        lastName: parent.lastName,
+        mustChangePassword: true,
+        ...(role ? { roles: { create: { roleId: role.id } } } : {}),
+      },
+    })
+    userId = user.id
+    await ctx.db.parent.update({ where: { id: parentId }, data: { userId, phone } })
+  }
+
+  if (parent.phone !== phone) {
+    await ctx.db.parent.update({ where: { id: parentId }, data: { phone } })
+  }
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'parent.issue_login',
+    module: 'parents',
+    entityType: 'Parent',
+    entityId: parentId,
+    summary: `Issued portal login for ${parent.firstName} ${parent.lastName}`,
+  })
+
+  return { temporaryPassword, userId }
+}
+
+async function assertPhoneAvailable(ctx: AppContext, phone: string, exceptUserId?: string) {
+  const clash = await ctx.db.user.findFirst({
+    where: {
+      tenantId: ctx.tenant.id,
+      deletedAt: null,
+      phone: { in: phoneLookupCandidates(phone) },
+      ...(exceptUserId ? { id: { not: exceptUserId } } : {}),
+    },
+    select: { id: true },
+  })
+  if (clash) throw conflict('Another account already uses this phone number')
 }
 
 export async function updateParent(
@@ -535,15 +675,24 @@ export async function createStaff(
   })
   if (clash) throw conflict(`Employee code ${input.employeeCode} is already in use`)
 
+  const phone = storePhone(input.phone)
+  const email = input.email?.trim().toLowerCase() || undefined
+
   let userId: string | undefined
   let temporaryPassword: string | undefined
 
   if (input.createLogin) {
-    if (!input.email) {
-      throw new ApiException(400, 'BAD_REQUEST', 'An email address is needed to create a login')
+    if (!phone) {
+      throw new ApiException(
+        400,
+        'BAD_REQUEST',
+        'A phone number is needed to create a portal login',
+      )
     }
-    temporaryPassword = `${randomToken(6).replace(/[^a-zA-Z0-9]/g, '')}A1`
-    const roleKey = input.roleKey ?? defaultRoleForStaffType(input.staffType)
+    temporaryPassword = staffInitialPassword(input.employeeCode)
+    await assertPhoneAvailable(ctx, phone)
+
+    const roleKey = input.roleKey || defaultRoleForStaffType(input.staffType)
     const role = await ctx.db.role.findFirst({
       where: { key: roleKey, OR: [{ tenantId: null }, { tenantId: ctx.tenant.id }] },
     })
@@ -551,8 +700,8 @@ export async function createStaff(
     const user = await ctx.db.user.create({
       data: {
         tenantId: ctx.tenant.id,
-        email: input.email,
-        phone: input.phone ?? null,
+        email: email ?? null,
+        phone,
         passwordHash: await hashPassword(temporaryPassword),
         firstName: input.firstName,
         lastName: input.lastName,
@@ -566,7 +715,13 @@ export async function createStaff(
   const { createLogin: _c, roleKey: _r, ...fields } = input
 
   const staff = await ctx.db.staff.create({
-    data: { ...fields, userId, tenantId: ctx.tenant.id },
+    data: {
+      ...fields,
+      phone,
+      email: email ?? null,
+      userId,
+      tenantId: ctx.tenant.id,
+    },
   })
 
   await audit({
@@ -582,6 +737,98 @@ export async function createStaff(
   })
 
   return { staff, temporaryPassword }
+}
+
+/**
+ * Issues (or re-issues) a staff portal login.
+ *
+ * Username = phone. Password = employee code. Does not overwrite an existing
+ * account unless `reset: true`.
+ */
+export async function issueStaffPortalLogin(
+  ctx: AppContext,
+  staffId: string,
+  opts?: { reset?: boolean; roleKey?: string },
+): Promise<{ temporaryPassword: string; userId: string }> {
+  if (!ctx.can('users.create') && !ctx.can('staff.create') && !ctx.can('staff.edit')) {
+    ctx.require('users.create')
+  }
+
+  const staff = await ctx.db.staff.findFirst({
+    where: { id: staffId, deletedAt: null },
+  })
+  if (!staff) throw notFound('Staff member')
+
+  const phone = storePhone(staff.phone)
+  if (!phone) {
+    throw new ApiException(
+      400,
+      'BAD_REQUEST',
+      'A phone number is needed to create a staff portal login',
+    )
+  }
+
+  const temporaryPassword = staffInitialPassword(staff.employeeCode)
+
+  if (staff.userId && !opts?.reset) {
+    throw conflict('This staff member already has a portal login')
+  }
+
+  await assertPhoneAvailable(ctx, phone, staff.userId ?? undefined)
+
+  const roleKey = opts?.roleKey || defaultRoleForStaffType(staff.staffType)
+  const role = await ctx.db.role.findFirst({
+    where: { key: roleKey, OR: [{ tenantId: null }, { tenantId: ctx.tenant.id }] },
+  })
+  const passwordHash = await hashPassword(temporaryPassword)
+
+  let userId = staff.userId
+  if (userId) {
+    await ctx.db.user.update({
+      where: { id: userId },
+      data: {
+        phone,
+        passwordHash,
+        mustChangePassword: true,
+        tempPasswordExpiresAt: null,
+        status: 'ACTIVE',
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    })
+  } else {
+    const user = await ctx.db.user.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        email: staff.email,
+        phone,
+        passwordHash,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        mustChangePassword: true,
+        ...(role ? { roles: { create: { roleId: role.id } } } : {}),
+      },
+    })
+    userId = user.id
+    await ctx.db.staff.update({ where: { id: staffId }, data: { userId, phone } })
+  }
+
+  if (staff.phone !== phone) {
+    await ctx.db.staff.update({ where: { id: staffId }, data: { phone } })
+  }
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'staff.issue_login',
+    module: 'staff',
+    entityType: 'Staff',
+    entityId: staffId,
+    summary: `Issued portal login for ${staff.firstName} ${staff.lastName} (${staff.employeeCode})`,
+  })
+
+  return { temporaryPassword, userId }
 }
 
 function defaultRoleForStaffType(type: string): string {

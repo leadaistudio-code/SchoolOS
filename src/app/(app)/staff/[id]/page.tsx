@@ -29,6 +29,8 @@ import { GeneratePayslipButton, OpenAppraisalButton, PayslipStatusControl, SetSa
 import { AppraisalEditor } from '../appraisal-editor'
 import { Staff360 } from './staff-360'
 import { uploadStaffPhotoAction, removeStaffPhotoAction } from './photo-actions'
+import { issueStaffPortalLoginAction } from '../actions'
+import { Button } from '@/components/ui/button'
 
 export const metadata = { title: 'Staff profile' }
 
@@ -72,6 +74,10 @@ export default async function StaffDetailPage({
   const canPayroll = ctx.can('staff.payroll')
   const canPayrollManage = ctx.can('staff.payroll_manage')
   const canAppraise = ctx.can('staff.appraise')
+  const canIssueLogin =
+    !staff.user &&
+    !!staff.phone &&
+    (ctx.can('users.create') || ctx.can('staff.create') || ctx.can('staff.edit'))
   const currency = ctx.tenant.currency
   const money = (minor: number) => formatMoney(minor, currency)
 
@@ -95,19 +101,28 @@ export default async function StaffDetailPage({
           />
         }
         actions={
-          ctx.can('staff.edit') ? (
-            <Link href={`/staff/${id}/edit`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
-              Edit profile
-            </Link>
-          ) : null
+          <div className="flex flex-wrap items-center gap-2">
+            {canIssueLogin ? (
+              <form action={issueStaffPortalLoginAction.bind(null, id)}>
+                <Button type="submit" size="sm" variant="secondary">
+                  Issue portal login
+                </Button>
+              </form>
+            ) : null}
+            {ctx.can('staff.edit') ? (
+              <Link href={`/staff/${id}/edit`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
+                Edit profile
+              </Link>
+            ) : null}
+          </div>
         }
       />
 
       {query.welcome ? (
         <Notice tone="success" title="Portal login created">
-          One-time password: <strong className="tnum">{query.welcome}</strong>. Share it with{' '}
-          {staff.firstName} now — it is not stored and cannot be shown again. They will be asked to
-          change it at first sign-in.
+          Username is their phone. One-time password: <strong className="tnum">{query.welcome}</strong>.
+          Share it with {staff.firstName} now — it is not stored and cannot be shown again. They will
+          be asked to change it at first sign-in (first password is their employee code).
         </Notice>
       ) : null}
 

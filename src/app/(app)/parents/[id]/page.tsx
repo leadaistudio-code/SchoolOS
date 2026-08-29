@@ -11,15 +11,29 @@ import {
   DescriptionList,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { EmptyState } from '@/components/ui/states'
+import { Button } from '@/components/ui/button'
+import { EmptyState, Notice } from '@/components/ui/states'
 import { Avatar, PersonCell } from '@/components/ui/identity'
+import { issueParentPortalLoginAction } from '../actions'
 
 export const metadata = { title: 'Parent profile' }
 
-export default async function ParentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ParentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | undefined>>
+}) {
   const { id } = await params
+  const query = await searchParams
   const ctx = await requireContext('parents.view')
   const parent = await getParent(ctx, id)
+  const canIssueLogin =
+    !parent.user &&
+    !!parent.phone &&
+    parent.children.length > 0 &&
+    (ctx.can('users.create') || ctx.can('parents.create') || ctx.can('parents.edit'))
 
   return (
     <div className="space-y-4">
@@ -30,7 +44,25 @@ export default async function ParentDetailPage({ params }: { params: Promise<{ i
             ? '1 child at this school'
             : `${parent.children.length} children at this school`
         }
+        actions={
+          canIssueLogin ? (
+            <form action={issueParentPortalLoginAction.bind(null, id)}>
+              <Button type="submit" size="sm" variant="secondary">
+                Issue portal login
+              </Button>
+            </form>
+          ) : null
+        }
       />
+
+      {query.welcome ? (
+        <Notice tone="success" title="Portal login created">
+          Username is their phone. One-time password:{' '}
+          <strong className="tnum">{query.welcome}</strong>. Share it with {parent.firstName} now —
+          it is not stored and cannot be shown again. They will be asked to change it at first
+          sign-in.
+        </Notice>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
@@ -56,11 +88,11 @@ export default async function ParentDetailPage({ params }: { params: Promise<{ i
                     .filter(Boolean)
                     .join(', ') || '—'
                 }</DescriptionItem>
-              <DescriptionItem label="Last sign-in">{
-                  parent.user?.lastLoginAt
+              <DescriptionItem label="Last sign-in">
+                  {parent.user?.lastLoginAt
                     ? format(parent.user.lastLoginAt, 'd MMM yyyy, HH:mm')
-                    : 'Never'
-                }</DescriptionItem>
+                    : 'Never'}
+                </DescriptionItem>
             </DescriptionList>
           </CardContent>
         </Card>
@@ -114,4 +146,3 @@ export default async function ParentDetailPage({ params }: { params: Promise<{ i
     </div>
   )
 }
-

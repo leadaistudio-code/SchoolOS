@@ -7,6 +7,7 @@ import { requireContext } from '@/server/context'
 import {
   archiveStaff,
   createStaff,
+  issueStaffPortalLogin,
   staffCreateSchema,
   staffUpdateSchema,
   updateStaff,
@@ -133,6 +134,19 @@ export async function archiveStaffAction(id: string, reason?: string): Promise<A
   } catch (err) {
     return fail(err, 'The record could not be archived')
   }
+}
+
+/** Issues a portal login for staff without one. Password shown once via `?welcome=`. */
+export async function issueStaffPortalLoginAction(staffId: string): Promise<void> {
+  const ctx = await requireContext()
+  if (!ctx.can('users.create') && !ctx.can('staff.create') && !ctx.can('staff.edit')) {
+    ctx.require('staff.edit')
+  }
+
+  const { temporaryPassword } = await issueStaffPortalLogin(ctx, staffId)
+
+  revalidatePath(`/staff/${staffId}`)
+  redirect(`/staff/${staffId}?welcome=${encodeURIComponent(temporaryPassword)}`)
 }
 
 /* ------------------------------------------------------------------ salary */

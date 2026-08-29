@@ -145,7 +145,7 @@ export default function LoginScreen() {
                   <Input
                     value={identifier}
                     onChangeText={(v) => { setIdentifier(v); setError(null) }}
-                    placeholder="you@school.edu"
+                    placeholder="Mobile number or email"
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
@@ -184,6 +184,10 @@ export default function LoginScreen() {
                 </Field>
 
                 <Button label="Sign in" onPress={submit} loading={busy} />
+
+                <Txt variant="small" color={colors.textOnDarkMuted} style={{ textAlign: 'center', marginTop: spacing.base }}>
+                  Use your mobile number and the password given by the school.
+                </Txt>
 
                 <Pressable
                   onPress={() => { setSchool(null); setPassword(''); setError(null) }}

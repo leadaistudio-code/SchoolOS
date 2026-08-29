@@ -7,7 +7,7 @@ import { Save } from 'lucide-react'
 import { emptyFormState, type FormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { Field, FormSection, Input, Select, Textarea } from '@/components/ui/input'
+import { Checkbox, Field, FormSection, Input, Select, Textarea } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import type { ClassOption } from './student-filters'
@@ -213,6 +213,13 @@ export function StudentForm({
             <Field label="Occupation" htmlFor="guardian.occupation">
               <Input id="guardian.occupation" name="guardian.occupation" />
             </Field>
+            <label className="flex items-center gap-2 sm:col-span-2">
+              <Checkbox name="guardian.createLogin" />
+              <span className="text-sm text-ink">
+                Create parent portal login (phone + child first name and date of birth as first
+                password)
+              </span>
+            </label>
         </FormSection>
       ) : null}
 

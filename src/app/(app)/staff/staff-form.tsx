@@ -231,7 +231,7 @@ export function StaffForm({
           {canCreateLogin ? (
             <FormSection
               title="Portal access"
-              description="Creates an account with a one-time password shown after saving."
+              description="Username is their phone. First password is the employee code — shown once after saving."
             >
               <label className="flex items-center gap-2">
                 <Checkbox
@@ -240,7 +240,7 @@ export function StaffForm({
                   onChange={(e) => setCreateLogin(e.target.checked)}
                 />
                 <span className="text-sm text-ink">
-                  Give this person a login — an email address is required
+                  Give this person a login — a phone number is required
                 </span>
               </label>
 
@@ -249,7 +249,7 @@ export function StaffForm({
                   label="Role"
                   htmlFor="roleKey"
                   className="mt-3 max-w-sm"
-                  hint="What they can see and do. Teaching staff default to Teacher."
+                  hint="What they can see and do. Teaching staff default to Teacher; front desk covers admissions."
                 >
                   <Select id="roleKey" name="roleKey" defaultValue="">
                     {ROLES.map((r) => (

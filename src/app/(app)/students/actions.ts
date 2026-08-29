@@ -53,10 +53,12 @@ export async function createStudentAction(
   const ctx = await requireContext('students.create')
 
   let studentId: string
+  let temporaryPassword: string | undefined
   try {
     const input = studentCreateSchema.parse(readForm(formData))
     const student = await createStudent(ctx, input)
     studentId = student.id
+    temporaryPassword = student.temporaryPassword
   } catch (err) {
     if (err instanceof ZodError) {
       return { error: 'Please correct the highlighted fields', fieldErrors: toFieldErrors(err) }
@@ -68,7 +70,11 @@ export async function createStudentAction(
   }
 
   revalidatePath('/students')
-  redirect(`/students/${studentId}`)
+  redirect(
+    temporaryPassword
+      ? `/students/${studentId}?welcome=${encodeURIComponent(temporaryPassword)}`
+      : `/students/${studentId}`,
+  )
 }
 
 export async function updateStudentAction(

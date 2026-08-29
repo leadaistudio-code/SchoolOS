@@ -60,3 +60,46 @@ export function maskPhone(e164: string): string {
   const cc = e164.startsWith('+') ? `+${digits.slice(0, digits.length - 10 > 0 ? digits.length - 10 : 2)} ` : ''
   return `${cc}····· ${last}`
 }
+
+/**
+ * Forms a typed phone number might already be stored as.
+ *
+ * Login and uniqueness checks try every candidate so `9842115933`,
+ * `09842115933` and `+919842115933` resolve to the same account.
+ */
+export function phoneLookupCandidates(
+  raw: string,
+  countryCode = env().DEFAULT_COUNTRY_CODE,
+): string[] {
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+
+  const out = new Set<string>()
+  out.add(trimmed)
+  out.add(trimmed.toLowerCase())
+
+  const digitsOnly = trimmed.replace(/[^\d]/g, '')
+  if (digitsOnly) out.add(digitsOnly)
+
+  const e164 = normalizePhone(trimmed, countryCode)
+  if (e164) {
+    out.add(e164)
+    out.add(e164.slice(1)) // without plus
+    const national = e164.replace(new RegExp(`^\\+${clean(countryCode).replace('+', '')}`), '')
+    if (national) {
+      out.add(national)
+      out.add(`0${national}`)
+    }
+  }
+
+  return [...out].filter(Boolean)
+}
+
+/** Preferred E.164 storage form, falling back to cleaned digits when unknown. */
+export function storePhone(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null
+  const normalized = normalizePhone(raw)
+  if (normalized) return normalized
+  const cleaned = clean(raw)
+  return cleaned || null
+}

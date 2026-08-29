@@ -33,7 +33,11 @@ export const ONBOARDING_SHEETS: OnboardingSheet[] = [
       ['7', 'Dates are YYYY-MM-DD. Money is rupees (not paise). Gender is Male / Female / Other.'],
       ['8', 'Do not rename sheets. You may add rows. Do not insert a title row above the header.'],
       ['9', 'Upload this file on Students → Bulk import. The whole pack imports in one go — classes, staff, students and parents are linked automatically.'],
-      ['10', 'Delete the sample rows before you send the real school data.'],
+      [
+        '10',
+        'Portal logins: when a Staff or Parent row has a phone number, a login is created automatically. Username = phone. Staff first password = employee code. Parent first password = child first name (lowercase, no spaces) + date of birth as YYYYMMDD (example: Aarav born 12 Apr 2015 → aarav20150412). Ask them to change the password after first sign-in at your school /login page.',
+      ],
+      ['11', 'Delete the sample rows before you send the real school data.'],
     ],
   },
   {

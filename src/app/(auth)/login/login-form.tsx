@@ -31,6 +31,7 @@ export function LoginForm({ next, showForgotPassword = false }: { next?: string;
         htmlFor="identifier"
         required
         error={state.fieldErrors.identifier}
+        hint="Parents and staff: use the mobile number on your school record"
       >
         <Input
           id="identifier"
@@ -39,13 +40,19 @@ export function LoginForm({ next, showForgotPassword = false }: { next?: string;
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="you@school.edu"
+          placeholder="Mobile number or email"
           required
           aria-invalid={!!state.fieldErrors.identifier}
         />
       </Field>
 
-      <Field label="Password" htmlFor="password" required error={state.fieldErrors.password}>
+      <Field
+        label="Password"
+        htmlFor="password"
+        required
+        error={state.fieldErrors.password}
+        hint="Use the password given by the school, then change it after first sign-in"
+      >
         <div className="relative">
           <Input
             id="password"
