@@ -38,3 +38,32 @@ export const REPORT_TONE: Record<string, SeriesKey> = {
   admissions: 'admissions',
   staff: 'staff',
 }
+
+/** Sidebar / module icon colour by route — mirrors Settings hub tiles. */
+export function navIconTone(href: string): SeriesKey {
+  const path = href === '/' ? '/' : href.replace(/\/$/, '')
+
+  if (path === '/') return 'admissions'
+  if (path.startsWith('/students') || path.startsWith('/my/')) return 'students'
+  if (path.startsWith('/parents') || path.startsWith('/feedback')) return 'parents'
+  if (path.startsWith('/staff')) return 'staff'
+  if (path.startsWith('/attendance') || path.startsWith('/leave')) return 'attendance'
+  if (path.startsWith('/academics') || path.startsWith('/assessments') || path.startsWith('/teacher')) {
+    return 'admissions'
+  }
+  if (path.startsWith('/exams') || path.startsWith('/score')) return 'late'
+  if (path.startsWith('/finance') || path.startsWith('/reports')) return 'fees'
+  if (path.startsWith('/admissions') || path.startsWith('/front-office') || path.startsWith('/website')) {
+    return 'admissions'
+  }
+  if (path.startsWith('/transport') || path.startsWith('/library') || path.startsWith('/inventory')) {
+    return 'transport'
+  }
+  if (path.startsWith('/sports') || path.startsWith('/events')) return 'parents'
+  if (path.startsWith('/communication')) return 'overdue'
+  if (path.startsWith('/settings') || path.startsWith('/account') || path.startsWith('/admin')) {
+    return 'staff'
+  }
+  return 'pending'
+}
+

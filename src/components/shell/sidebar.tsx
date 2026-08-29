@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import { NAV_SECTIONS, type NavItem, type NavSection } from '@/lib/navigation'
+import { navIconTone, seriesToneClass } from '@/lib/chart-tones'
 import { cn } from '@/lib/utils'
 import { Icon } from './icon'
 import { SchoolScene } from '@/components/illustrations/school-scene'
@@ -173,6 +174,44 @@ const ROW =
 
 const IDLE = 'text-[var(--sidebar-fg)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-fg-strong)]'
 
+/** Soft tinted badge behind each nav icon — same language as Settings hub tiles. */
+function NavIconBadge({
+  name,
+  href,
+  active = false,
+}: {
+  name: string
+  href: string
+  active?: boolean
+}) {
+  const tone = navIconTone(href)
+  return (
+    <span
+      className={cn(
+        'grid size-7 shrink-0 place-items-center rounded-[8px] transition-colors',
+        active ? 'bg-white/20 text-white' : seriesToneClass(tone),
+      )}
+      aria-hidden
+    >
+      <Icon name={name} className="size-[15px]" />
+    </span>
+  )
+}
+
+const DOT_TONE: Record<string, string> = {
+  students: 'bg-[var(--chart-students)]',
+  staff: 'bg-[var(--chart-staff)]',
+  parents: 'bg-[var(--chart-parents)]',
+  attendance: 'bg-[var(--chart-attendance)]',
+  fees: 'bg-[var(--chart-fees)]',
+  pending: 'bg-[var(--chart-pending)]',
+  overdue: 'bg-[var(--chart-overdue)]',
+  admissions: 'bg-[var(--chart-admissions)]',
+  transport: 'bg-[var(--chart-transport)]',
+  late: 'bg-[var(--chart-late)]',
+  leave: 'bg-[var(--chart-leave)]',
+}
+
 function NavNode({
   item,
   pathname,
@@ -205,7 +244,7 @@ function NavNode({
         style={active ? { backgroundImage: 'var(--product-grad)' } : undefined}
         title={collapsed ? item.label : undefined}
       >
-        <Icon name={item.icon} className="size-[18px] shrink-0" />
+        <NavIconBadge name={item.icon} href={item.href} active={active} />
         {!collapsed ? (
           <>
             <span className="truncate">{item.label}</span>
@@ -224,10 +263,7 @@ function NavNode({
         aria-expanded={open}
         className={cn(ROW, active ? 'text-[var(--sidebar-fg-strong)]' : IDLE)}
       >
-        <Icon
-          name={item.icon}
-          className={cn('size-[18px] shrink-0', active && 'text-[var(--product-500)]')}
-        />
+        <NavIconBadge name={item.icon} href={item.href} active={false} />
         <span className="flex-1 truncate text-left">{item.label}</span>
         <ChevronDown
           className={cn(
@@ -258,7 +294,9 @@ function NavNode({
                   <span
                     className={cn(
                       'size-1.5 shrink-0 rounded-full',
-                      childActive ? 'bg-[var(--product-500)]' : 'bg-[var(--sidebar-border)]',
+                      childActive
+                        ? DOT_TONE[navIconTone(child.href)] ?? 'bg-[var(--product-500)]'
+                        : 'bg-[var(--sidebar-border)]',
                     )}
                     aria-hidden
                   />

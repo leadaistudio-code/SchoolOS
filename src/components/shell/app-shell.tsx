@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import type { NavItem } from '@/lib/navigation'
+import { navIconTone, seriesToneClass } from '@/lib/chart-tones'
 import { Sidebar } from './sidebar'
 import { Topbar, type TopbarUser } from './topbar'
 import { Icon } from './icon'
@@ -185,7 +186,17 @@ export function AppShell({
                     active ? 'text-[var(--product-600)]' : 'text-ink-subtle',
                   )}
                 >
-                  <Icon name={item.icon} className="size-[18px]" />
+                  <span
+                    className={cn(
+                      'grid size-8 place-items-center rounded-[9px]',
+                      active
+                        ? seriesToneClass(navIconTone(item.href))
+                        : 'bg-surface-2 text-ink-muted',
+                    )}
+                    aria-hidden
+                  >
+                    <Icon name={item.icon} className="size-[16px]" />
+                  </span>
                   {item.label}
                 </Link>
               )
