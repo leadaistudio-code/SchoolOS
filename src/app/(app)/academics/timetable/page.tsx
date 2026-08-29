@@ -101,7 +101,7 @@ export default async function TimetablePage({
           staffId={params.staffId}
         />
 
-        <PeriodStrip periods={periods} />
+        <PeriodStrip periods={periods} editable={canManage} />
 
         {isTeacherView ? (
           <TeacherView staffId={params.staffId!} />

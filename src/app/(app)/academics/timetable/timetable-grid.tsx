@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2, Plus, X } from 'lucide-react'
 import type { TimetableGrid as Grid } from '@/server/modules/timetable/service'
 import { setSlotAction } from './actions'
@@ -33,6 +34,7 @@ export function TimetableGrid({
   editable: boolean
   readOnlyReason?: string
 }) {
+  const router = useRouter()
   const toast = useToast()
   const [editing, setEditing] = React.useState<{ periodId: string; day: number } | null>(null)
   const [saving, setSaving] = React.useState<string | null>(null)
@@ -59,6 +61,12 @@ export function TimetableGrid({
 
     setSaving(null)
     setEditing(null)
+    if (result.ok) router.refresh()
+  }
+
+  const clear = async (periodId: string, day: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await save(periodId, day, '')
   }
 
   return (
@@ -133,6 +141,7 @@ export function TimetableGrid({
                             ))}
                           </Select>
                           <button
+                            type="button"
                             onClick={() => setEditing(null)}
                             className="size-7 grid place-items-center rounded-[var(--radius-sm)] text-ink-subtle hover:text-ink"
                             aria-label="Cancel"
@@ -145,30 +154,50 @@ export function TimetableGrid({
                           <Loader2 className="size-4 animate-spin text-ink-subtle" aria-hidden />
                         </div>
                       ) : cell?.subject ? (
-                        <button
-                          disabled={!editable}
-                          onClick={() => setEditing({ periodId: period.id, day: day.value })}
+                        <div
                           className={cn(
-                            'w-full text-left rounded-[var(--radius-sm)] border border-line bg-surface px-2.5 py-1.5 min-h-14',
+                            'group relative w-full text-left rounded-[var(--radius-sm)] border border-line bg-surface px-2.5 py-1.5 min-h-14',
                             editable && 'hover:border-[var(--brand-500)] hover:bg-[var(--brand-50)]',
                           )}
                         >
-                          <span className="block text-xs font-medium text-ink truncate">
-                            {cell.subject}
-                          </span>
-                          {cell.teacher ? (
-                            <span className="block text-xs text-ink-subtle truncate">
-                              {cell.teacher}
+                          <button
+                            type="button"
+                            disabled={!editable}
+                            onClick={() => setEditing({ periodId: period.id, day: day.value })}
+                            className="w-full text-left disabled:cursor-default"
+                            aria-label={
+                              editable
+                                ? `Change ${cell.subject} on ${day.label} in ${period.name}`
+                                : undefined
+                            }
+                          >
+                            <span className="block text-xs font-medium text-ink truncate pr-5">
+                              {cell.subject}
                             </span>
+                            {cell.teacher ? (
+                              <span className="block text-xs text-ink-subtle truncate">
+                                {cell.teacher}
+                              </span>
+                            ) : null}
+                            {cell.roomName ? (
+                              <span className="block text-xs text-ink-subtle">{cell.roomName}</span>
+                            ) : null}
+                          </button>
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={(e) => clear(period.id, day.value, e)}
+                              className="absolute right-1 top-1 size-6 grid place-items-center rounded-[var(--radius-sm)] text-ink-subtle opacity-0 group-hover:opacity-100 hover:bg-danger-bg hover:text-[var(--danger)] focus:opacity-100"
+                              aria-label={`Clear ${cell.subject} on ${day.label}`}
+                              title="Clear this slot"
+                            >
+                              <X className="size-3.5" aria-hidden />
+                            </button>
                           ) : null}
-                          {cell.roomName ? (
-                            <span className="block text-xs text-ink-subtle">
-                              {cell.roomName}
-                            </span>
-                          ) : null}
-                        </button>
+                        </div>
                       ) : editable ? (
                         <button
+                          type="button"
                           onClick={() => setEditing({ periodId: period.id, day: day.value })}
                           className="w-full min-h-14 rounded-[var(--radius-sm)] border border-dashed border-line text-ink-subtle hover:text-[var(--brand-600)] hover:border-[var(--brand-500)] grid place-items-center"
                           aria-label={`Add a lesson on ${day.label} in ${period.name}`}
@@ -191,8 +220,8 @@ export function TimetableGrid({
 
       {editable ? (
         <p className="px-4 py-3 text-xs text-ink-subtle border-t border-line">
-          Click a slot to set or clear it. A teacher already taking another class in that period
-          is refused, so the grid cannot double-book anyone.
+          Click a lesson to change the subject, or the × to clear it. A teacher already taking
+          another class in that period is refused, so the grid cannot double-book anyone.
         </p>
       ) : null}
     </div>

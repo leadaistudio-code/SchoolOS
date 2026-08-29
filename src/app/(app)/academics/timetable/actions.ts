@@ -3,7 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
-import { createPeriod, periodSchema, setSlot, slotSchema } from '@/server/modules/timetable/service'
+import {
+  createPeriod,
+  deletePeriod,
+  periodSchema,
+  periodUpdateSchema,
+  setSlot,
+  slotSchema,
+  updatePeriod,
+} from '@/server/modules/timetable/service'
 
 export type SlotResult = { ok: boolean; message: string }
 
@@ -55,6 +63,48 @@ export async function createPeriodAction(payload: unknown): Promise<SlotResult> 
     return {
       ok: false,
       message: err instanceof Error ? err.message : 'The period could not be saved',
+    }
+  }
+}
+
+export async function updatePeriodAction(payload: unknown): Promise<SlotResult> {
+  const ctx = await requireContext('timetable.manage')
+
+  try {
+    const updated = await updatePeriod(ctx, periodUpdateSchema.parse(payload))
+    revalidatePath('/academics/timetable')
+    return {
+      ok: true,
+      message: `${updated.name} now runs ${updated.startTime}–${updated.endTime}.`,
+    }
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return { ok: false, message: err.issues[0]?.message ?? 'Invalid period' }
+    }
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'The period could not be saved',
+    }
+  }
+}
+
+export async function deletePeriodAction(id: string): Promise<SlotResult> {
+  const ctx = await requireContext('timetable.manage')
+
+  try {
+    const result = await deletePeriod(ctx, id)
+    revalidatePath('/academics/timetable')
+    return {
+      ok: true,
+      message:
+        result.slotsRemoved > 0
+          ? `Period removed, along with ${result.slotsRemoved} scheduled lesson${result.slotsRemoved === 1 ? '' : 's'}.`
+          : 'Period removed.',
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'The period could not be deleted',
     }
   }
 }

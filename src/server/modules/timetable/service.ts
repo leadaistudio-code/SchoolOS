@@ -379,6 +379,111 @@ export async function createPeriod(ctx: AppContext, input: z.infer<typeof period
   return created
 }
 
+export const periodUpdateSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().trim().min(1).max(40),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Use a 24-hour HH:mm time'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Use a 24-hour HH:mm time'),
+    isBreak: z.coerce.boolean().default(false),
+    sortOrder: z.coerce.number().int().min(0).max(50).default(0),
+  })
+  .refine((v) => v.endTime > v.startTime, {
+    path: ['endTime'],
+    message: 'The period must end after it starts',
+  })
+
+/** Updates a period's name, times or break flag. Clears lessons if turned into a break. */
+export async function updatePeriod(ctx: AppContext, input: z.infer<typeof periodUpdateSchema>) {
+  ctx.require('timetable.manage')
+
+  const existing = await ctx.db.timetablePeriod.findFirst({ where: { id: input.id } })
+  if (!existing) throw notFound('Period')
+
+  const nameClash = await ctx.db.timetablePeriod.findFirst({
+    where: { name: input.name, id: { not: input.id } },
+    select: { id: true },
+  })
+  if (nameClash) throw conflict(`A period called ${input.name} already exists`)
+
+  const overlapping = await ctx.db.timetablePeriod.findFirst({
+    where: {
+      id: { not: input.id },
+      startTime: { lt: input.endTime },
+      endTime: { gt: input.startTime },
+    },
+    select: { name: true, startTime: true, endTime: true },
+  })
+  if (overlapping) {
+    throw conflict(
+      `That time overlaps ${overlapping.name} (${overlapping.startTime}–${overlapping.endTime})`,
+    )
+  }
+
+  const updated = await ctx.db.$transaction(async (tx) => {
+    // A break cannot hold lessons — clear any that were already scheduled.
+    if (input.isBreak && !existing.isBreak) {
+      await tx.timetableSlot.deleteMany({ where: { periodId: input.id } })
+    }
+    return tx.timetablePeriod.update({
+      where: { id: input.id },
+      data: {
+        name: input.name,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        isBreak: input.isBreak,
+        sortOrder: input.sortOrder,
+      },
+    })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'timetable.update_period',
+    module: 'timetable',
+    entityType: 'TimetablePeriod',
+    entityId: updated.id,
+    summary: `Updated period ${updated.name} (${updated.startTime}–${updated.endTime})`,
+    before: existing,
+    after: updated,
+  })
+  return updated
+}
+
+/**
+ * Removes a period and every lesson scheduled in it across all sections.
+ * Cascade on TimetableSlot.periodId already deletes the slots.
+ */
+export async function deletePeriod(ctx: AppContext, id: string) {
+  ctx.require('timetable.manage')
+
+  const existing = await ctx.db.timetablePeriod.findFirst({
+    where: { id },
+    include: { _count: { select: { slots: true } } },
+  })
+  if (!existing) throw notFound('Period')
+
+  await ctx.db.timetablePeriod.delete({ where: { id } })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'timetable.delete_period',
+    module: 'timetable',
+    entityType: 'TimetablePeriod',
+    entityId: id,
+    summary: `Deleted period ${existing.name}${
+      existing._count.slots > 0 ? ` and ${existing._count.slots} scheduled lessons` : ''
+    }`,
+    before: existing,
+  })
+
+  return { ok: true as const, slotsRemoved: existing._count.slots }
+}
+
 /**
  * Free/busy for one period slot: which teachers are already occupied. Used to
  * grey out impossible choices in the builder before the user picks them.
