@@ -1,10 +1,12 @@
+import { Medal, Trophy, Users } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listSports, sportsSetup } from '@/server/modules/sports/service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { AddMemberForm, CreateSportForm, CreateTeamForm } from './forms'
+import { formatNumber } from '@/lib/utils'
 
 export const metadata = { title: 'Sports' }
 
@@ -16,13 +18,54 @@ export default async function SportsPage() {
   const teams = sports.flatMap((s) =>
     s.teams.map((t) => ({ id: t.id, label: `${s.name} · ${t.name}` })),
   )
+  const teamCount = sports.reduce((sum, s) => sum + s.teams.length, 0)
+  const memberCount = sports.reduce(
+    (sum, s) => sum + s.teams.reduce((tSum, t) => tSum + t._count.members, 0),
+    0,
+  )
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Sports" description="Sports, teams and squad members." />
+    <div className="space-y-4">
+      <ColorBanner
+        tone="attendance"
+        eyebrow="Sports"
+        title={
+          sports.length > 0
+            ? `${formatNumber(sports.length)} sports programmes`
+            : 'Sports, teams and squads'
+        }
+        description="Sports, teams and squad members."
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ColorTile
+          label="Sports"
+          value={formatNumber(sports.length)}
+          sub="Programmes on offer"
+          tone="attendance"
+          icon={<Trophy className="size-5" aria-hidden />}
+          delayMs={40}
+        />
+        <ColorTile
+          label="Teams"
+          value={formatNumber(teamCount)}
+          sub="Across all sports"
+          tone="students"
+          icon={<Medal className="size-5" aria-hidden />}
+          delayMs={80}
+        />
+        <ColorTile
+          label="Squad members"
+          value={formatNumber(memberCount)}
+          sub="Students on teams"
+          tone="parents"
+          icon={<Users className="size-5" aria-hidden />}
+          delayMs={120}
+        />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card>
+        <Card variant="elevated">
           <CardHeader>
             <CardTitle>Sports · {sports.length}</CardTitle>
           </CardHeader>
@@ -56,7 +99,7 @@ export default async function SportsPage() {
 
         {setup ? (
           <div className="space-y-6">
-            <Card>
+            <Card variant="elevated">
               <CardHeader>
                 <CardTitle>Add sport</CardTitle>
               </CardHeader>
@@ -64,7 +107,7 @@ export default async function SportsPage() {
                 <CreateSportForm />
               </CardContent>
             </Card>
-            <Card>
+            <Card variant="elevated">
               <CardHeader>
                 <CardTitle>Add team</CardTitle>
               </CardHeader>
@@ -72,7 +115,7 @@ export default async function SportsPage() {
                 <CreateTeamForm sports={sports.map((s) => ({ id: s.id, name: s.name }))} />
               </CardContent>
             </Card>
-            <Card>
+            <Card variant="elevated">
               <CardHeader>
                 <CardTitle>Add member</CardTitle>
               </CardHeader>

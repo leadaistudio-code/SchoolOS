@@ -1,12 +1,13 @@
 import Link from 'next/link'
+import { BookOpen, GraduationCap, Layers } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getClassTree } from '@/server/modules/academics/service'
 import { teacherOptions } from '@/server/modules/people/service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
-import { cn } from '@/lib/utils'
+import { cn, formatNumber } from '@/lib/utils'
 import { AddSectionButton, EditClassButton, EditSectionButton, NewClassButton } from './class-forms'
 
 export const metadata = { title: 'Classes & sections' }
@@ -41,21 +42,58 @@ export default async function ClassesPage() {
     (sum, c) => sum + c.sections.reduce((s, sec) => s + sec._count.enrollments, 0),
     0,
   )
+  const totalSections = classes.reduce((sum, c) => sum + c.sections.length, 0)
 
   // The ladder position a new class would take: one above the highest in use,
   // capped at the schema's ceiling.
   const nextNumeric = Math.min(20, classes.reduce((max, c) => Math.max(max, c.numeric), -1) + 1)
 
   return (
-    <div>
-      <PageHeader
-        title="Classes & sections"
-        description={`${classes.length} classes · ${totalStudents} enrolled students in the current session`}
+    <div className="space-y-4">
+      <ColorBanner
+        tone="admissions"
+        eyebrow="Classes"
+        title={
+          classes.length > 0
+            ? `${formatNumber(classes.length)} classes · ${formatNumber(totalStudents)} enrolled`
+            : 'Classes & sections'
+        }
+        description="Attendance, timetables and fees all read from this tree."
         actions={canManage ? <NewClassButton nextNumeric={nextNumeric} /> : null}
       />
 
+      {classes.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ColorTile
+            label="Classes"
+            value={formatNumber(classes.length)}
+            sub="Class levels this session"
+            tone="admissions"
+            icon={<GraduationCap className="size-5" aria-hidden />}
+            delayMs={40}
+          />
+          <ColorTile
+            label="Sections"
+            value={formatNumber(totalSections)}
+            sub="Across all classes"
+            tone="students"
+            icon={<Layers className="size-5" aria-hidden />}
+            delayMs={80}
+          />
+          <ColorTile
+            label="Enrolled"
+            value={formatNumber(totalStudents)}
+            sub="Students in current session"
+            tone="attendance"
+            href="/students"
+            icon={<BookOpen className="size-5" aria-hidden />}
+            delayMs={120}
+          />
+        </div>
+      ) : null}
+
       {classes.length === 0 ? (
-        <Card>
+        <Card variant="elevated">
           <EmptyState
             title="No classes yet"
             description={
@@ -73,7 +111,7 @@ export default async function ClassesPage() {
             const capacity = c.sections.reduce((s, sec) => s + sec.capacity, 0)
 
             return (
-              <Card key={c.id} className="flex flex-col">
+              <Card key={c.id} variant="elevated" className="flex flex-col">
                 <CardHeader>
                   <div>
                     <CardTitle>{c.name}</CardTitle>

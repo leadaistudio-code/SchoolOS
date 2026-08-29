@@ -1,12 +1,17 @@
 import Link from 'next/link'
+import { AlertCircle, CalendarCheck, Layers } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { markableSections } from '@/server/modules/academics/service'
 import { getRegister, unmarkedSections } from '@/server/modules/attendance/service'
 import { toDateInput } from '@/lib/dates'
-import { PageBanner } from '@/components/page-banner'
+import { formatNumber } from '@/lib/utils'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerSecondaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { SectionPicker } from './section-picker'
 import { AttendanceRegister } from './register'
 
@@ -25,23 +30,61 @@ export default async function AttendancePage({
   const sections = await markableSections(ctx)
   const sectionId = params.sectionId ?? sections[0]?.id
 
+  const pending =
+    ctx.can('attendance.report') && sections.length > 0
+      ? await unmarkedSections(ctx, onDate)
+      : []
+
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Student attendance"
-        description={onDate === today ? 'Today’s register' : `Register for ${onDate}`}
+      <ColorBanner
         tone="attendance"
+        eyebrow="Attendance"
+        title={onDate === today ? "Today’s register" : `Register for ${onDate}`}
+        description={
+          sections.length > 0
+            ? `${formatNumber(sections.length)} sections you can mark`
+            : 'Mark presence for the sections assigned to you.'
+        }
         actions={
           ctx.can('attendance.report') ? (
-            <Link
-              href="/attendance/reports"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
+            <Link href="/attendance/reports" className={colorBannerSecondaryBtn()}>
               Reports
             </Link>
           ) : null
         }
       />
+
+      {sections.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ColorTile
+            label="Your sections"
+            value={formatNumber(sections.length)}
+            sub="Classes you can mark"
+            tone="attendance"
+            icon={<Layers className="size-5" aria-hidden />}
+            delayMs={40}
+          />
+          {ctx.can('attendance.report') ? (
+            <ColorTile
+              label="Not yet marked"
+              value={formatNumber(pending.length)}
+              sub={onDate === today ? 'Outstanding today' : `Outstanding for ${onDate}`}
+              tone={pending.length > 0 ? 'overdue' : 'pending'}
+              icon={<AlertCircle className="size-5" aria-hidden />}
+              delayMs={80}
+            />
+          ) : null}
+          <ColorTile
+            label="Register date"
+            value={onDate === today ? 'Today' : onDate}
+            sub="Change date in the picker below"
+            tone="students"
+            icon={<CalendarCheck className="size-5" aria-hidden />}
+            delayMs={120}
+          />
+        </div>
+      ) : null}
 
       {sections.length === 0 ? (
         <Card variant="elevated">
@@ -66,7 +109,9 @@ export default async function AttendancePage({
             )}
           </Card>
 
-          {ctx.can('attendance.report') ? <PendingSections onDate={onDate} /> : null}
+          {ctx.can('attendance.report') ? (
+            <PendingSectionsList pending={pending} onDate={onDate} />
+          ) : null}
         </div>
       )}
     </div>
@@ -74,10 +119,13 @@ export default async function AttendancePage({
 }
 
 /** Which sections still have nobody marked today — the reason a register gets chased. */
-async function PendingSections({ onDate }: { onDate: string }) {
-  const ctx = await requireContext('attendance.view')
-  const pending = await unmarkedSections(ctx, onDate)
-
+function PendingSectionsList({
+  pending,
+  onDate,
+}: {
+  pending: Awaited<ReturnType<typeof unmarkedSections>>
+  onDate: string
+}) {
   return (
     <Card variant="elevated">
       <CardHeader>
@@ -97,7 +145,13 @@ async function PendingSections({ onDate }: { onDate: string }) {
                   {s.label}
                 </Link>
                 <span className="text-xs tnum text-ink-subtle">
-                  <span className={s.marked === 0 ? 'text-[var(--danger)] font-medium' : 'text-warning font-medium'}>
+                  <span
+                    className={
+                      s.marked === 0
+                        ? 'text-[var(--danger)] font-medium'
+                        : 'text-warning font-medium'
+                    }
+                  >
                     {s.marked}
                   </span>
                   /{s.enrolled}

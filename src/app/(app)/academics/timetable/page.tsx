@@ -3,7 +3,7 @@ import { requireContext } from '@/server/context'
 import { getClassTree } from '@/server/modules/academics/service'
 import { listPeriods, sectionTimetable, teacherTimetable } from '@/server/modules/timetable/service'
 import { teacherOptions } from '@/server/modules/people/service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner } from '@/components/dashboard/color-tiles'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { Badge } from '@/components/ui/badge'
@@ -37,9 +37,14 @@ export default async function TimetablePage({
 
   if (sections.length === 0) {
     return (
-      <div>
-        <PageHeader title="Timetable" />
-        <Card>
+      <div className="space-y-4">
+        <ColorBanner
+          tone="attendance"
+          eyebrow="Timetable"
+          title="Timetable"
+          description="Add a class and section before building the weekly grid."
+        />
+        <Card variant="elevated">
           <EmptyState
             title="No sections yet"
             description="A timetable is drawn for one section at a time. Add a class and at least one section under Classes & sections first."
@@ -58,13 +63,15 @@ export default async function TimetablePage({
   // page becomes a prompt to define the school day rather than an empty table.
   if (periods.length === 0) {
     return (
-      <div>
-        <PageHeader
-          title="Timetable"
-          description="Define the school day before building the grid"
+      <div className="space-y-4">
+        <ColorBanner
+          tone="attendance"
+          eyebrow="Timetable"
+          title="Define the school day"
+          description="Add periods before building the weekly grid."
           actions={canManage ? <NewPeriodButton periods={[]} variant="primary" /> : null}
         />
-        <Card>
+        <Card variant="elevated">
           <EmptyState
             title="The school day has no periods yet"
             description={
@@ -82,8 +89,10 @@ export default async function TimetablePage({
   }
 
   return (
-    <div>
-      <PageHeader
+    <div className="space-y-4">
+      <ColorBanner
+        tone="attendance"
+        eyebrow="Timetable"
         title="Timetable"
         description={
           isTeacherView
@@ -93,7 +102,7 @@ export default async function TimetablePage({
         actions={canManage ? <NewPeriodButton periods={periods} /> : null}
       />
 
-      <Card className="overflow-hidden">
+      <Card variant="elevated" className="overflow-hidden">
         <TimetablePicker
           sections={sections}
           teachers={teachers.map((t) => ({ id: t.id, label: `${t.firstName} ${t.lastName}` }))}

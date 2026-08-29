@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { calendarMonth, upcomingEvents } from '@/server/modules/academics/content-service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner } from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -76,15 +76,17 @@ export default async function CalendarPage({
   })
 
   return (
-    <div>
-      <PageHeader
-        title="School calendar"
+    <div className="space-y-4">
+      <ColorBanner
+        tone="admissions"
+        eyebrow="Calendar"
+        title={monthLabel}
         description="Holidays, exams, PTMs and school events"
         actions={canManage ? <NewCalendarEventButton /> : null}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px] items-start">
-        <Card className="overflow-hidden">
+        <Card variant="elevated" className="overflow-hidden">
           <div className="flex items-center justify-between gap-3 p-3 border-b border-line">
             <p className="text-base font-semibold text-ink">{monthLabel}</p>
             <div className="flex items-center gap-1.5">
@@ -187,7 +189,7 @@ export default async function CalendarPage({
           </div>
         </Card>
 
-        <Card>
+        <Card variant="elevated">
           <CardHeader>
             <CardTitle>Coming up</CardTitle>
           </CardHeader>

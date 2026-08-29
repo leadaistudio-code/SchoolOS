@@ -1,15 +1,19 @@
 import Link from 'next/link'
-import { Paperclip, Pin, Plus } from 'lucide-react'
+import { Megaphone, Paperclip, Pin, Plus } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listNotices } from '@/server/modules/notices/service'
 import { parseListQuery } from '@/lib/query'
-import { PageHeader } from '@/components/page-header'
+import { formatNumber } from '@/lib/utils'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card } from '@/components/ui/card'
 import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
-import { buttonVariants } from '@/components/ui/button-variants'
 
 export const metadata = { title: 'Notices' }
 
@@ -31,11 +35,19 @@ export default async function NoticesPage({
 
   const { rows, total } = await listNotices(ctx, query, { priority: params.priority })
   const canPublish = ctx.can('notices.publish')
+  const pinned = rows.filter((n) => n.pinned).length
+  const drafts = rows.filter((n) => !n.isPublished).length
 
   return (
-    <div>
-      <PageHeader
-        title="Notice board"
+    <div className="space-y-4">
+      <ColorBanner
+        tone="pending"
+        eyebrow="Notices"
+        title={
+          total > 0
+            ? `${formatNumber(total)} notices on the board`
+            : 'Notice board'
+        }
         description={
           canPublish
             ? 'Everything posted, including drafts and expired notices.'
@@ -43,7 +55,7 @@ export default async function NoticesPage({
         }
         actions={
           ctx.can('notices.create') ? (
-            <Link href="/communication/notices/new" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/communication/notices/new" className={colorBannerPrimaryBtn()}>
               <Plus aria-hidden />
               Post a notice
             </Link>
@@ -51,7 +63,36 @@ export default async function NoticesPage({
         }
       />
 
-      <Card className="overflow-hidden">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ColorTile
+          label="Notices"
+          value={formatNumber(total)}
+          sub="Matching these filters"
+          tone="pending"
+          icon={<Megaphone className="size-5" aria-hidden />}
+          delayMs={40}
+        />
+        <ColorTile
+          label="Pinned on page"
+          value={formatNumber(pinned)}
+          sub="Shown at the top"
+          tone="admissions"
+          icon={<Pin className="size-5" aria-hidden />}
+          delayMs={80}
+        />
+        {canPublish ? (
+          <ColorTile
+            label="Drafts on page"
+            value={formatNumber(drafts)}
+            sub="Not yet published"
+            tone="staff"
+            icon={<Paperclip className="size-5" aria-hidden />}
+            delayMs={120}
+          />
+        ) : null}
+      </div>
+
+      <Card variant="elevated" className="overflow-hidden">
         <SearchBar placeholder="Search notices" />
 
         {rows.length === 0 ? (

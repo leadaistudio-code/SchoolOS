@@ -1,11 +1,14 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { BookOpen, Briefcase, CalendarDays, Plus } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStaff } from '@/server/modules/people/service'
 import { parseListQuery } from '@/lib/query'
 import { formatNumber } from '@/lib/utils'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
@@ -40,13 +43,22 @@ export default async function StaffPage({
 
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Teachers & staff"
-        description={`${formatNumber(totalStaff)} staff records on file`}
+      <ColorBanner
         tone="staff"
+        eyebrow="Staff"
+        title={
+          totalStaff > 0
+            ? `${formatNumber(totalStaff)} staff on file`
+            : 'No staff yet'
+        }
+        description={
+          totalStaff > 0
+            ? `${formatNumber(teachingStaff)} teaching · directory, payroll and leave`
+            : 'Add teaching and support staff to assign classes and run payroll.'
+        }
         actions={
           ctx.can('staff.create') ? (
-            <Link href="/staff/new" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/staff/new" className={colorBannerPrimaryBtn()}>
               <Plus aria-hidden /> Add staff
             </Link>
           ) : null
@@ -54,29 +66,29 @@ export default async function StaffPage({
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
+        <ColorTile
           label="Total staff"
           value={formatNumber(totalStaff)}
-          icon="Briefcase"
-          tone="staff"
           sub="All staff types"
+          tone="staff"
+          icon={<Briefcase className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Teaching"
           value={formatNumber(teachingStaff)}
-          icon="BookOpen"
-          tone="admissions"
           sub="Teaching staff"
+          tone="admissions"
+          icon={<BookOpen className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="Payroll & leave"
           value="Open"
-          icon="CalendarDays"
-          tone="leave"
           sub="Appraisals, payroll and leave"
+          tone="leave"
           href="/staff/payroll"
+          icon={<CalendarDays className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>

@@ -1,5 +1,5 @@
 import { requireContext } from '@/server/context'
-import { PageBanner } from '@/components/page-banner'
+import { ColorBanner } from '@/components/dashboard/color-tiles'
 import { HubTile, HubTileGrid } from '@/components/ui/hub-tile'
 import type { SeriesKey } from '@/lib/chart-tones'
 
@@ -120,10 +120,13 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Settings"
-        description={school ? `${school.name} · school code ${school.code}` : 'School configuration'}
+      <ColorBanner
         tone="staff"
+        eyebrow="Settings"
+        title="Settings"
+        description={
+          school ? `${school.name} · school code ${school.code}` : 'School configuration'
+        }
       />
 
       <HubTileGrid>

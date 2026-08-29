@@ -1,3 +1,11 @@
+import {
+  Activity,
+  BadgeIndianRupee,
+  CalendarCheck,
+  MessageSquare,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { attendanceDate } from '@/lib/dates'
 import { formatMoney, formatNumber } from '@/lib/utils'
@@ -5,8 +13,7 @@ import { REPORTS } from '@/lib/reports'
 import { REPORT_TONE } from '@/lib/chart-tones'
 import { scoreSchool } from '@/server/modules/score/service'
 import { bandMeta } from '@/lib/score'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { HubTile, HubTileGrid } from '@/components/ui/hub-tile'
 
@@ -104,72 +111,73 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-4">
-      <PageBanner
+      <ColorBanner
+        tone="attendance"
+        eyebrow="Reports"
         title="Reports & analytics"
         description={
           session
             ? `${session.name} · figures below cover the month to date`
             : 'Figures below cover the month to date'
         }
-        tone="attendance"
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+        <ColorTile
           label="Students on roll"
           value={formatNumber(students)}
-          icon="Users"
-          tone="students"
           sub="Active enrolments"
+          tone="students"
           href="/reports/enrolment"
+          icon={<Users className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Attendance this month"
           value={rate === null ? 'No data' : `${rate}%`}
-          icon="CalendarCheck"
-          tone="attendance"
           sub={`${formatNumber(marked)} day-records marked`}
+          tone="attendance"
           href="/reports/attendance"
+          icon={<CalendarCheck className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="Collected this month"
           value={formatMoney(collected._sum.amountMinor ?? 0, currency)}
-          icon="BadgeIndianRupee"
-          tone="fees"
           sub="Payments confirmed"
+          tone="fees"
           href="/reports/collection"
+          icon={<BadgeIndianRupee className="size-5" aria-hidden />}
           delayMs={120}
         />
-        <StatCard
+        <ColorTile
           label="Outstanding"
           value={formatMoney(outstanding._sum.balanceMinor ?? 0, currency)}
-          icon="Wallet"
-          tone={(outstanding._sum.balanceMinor ?? 0) > 0 ? 'overdue' : 'pending'}
           sub={`${formatNumber(outstanding._count._all)} invoices unpaid`}
+          tone={(outstanding._sum.balanceMinor ?? 0) > 0 ? 'overdue' : 'pending'}
           href="/reports/collection"
+          icon={<Wallet className="size-5" aria-hidden />}
           delayMs={160}
         />
         {health && health.score !== null ? (
-          <StatCard
+          <ColorTile
             label="Health score"
             value={String(Math.round(health.score * 10) / 10)}
-            icon="Activity"
-            tone="admissions"
             sub={`${bandMeta(health.band!).label} · ${formatNumber(health.studentsScored)} students scored`}
+            tone="admissions"
             href="/score"
+            icon={<Activity className="size-5" aria-hidden />}
             delayMs={200}
           />
         ) : null}
         {canFeedback ? (
-          <StatCard
+          <ColorTile
             label="Feedback campaigns"
             value={formatNumber(openCampaigns)}
-            icon="MessageSquare"
-            tone="parents"
             sub="Active or scheduled"
+            tone="parents"
             href="/feedback"
+            icon={<MessageSquare className="size-5" aria-hidden />}
             delayMs={240}
           />
         ) : null}

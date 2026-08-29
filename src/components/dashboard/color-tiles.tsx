@@ -2,6 +2,25 @@ import * as React from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { seriesSolidGradient, type SeriesKey } from '@/lib/chart-tones'
+import { buttonVariants } from '@/components/ui/button-variants'
+
+/** Secondary action on a colour banner (ghost white outline). */
+export function colorBannerSecondaryBtn(...extra: (string | undefined)[]) {
+  return cn(
+    buttonVariants({ variant: 'secondary', size: 'sm' }),
+    'border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white',
+    ...extra,
+  )
+}
+
+/** Primary action on a colour banner (solid white chip). */
+export function colorBannerPrimaryBtn(...extra: (string | undefined)[]) {
+  return cn(
+    buttonVariants({ size: 'sm' }),
+    'bg-white text-ink hover:bg-white/90',
+    ...extra,
+  )
+}
 
 /**
  * Full-colour module hero — same language as the Admissions dashboard banner.

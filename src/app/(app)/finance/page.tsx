@@ -1,18 +1,21 @@
 import Link from 'next/link'
+import { AlertCircle, BadgeIndianRupee, TrendingUp, Wallet } from 'lucide-react'
 import { startOfMonth } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { outstandingByClass } from '@/server/modules/finance/service'
 import { attendanceDate, formatDay } from '@/lib/dates'
 import { isSelfScoped } from '@/lib/rbac/roles'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+  colorBannerSecondaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
-import { formatMoney, formatNumber } from '@/lib/utils'
+import { formatMoney, formatNumber, cn } from '@/lib/utils'
 import { ParentFinance } from './parent-finance'
-import { cn } from '@/lib/utils'
 
 export const metadata = { title: 'Finance' }
 
@@ -75,22 +78,20 @@ export default async function FinancePage() {
 
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Finance"
-        description={`${formatNumber(billed._count._all)} invoices this session · ${collectionRate}% collected`}
+      <ColorBanner
         tone="fees"
+        eyebrow="Finance"
+        title={`${collectionRate}% collected`}
+        description={`${formatNumber(billed._count._all)} invoices this session · ${formatMoney(outstandingMinor, currency)} still outstanding`}
         actions={
           <>
             {ctx.can('fees.invoice') ? (
-              <Link
-                href="/finance/invoices"
-                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-              >
+              <Link href="/finance/invoices" className={colorBannerSecondaryBtn()}>
                 Invoices
               </Link>
             ) : null}
             {ctx.can('fees.collect') ? (
-              <Link href="/finance/collect" className={buttonVariants({ size: 'sm' })}>
+              <Link href="/finance/collect" className={colorBannerPrimaryBtn()}>
                 Collect a payment
               </Link>
             ) : null}
@@ -99,39 +100,39 @@ export default async function FinancePage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+        <ColorTile
           label="Collected today"
           value={formatMoney(collectedToday._sum.amountMinor ?? 0, currency)}
-          icon="BadgeIndianRupee"
-          tone="fees"
           sub={`${formatNumber(collectedToday._count._all)} payments`}
+          tone="fees"
           href="/finance/payments"
+          icon={<BadgeIndianRupee className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Collected this month"
           value={formatMoney(collectedMonth._sum.amountMinor ?? 0, currency)}
-          icon="TrendingUp"
-          tone="attendance"
           sub={`of ${formatMoney(billedMinor, currency)} billed`}
+          tone="attendance"
+          icon={<TrendingUp className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="Outstanding"
           value={formatMoney(outstandingMinor, currency)}
-          icon="Wallet"
-          tone="pending"
           sub={`${collectionRate}% of billing collected`}
+          tone="pending"
           href="/finance/outstanding"
+          icon={<Wallet className="size-5" aria-hidden />}
           delayMs={120}
         />
-        <StatCard
+        <ColorTile
           label="Overdue"
           value={formatMoney(overdue._sum.balanceMinor ?? 0, currency)}
-          icon="AlertCircle"
-          tone="overdue"
           sub={`${formatNumber(overdue._count._all)} invoices past due`}
+          tone="overdue"
           href="/finance/outstanding"
+          icon={<AlertCircle className="size-5" aria-hidden />}
           delayMs={160}
         />
       </div>

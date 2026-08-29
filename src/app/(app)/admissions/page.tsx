@@ -1,10 +1,14 @@
 import Link from 'next/link'
+import { Bell, UserCheck, UserSearch } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { formatNumber } from '@/lib/utils'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+  colorBannerSecondaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { listLeadSetup, listLeadsByStage } from '@/server/modules/admissions/service'
 import { AdmissionsBoard } from './board'
 import { CreateLeadForm } from './create-lead-form'
@@ -24,49 +28,51 @@ export default async function AdmissionsPage() {
 
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Admission pipeline"
-        description={`${formatNumber(openLeads)} open enquiries · ${formatNumber(enrolled)} enrolled this cycle`}
+      <ColorBanner
         tone="admissions"
+        eyebrow="Admissions"
+        title={
+          openLeads > 0
+            ? `${formatNumber(openLeads)} open enquiries`
+            : 'Admission pipeline'
+        }
+        description={`${formatNumber(enrolled)} enrolled this cycle · chase follow-ups from the board`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admissions/followups"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
+          <>
+            <Link href="/admissions/followups" className={colorBannerSecondaryBtn()}>
               Follow-ups
             </Link>
-            <Link href="/admissions/analytics" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/admissions/analytics" className={colorBannerPrimaryBtn()}>
               Analytics
             </Link>
-          </div>
+          </>
         }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
+        <ColorTile
           label="Open enquiries"
           value={formatNumber(openLeads)}
-          icon="UserSearch"
-          tone="admissions"
           sub="Not yet enrolled or lost"
+          tone="admissions"
+          icon={<UserSearch className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Enrolled"
           value={formatNumber(enrolled)}
-          icon="UserCheck"
-          tone="students"
           sub="Converted to students"
+          tone="students"
+          icon={<UserCheck className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="Follow-ups due"
           value={formatNumber(followUpsDue)}
-          icon="Bell"
-          tone={followUpsDue > 0 ? 'overdue' : 'pending'}
           sub="Need a call or visit today"
+          tone={followUpsDue > 0 ? 'overdue' : 'pending'}
           href="/admissions/followups"
+          icon={<Bell className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>

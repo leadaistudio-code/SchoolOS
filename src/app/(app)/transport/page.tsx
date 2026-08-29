@@ -1,11 +1,24 @@
 import Link from 'next/link'
-import { AlertTriangle, MapPinned, Plus, Route as RouteIcon, UserCheck } from 'lucide-react'
+import {
+  AlertTriangle,
+  Bus,
+  Gauge,
+  MapPinned,
+  Plus,
+  Route as RouteIcon,
+  UserCheck,
+} from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { transportOverview } from '@/server/modules/transport/service'
 import { formatDay } from '@/lib/dates'
-import { PageHeader } from '@/components/page-header'
+import { formatNumber } from '@/lib/utils'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+  colorBannerSecondaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Metric, MetricRow } from '@/components/ui/metric'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -17,59 +30,76 @@ export const metadata = { title: 'Transport' }
 export default async function TransportPage() {
   const ctx = await requireContext('transport.view')
   const data = await transportOverview(ctx)
+  const needsAttention = data.alerts.length + data.withoutDriver
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Transport"
-        description={`${data.activeBuses} buses · ${data.activeRoutes} routes · ${data.riders} students travelling`}
+      <ColorBanner
+        tone="transport"
+        eyebrow="Transport"
+        title={
+          data.activeBuses > 0
+            ? `${formatNumber(data.activeBuses)} buses · ${formatNumber(data.riders)} riders`
+            : 'Transport fleet'
+        }
+        description={`${formatNumber(data.activeRoutes)} routes · ${formatNumber(data.seats)} seats across the fleet`}
         actions={
-          <div className="flex items-center gap-2">
+          <>
             {ctx.can('transport.track') ? (
-              <Link href="/transport/tracking" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              <Link href="/transport/tracking" className={colorBannerSecondaryBtn()}>
                 <MapPinned aria-hidden />
                 Live map
               </Link>
             ) : null}
             {ctx.can('transport.manage') ? (
-              <Link href="/transport/buses/new" className={buttonVariants({ size: 'sm' })}>
+              <Link href="/transport/buses/new" className={colorBannerPrimaryBtn()}>
                 <Plus aria-hidden />
                 Add bus
               </Link>
             ) : null}
-          </div>
+          </>
         }
       />
 
-      <MetricRow>
-        <Metric
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ColorTile
           label="Buses on the road"
-          value={String(data.running)}
-          sub={`${data.activeBuses} in the fleet · ${data.completed} trips done today`}
+          value={formatNumber(data.running)}
+          sub={`${formatNumber(data.activeBuses)} in the fleet · ${formatNumber(data.completed)} trips done today`}
+          tone="transport"
           href="/transport/tracking"
+          icon={<Bus className="size-5" aria-hidden />}
+          delayMs={40}
         />
-        <Metric
+        <ColorTile
           label="Students travelling"
-          value={String(data.riders)}
-          sub={`${data.seats} seats across the fleet`}
+          value={formatNumber(data.riders)}
+          sub={`${formatNumber(data.seats)} seats across the fleet`}
+          tone="students"
           href="/transport/assignments"
+          icon={<UserCheck className="size-5" aria-hidden />}
+          delayMs={80}
         />
-        <Metric
+        <ColorTile
           label="Seat occupancy"
           value={`${data.occupancyPercent}%`}
           sub={data.occupancyPercent > 95 ? 'Effectively full' : 'Room to add riders'}
-          emphasis={data.occupancyPercent > 95 ? 'warning' : undefined}
+          tone={data.occupancyPercent > 95 ? 'overdue' : 'attendance'}
+          icon={<Gauge className="size-5" aria-hidden />}
+          delayMs={120}
         />
-        <Metric
+        <ColorTile
           label="Needs attention"
-          value={String(data.alerts.length + data.withoutDriver)}
-          sub={`${data.alerts.length} document${data.alerts.length === 1 ? '' : 's'} · ${data.withoutDriver} without a driver`}
-          emphasis={data.alerts.length + data.withoutDriver > 0 ? 'danger' : undefined}
+          value={formatNumber(needsAttention)}
+          sub={`${formatNumber(data.alerts.length)} document${data.alerts.length === 1 ? '' : 's'} · ${formatNumber(data.withoutDriver)} without a driver`}
+          tone={needsAttention > 0 ? 'overdue' : 'pending'}
+          icon={<AlertTriangle className="size-5" aria-hidden />}
+          delayMs={160}
         />
-      </MetricRow>
+      </div>
 
       {data.alerts.length > 0 ? (
-        <Card className="overflow-hidden">
+        <Card variant="elevated" className="overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="size-4 text-warning" aria-hidden />
@@ -104,7 +134,7 @@ export default async function TransportPage() {
         </Card>
       ) : null}
 
-      <Card className="overflow-hidden">
+      <Card variant="elevated" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Fleet</CardTitle>
           <Link href="/transport/buses" className="text-sm text-[var(--brand-600)] hover:underline">

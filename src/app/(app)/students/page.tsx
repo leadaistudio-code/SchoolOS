@@ -5,11 +5,15 @@ import { requireContext } from '@/server/context'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
 import { studentListFilterSchema } from '@/server/modules/students/schema'
 import { parseListQuery } from '@/lib/query'
-import { cn, formatNumber } from '@/lib/utils'
-import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
+import { formatNumber } from '@/lib/utils'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+  colorBannerSecondaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { StudentsBannerScene } from '@/components/illustrations/school-scene'
 import { Card } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { TableSkeleton } from '@/components/ui/states'
 import { StudentFilters } from './student-filters'
 import { StudentTable } from './student-table'
@@ -53,25 +57,13 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         actions={
           <>
             {ctx.can('students.import') ? (
-              <Link
-                href="/students/import"
-                className={cn(
-                  buttonVariants({ variant: 'secondary', size: 'sm' }),
-                  'border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white',
-                )}
-              >
+              <Link href="/students/import" className={colorBannerSecondaryBtn()}>
                 <Upload aria-hidden />
                 Import
               </Link>
             ) : null}
             {ctx.can('students.create') ? (
-              <Link
-                href="/students/new"
-                className={cn(
-                  buttonVariants({ size: 'sm' }),
-                  'bg-white text-[var(--chart-students)] hover:bg-white/90',
-                )}
-              >
+              <Link href="/students/new" className={colorBannerPrimaryBtn()}>
                 <Plus aria-hidden />
                 Add student
               </Link>

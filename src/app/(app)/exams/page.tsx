@@ -1,12 +1,15 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Calendar, FileCheck, Plus, ScrollText } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listExams } from '@/server/modules/exams/service'
 import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
 import { formatNumber } from '@/lib/utils'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  ColorBanner,
+  ColorTile,
+  colorBannerPrimaryBtn,
+} from '@/components/dashboard/color-tiles'
 import { Card } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -32,13 +35,18 @@ export default async function ExamsPage({
 
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Examinations"
-        description={`${formatNumber(total)} exams in the catalogue`}
+      <ColorBanner
         tone="late"
+        eyebrow="Exams"
+        title={
+          total > 0
+            ? `${formatNumber(total)} exams in the catalogue`
+            : 'No examinations yet'
+        }
+        description="Schedule papers, enter marks and generate report cards."
         actions={
           ctx.can('exams.manage') ? (
-            <Link href="/exams/new" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/exams/new" className={colorBannerPrimaryBtn()}>
               <Plus aria-hidden />
               New exam
             </Link>
@@ -47,29 +55,29 @@ export default async function ExamsPage({
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
+        <ColorTile
           label="Total exams"
           value={formatNumber(total)}
-          icon="FileCheck"
-          tone="late"
           sub="All examination records"
+          tone="late"
+          icon={<FileCheck className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Upcoming / active"
           value={formatNumber(activeExams)}
-          icon="Calendar"
-          tone="admissions"
           sub="On this page of results"
+          tone="admissions"
+          icon={<Calendar className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="Report cards"
           value="Open"
-          icon="ScrollText"
-          tone="students"
           sub="Generate and print cards"
+          tone="students"
           href="/exams/report-cards"
+          icon={<ScrollText className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>

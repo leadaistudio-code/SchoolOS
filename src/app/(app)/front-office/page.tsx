@@ -1,7 +1,8 @@
+import { CalendarClock, DoorOpen, UserRound } from 'lucide-react'
 import { format } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { listAppointments, listTodayVisitors } from '@/server/modules/front-office/service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -11,6 +12,7 @@ import {
   CheckInForm,
   VisitorRowActions,
 } from './forms'
+import { formatNumber } from '@/lib/utils'
 
 export const metadata = { title: 'Front office' }
 
@@ -20,17 +22,52 @@ export default async function FrontOfficePage() {
     listTodayVisitors(ctx),
     listAppointments(ctx),
   ])
+  const stillIn = visitors.filter((v) => !v.checkOutAt).length
+  const scheduled = appointments.filter((a) => a.status === 'SCHEDULED').length
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Front office"
+    <div className="space-y-4">
+      <ColorBanner
+        tone="parents"
+        eyebrow="Front office"
+        title={
+          visitors.length > 0
+            ? `${formatNumber(stillIn)} visitors currently in`
+            : 'Front desk today'
+        }
         description="Visitors at the desk and appointments for today."
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ColorTile
+          label="Today’s visitors"
+          value={formatNumber(visitors.length)}
+          sub={`${formatNumber(stillIn)} still on campus`}
+          tone="parents"
+          icon={<DoorOpen className="size-5" aria-hidden />}
+          delayMs={40}
+        />
+        <ColorTile
+          label="On campus"
+          value={formatNumber(stillIn)}
+          sub="Checked in, not out"
+          tone="attendance"
+          icon={<UserRound className="size-5" aria-hidden />}
+          delayMs={80}
+        />
+        <ColorTile
+          label="Appointments"
+          value={formatNumber(appointments.length)}
+          sub={`${formatNumber(scheduled)} still scheduled`}
+          tone="pending"
+          icon={<CalendarClock className="size-5" aria-hidden />}
+          delayMs={120}
+        />
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <Card>
+          <Card variant="elevated">
             <CardHeader>
               <CardTitle>Today&apos;s visitors</CardTitle>
             </CardHeader>
@@ -64,7 +101,7 @@ export default async function FrontOfficePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card variant="elevated">
             <CardHeader>
               <CardTitle>Appointments</CardTitle>
             </CardHeader>
@@ -94,7 +131,7 @@ export default async function FrontOfficePage() {
 
         {ctx.can('frontoffice.manage') ? (
           <div className="space-y-6">
-            <Card>
+            <Card variant="elevated">
               <CardHeader>
                 <CardTitle>Check in</CardTitle>
               </CardHeader>
@@ -102,7 +139,7 @@ export default async function FrontOfficePage() {
                 <CheckInForm />
               </CardContent>
             </Card>
-            <Card>
+            <Card variant="elevated">
               <CardHeader>
                 <CardTitle>New appointment</CardTitle>
               </CardHeader>

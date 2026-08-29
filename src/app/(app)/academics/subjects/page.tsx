@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { BookMarked, Link2, NotebookPen } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import {
   getClassTree,
@@ -6,12 +7,13 @@ import {
   listSubjects,
 } from '@/server/modules/academics/service'
 import { teacherOptions } from '@/server/modules/people/service'
-import { PageHeader } from '@/components/page-header'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { AssignSubjectButton, EditAssignmentButton, EditSubjectButton, NewSubjectButton } from './subject-forms'
+import { formatNumber } from '@/lib/utils'
 
 export const metadata = { title: 'Subjects' }
 
@@ -40,12 +42,19 @@ export default async function SubjectsPage() {
     id: t.id,
     label: `${t.firstName} ${t.lastName} — ${t.employeeCode}`,
   }))
+  const electives = subjects.filter((s) => s.isElective).length
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Subjects"
-        description={`${subjects.length} subjects · taught in ${assignments.length} class pairings`}
+      <ColorBanner
+        tone="students"
+        eyebrow="Subjects"
+        title={
+          subjects.length > 0
+            ? `${formatNumber(subjects.length)} subjects · ${formatNumber(assignments.length)} class pairings`
+            : 'Subjects catalogue'
+        }
+        description="What the school teaches, and where each subject is assigned."
         actions={
           canManage ? (
             <>
@@ -60,7 +69,34 @@ export default async function SubjectsPage() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ColorTile
+          label="Catalogue"
+          value={formatNumber(subjects.length)}
+          sub="Subjects the school teaches"
+          tone="students"
+          icon={<NotebookPen className="size-5" aria-hidden />}
+          delayMs={40}
+        />
+        <ColorTile
+          label="Class pairings"
+          value={formatNumber(assignments.length)}
+          sub="Taught in a class"
+          tone="admissions"
+          icon={<Link2 className="size-5" aria-hidden />}
+          delayMs={80}
+        />
+        <ColorTile
+          label="Electives"
+          value={formatNumber(electives)}
+          sub="Optional subjects"
+          tone="pending"
+          icon={<BookMarked className="size-5" aria-hidden />}
+          delayMs={120}
+        />
+      </div>
+
+      <Card variant="elevated" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Catalogue</CardTitle>
           <span className="text-xs text-ink-subtle">Every subject the school teaches</span>
@@ -123,7 +159,7 @@ export default async function SubjectsPage() {
         )}
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card variant="elevated" className="overflow-hidden">
         <CardHeader>
           <CardTitle>Taught in</CardTitle>
           <span className="text-xs text-ink-subtle">
