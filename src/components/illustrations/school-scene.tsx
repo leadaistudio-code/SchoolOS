@@ -141,32 +141,86 @@ export function StudentsScene({ className }: { className?: string }) {
 export function AdmissionsScene({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 160 120" className={cn('block', className)} aria-hidden>
-      <circle cx="80" cy="60" r="46" fill="var(--product-500)" opacity="0.12" />
+      <circle cx="80" cy="60" r="46" fill="#fff" opacity="0.12" />
 
       {/* Form */}
       <g transform="translate(44 20)">
-        <rect width="62" height="80" rx="7" fill="var(--surface)" stroke="var(--border-strong)" />
-        <rect x="10" y="12" width="30" height="5" rx="2.5" fill="var(--chart-admissions)" />
-        <g fill="var(--border-strong)">
+        <rect width="62" height="80" rx="7" fill="#fff" />
+        <rect x="10" y="12" width="30" height="5" rx="2.5" fill="#60a5fa" />
+        <g fill="#93c5fd">
           <rect x="10" y="26" width="42" height="4" rx="2" />
           <rect x="10" y="36" width="34" height="4" rx="2" />
           <rect x="10" y="46" width="40" height="4" rx="2" />
           <rect x="10" y="56" width="24" height="4" rx="2" />
         </g>
-        <rect x="10" y="66" width="26" height="8" rx="4" fill="var(--chart-attendance)" opacity="0.85" />
+        <rect x="10" y="66" width="26" height="8" rx="4" fill="#34d399" />
       </g>
 
       {/* Pencil */}
       <g transform="rotate(38 118 62)">
-        <rect x="108" y="30" width="9" height="42" rx="2" fill="var(--chart-staff)" />
-        <path d="M108 72h9l-4.5 9z" fill="var(--text)" opacity="0.75" />
-        <rect x="108" y="30" width="9" height="7" rx="2" fill="var(--chart-overdue)" />
+        <rect x="108" y="30" width="9" height="42" rx="2" fill="#fbbf24" />
+        <path d="M108 72h9l-4.5 9z" fill="#1e293b" opacity="0.75" />
+        <rect x="108" y="30" width="9" height="7" rx="2" fill="#fb7185" />
       </g>
 
       {/* Approval tick */}
       <g transform="translate(96 74)">
-        <circle r="14" cx="14" cy="14" fill="var(--chart-attendance)" />
+        <circle r="14" cx="14" cy="14" fill="#10b981" />
         <path d="M8 14.5 12.5 19 21 10" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  )
+}
+
+/** Students banner art: two pupils on a light plate for coloured heroes. */
+export function StudentsBannerScene({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 160 120" className={cn('block', className)} aria-hidden>
+      <circle cx="80" cy="60" r="46" fill="#fff" opacity="0.12" />
+      <g transform="translate(38 28)">
+        <path d="M8 62c0-14 7-22 20-22s20 8 20 22z" fill="#fff" opacity="0.95" />
+        <circle cx="28" cy="22" r="13" fill="#fde68a" />
+        <path d="M15 20c0-8 6-13 13-13s13 5 13 13c0-4-5-6-13-6s-13 2-13 6z" fill="#1e293b" opacity="0.7" />
+        <path d="M18 40v20M38 40v20" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" />
+      </g>
+      <g transform="translate(88 34)">
+        <path d="M4 56c0-12 6-20 18-20s18 8 18 20z" fill="#fff" opacity="0.9" />
+        <circle cx="22" cy="20" r="11.5" fill="#fde68a" />
+        <path d="M11 19c0-7 5-12 11-12s11 5 11 12c-2-4-6-6-11-6s-10 2-11 6z" fill="#1e293b" opacity="0.7" />
+        <path d="M38 40 48 28" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="50" cy="26" r="4" fill="#fde68a" />
+      </g>
+      <g transform="translate(118 22)">
+        <path d="M0 6 16 0l-5 14-3-6z" fill="#fff" opacity="0.95" />
+      </g>
+    </svg>
+  )
+}
+
+/** Parents banner art: guardian + child silhouette for coloured heroes. */
+export function ParentsBannerScene({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 160 120" className={cn('block', className)} aria-hidden>
+      <circle cx="80" cy="60" r="46" fill="#fff" opacity="0.12" />
+      {/* Adult */}
+      <g transform="translate(48 22)">
+        <path d="M10 70c0-18 10-30 26-30s26 12 26 30z" fill="#fff" opacity="0.95" />
+        <circle cx="36" cy="24" r="15" fill="#fde68a" />
+        <path d="M21 22c0-9 7-15 15-15s15 6 15 15c0-4-6-7-15-7s-15 3-15 7z" fill="#1e293b" opacity="0.7" />
+      </g>
+      {/* Child */}
+      <g transform="translate(96 48)">
+        <path d="M4 44c0-11 6-18 16-18s16 7 16 18z" fill="#fff" opacity="0.9" />
+        <circle cx="20" cy="16" r="11" fill="#fde68a" />
+        <path d="M9 15c0-7 5-12 11-12s11 5 11 12c-2-4-6-6-11-6s-10 2-11 6z" fill="#1e293b" opacity="0.7" />
+      </g>
+      {/* Heart badge */}
+      <g transform="translate(108 78)">
+        <circle r="13" cx="13" cy="13" fill="#f43f5e" />
+        <path
+          d="M13 20c-4-3.2-7-5.6-7-8.4A3.6 3.6 0 0 1 13 9.2 3.6 3.6 0 0 1 20 11.6C20 14.4 17 16.8 13 20z"
+          fill="#fff"
+        />
       </g>
     </svg>
   )

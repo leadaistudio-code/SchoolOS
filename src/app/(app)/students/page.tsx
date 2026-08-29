@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { Plus, Upload } from 'lucide-react'
+import { GraduationCap, HeartHandshake, Plus, Upload, Users } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
 import { studentListFilterSchema } from '@/server/modules/students/schema'
 import { parseListQuery } from '@/lib/query'
-import { formatNumber } from '@/lib/utils'
-import { PageBanner } from '@/components/page-banner'
-import { StatCard } from '@/components/dashboard/stat-card'
+import { cn, formatNumber } from '@/lib/utils'
+import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
+import { StudentsBannerScene } from '@/components/illustrations/school-scene'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { TableSkeleton } from '@/components/ui/states'
@@ -31,25 +31,47 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
     }),
   ])
 
+  const withParent = parentLinks.length
+  const withoutParent = Math.max(0, activeCount - withParent)
+
   return (
     <div className="space-y-4">
-      <PageBanner
-        title="Students"
-        description={`${formatNumber(activeCount)} active on roll across ${formatNumber(classCount)} classes`}
+      <ColorBanner
         tone="students"
+        eyebrow="Students"
+        title={
+          activeCount > 0
+            ? `${formatNumber(activeCount)} active on roll`
+            : 'No students on roll yet'
+        }
+        description={
+          activeCount > 0
+            ? `Across ${formatNumber(classCount)} classes · ${formatNumber(withParent)} with a parent linked`
+            : 'Admit the first student to start the roll.'
+        }
+        media={<StudentsBannerScene className="h-28 w-28" />}
         actions={
           <>
             {ctx.can('students.import') ? (
               <Link
                 href="/students/import"
-                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                className={cn(
+                  buttonVariants({ variant: 'secondary', size: 'sm' }),
+                  'border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white',
+                )}
               >
                 <Upload aria-hidden />
                 Import
               </Link>
             ) : null}
             {ctx.can('students.create') ? (
-              <Link href="/students/new" className={buttonVariants({ size: 'sm' })}>
+              <Link
+                href="/students/new"
+                className={cn(
+                  buttonVariants({ size: 'sm' }),
+                  'bg-white text-[var(--chart-students)] hover:bg-white/90',
+                )}
+              >
                 <Plus aria-hidden />
                 Add student
               </Link>
@@ -59,31 +81,35 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
+        <ColorTile
           label="Active students"
           value={formatNumber(activeCount)}
-          icon="Users"
-          tone="students"
           sub="Currently enrolled"
+          tone="students"
           href="/students"
+          icon={<Users className="size-5" aria-hidden />}
           delayMs={40}
         />
-        <StatCard
+        <ColorTile
           label="Classes"
           value={formatNumber(classCount)}
-          icon="GraduationCap"
-          tone="admissions"
           sub="Class levels in this session"
+          tone="admissions"
           href="/academics/classes"
+          icon={<GraduationCap className="size-5" aria-hidden />}
           delayMs={80}
         />
-        <StatCard
+        <ColorTile
           label="With parent linked"
-          value={formatNumber(parentLinks.length)}
-          icon="HeartHandshake"
+          value={formatNumber(withParent)}
+          sub={
+            withoutParent > 0
+              ? `${formatNumber(withoutParent)} still need a guardian`
+              : 'Primary guardian on file'
+          }
           tone="parents"
-          sub="Primary guardian on file"
           href="/parents"
+          icon={<HeartHandshake className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>

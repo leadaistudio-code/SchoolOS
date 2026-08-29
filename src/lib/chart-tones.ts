@@ -30,6 +30,11 @@ export function seriesBannerGradient(tone: SeriesKey): string {
   return `linear-gradient(105deg, color-mix(in srgb, var(--chart-${tone}) 14%, var(--surface)) 0%, var(--surface) 55%, color-mix(in srgb, var(--product-500) 8%, var(--surface)) 100%)`
 }
 
+/** Saturated fill for colourful KPI / hero tiles (white text on top). */
+export function seriesSolidGradient(tone: SeriesKey): string {
+  return `linear-gradient(135deg, var(--chart-${tone}) 0%, color-mix(in srgb, var(--chart-${tone}) 72%, #1e1b4b) 100%)`
+}
+
 export const REPORT_TONE: Record<string, SeriesKey> = {
   collection: 'fees',
   attendance: 'attendance',
