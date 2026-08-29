@@ -338,7 +338,7 @@ export async function issueParentPortalLogin(
 
   await assertPhoneAvailable(ctx, phone, parent.userId ?? undefined)
 
-      const role = await ctx.db.role.findFirst({
+  const role = await ctx.db.role.findFirst({
     where: { key: ROLE.PARENT, OR: [{ tenantId: null }, { tenantId: ctx.tenant.id }] },
   })
   const passwordHash = await hashPassword(temporaryPassword)
