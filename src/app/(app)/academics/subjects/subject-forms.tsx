@@ -1,11 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { Link2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button, IconButton } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Checkbox, Field, Input, Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
+import { SUBJECT_PRESETS } from '@/lib/subject-presets'
 import {
   archiveSubjectAction,
   assignSubjectAction,
@@ -18,12 +20,32 @@ import {
 export type Option = { id: string; label: string }
 
 export function NewSubjectButton({ label = 'New subject' }: { label?: string }) {
+  const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
+  const [preset, setPreset] = React.useState('')
   const [code, setCode] = React.useState('')
   const [name, setName] = React.useState('')
   const [isElective, setIsElective] = React.useState(false)
+
+  const openDialog = () => {
+    setPreset('')
+    setCode('')
+    setName('')
+    setIsElective(false)
+    setOpen(true)
+  }
+
+  const applyPreset = (value: string) => {
+    setPreset(value)
+    if (!value) return
+    const match = SUBJECT_PRESETS.find((p) => p.code === value)
+    if (!match) return
+    setCode(match.code)
+    setName(match.name)
+    setIsElective(match.isElective)
+  }
 
   const submit = () =>
     startTransition(async () => {
@@ -38,14 +60,16 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
       }
       toast.push({ tone: 'success', title: 'Subject created', description: result.message })
       setOpen(false)
+      setPreset('')
       setCode('')
       setName('')
       setIsElective(false)
+      router.refresh()
     })
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={openDialog}>
         <Plus aria-hidden /> {label}
       </Button>
 
@@ -66,6 +90,26 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
         }
       >
         <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+          <Field
+            label="Common subject"
+            htmlFor="subject-preset"
+            className="sm:col-span-2"
+            hint="Pick a template or type your own code and name below"
+          >
+            <Select
+              id="subject-preset"
+              value={preset}
+              onChange={(e) => applyPreset(e.target.value)}
+            >
+              <option value="">Choose a common subject...</option>
+              {SUBJECT_PRESETS.map((p) => (
+                <option key={p.code} value={p.code}>
+                  {p.name} ({p.code})
+                </option>
+              ))}
+            </Select>
+          </Field>
+
           <Field label="Code" htmlFor="subject-code" required hint="Letters and numbers">
             <Input
               id="subject-code"
@@ -242,6 +286,7 @@ export function AssignSubjectButton({
   variant?: 'primary' | 'secondary'
   label?: string
 }) {
+  const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
@@ -250,6 +295,14 @@ export function AssignSubjectButton({
   const [teacherId, setTeacherId] = React.useState('')
 
   const blocked = classes.length === 0 || subjects.length === 0
+
+  const openDialog = () => {
+    setClassLevelId('')
+    setSubjectId('')
+    setTeacherId('')
+    setOpen(true)
+    router.refresh()
+  }
 
   const submit = () =>
     startTransition(async () => {
@@ -264,8 +317,10 @@ export function AssignSubjectButton({
       }
       toast.push({ tone: 'success', title: 'Subject assigned', description: result.message })
       setOpen(false)
+      setClassLevelId('')
       setSubjectId('')
       setTeacherId('')
+      router.refresh()
     })
 
   return (
@@ -273,10 +328,14 @@ export function AssignSubjectButton({
       <Button
         size="sm"
         variant={variant}
-        onClick={() => setOpen(true)}
+        onClick={openDialog}
         disabled={blocked}
         title={
-          blocked ? 'Create at least one class and one subject first' : 'Attach a subject to a class'
+          blocked
+            ? classes.length === 0
+              ? 'Create a class under Academics > Classes first'
+              : 'Create at least one subject first'
+            : 'Attach a subject to a class'
         }
       >
         <Link2 aria-hidden /> {label}
@@ -298,6 +357,17 @@ export function AssignSubjectButton({
           </>
         }
       >
+        {classes.length === 0 ? (
+          <p className="text-sm text-warning">
+            No classes found for the current academic session. Create a class under Academics →
+            Classes, or set an active session in Settings.
+          </p>
+        ) : null}
+        {subjects.length === 0 ? (
+          <p className="text-sm text-warning">
+            No subjects in the catalogue yet. Add a subject first, then assign it here.
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Class" htmlFor="assign-class" required>
             <Select

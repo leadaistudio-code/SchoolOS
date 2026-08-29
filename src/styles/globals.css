@@ -277,6 +277,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+select option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
 h1,
 h2,
 h3,

@@ -206,9 +206,9 @@ four, so three-quarters of it could never run on any given phone.
 
 | File | Size | Use |
 |---|---|---|
-| `MyCampusView-v1.0.0-phone.apk` | **45 MB** | Send this to people |
-| `MyCampusView-v1.0.0.apk` | 103 MB | Only if you need emulator support |
-| `MyCampusView-v1.0.0.aab` | 73 MB | Upload this to Google Play |
+| `MyCampusView-v2.0.0-phone.apk` | **45 MB** | Send this to people |
+| `MyCampusView-v2.0.0.apk` | 103 MB | Only if you need emulator support |
+| `MyCampusView-v2.0.0.aab` | 73 MB | Upload this to Google Play |
 
 **For the Play Store, size stops being your problem.** You upload the `.aab`,
 and Google builds a custom download per device — usually around 25 MB. You
@@ -226,7 +226,7 @@ never upload an APK to Play.
 .\mobile\scripts\build-android.ps1 -All -Bundle
 
 # Install on a plugged-in phone with USB debugging on
-adb install -r releases\MyCampusView-v1.0.0-phone.apk
+adb install -r releases\MyCampusView-v2.0.0-phone.apk
 
 # Is the backend deployed?
 curl -s -o /dev/null -w "%{content_type}\n" https://www.mycampusview.com/api/v1/site/school/demo

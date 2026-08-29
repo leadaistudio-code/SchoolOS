@@ -95,7 +95,9 @@ export function Dialog({
           </button>
         </div>
 
-        <div className="px-4 py-3 overflow-y-auto scroll-thin">{children}</div>
+        <div className="px-4 py-3 min-h-0 flex-1 overflow-y-auto overflow-x-visible scroll-thin">
+          {children}
+        </div>
 
         {footer ? (
           <div className="flex items-center gap-2 px-4 py-3 border-t border-line">{footer}</div>

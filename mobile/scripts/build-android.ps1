@@ -62,6 +62,29 @@ if ($LASTEXITCODE -ge 8) { throw "Copy failed (robocopy code $LASTEXITCODE)" }
 $escaped = ($sdk -replace '\\', '/') -replace '^C:', 'C\:'
 Set-Content -Path (Join-Path $work 'android\local.properties') -Value "sdk.dir=$escaped" -Encoding ascii
 
+# keystore.properties must live at android/keystore.properties (not android/app/).
+$keystoreRoot = Join-Path $work 'android\keystore.properties'
+$keystoreApp  = Join-Path $work 'android\app\keystore.properties'
+if (-not (Test-Path $keystoreRoot) -and (Test-Path $keystoreApp)) {
+    Copy-Item $keystoreApp $keystoreRoot -Force
+    Write-Host 'Copied android/app/keystore.properties -> android/keystore.properties' -ForegroundColor Yellow
+}
+if (-not (Test-Path $keystoreRoot)) {
+    Write-Warning 'No android/keystore.properties — release will be signed with the debug key (Play upload will fail).'
+}
+
+# Expo prebuild resets signing; re-apply the release keystore block every build.
+$gradleFile = Join-Path $work 'android\app\build.gradle'
+$snippet    = Get-Content (Join-Path $PSScriptRoot 'android-signing.gradle.snippet') -Raw
+$gradle     = Get-Content $gradleFile -Raw
+$pattern    = '(?ms)^    signingConfigs \{.*?^        release \{\r?\n            // Caution!.*?^            signingConfig signingConfigs\.debug\r?\n'
+if ($gradle -match $pattern) {
+    Set-Content -Path $gradleFile -Value ($gradle -replace $pattern, $snippet) -NoNewline
+    Write-Host 'Applied release signing config to android/app/build.gradle' -ForegroundColor Cyan
+} elseif ($gradle -notmatch 'hasReleaseKeystore') {
+    throw 'Could not patch android/app/build.gradle for release signing — layout changed after prebuild.'
+}
+
 # ------------------------------------------------------- 2. clear JS cache
 Remove-Item -Recurse -Force `
     (Join-Path $work 'android\app\build\generated\assets\react'), `
@@ -98,14 +121,26 @@ New-Item -ItemType Directory -Force -Path $releases | Out-Null
 $suffix = if ($Phone) { '-phone' } else { '' }
 
 $apk = Join-Path $work 'android\app\build\outputs\apk\release\app-release.apk'
-$out = Join-Path $releases "MyCampusView-v1.0.0$suffix.apk"
+$out = Join-Path $releases "MyCampusView-v2.0.0$suffix.apk"
 Copy-Item $apk $out -Force
 Write-Host ("APK  {0}  {1:N1} MB" -f $out, ((Get-Item $out).Length / 1MB)) -ForegroundColor Green
 Write-Host ("     SHA-256 {0}" -f (Get-FileHash $out -Algorithm SHA256).Hash.ToLower())
 
 if ($Bundle) {
     $aab = Join-Path $work 'android\app\build\outputs\bundle\release\app-release.aab'
-    $outB = Join-Path $releases 'MyCampusView-v1.0.0.aab'
+    $outB = Join-Path $releases 'MyCampusView-v2.0.0.aab'
     Copy-Item $aab $outB -Force
     Write-Host ("AAB  {0}  {1:N1} MB" -f $outB, ((Get-Item $outB).Length / 1MB)) -ForegroundColor Green
+
+    $apksigner = Get-ChildItem -Path (Join-Path $sdk 'build-tools') -Recurse -Filter 'apksigner.bat' |
+        Sort-Object FullName -Descending | Select-Object -First 1
+    if ($apksigner) {
+        $cert = & $apksigner.FullName verify --print-certs $outB 2>&1 |
+            Select-String -Pattern 'Signer #1 certificate SHA-1 digest:' |
+            ForEach-Object { ($_ -replace '.*digest:\s*', '').Trim() }
+        if ($cert) {
+            Write-Host ("     Upload cert SHA-1 {0}" -f $cert) -ForegroundColor Cyan
+            Write-Host '     Play expects SHA-1 48:ED:2E:8C:53:29:48:95:2E:89:9F:64:9D:C8:9D:9D:75:E8:DD:13' -ForegroundColor DarkGray
+        }
+    }
 }

@@ -28,7 +28,7 @@ export const Select = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <select
     ref={ref}
-    className={cn(base, 'h-9 pr-7 appearance-none bg-no-repeat', className)}
+    className={cn(base, 'h-9 pr-7 appearance-none bg-no-repeat cursor-pointer', className)}
     style={{
       backgroundImage:
         "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23757f8d' stroke-width='1.5'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")",
