@@ -79,7 +79,14 @@ export async function requireContext(permission?: string): Promise<AppContext> {
 
   const ctx = await getContext()
   if (!ctx) redirect('/login')
-  if (ctx.user.mustChangePassword) redirect('/account/password')
+  if (ctx.user.mustChangePassword) {
+    const h = await headers()
+    const path = h.get('x-pathname') ?? ''
+    // Never redirect away from the page that clears this flag.
+    if (!path.startsWith('/account/password')) {
+      redirect('/account/password')
+    }
+  }
   if (permission && !ctx.can(permission)) redirect('/403')
   return ctx
 }
@@ -118,7 +125,13 @@ export async function requireSupportContext(permission?: string): Promise<AppCon
   }
 
   const ctx = buildAppContext(user, tenant)
-  if (ctx.user.mustChangePassword) redirect('/account/password')
+  if (ctx.user.mustChangePassword) {
+    const h = await headers()
+    const path = h.get('x-pathname') ?? ''
+    if (!path.startsWith('/account/password')) {
+      redirect('/account/password')
+    }
+  }
   if (permission && !ctx.can(permission)) redirect('/403')
   return ctx
 }

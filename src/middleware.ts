@@ -74,6 +74,16 @@ function isMarketingHost(host: string): boolean {
   return bare === root || bare === `www.${root}`
 }
 
+function withPathname(request: NextRequest, pathname: string) {
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', pathname)
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  })
+  response.headers.set('x-pathname', pathname)
+  return response
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? ''
@@ -108,22 +118,16 @@ export function middleware(request: NextRequest) {
     if (pathname === '/site' || pathname.startsWith('/site/')) {
       return new NextResponse('Not found', { status: 404 })
     }
-    const response = NextResponse.next()
-    response.headers.set('x-pathname', pathname)
-    return response
+    return withPathname(request, pathname)
   }
 
   const servesMarketing = deployment === 'marketing' || isMarketingHost(host)
   if (!servesMarketing) {
-    const response = NextResponse.next()
-    response.headers.set('x-pathname', pathname)
-    return response
+    return withPathname(request, pathname)
   }
 
   if (PASSTHROUGH.some((prefix) => pathname.startsWith(prefix))) {
-    const response = NextResponse.next()
-    response.headers.set('x-pathname', pathname)
-    return response
+    return withPathname(request, pathname)
   }
 
   // Already rewritten, or someone typed the internal path: send them to the
