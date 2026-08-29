@@ -143,10 +143,16 @@ export async function issueStaffPortalLoginAction(staffId: string): Promise<void
     ctx.require('staff.edit')
   }
 
-  const { temporaryPassword } = await issueStaffPortalLogin(ctx, staffId)
-
-  revalidatePath(`/staff/${staffId}`)
-  redirect(`/staff/${staffId}?welcome=${encodeURIComponent(temporaryPassword)}`)
+  try {
+    const { temporaryPassword } = await issueStaffPortalLogin(ctx, staffId)
+    revalidatePath(`/staff/${staffId}`)
+    redirect(`/staff/${staffId}?welcome=${encodeURIComponent(temporaryPassword)}`)
+  } catch (err) {
+    const { isRedirectError } = await import('next/dist/client/components/redirect-error')
+    if (isRedirectError(err)) throw err
+    const message = err instanceof Error ? err.message : 'Could not issue a portal login'
+    redirect(`/staff/${staffId}?issueError=${encodeURIComponent(message)}`)
+  }
 }
 
 /* ------------------------------------------------------------------ salary */

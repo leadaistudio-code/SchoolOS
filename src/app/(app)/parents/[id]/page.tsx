@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { getParent } from '@/server/modules/people/service'
 import { PageHeader } from '@/components/page-header'
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { EmptyState, Notice } from '@/components/ui/states'
 import { Avatar, PersonCell } from '@/components/ui/identity'
 import { issueParentPortalLoginAction } from '../actions'
@@ -29,10 +31,12 @@ export default async function ParentDetailPage({
   const query = await searchParams
   const ctx = await requireContext('parents.view')
   const parent = await getParent(ctx, id)
+
+  const childWithDob = parent.children.find((c) => c.student.dateOfBirth)
   const canIssueLogin =
     !parent.user &&
     !!parent.phone &&
-    parent.children.length > 0 &&
+    !!childWithDob &&
     (ctx.can('users.create') || ctx.can('parents.create') || ctx.can('parents.edit'))
 
   return (
@@ -64,6 +68,19 @@ export default async function ParentDetailPage({
         </Notice>
       ) : null}
 
+      {query.issueError ? (
+        <Notice tone="danger" title="Could not issue portal login">
+          {query.issueError}
+        </Notice>
+      ) : null}
+
+      {!parent.user && parent.phone && parent.children.length > 0 && !childWithDob ? (
+        <Notice tone="warning" title="Date of birth needed">
+          Portal login needs a child date of birth (first password is first name + YYYYMMDD). Open the
+          student record and add their date of birth, then try again.
+        </Notice>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardContent>
@@ -83,16 +100,16 @@ export default async function ParentDetailPage({
               <DescriptionItem label="Phone">{parent.phone ?? '—'}</DescriptionItem>
               <DescriptionItem label="Email">{parent.email ?? '—'}</DescriptionItem>
               <DescriptionItem label="Occupation">{parent.occupation ?? '—'}</DescriptionItem>
-              <DescriptionItem label="Address">{
-                  [parent.addressLine1, parent.city, parent.state, parent.postalCode]
-                    .filter(Boolean)
-                    .join(', ') || '—'
-                }</DescriptionItem>
+              <DescriptionItem label="Address">
+                {[parent.addressLine1, parent.city, parent.state, parent.postalCode]
+                  .filter(Boolean)
+                  .join(', ') || '—'}
+              </DescriptionItem>
               <DescriptionItem label="Last sign-in">
-                  {parent.user?.lastLoginAt
-                    ? format(parent.user.lastLoginAt, 'd MMM yyyy, HH:mm')
-                    : 'Never'}
-                </DescriptionItem>
+                {parent.user?.lastLoginAt
+                  ? format(parent.user.lastLoginAt, 'd MMM yyyy, HH:mm')
+                  : 'Never'}
+              </DescriptionItem>
             </DescriptionList>
           </CardContent>
         </Card>
@@ -127,13 +144,25 @@ export default async function ParentDetailPage({
                           enrollment
                             ? ` · ${enrollment.classLevel.name} ${enrollment.section.name}`
                             : ''
-                        }${enrollment?.rollNumber ? ` · Roll ${enrollment.rollNumber}` : ''}`}
+                        }${enrollment?.rollNumber ? ` · Roll ${enrollment.rollNumber}` : ''}${
+                          link.student.dateOfBirth
+                            ? ''
+                            : ' · DOB missing'
+                        }`}
                       />
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-xs text-ink-subtle first-letter:uppercase">
                           {link.relation.toLowerCase()}
                         </span>
                         {link.isPrimary ? <Badge tone="brand">Primary</Badge> : null}
+                        {!link.student.dateOfBirth ? (
+                          <Link
+                            href={`/students/${link.student.id}/edit`}
+                            className={buttonVariants({ size: 'sm', variant: 'ghost' })}
+                          >
+                            Add DOB
+                          </Link>
+                        ) : null}
                       </div>
                     </li>
                   )

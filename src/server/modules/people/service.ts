@@ -157,6 +157,7 @@ export async function getParent(ctx: AppContext, id: string) {
               firstName: true,
               lastName: true,
               admissionNo: true,
+              dateOfBirth: true,
               status: true,
               enrollments: {
                 where: { isCurrent: true },
@@ -289,9 +290,10 @@ export async function issueParentPortalLogin(
     include: {
       children: {
         orderBy: [{ isPrimary: 'desc' }],
-        take: 5,
         include: {
-          student: { select: { firstName: true, dateOfBirth: true, deletedAt: true } },
+          student: {
+            select: { firstName: true, dateOfBirth: true, deletedAt: true, admissionNo: true },
+          },
         },
       },
     },
@@ -307,12 +309,15 @@ export async function issueParentPortalLogin(
     )
   }
 
-  const child = parent.children.find((c) => !c.student.deletedAt)?.student
+  // Prefer the primary-linked child that has a DOB; otherwise any linked child with DOB.
+  const child = parent.children
+    .map((c) => c.student)
+    .find((s) => s && !s.deletedAt && s.dateOfBirth)
   if (!child?.dateOfBirth) {
     throw new ApiException(
       400,
       'BAD_REQUEST',
-      'Link a child with a date of birth before creating a parent portal login',
+      'Add a date of birth on the linked student before creating a parent portal login. The first password is child first name + DOB (YYYYMMDD).',
     )
   }
 
@@ -333,7 +338,9 @@ export async function issueParentPortalLogin(
 
   await assertPhoneAvailable(ctx, phone, parent.userId ?? undefined)
 
-  const role = await ctx.db.role.findFirst({ where: { tenantId: null, key: ROLE.PARENT } })
+      const role = await ctx.db.role.findFirst({
+    where: { key: ROLE.PARENT, OR: [{ tenantId: null }, { tenantId: ctx.tenant.id }] },
+  })
   const passwordHash = await hashPassword(temporaryPassword)
 
   let userId = parent.userId
@@ -354,7 +361,7 @@ export async function issueParentPortalLogin(
     const user = await ctx.db.user.create({
       data: {
         tenantId: ctx.tenant.id,
-        email: parent.email,
+        email: parent.email?.trim().toLowerCase() || null,
         phone,
         passwordHash,
         firstName: parent.firstName,

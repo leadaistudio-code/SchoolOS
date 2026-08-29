@@ -126,6 +126,12 @@ export default async function StaffDetailPage({
         </Notice>
       ) : null}
 
+      {query.issueError ? (
+        <Notice tone="danger" title="Could not issue portal login">
+          {query.issueError}
+        </Notice>
+      ) : null}
+
       <LinkTabs
         label="Staff record"
         items={[
