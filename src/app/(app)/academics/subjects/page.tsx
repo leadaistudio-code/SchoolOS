@@ -11,7 +11,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
-import { AssignSubjectButton, NewSubjectButton } from './subject-forms'
+import { AssignSubjectButton, EditAssignmentButton, EditSubjectButton, NewSubjectButton } from './subject-forms'
 
 export const metadata = { title: 'Subjects' }
 
@@ -84,6 +84,7 @@ export default async function SubjectsPage() {
                   <TH>Subject</TH>
                   <TH>Type</TH>
                   <TH align="right">Classes</TH>
+                  {canManage ? <TH align="right"> </TH> : null}
                 </tr>
               </THead>
               <TBody>
@@ -103,6 +104,17 @@ export default async function SubjectsPage() {
                         s._count.classes
                       )}
                     </TD>
+                    {canManage ? (
+                      <TD align="right">
+                        <EditSubjectButton
+                          id={s.id}
+                          code={s.code}
+                          name={s.name}
+                          isElective={s.isElective}
+                          classCount={s._count.classes}
+                        />
+                      </TD>
+                    ) : null}
                   </TR>
                 ))}
               </TBody>
@@ -148,6 +160,7 @@ export default async function SubjectsPage() {
                   <TH>Teacher</TH>
                   <TH>Syllabus</TH>
                   <TH align="right">Periods a week</TH>
+                  {canManage ? <TH align="right"> </TH> : null}
                 </tr>
               </THead>
               <TBody>
@@ -180,6 +193,18 @@ export default async function SubjectsPage() {
                     <TD align="right" className="text-sm tnum">
                       {a._count.timetable}
                     </TD>
+                    {canManage ? (
+                      <TD align="right">
+                        <EditAssignmentButton
+                          id={a.id}
+                          classLabel={a.classLevel.name}
+                          subjectLabel={a.subject.name}
+                          teacherId={a.teacher?.id ?? null}
+                          teachers={teacherOpts}
+                          hasSyllabusOrTimetable={a._count.curricula > 0 || a._count.timetable > 0}
+                        />
+                      </TD>
+                    ) : null}
                   </TR>
                 ))}
               </TBody>

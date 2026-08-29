@@ -46,6 +46,15 @@ export const subjectCreateSchema = z.object({
   isElective: z.boolean().default(false),
 })
 
+export const subjectUpdateSchema = subjectCreateSchema.partial().extend({
+  id: z.string().min(1),
+})
+
+export const classSubjectUpdateSchema = z.object({
+  id: z.string().min(1),
+  teacherId: z.string().optional().nullable(),
+})
+
 /** The current academic session, or a clear error telling the admin to make one. */
 export async function currentSession(ctx: AppContext) {
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
@@ -479,6 +488,81 @@ export const classSubjectSchema = z.object({
  * hang off a class-subject rather than off a subject, because "Maths" means
  * nothing until it means Maths in Class 6 taught by someone.
  */
+export async function updateSubject(
+  ctx: AppContext,
+  input: z.infer<typeof subjectUpdateSchema>,
+) {
+  ctx.require('academics.manage')
+
+  const before = await ctx.db.subject.findFirst({ where: { id: input.id, deletedAt: null } })
+  if (!before) throw notFound('Subject')
+
+  const code = input.code ? input.code.toUpperCase() : undefined
+  if (code && code !== before.code) {
+    const clash = await ctx.db.subject.findFirst({
+      where: { code, deletedAt: null, id: { not: input.id } },
+      select: { id: true },
+    })
+    if (clash) throw conflict(`Subject code ${code} is already in use`)
+  }
+
+  const updated = await ctx.db.subject.update({
+    where: { id: input.id },
+    data: {
+      code,
+      name: input.name,
+      isElective: input.isElective,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'subject.update',
+    module: 'academics',
+    entityType: 'Subject',
+    entityId: updated.id,
+    summary: `Updated subject ${updated.name} (${updated.code})`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+export async function archiveSubject(ctx: AppContext, id: string) {
+  ctx.require('academics.manage')
+
+  const before = await ctx.db.subject.findFirst({
+    where: { id, deletedAt: null },
+    include: { _count: { select: { classes: true } } },
+  })
+  if (!before) throw notFound('Subject')
+  if (before._count.classes > 0) {
+    throw conflict(
+      `${before.name} is still taught in ${before._count.classes} class${before._count.classes === 1 ? '' : 'es'}. Unassign it first.`,
+    )
+  }
+
+  const archived = await ctx.db.subject.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'subject.archive',
+    module: 'academics',
+    entityType: 'Subject',
+    entityId: id,
+    summary: `Archived subject ${before.name}`,
+    before,
+  })
+  return archived
+}
+
 export async function assignSubjectToClass(
   ctx: AppContext,
   input: z.infer<typeof classSubjectSchema>,
@@ -518,6 +602,86 @@ export async function assignSubjectToClass(
     after: created,
   })
   return created
+}
+
+export async function updateClassSubject(
+  ctx: AppContext,
+  input: z.infer<typeof classSubjectUpdateSchema>,
+) {
+  ctx.require('academics.manage')
+
+  const before = await ctx.db.classSubject.findFirst({
+    where: { id: input.id },
+    include: {
+      subject: { select: { name: true, code: true } },
+      classLevel: { select: { name: true } },
+      teacher: { select: { firstName: true, lastName: true } },
+    },
+  })
+  if (!before) throw notFound('Class subject')
+
+  if (input.teacherId) {
+    const teacher = await ctx.db.staff.findFirst({
+      where: { id: input.teacherId, deletedAt: null },
+      select: { id: true },
+    })
+    if (!teacher) throw notFound('Teacher')
+  }
+
+  const updated = await ctx.db.classSubject.update({
+    where: { id: input.id },
+    data: {
+      teacherId: input.teacherId === undefined ? undefined : input.teacherId || null,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'class_subject.update',
+    module: 'academics',
+    entityType: 'ClassSubject',
+    entityId: updated.id,
+    summary: `Updated teacher for ${before.subject.name} in ${before.classLevel.name}`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+export async function unassignSubjectFromClass(ctx: AppContext, id: string) {
+  ctx.require('academics.manage')
+
+  const before = await ctx.db.classSubject.findFirst({
+    where: { id },
+    include: {
+      subject: { select: { name: true } },
+      classLevel: { select: { name: true } },
+      _count: { select: { curricula: true, timetable: true } },
+    },
+  })
+  if (!before) throw notFound('Class subject')
+  if (before._count.curricula > 0 || before._count.timetable > 0) {
+    throw conflict(
+      `${before.subject.name} in ${before.classLevel.name} still has a syllabus or timetable slots. Remove those first.`,
+    )
+  }
+
+  await ctx.db.classSubject.delete({ where: { id } })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'class_subject.delete',
+    module: 'academics',
+    entityType: 'ClassSubject',
+    entityId: id,
+    summary: `Removed ${before.subject.name} from ${before.classLevel.name}`,
+    before,
+  })
+  return { ok: true }
 }
 
 /**

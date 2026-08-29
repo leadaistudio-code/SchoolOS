@@ -63,7 +63,7 @@ export async function saveWeights(
   ctx.require('score.manage')
 
   const known = new Set(metricsFor(population).map((m) => m.key))
-  const rows = input.filter((row) => known.has(row.metric))
+  const rows = input.filter((row) => known.has(row.metric) || row.metric.startsWith('CUSTOM:'))
 
   if (rows.length === 0) {
     throw new Error('No recognisable metrics to save')
@@ -79,8 +79,15 @@ export async function saveWeights(
     select: { metric: true, weight: true, isEnabled: true },
   })
 
-  await ctx.db.$transaction(
-    rows.map((row) =>
+  // Custom metrics removed in the editor must leave the table, otherwise they
+  // reappear on the next load via resolveWeights.
+  const keep = new Set(rows.map((r) => r.metric))
+  const staleCustom = before
+    .filter((b) => b.metric.startsWith('CUSTOM:') && !keep.has(b.metric))
+    .map((b) => b.metric)
+
+  await ctx.db.$transaction([
+    ...rows.map((row) =>
       ctx.db.scoreWeight.upsert({
         where: {
           tenantId_population_metric: {
@@ -104,7 +111,14 @@ export async function saveWeights(
         },
       }),
     ),
-  )
+    ...(staleCustom.length
+      ? [
+          ctx.db.scoreWeight.deleteMany({
+            where: { population, metric: { in: staleCustom } },
+          }),
+        ]
+      : []),
+  ])
 
   await audit({
     tenantId: ctx.tenant.id,

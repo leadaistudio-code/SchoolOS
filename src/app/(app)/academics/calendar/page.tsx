@@ -8,6 +8,12 @@ import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
+import {
+  AddOnDateButton,
+  EditCalendarEventButton,
+  NewCalendarEventButton,
+  type CalendarEventDraft,
+} from './calendar-forms'
 
 export const metadata = { title: 'School calendar' }
 
@@ -23,12 +29,35 @@ const KIND_TONE: Record<string, string> = {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+function toDraft(e: {
+  id: string
+  title: string
+  description?: string | null
+  kind: string
+  allDay: boolean
+  startsAt: Date
+  endsAt: Date
+  location?: string | null
+}): CalendarEventDraft {
+  return {
+    id: e.id,
+    title: e.title,
+    description: e.description ?? null,
+    kind: e.kind,
+    startsAt: e.startsAt.toISOString().slice(0, 10),
+    endsAt: e.endsAt.toISOString().slice(0, 10),
+    allDay: e.allDay,
+    location: e.location ?? null,
+  }
+}
+
 export default async function CalendarPage({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
   const ctx = await requireContext('calendar.view')
+  const canManage = ctx.can('calendar.manage')
   const params = await searchParams
 
   const [month, upcoming] = await Promise.all([
@@ -50,6 +79,8 @@ export default async function CalendarPage({
     <div>
       <PageHeader
         title="School calendar"
+        description="Holidays, exams, PTMs and school events"
+        actions={canManage ? <NewCalendarEventButton /> : null}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px] items-start">
@@ -101,32 +132,50 @@ export default async function CalendarPage({
                   day.isSunday && day.inMonth && 'bg-surface-2/40',
                 )}
               >
-                <span
-                  className={cn(
-                    'inline-grid place-items-center size-6 rounded-full text-xs tnum',
-                    day.isToday
-                      ? 'bg-[var(--brand-500)] text-[var(--brand-contrast)] font-semibold'
-                      : day.inMonth
-                        ? 'text-ink'
-                        : 'text-ink-subtle',
-                  )}
-                >
-                  {Number(day.date.slice(8, 10))}
-                </span>
+                <div className="flex items-center justify-between gap-1">
+                  <span
+                    className={cn(
+                      'inline-grid place-items-center size-6 rounded-full text-xs tnum',
+                      day.isToday
+                        ? 'bg-[var(--brand-500)] text-[var(--brand-contrast)] font-semibold'
+                        : day.inMonth
+                          ? 'text-ink'
+                          : 'text-ink-subtle',
+                    )}
+                  >
+                    {Number(day.date.slice(8, 10))}
+                  </span>
+                  {canManage && day.inMonth ? <AddOnDateButton date={day.date} /> : null}
+                </div>
 
                 <div className="mt-1 space-y-1">
-                  {day.events.slice(0, 3).map((e) => (
-                    <div
-                      key={`${day.date}-${e.id}`}
-                      title={e.title}
-                      className={cn(
-                        'truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
-                        KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
-                      )}
-                    >
-                      {e.title}
-                    </div>
-                  ))}
+                  {day.events.slice(0, 3).map((e) =>
+                    canManage ? (
+                      <div key={`${day.date}-${e.id}`} className="flex items-start gap-0.5">
+                        <div
+                          title={e.title}
+                          className={cn(
+                            'min-w-0 flex-1 truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
+                            KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
+                          )}
+                        >
+                          {e.title}
+                        </div>
+                        <EditCalendarEventButton event={toDraft(e)} />
+                      </div>
+                    ) : (
+                      <div
+                        key={`${day.date}-${e.id}`}
+                        title={e.title}
+                        className={cn(
+                          'truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
+                          KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
+                        )}
+                      >
+                        {e.title}
+                      </div>
+                    ),
+                  )}
                   {day.events.length > 3 ? (
                     <p className="text-xs text-ink-subtle px-1.5">
                       +{day.events.length - 3} more
@@ -146,7 +195,12 @@ export default async function CalendarPage({
             {upcoming.length === 0 ? (
               <EmptyState
                 title="Nothing scheduled"
-                description="Events added to the calendar will appear here."
+                description={
+                  canManage
+                    ? 'Add a holiday or event to place it on the calendar.'
+                    : 'Events added to the calendar will appear here.'
+                }
+                action={canManage ? <NewCalendarEventButton label="Add the first entry" /> : undefined}
               />
             ) : (
               <ul className="divide-y divide-[var(--border)]">
@@ -164,7 +218,10 @@ export default async function CalendarPage({
                           {e.location ? ` · ${e.location}` : ''}
                         </p>
                       </div>
-                      <Badge tone="neutral">{humanizeStatus(e.kind)}</Badge>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Badge tone="neutral">{humanizeStatus(e.kind)}</Badge>
+                        {canManage ? <EditCalendarEventButton event={toDraft(e)} /> : null}
+                      </div>
                     </div>
                   </li>
                 ))}

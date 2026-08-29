@@ -1,22 +1,22 @@
 'use client'
 
 import * as React from 'react'
-import { Link2, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Link2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Button, IconButton } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Checkbox, Field, Input, Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
-import { assignSubjectAction, createSubjectAction } from './actions'
+import {
+  archiveSubjectAction,
+  assignSubjectAction,
+  createSubjectAction,
+  unassignSubjectAction,
+  updateClassSubjectAction,
+  updateSubjectAction,
+} from './actions'
 
 export type Option = { id: string; label: string }
 
-/**
- * Creating a subject.
- *
- * The code is upper-cased by the service, so the field does it on the way in
- * too — a form that silently changes what was typed after submission reads as
- * a bug even when it is correct.
- */
 export function NewSubjectButton({ label = 'New subject' }: { label?: string }) {
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
@@ -97,13 +97,138 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
   )
 }
 
-/**
- * Attaching a subject to a class.
- *
- * Presented as its own action rather than folded into subject creation,
- * because the two happen at different times: subjects are set up once, and
- * assignments change every session as the timetable is rebuilt.
- */
+export function EditSubjectButton({
+  id,
+  code: initialCode,
+  name: initialName,
+  isElective: initialElective,
+  classCount,
+}: {
+  id: string
+  code: string
+  name: string
+  isElective: boolean
+  classCount: number
+}) {
+  const toast = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
+  const [code, setCode] = React.useState(initialCode)
+  const [name, setName] = React.useState(initialName)
+  const [isElective, setIsElective] = React.useState(initialElective)
+  const [confirmRemove, setConfirmRemove] = React.useState(false)
+
+  const openDialog = () => {
+    setCode(initialCode)
+    setName(initialName)
+    setIsElective(initialElective)
+    setConfirmRemove(false)
+    setOpen(true)
+  }
+
+  const submit = () =>
+    startTransition(async () => {
+      const result = await updateSubjectAction({
+        id,
+        code: code.trim().toUpperCase(),
+        name: name.trim(),
+        isElective,
+      })
+      if (!result.ok) {
+        toast.push({ tone: 'error', title: 'Could not update subject', description: result.message })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Subject updated', description: result.message })
+      setOpen(false)
+    })
+
+  const remove = () =>
+    startTransition(async () => {
+      const result = await archiveSubjectAction(id)
+      if (!result.ok) {
+        toast.push({ tone: 'error', title: 'Could not archive subject', description: result.message })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Subject archived', description: result.message })
+      setOpen(false)
+    })
+
+  return (
+    <>
+      <IconButton label={`Edit ${initialName}`} onClick={openDialog}>
+        <Pencil className="size-3.5" aria-hidden />
+      </IconButton>
+
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Edit ${initialName}`}
+        description="Changes apply everywhere this subject is taught."
+        footer={
+          <>
+            <Button onClick={submit} loading={pending} disabled={!code.trim() || !name.trim()}>
+              Save changes
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+          <Field label="Code" htmlFor={`edit-code-${id}`} required>
+            <Input
+              id={`edit-code-${id}`}
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              autoFocus
+            />
+          </Field>
+          <Field label="Subject name" htmlFor={`edit-name-${id}`} required>
+            <Input
+              id={`edit-name-${id}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <label className="flex items-center gap-2 sm:col-span-2">
+            <Checkbox checked={isElective} onChange={(e) => setIsElective(e.target.checked)} />
+            <span className="text-sm text-ink">Elective</span>
+          </label>
+        </div>
+
+        <div className="mt-4 border-t border-line pt-3">
+          {confirmRemove ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-ink-muted">
+                {classCount > 0
+                  ? `Still taught in ${classCount} class${classCount === 1 ? '' : 'es'} — unassign first.`
+                  : 'Archive this subject? It will leave the catalogue.'}
+              </p>
+              <Button
+                size="sm"
+                variant="danger"
+                loading={pending}
+                disabled={classCount > 0}
+                onClick={remove}
+              >
+                Archive
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
+                Keep
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
+              <Trash2 aria-hidden /> Archive subject
+            </Button>
+          )}
+        </div>
+      </Dialog>
+    </>
+  )
+}
+
 export function AssignSubjectButton({
   classes,
   subjects,
@@ -228,6 +353,135 @@ export function AssignSubjectButton({
               ))}
             </Select>
           </Field>
+        </div>
+      </Dialog>
+    </>
+  )
+}
+
+export function EditAssignmentButton({
+  id,
+  classLabel,
+  subjectLabel,
+  teacherId: initialTeacherId,
+  teachers,
+  hasSyllabusOrTimetable,
+}: {
+  id: string
+  classLabel: string
+  subjectLabel: string
+  teacherId: string | null
+  teachers: Option[]
+  hasSyllabusOrTimetable: boolean
+}) {
+  const toast = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
+  const [teacherId, setTeacherId] = React.useState(initialTeacherId ?? '')
+  const [confirmRemove, setConfirmRemove] = React.useState(false)
+
+  const openDialog = () => {
+    setTeacherId(initialTeacherId ?? '')
+    setConfirmRemove(false)
+    setOpen(true)
+  }
+
+  const submit = () =>
+    startTransition(async () => {
+      const result = await updateClassSubjectAction({
+        id,
+        teacherId: teacherId || null,
+      })
+      if (!result.ok) {
+        toast.push({
+          tone: 'error',
+          title: 'Could not update assignment',
+          description: result.message,
+        })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Assignment updated', description: result.message })
+      setOpen(false)
+    })
+
+  const remove = () =>
+    startTransition(async () => {
+      const result = await unassignSubjectAction(id)
+      if (!result.ok) {
+        toast.push({
+          tone: 'error',
+          title: 'Could not remove assignment',
+          description: result.message,
+        })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Assignment removed', description: result.message })
+      setOpen(false)
+    })
+
+  return (
+    <>
+      <IconButton label={`Edit ${subjectLabel} in ${classLabel}`} onClick={openDialog}>
+        <Pencil className="size-3.5" aria-hidden />
+      </IconButton>
+
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`${subjectLabel} · ${classLabel}`}
+        description="Who teaches this subject in this class."
+        footer={
+          <>
+            <Button onClick={submit} loading={pending}>
+              Save teacher
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <Field label="Teacher" htmlFor={`edit-teacher-${id}`}>
+          <Select
+            id={`edit-teacher-${id}`}
+            value={teacherId}
+            onChange={(e) => setTeacherId(e.target.value)}
+          >
+            <option value="">Not assigned yet</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <div className="mt-4 border-t border-line pt-3">
+          {confirmRemove ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-ink-muted">
+                {hasSyllabusOrTimetable
+                  ? 'Still has a syllabus or timetable slots — remove those first.'
+                  : 'Remove this subject from the class?'}
+              </p>
+              <Button
+                size="sm"
+                variant="danger"
+                loading={pending}
+                disabled={hasSyllabusOrTimetable}
+                onClick={remove}
+              >
+                Remove
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
+                Keep
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(true)}>
+              <Trash2 aria-hidden /> Remove from class
+            </Button>
+          )}
         </div>
       </Dialog>
     </>

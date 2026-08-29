@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { RotateCcw, Save } from 'lucide-react'
+import { Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox, Input } from '@/components/ui/input'
@@ -10,6 +10,9 @@ import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
+  customMetricKey,
+  isCustomMetric,
+  metricLabel,
   metricsFor,
   weightShares,
   type MetricDef,
@@ -45,10 +48,8 @@ export function WeightsEditor({
 
   const [rows, setRows] = React.useState<WeightSetting[]>(initial)
   const [pending, start] = React.useTransition()
+  const [newLabel, setNewLabel] = React.useState('')
 
-  // A save elsewhere, or a module being switched on, changes what the server
-  // considers current; adopt it rather than leaving the editor showing a stale
-  // set the next save would write back.
   React.useEffect(() => setRows(initial), [initial])
 
   const catalogue = React.useMemo(
@@ -56,10 +57,16 @@ export function WeightsEditor({
     [population, availableMetrics],
   )
 
+  const customRows = React.useMemo(
+    () => rows.filter((r) => isCustomMetric(r.metric)),
+    [rows],
+  )
+
   const shares = React.useMemo(() => weightShares(rows), [rows])
   const anyLive = rows.some((r) => r.isEnabled && r.weight > 0)
   const dirty = React.useMemo(
     () =>
+      rows.length !== initial.length ||
       rows.some((row) => {
         const before = initial.find((i) => i.metric === row.metric)
         return !before || before.weight !== row.weight || before.isEnabled !== row.isEnabled
@@ -69,6 +76,25 @@ export function WeightsEditor({
 
   const update = (metric: string, patch: Partial<WeightSetting>) =>
     setRows((prev) => prev.map((r) => (r.metric === metric ? { ...r, ...patch } : r)))
+
+  const addCustom = () => {
+    const label = newLabel.trim()
+    if (label.length < 2) return
+    const key = customMetricKey(label)
+    if (rows.some((r) => r.metric.toLowerCase() === key.toLowerCase())) {
+      toast.push({
+        tone: 'error',
+        title: 'Already added',
+        description: `"${label}" is already in the weighting.`,
+      })
+      return
+    }
+    setRows((prev) => [...prev, { metric: key, weight: 5, isEnabled: true }])
+    setNewLabel('')
+  }
+
+  const removeCustom = (metric: string) =>
+    setRows((prev) => prev.filter((r) => r.metric !== metric))
 
   const save = () =>
     start(async () => {
@@ -127,7 +153,91 @@ export function WeightsEditor({
               />
             )
           })}
+
+          {customRows.map((row) => {
+            const share = shares.get(row.metric) ?? 0
+            const label = metricLabel(row.metric)
+            return (
+              <li key={row.metric} className={cn('py-3', (!row.isEnabled || row.weight === 0) && 'opacity-60')}>
+                <div className="flex flex-wrap items-start gap-3">
+                  <label className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      checked={row.isEnabled}
+                      onChange={(e) => update(row.metric, { isEnabled: e.target.checked })}
+                      aria-label={`Count ${label} towards the score`}
+                    />
+                  </label>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink">{label}</p>
+                    <p className="text-xs text-ink-muted">Custom area — weight it here; scores need a data source later.</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      step={1}
+                      value={row.weight}
+                      disabled={!row.isEnabled}
+                      onChange={(e) => update(row.metric, { weight: Number(e.target.value) })}
+                      aria-label={`${label} weight`}
+                      className="w-32 accent-[var(--brand-500)]"
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={row.weight}
+                      disabled={!row.isEnabled}
+                      onChange={(e) => update(row.metric, { weight: Number(e.target.value) || 0 })}
+                      className="w-16"
+                      aria-label={`${label} weight value`}
+                    />
+                    <span className="w-12 text-right text-xs tnum text-ink-subtle">
+                      {Math.round(share * 100)}%
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removeCustom(row.metric)}
+                      aria-label={`Remove ${label}`}
+                    >
+                      <Trash2 aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
         </ul>
+
+        {population === 'STUDENT' ? (
+          <div className="flex flex-wrap items-end gap-2 rounded-[var(--radius)] border border-dashed border-line bg-surface-2/40 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">Add a custom area</p>
+              <p className="text-xs text-ink-subtle">
+                e.g. Arts, Debate, NCC — appears in the weighting alongside Sports and Academics.
+              </p>
+              <Input
+                className="mt-2"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="Area name"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addCustom()
+                  }
+                }}
+              />
+            </div>
+            <Button size="sm" variant="secondary" onClick={addCustom} disabled={newLabel.trim().length < 2}>
+              <Plus aria-hidden /> Add weightage
+            </Button>
+          </div>
+        ) : null}
 
         {!anyLive ? (
           <Notice tone="danger" title="Nothing is switched on">
@@ -179,8 +289,6 @@ function MetricRow({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-ink">{metric.label}</p>
           <p className="text-xs text-ink-muted">{metric.description}</p>
-          {/* Naming the records behind a metric is what makes a disputed score
-              checkable instead of a matter of opinion. */}
           <p className="mt-0.5 text-xs text-ink-subtle">{metric.source}</p>
         </div>
 
@@ -202,12 +310,12 @@ function MetricRow({
             max={100}
             value={row.weight}
             disabled={!row.isEnabled}
-            onChange={(e) => onChange({ weight: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
-            aria-label={`${metric.label} weight, typed`}
-            className="w-16 text-center"
+            onChange={(e) => onChange({ weight: Number(e.target.value) || 0 })}
+            className="w-16"
+            aria-label={`${metric.label} weight value`}
           />
-          <span className="w-14 shrink-0 text-right text-sm tnum font-medium text-ink">
-            {off ? '—' : `${share.toFixed(0)}%`}
+          <span className="w-12 text-right text-xs tnum text-ink-subtle">
+            {Math.round(share * 100)}%
           </span>
         </div>
       </div>

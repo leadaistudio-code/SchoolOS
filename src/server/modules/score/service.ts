@@ -170,6 +170,7 @@ export async function scoreStudents(
     disciplineTotal,
     boarding,
     loans,
+    sportsMembers,
   ] = await Promise.all([
     live.has('ATTENDANCE') || live.has('PUNCTUALITY')
       ? ctx.db.studentAttendance.groupBy({
@@ -255,6 +256,13 @@ export async function scoreStudents(
           select: { studentId: true, dueOn: true, returnedOn: true, status: true },
         })
       : [],
+
+    live.has('SPORTS')
+      ? ctx.db.sportsTeamMember.findMany({
+          where: { studentId: { in: ids } },
+          select: { studentId: true, isCaptain: true },
+        })
+      : [],
   ])
 
   /* --- fold the aggregates into per-student tallies --------------------- */
@@ -272,6 +280,8 @@ export async function scoreStudents(
     missedBus: number
     loansClosed: number
     loansOnTime: number
+    sportsTeams: number
+    sportsCaptain: boolean
   }
 
   const blank = (): Tally => ({
@@ -287,6 +297,8 @@ export async function scoreStudents(
     missedBus: 0,
     loansClosed: 0,
     loansOnTime: 0,
+    sportsTeams: 0,
+    sportsCaptain: false,
   })
 
   const tally = new Map<string, Tally>(ids.map((id) => [id, blank()]))
@@ -342,6 +354,11 @@ export async function scoreStudents(
       t.loansClosed += 1
     }
   }
+  for (const member of sportsMembers) {
+    const t = get(member.studentId)
+    t.sportsTeams += 1
+    if (member.isCaptain) t.sportsCaptain = true
+  }
 
   const schoolRecordsConduct = disciplineTotal > 0
 
@@ -388,6 +405,8 @@ function studentReadings(
     missedBus: number
     loansClosed: number
     loansOnTime: number
+    sportsTeams: number
+    sportsCaptain: boolean
   },
   schoolRecordsConduct: boolean,
 ): MetricReading[] {
@@ -470,6 +489,21 @@ function studentReadings(
         t.loansClosed > 0
           ? `${t.loansOnTime} of ${t.loansClosed} books returned on time`
           : 'No completed loans',
+    },
+    {
+      metric: 'SPORTS',
+      score:
+        t.sportsTeams === 0
+          ? null
+          : t.sportsCaptain
+            ? 100
+            : Math.min(100, 70 + t.sportsTeams * 10),
+      detail:
+        t.sportsTeams === 0
+          ? 'Not on a sports team'
+          : t.sportsCaptain
+            ? `Captain · ${t.sportsTeams} team${t.sportsTeams === 1 ? '' : 's'}`
+            : `On ${t.sportsTeams} sports team${t.sportsTeams === 1 ? '' : 's'}`,
     },
   ]
 }

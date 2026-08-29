@@ -212,10 +212,13 @@ export type CalendarMonth = {
     events: {
       id: string
       title: string
+      description: string | null
       kind: string
       color: string | null
       allDay: boolean
       startsAt: Date
+      endsAt: Date
+      location: string | null
     }[]
   }[]
 }
@@ -243,11 +246,13 @@ export async function calendarMonth(
     select: {
       id: true,
       title: true,
+      description: true,
       kind: true,
       color: true,
       allDay: true,
       startsAt: true,
       endsAt: true,
+      location: true,
     },
   })
 
@@ -281,10 +286,13 @@ export async function calendarMonth(
       events: (byDay.get(key) ?? []).map((e) => ({
         id: e.id,
         title: e.title,
+        description: e.description,
         kind: e.kind,
         color: e.color,
         allDay: e.allDay,
         startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        location: e.location,
       })),
     })
   }
@@ -327,6 +335,52 @@ export async function createCalendarEvent(
   return created
 }
 
+export async function updateCalendarEvent(
+  ctx: AppContext,
+  id: string,
+  input: z.infer<typeof calendarEventSchema>,
+) {
+  ctx.require('calendar.manage')
+
+  const before = await ctx.db.calendarEvent.findFirst({ where: { id } })
+  if (!before) throw notFound('Event')
+
+  const updated = await ctx.db.calendarEvent.update({
+    where: { id },
+    data: {
+      title: input.title,
+      description: input.description,
+      kind: input.kind,
+      startsAt: new Date(input.startsAt),
+      endsAt: new Date(input.endsAt),
+      allDay: input.allDay,
+      location: input.location,
+      color: input.color,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'calendar.update',
+    module: 'calendar',
+    entityType: 'CalendarEvent',
+    entityId: updated.id,
+    summary: `Updated "${updated.title}" on the school calendar`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+export async function getCalendarEvent(ctx: AppContext, id: string) {
+  ctx.require('calendar.view')
+  const event = await ctx.db.calendarEvent.findFirst({ where: { id } })
+  if (!event) throw notFound('Event')
+  return event
+}
+
 export async function deleteCalendarEvent(ctx: AppContext, id: string) {
   ctx.require('calendar.manage')
   const before = await ctx.db.calendarEvent.findFirst({ where: { id } })
@@ -356,7 +410,9 @@ export async function upcomingEvents(ctx: AppContext, limit = 8) {
     select: {
       id: true,
       title: true,
+      description: true,
       kind: true,
+      allDay: true,
       startsAt: true,
       endsAt: true,
       location: true,

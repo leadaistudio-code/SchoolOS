@@ -114,6 +114,15 @@ export const STUDENT_METRICS: MetricDef[] = [
     defaultWeight: 2,
     module: 'library',
   },
+  {
+    key: 'SPORTS',
+    population: 'STUDENT',
+    label: 'Sports',
+    description: 'Participation in school sports and teams.',
+    source:
+      'Active membership of a sports team. Captains score higher. Students not on a team are left out rather than scored as zero.',
+    defaultWeight: 5,
+  },
 ]
 
 export const STAFF_METRICS: MetricDef[] = [
@@ -160,7 +169,18 @@ export function metricsFor(population: ScorePopulation): MetricDef[] {
 }
 
 export function metricLabel(key: string): string {
+  if (key.startsWith('CUSTOM:')) return key.slice('CUSTOM:'.length) || 'Custom area'
   return METRIC_BY_KEY.get(key)?.label ?? key.replace(/_/g, ' ').toLowerCase()
+}
+
+export function isCustomMetric(key: string): boolean {
+  return key.startsWith('CUSTOM:')
+}
+
+/** Build a stable custom metric key from a human label. */
+export function customMetricKey(label: string): string {
+  const cleaned = label.trim().replace(/\s+/g, ' ').slice(0, 60)
+  return `CUSTOM:${cleaned}`
 }
 
 export function metricDef(key: string): MetricDef | undefined {
@@ -355,7 +375,7 @@ export function resolveWeights(
 ): WeightSetting[] {
   const storedBy = new Map(stored.map((s) => [s.metric, s]))
 
-  return metricsFor(population)
+  const catalogue = metricsFor(population)
     .filter((m) => {
       if (!m.module || !enabledModules) return true
       return enabledModules[m.module]
@@ -368,6 +388,18 @@ export function resolveWeights(
         isEnabled: override?.isEnabled ?? true,
       }
     })
+
+  // School-defined areas the catalogue does not know about.
+  const known = new Set(catalogue.map((c) => c.metric))
+  const customs = stored
+    .filter((s) => isCustomMetric(s.metric) && !known.has(s.metric))
+    .map((s) => ({
+      metric: s.metric,
+      weight: s.weight,
+      isEnabled: s.isEnabled,
+    }))
+
+  return [...catalogue, ...customs]
 }
 
 /** Normalised percentage each weight represents, for display in the editor. */
