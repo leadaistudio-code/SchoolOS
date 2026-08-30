@@ -240,6 +240,51 @@ export async function rejectAdmitCard(
   return updated
 }
 
+/** Undo a mistaken approval — returns the card to pending for re-review. */
+export async function revokeAdmitCardApproval(ctx: AppContext, id: string) {
+  ctx.require('exams.admit_approve')
+
+  const card = await ctx.db.admitCard.findFirst({
+    where: { id, tenantId: ctx.tenant.id },
+    include: {
+      exam: { select: { name: true } },
+      student: { select: { firstName: true, lastName: true } },
+    },
+  })
+  if (!card) throw notFound('Admit card')
+  if (card.status !== 'APPROVED') {
+    throw conflict('Only approved admit cards can be rolled back to pending')
+  }
+
+  const feeDueMinor = await studentFeeDueMinor(ctx, card.studentId)
+
+  const updated = await ctx.db.admitCard.update({
+    where: { id },
+    data: {
+      status: 'PENDING',
+      approvedById: null,
+      approvedAt: null,
+      rejectedReason: null,
+      feeDueMinor,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'admit_card.revoke',
+    module: 'exams',
+    entityType: 'AdmitCard',
+    entityId: id,
+    summary: `Rolled back approval for admit card ${card.number} (${card.student.firstName} ${card.student.lastName})`,
+    before: card,
+    after: updated,
+  })
+
+  return updated
+}
+
 export async function refreshAdmitCardFees(ctx: AppContext, examId: string) {
   ctx.require('exams.admit_cards')
 

@@ -6,6 +6,7 @@ import { formatDay } from '@/lib/dates'
 import { Badge } from '@/components/ui/badge'
 import { Notice } from '@/components/ui/states'
 import { PrintAdmitCardButton } from '../print-button'
+import { AdmitCardRollbackButton } from '../rollback-button'
 
 export const metadata = { title: 'Admit card' }
 
@@ -14,6 +15,8 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
   const { id } = await params
   const data = await getAdmitCardPrint(ctx, id)
   const { card, schoolName, schoolAddress, className, rollNumber, dateSheet, canPrint } = data
+
+  const canApprove = ctx.can('exams.admit_approve')
 
   if (!canPrint && card.status !== 'APPROVED') {
     return (
@@ -39,7 +42,12 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
           <ChevronLeft className="size-4" aria-hidden />
           Admit cards
         </Link>
-        <PrintAdmitCardButton />
+        <div className="flex items-center gap-2">
+          {canApprove && card.status === 'APPROVED' ? (
+            <AdmitCardRollbackButton id={card.id} examId={card.examId} />
+          ) : null}
+          <PrintAdmitCardButton />
+        </div>
       </div>
 
       <article className="border border-line bg-surface p-5 sm:p-8 print:border-0 print:p-0">

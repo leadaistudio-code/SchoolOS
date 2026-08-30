@@ -8,6 +8,7 @@ import {
   generateAdmitCards,
   refreshAdmitCardFees,
   rejectAdmitCard,
+  revokeAdmitCardApproval,
 } from '@/server/modules/exams/admit-cards'
 
 export async function generateAdmitCardsAction(
@@ -61,5 +62,19 @@ export async function rejectAdmitCardAction(
     return { ok: true, message: 'Admit card rejected.' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Could not reject admit card' }
+  }
+}
+
+export async function revokeAdmitCardAction(
+  id: string,
+  examId: string,
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    await revokeAdmitCardApproval(await requireContext('exams.admit_approve'), id)
+    revalidatePath(`/exams/${examId}/admit-cards`)
+    revalidatePath(`/exams/admit-cards/${id}`)
+    return { ok: true, message: 'Approval rolled back. The card is pending again.' }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Could not roll back approval' }
   }
 }

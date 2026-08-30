@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Check, RefreshCw, UserPlus, X } from 'lucide-react'
+import { Check, RefreshCw, Undo2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
@@ -13,6 +13,7 @@ import {
   generateAdmitCardsAction,
   refreshAdmitCardFeesAction,
   rejectAdmitCardAction,
+  revokeAdmitCardAction,
 } from '../../admit-cards/actions'
 
 type Row = {
@@ -153,12 +154,37 @@ export function AdmitCardPanel({
                     <TD align="right">
                       <div className="flex justify-end gap-1">
                         {row.status === 'APPROVED' ? (
-                          <Link
-                            href={`/exams/admit-cards/${row.id}`}
-                            className="text-sm font-medium text-brand-600 hover:underline"
-                          >
-                            Print
-                          </Link>
+                          <>
+                            <Link
+                              href={`/exams/admit-cards/${row.id}`}
+                              className="text-sm font-medium text-brand-600 hover:underline"
+                            >
+                              Print
+                            </Link>
+                            {canApprove ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={pending}
+                                title="Roll back approval if this was a mistake"
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      'Roll back approval? The admit card will return to pending and printing will be blocked until approved again.',
+                                    )
+                                  ) {
+                                    return
+                                  }
+                                  run(
+                                    () => revokeAdmitCardAction(row.id, examId),
+                                    'Rollback',
+                                  )
+                                }}
+                              >
+                                <Undo2 aria-hidden /> Rollback
+                              </Button>
+                            ) : null}
+                          </>
                         ) : canApprove && row.status === 'PENDING' ? (
                           <>
                             <Button
