@@ -12,7 +12,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
-import { AssignSubjectButton, EditAssignmentButton, EditSubjectButton, NewSubjectButton } from './subject-forms'
+import { AssignSubjectButton, EditAssignmentButton, EditSubjectButton, MapSubjectToClassesButton, NewSubjectButton } from './subject-forms'
 import { formatNumber } from '@/lib/utils'
 
 export const metadata = { title: 'Subjects' }
@@ -42,6 +42,16 @@ export default async function SubjectsPage() {
     id: t.id,
     label: `${t.firstName} ${t.lastName} — ${t.employeeCode}`,
   }))
+  const assignedPairs = assignments.map((a) => ({
+    subjectId: a.subject.id,
+    classLevelId: a.classLevel.id,
+  }))
+  const classesBySubject = new Map<string, string[]>()
+  for (const a of assignments) {
+    const list = classesBySubject.get(a.subject.id) ?? []
+    list.push(a.classLevel.name)
+    classesBySubject.set(a.subject.id, list)
+  }
   const electives = subjects.filter((s) => s.isElective).length
 
   return (
@@ -62,8 +72,9 @@ export default async function SubjectsPage() {
                 classes={classOptions}
                 subjects={subjectOptions}
                 teachers={teacherOpts}
+                assignedPairs={assignedPairs}
               />
-              <NewSubjectButton />
+              <NewSubjectButton classes={classOptions} teachers={teacherOpts} />
             </>
           ) : null
         }
@@ -109,7 +120,7 @@ export default async function SubjectsPage() {
                 ? 'Add the subjects this school teaches, then attach each one to the classes that study it.'
                 : 'An administrator has not added any subjects yet.'
             }
-            action={canManage ? <NewSubjectButton label="Add the first subject" /> : undefined}
+            action={canManage ? <NewSubjectButton label="Add the first subject" classes={classOptions} teachers={teacherOpts} /> : undefined}
           />
         ) : (
           <TableWrap>
@@ -119,7 +130,7 @@ export default async function SubjectsPage() {
                   <TH>Code</TH>
                   <TH>Subject</TH>
                   <TH>Type</TH>
-                  <TH align="right">Classes</TH>
+                  <TH>Classes mapped</TH>
                   {canManage ? <TH align="right"> </TH> : null}
                 </tr>
               </THead>
@@ -133,22 +144,32 @@ export default async function SubjectsPage() {
                         {s.isElective ? 'elective' : 'core'}
                       </Badge>
                     </TD>
-                    <TD align="right" className="text-sm">
-                      {s._count.classes === 0 ? (
-                        <span className="text-ink-subtle">Not assigned</span>
+                    <TD className="text-sm text-ink-muted">
+                      {(classesBySubject.get(s.id) ?? []).length === 0 ? (
+                        <span className="text-ink-subtle">Not mapped</span>
                       ) : (
-                        s._count.classes
+                        (classesBySubject.get(s.id) ?? []).join(', ')
                       )}
                     </TD>
                     {canManage ? (
                       <TD align="right">
-                        <EditSubjectButton
-                          id={s.id}
-                          code={s.code}
-                          name={s.name}
-                          isElective={s.isElective}
-                          classCount={s._count.classes}
-                        />
+                        <div className="flex justify-end gap-1">
+                          <MapSubjectToClassesButton
+                            subjectId={s.id}
+                            subjectLabel={s.name}
+                            classes={classOptions}
+                            teachers={teacherOpts}
+                            assignedPairs={assignedPairs}
+                            mappedClassNames={classesBySubject.get(s.id) ?? []}
+                          />
+                          <EditSubjectButton
+                            id={s.id}
+                            code={s.code}
+                            name={s.name}
+                            isElective={s.isElective}
+                            classCount={s._count.classes}
+                          />
+                        </div>
                       </TD>
                     ) : null}
                   </TR>
@@ -180,8 +201,9 @@ export default async function SubjectsPage() {
                   classes={classOptions}
                   subjects={subjectOptions}
                   teachers={teacherOpts}
+                  assignedPairs={assignedPairs}
                   variant="primary"
-                  label="Assign the first subject"
+                  label="Map the first subject"
                 />
               ) : undefined
             }

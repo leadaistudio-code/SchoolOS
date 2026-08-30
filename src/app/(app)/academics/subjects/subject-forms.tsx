@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast'
 import { SUBJECT_PRESETS } from '@/lib/subject-presets'
 import {
   archiveSubjectAction,
-  assignSubjectAction,
+  assignSubjectsToClassesAction,
   createSubjectAction,
   unassignSubjectAction,
   updateClassSubjectAction,
@@ -19,7 +19,97 @@ import {
 
 export type Option = { id: string; label: string }
 
-export function NewSubjectButton({ label = 'New subject' }: { label?: string }) {
+export type AssignmentPair = { subjectId: string; classLevelId: string }
+
+function ClassCheckboxGrid({
+  classes,
+  selectedIds,
+  onToggle,
+  disabledIds,
+}: {
+  classes: Option[]
+  selectedIds: string[]
+  onToggle: (id: string, checked: boolean) => void
+  disabledIds?: Set<string>
+}) {
+  if (classes.length === 0) {
+    return (
+      <p className="text-sm text-warning">
+        No classes found for the current academic session. Create a class under Academics → Classes
+        first.
+      </p>
+    )
+  }
+
+  return (
+    <div className="grid max-h-48 gap-1.5 overflow-y-auto rounded-[var(--radius-sm)] border border-line p-2 sm:grid-cols-2">
+      {classes.map((c) => {
+        const disabled = disabledIds?.has(c.id)
+        return (
+          <label
+            key={c.id}
+            className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-sm ${
+              disabled
+                ? 'cursor-not-allowed text-ink-subtle'
+                : 'cursor-pointer text-ink hover:bg-surface-2'
+            }`}
+          >
+            <Checkbox
+              checked={selectedIds.includes(c.id)}
+              disabled={disabled}
+              onChange={(e) => onToggle(c.id, e.target.checked)}
+            />
+            <span>{c.label}</span>
+            {disabled ? <span className="text-xs text-ink-subtle">mapped</span> : null}
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+function TeacherSelect({
+  id,
+  teachers,
+  value,
+  onChange,
+}: {
+  id: string
+  teachers: Option[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <Field
+      label="Teacher"
+      htmlFor={id}
+      hint={
+        teachers.length === 0
+          ? 'No teaching staff on record yet'
+          : 'Optional default teacher for the selected classes'
+      }
+    >
+      <Select id={id} value={value} disabled={teachers.length === 0} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Not assigned yet</option>
+        {teachers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  )
+}
+
+export function NewSubjectButton({
+  label = 'New subject',
+  classes = [],
+  teachers = [],
+}: {
+  label?: string
+  classes?: Option[]
+  teachers?: Option[]
+}) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
@@ -28,23 +118,21 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
   const [code, setCode] = React.useState('')
   const [name, setName] = React.useState('')
   const [isElective, setIsElective] = React.useState(false)
+  const [classLevelIds, setClassLevelIds] = React.useState<string[]>([])
+  const [teacherId, setTeacherId] = React.useState('')
 
   const openDialog = () => {
     setPreset('')
     setCode('')
     setName('')
     setIsElective(false)
+    setClassLevelIds([])
+    setTeacherId('')
     setOpen(true)
   }
 
-  const applyPreset = (value: string) => {
-    setPreset(value)
-    if (!value) return
-    const match = SUBJECT_PRESETS.find((p) => p.code === value)
-    if (!match) return
-    setCode(match.code)
-    setName(match.name)
-    setIsElective(match.isElective)
+  const toggleClass = (id: string, checked: boolean) => {
+    setClassLevelIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
   }
 
   const submit = () =>
@@ -53,6 +141,8 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
         code: code.trim().toUpperCase(),
         name: name.trim(),
         isElective,
+        classLevelIds,
+        teacherId: teacherId || undefined,
       })
       if (!result.ok) {
         toast.push({ tone: 'error', title: 'Could not create subject', description: result.message })
@@ -64,8 +154,20 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
       setCode('')
       setName('')
       setIsElective(false)
+      setClassLevelIds([])
+      setTeacherId('')
       router.refresh()
     })
+
+  const applyPreset = (value: string) => {
+    setPreset(value)
+    if (!value) return
+    const match = SUBJECT_PRESETS.find((p) => p.code === value)
+    if (!match) return
+    setCode(match.code)
+    setName(match.name)
+    setIsElective(match.isElective)
+  }
 
   return (
     <>
@@ -146,6 +248,27 @@ export function NewSubjectButton({ label = 'New subject' }: { label?: string }) 
               Elective — students choose it rather than all taking it
             </span>
           </label>
+
+          <Field
+            label="Map to classes"
+            className="sm:col-span-2"
+            hint="Select every class that studies this subject. You can add more later."
+          >
+            <ClassCheckboxGrid
+              classes={classes}
+              selectedIds={classLevelIds}
+              onToggle={toggleClass}
+            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <TeacherSelect
+              id="new-subject-teacher"
+              teachers={teachers}
+              value={teacherId}
+              onChange={setTeacherId}
+            />
+          </div>
         </div>
       </Dialog>
     </>
@@ -288,12 +411,14 @@ export function AssignSubjectButton({
   classes,
   subjects,
   teachers,
+  assignedPairs = [],
   variant = 'secondary',
-  label = 'Assign to class',
+  label = 'Map subject to classes',
 }: {
   classes: Option[]
   subjects: Option[]
   teachers: Option[]
+  assignedPairs?: AssignmentPair[]
   variant?: 'primary' | 'secondary'
   label?: string
 }) {
@@ -301,34 +426,47 @@ export function AssignSubjectButton({
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
-  const [classLevelId, setClassLevelId] = React.useState('')
   const [subjectId, setSubjectId] = React.useState('')
+  const [classLevelIds, setClassLevelIds] = React.useState<string[]>([])
   const [teacherId, setTeacherId] = React.useState('')
 
   const blocked = classes.length === 0 || subjects.length === 0
 
+  const disabledClassIds = React.useMemo(() => {
+    if (!subjectId) return new Set<string>()
+    return new Set(
+      assignedPairs
+        .filter((p) => p.subjectId === subjectId)
+        .map((p) => p.classLevelId),
+    )
+  }, [assignedPairs, subjectId])
+
   const openDialog = () => {
-    setClassLevelId('')
     setSubjectId('')
+    setClassLevelIds([])
     setTeacherId('')
     setOpen(true)
   }
 
+  const toggleClass = (id: string, checked: boolean) => {
+    setClassLevelIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
+  }
+
   const submit = () =>
     startTransition(async () => {
-      const result = await assignSubjectAction({
-        classLevelId,
+      const result = await assignSubjectsToClassesAction({
         subjectId,
+        classLevelIds,
         teacherId: teacherId || undefined,
       })
       if (!result.ok) {
-        toast.push({ tone: 'error', title: 'Could not assign subject', description: result.message })
+        toast.push({ tone: 'error', title: 'Could not map subject', description: result.message })
         return
       }
-      toast.push({ tone: 'success', title: 'Subject assigned', description: result.message })
+      toast.push({ tone: 'success', title: 'Subject mapped', description: result.message })
       setOpen(false)
-      setClassLevelId('')
       setSubjectId('')
+      setClassLevelIds([])
       setTeacherId('')
       router.refresh()
     })
@@ -345,7 +483,7 @@ export function AssignSubjectButton({
             ? classes.length === 0
               ? 'Create a class under Academics > Classes first'
               : 'Create at least one subject first'
-            : 'Attach a subject to a class'
+            : 'Map a subject to one or more classes'
         }
       >
         <Link2 aria-hidden /> {label}
@@ -354,12 +492,16 @@ export function AssignSubjectButton({
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
-        title="Assign a subject to a class"
-        description="This is what a syllabus, a timetable slot, a lesson log and a homework task all attach to."
+        title="Map subject to classes"
+        description="Choose a subject and the classes that study it. Syllabus, timetable and homework attach to each pairing."
         footer={
           <>
-            <Button onClick={submit} loading={pending} disabled={!classLevelId || !subjectId}>
-              Assign subject
+            <Button
+              onClick={submit}
+              loading={pending}
+              disabled={!subjectId || classLevelIds.length === 0}
+            >
+              Save mapping
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -367,38 +509,20 @@ export function AssignSubjectButton({
           </>
         }
       >
-        {classes.length === 0 ? (
-          <p className="text-sm text-warning">
-            No classes found for the current academic session. Create a class under Academics →
-            Classes, or set an active session in Settings.
-          </p>
-        ) : null}
         {subjects.length === 0 ? (
-          <p className="text-sm text-warning">
-            No subjects in the catalogue yet. Add a subject first, then assign it here.
+          <p className="text-sm text-warning mb-3">
+            No subjects in the catalogue yet. Add a subject first, then map it here.
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Class" htmlFor="assign-class" required>
-            <Select
-              id="assign-class"
-              value={classLevelId}
-              onChange={(e) => setClassLevelId(e.target.value)}
-            >
-              <option value="">Choose a class</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
+        <div className="grid gap-3">
           <Field label="Subject" htmlFor="assign-subject" required>
             <Select
               id="assign-subject"
               value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
+              onChange={(e) => {
+                setSubjectId(e.target.value)
+                setClassLevelIds([])
+              }}
             >
               <option value="">Choose a subject</option>
               {subjects.map((s) => (
@@ -410,29 +534,132 @@ export function AssignSubjectButton({
           </Field>
 
           <Field
-            label="Teacher"
-            htmlFor="assign-teacher"
-            className="sm:col-span-2"
+            label="Classes"
             hint={
-              teachers.length === 0
-                ? 'No teaching staff on record yet'
-                : 'Who teaches it. Needed before they can log classwork or set homework.'
+              subjectId
+                ? 'Already mapped classes are disabled'
+                : 'Pick a subject first, then select classes'
             }
           >
-            <Select
-              id="assign-teacher"
-              value={teacherId}
-              disabled={teachers.length === 0}
-              onChange={(e) => setTeacherId(e.target.value)}
-            >
-              <option value="">Not assigned yet</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
+            <ClassCheckboxGrid
+              classes={classes}
+              selectedIds={classLevelIds}
+              onToggle={toggleClass}
+              disabledIds={disabledClassIds}
+            />
           </Field>
+
+          <TeacherSelect
+            id="assign-teacher"
+            teachers={teachers}
+            value={teacherId}
+            onChange={setTeacherId}
+          />
+        </div>
+      </Dialog>
+    </>
+  )
+}
+
+export function MapSubjectToClassesButton({
+  subjectId,
+  subjectLabel,
+  classes,
+  teachers,
+  assignedPairs,
+  mappedClassNames,
+}: {
+  subjectId: string
+  subjectLabel: string
+  classes: Option[]
+  teachers: Option[]
+  assignedPairs: AssignmentPair[]
+  mappedClassNames: string[]
+}) {
+  const router = useRouter()
+  const toast = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
+  const [classLevelIds, setClassLevelIds] = React.useState<string[]>([])
+  const [teacherId, setTeacherId] = React.useState('')
+
+  const disabledClassIds = React.useMemo(
+    () =>
+      new Set(
+        assignedPairs
+          .filter((p) => p.subjectId === subjectId)
+          .map((p) => p.classLevelId),
+      ),
+    [assignedPairs, subjectId],
+  )
+
+  const toggleClass = (id: string, checked: boolean) => {
+    setClassLevelIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
+  }
+
+  const submit = () =>
+    startTransition(async () => {
+      const result = await assignSubjectsToClassesAction({
+        subjectId,
+        classLevelIds,
+        teacherId: teacherId || undefined,
+      })
+      if (!result.ok) {
+        toast.push({ tone: 'error', title: 'Could not map classes', description: result.message })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Classes mapped', description: result.message })
+      setOpen(false)
+      setClassLevelIds([])
+      setTeacherId('')
+      router.refresh()
+    })
+
+  return (
+    <>
+      <IconButton label={`Map ${subjectLabel} to classes`} onClick={() => setOpen(true)}>
+        <Link2 className="size-3.5" aria-hidden />
+      </IconButton>
+
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Map ${subjectLabel} to classes`}
+        description="Add this subject to more classes. Each class pairing can have its own syllabus and timetable."
+        footer={
+          <>
+            <Button onClick={submit} loading={pending} disabled={classLevelIds.length === 0}>
+              Add to selected classes
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        {mappedClassNames.length > 0 ? (
+          <p className="mb-3 text-sm text-ink-muted">
+            Already mapped: {mappedClassNames.join(', ')}
+          </p>
+        ) : (
+          <p className="mb-3 text-sm text-ink-muted">Not mapped to any class yet.</p>
+        )}
+
+        <div className="grid gap-3">
+          <Field label="Add to classes">
+            <ClassCheckboxGrid
+              classes={classes}
+              selectedIds={classLevelIds}
+              onToggle={toggleClass}
+              disabledIds={disabledClassIds}
+            />
+          </Field>
+          <TeacherSelect
+            id={`map-teacher-${subjectId}`}
+            teachers={teachers}
+            value={teacherId}
+            onChange={setTeacherId}
+          />
         </div>
       </Dialog>
     </>

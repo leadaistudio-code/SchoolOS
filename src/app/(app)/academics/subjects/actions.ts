@@ -6,10 +6,12 @@ import { requireContext } from '@/server/context'
 import {
   archiveSubject,
   assignSubjectToClass,
+  assignSubjectToClasses,
+  assignSubjectToClassesSchema,
   classSubjectSchema,
   classSubjectUpdateSchema,
-  createSubject,
-  subjectCreateSchema,
+  createSubjectWithClasses,
+  subjectCreateWithClassesSchema,
   subjectUpdateSchema,
   unassignSubjectFromClass,
   updateClassSubject,
@@ -36,14 +38,38 @@ function revalidateAcademics() {
 export async function createSubjectAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('academics.manage')
   try {
-    const created = await createSubject(ctx, subjectCreateSchema.parse(payload))
+    const parsed = subjectCreateWithClassesSchema.parse(payload)
+    const { subject, assigned, skipped } = await createSubjectWithClasses(ctx, parsed)
     revalidatePath('/academics/subjects')
+    const skippedNote =
+      skipped.length > 0 ? ` (${skipped.length} class${skipped.length === 1 ? '' : 'es'} were already mapped)` : ''
     return {
       ok: true,
-      message: `${created.name} added. Attach it to the classes that study it.`,
+      message:
+        assigned > 0
+          ? `${subject.name} created and mapped to ${assigned} class${assigned === 1 ? '' : 'es'}.${skippedNote}`
+          : `${subject.name} added. Map it to the classes that study it when ready.`,
     }
   } catch (err) {
     return fail(err, 'The subject could not be created')
+  }
+}
+
+export async function assignSubjectsToClassesAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('academics.manage')
+  try {
+    const result = await assignSubjectToClasses(ctx, assignSubjectToClassesSchema.parse(payload))
+    revalidateAcademics()
+    const skippedNote =
+      result.skipped.length > 0
+        ? ` Skipped ${result.skipped.length} already mapped: ${result.skipped.join(', ')}.`
+        : ''
+    return {
+      ok: true,
+      message: `${result.subjectName} mapped to ${result.created} class${result.created === 1 ? '' : 'es'}.${skippedNote}`,
+    }
+  } catch (err) {
+    return fail(err, 'The subject could not be mapped')
   }
 }
 

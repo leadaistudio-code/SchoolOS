@@ -483,13 +483,19 @@ export const classSubjectSchema = z.object({
   teacherId: z.string().optional(),
 })
 
+export const assignSubjectToClassesSchema = z.object({
+  subjectId: z.string().min(1, 'Select a subject'),
+  classLevelIds: z.array(z.string()).min(1, 'Select at least one class'),
+  teacherId: z.string().optional(),
+})
+
+export const subjectCreateWithClassesSchema = subjectCreateSchema.extend({
+  classLevelIds: z.array(z.string()).default([]),
+  teacherId: z.string().optional(),
+})
+
 /**
- * Attaches a subject to a class, optionally naming who teaches it.
- *
- * This mapping is the hinge the rest of academics turns on: a syllabus, a
- * timetable slot, a homework task, a classwork entry and an exam paper all
- * hang off a class-subject rather than off a subject, because "Maths" means
- * nothing until it means Maths in Class 6 taught by someone.
+ * Updates a subject in the school-wide catalogue.
  */
 export async function updateSubject(
   ctx: AppContext,
@@ -605,6 +611,90 @@ export async function assignSubjectToClass(
     after: created,
   })
   return created
+}
+
+export async function assignSubjectToClasses(
+  ctx: AppContext,
+  input: z.infer<typeof assignSubjectToClassesSchema>,
+) {
+  ctx.require('academics.manage')
+
+  const subject = await ctx.db.subject.findFirst({
+    where: { id: input.subjectId, deletedAt: null },
+    select: { id: true, name: true },
+  })
+  if (!subject) throw notFound('Subject')
+
+  let created = 0
+  const skipped: string[] = []
+
+  for (const classLevelId of input.classLevelIds) {
+    const classLevel = await ctx.db.classLevel.findFirst({
+      where: { id: classLevelId, deletedAt: null },
+      select: { id: true, name: true },
+    })
+    if (!classLevel) continue
+
+    const existing = await ctx.db.classSubject.findFirst({
+      where: { classLevelId, subjectId: input.subjectId },
+    })
+    if (existing) {
+      skipped.push(classLevel.name)
+      continue
+    }
+
+    const row = await ctx.db.classSubject.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        classLevelId,
+        subjectId: input.subjectId,
+        teacherId: input.teacherId || null,
+      },
+    })
+
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'class_subject.create',
+      module: 'academics',
+      entityType: 'ClassSubject',
+      entityId: row.id,
+      summary: `Added ${subject.name} to ${classLevel.name}`,
+      after: row,
+    })
+    created++
+  }
+
+  if (created === 0) {
+    throw conflict(
+      skipped.length > 0
+        ? `${subject.name} is already taught in ${skipped.join(', ')}`
+        : 'No classes were selected',
+    )
+  }
+
+  return { created, skipped, subjectName: subject.name }
+}
+
+export async function createSubjectWithClasses(
+  ctx: AppContext,
+  input: z.infer<typeof subjectCreateWithClassesSchema>,
+) {
+  const { classLevelIds, teacherId, ...subjectInput } = input
+  const created = await createSubject(ctx, subjectInput)
+
+  if (classLevelIds.length === 0) {
+    return { subject: created, assigned: 0, skipped: [] as string[] }
+  }
+
+  const mapped = await assignSubjectToClasses(ctx, {
+    subjectId: created.id,
+    classLevelIds,
+    teacherId,
+  })
+
+  return { subject: created, assigned: mapped.created, skipped: mapped.skipped }
 }
 
 export async function updateClassSubject(
