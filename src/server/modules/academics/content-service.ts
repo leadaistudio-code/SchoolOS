@@ -202,6 +202,22 @@ export const calendarEventSchema = z
     message: 'The event cannot end before it starts',
   })
 
+export type CalendarDisplayEvent = {
+  id: string
+  title: string
+  description: string | null
+  kind: string
+  color: string | null
+  allDay: boolean
+  startsAt: Date
+  endsAt: Date
+  location: string | null
+  /** Set for exam date-sheet entries; links to the exam detail page. */
+  href?: string
+  /** Exam papers are managed from Exams, not the calendar editor. */
+  readOnly?: boolean
+}
+
 export type CalendarMonth = {
   month: string
   days: {
@@ -209,18 +225,72 @@ export type CalendarMonth = {
     isToday: boolean
     isSunday: boolean
     inMonth: boolean
-    events: {
-      id: string
-      title: string
-      description: string | null
-      kind: string
-      color: string | null
-      allDay: boolean
-      startsAt: Date
-      endsAt: Date
-      location: string | null
-    }[]
+    events: CalendarDisplayEvent[]
   }[]
+}
+
+function parseExamTime(examDate: Date, time: string | null): Date {
+  const base = attendanceDate(examDate)
+  if (!time) return base
+  const [hours, minutes] = time.split(':').map((part) => Number(part))
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return base
+  return new Date(
+    Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), hours, minutes),
+  )
+}
+
+async function examPapersInRange(ctx: AppContext, from: Date, to: Date) {
+  return ctx.db.examSubject.findMany({
+    where: {
+      examDate: { not: null, gte: from, lte: to },
+      exam: { status: { not: 'ARCHIVED' } },
+    },
+    orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
+    select: {
+      id: true,
+      examDate: true,
+      startTime: true,
+      endTime: true,
+      roomName: true,
+      exam: { select: { id: true, name: true } },
+      classSubject: {
+        select: {
+          classLevel: { select: { name: true } },
+          subject: { select: { name: true } },
+        },
+      },
+    },
+  })
+}
+
+function examPaperToCalendarEvent(paper: Awaited<ReturnType<typeof examPapersInRange>>[number]): CalendarDisplayEvent {
+  const examDate = paper.examDate!
+  const subject = paper.classSubject.subject.name
+  const className = paper.classSubject.classLevel.name
+  const hasTime = Boolean(paper.startTime)
+  const startsAt = parseExamTime(examDate, paper.startTime)
+  const endsAt = parseExamTime(examDate, paper.endTime ?? paper.startTime)
+  const timeLabel = hasTime
+    ? paper.endTime && paper.endTime !== paper.startTime
+      ? `${paper.startTime}–${paper.endTime}`
+      : paper.startTime!
+    : null
+
+  return {
+    id: `exam-subject:${paper.id}`,
+    title: timeLabel
+      ? `${subject} · ${className} (${timeLabel})`
+      : `${subject} · ${className}`,
+    description: paper.exam.name,
+    kind: 'EXAM',
+    color: null,
+    allDay: !hasTime,
+    startsAt,
+    endsAt,
+    location: paper.roomName,
+    href: `/exams/${paper.exam.id}`,
+    readOnly: true,
+  }
 }
 
 /**
@@ -237,35 +307,50 @@ export async function calendarMonth(
   const from = startOfMonth(anchor)
   const to = endOfMonth(anchor)
 
-  const events = await ctx.db.calendarEvent.findMany({
-    where: {
-      startsAt: { lte: to },
-      endsAt: { gte: from },
-    },
-    orderBy: { startsAt: 'asc' },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      kind: true,
-      color: true,
-      allDay: true,
-      startsAt: true,
-      endsAt: true,
-      location: true,
-    },
-  })
+  const [storedEvents, examPapers] = await Promise.all([
+    ctx.db.calendarEvent.findMany({
+      where: {
+        startsAt: { lte: to },
+        endsAt: { gte: from },
+      },
+      orderBy: { startsAt: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        kind: true,
+        color: true,
+        allDay: true,
+        startsAt: true,
+        endsAt: true,
+        location: true,
+      },
+    }),
+    examPapersInRange(ctx, from, to),
+  ])
 
-  const byDay = new Map<string, typeof events>()
+  const events: CalendarDisplayEvent[] = [
+    ...storedEvents.map((event) => ({ ...event, readOnly: false as const })),
+    ...examPapers.map(examPaperToCalendarEvent),
+  ]
+
+  const byDay = new Map<string, CalendarDisplayEvent[]>()
   for (const event of events) {
     // A multi-day event appears on each day it spans.
-    const cursor = new Date(event.startsAt)
-    const last = new Date(event.endsAt)
-    while (cursor <= last) {
+    const cursor = attendanceDate(event.startsAt)
+    const last = attendanceDate(event.endsAt)
+    while (cursor.getTime() <= last.getTime()) {
       const key = cursor.toISOString().slice(0, 10)
       byDay.set(key, [...(byDay.get(key) ?? []), event])
-      cursor.setDate(cursor.getDate() + 1)
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
+  }
+
+  for (const [key, dayEvents] of byDay) {
+    byDay.set(
+      key,
+      [...dayEvents].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.title.localeCompare(b.title)),
+    )
   }
 
   const gridStart = new Date(from)
@@ -293,6 +378,8 @@ export async function calendarMonth(
         startsAt: e.startsAt,
         endsAt: e.endsAt,
         location: e.location,
+        href: e.href,
+        readOnly: e.readOnly,
       })),
     })
   }
@@ -402,20 +489,32 @@ export async function deleteCalendarEvent(ctx: AppContext, id: string) {
   return { ok: true }
 }
 
-export async function upcomingEvents(ctx: AppContext, limit = 8) {
-  return ctx.db.calendarEvent.findMany({
-    where: { endsAt: { gte: new Date() } },
-    orderBy: { startsAt: 'asc' },
-    take: limit,
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      kind: true,
-      allDay: true,
-      startsAt: true,
-      endsAt: true,
-      location: true,
-    },
-  })
+export async function upcomingEvents(ctx: AppContext, limit = 8): Promise<CalendarDisplayEvent[]> {
+  ctx.require('calendar.view')
+
+  const now = new Date()
+  const today = attendanceDate(now)
+
+  const [storedEvents, examPapers] = await Promise.all([
+    ctx.db.calendarEvent.findMany({
+      where: { endsAt: { gte: now } },
+      orderBy: { startsAt: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        kind: true,
+        color: true,
+        allDay: true,
+        startsAt: true,
+        endsAt: true,
+        location: true,
+      },
+    }),
+    examPapersInRange(ctx, today, new Date(Date.UTC(today.getUTCFullYear() + 1, today.getUTCMonth(), today.getUTCDate()))),
+  ])
+
+  return [...storedEvents.map((event) => ({ ...event, readOnly: false as const })), ...examPapers.map(examPaperToCalendarEvent)]
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.title.localeCompare(b.title))
+    .slice(0, limit)
 }

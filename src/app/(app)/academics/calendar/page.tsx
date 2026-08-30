@@ -29,6 +29,70 @@ const KIND_TONE: Record<string, string> = {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+type MonthEvent = {
+  id: string
+  title: string
+  description?: string | null
+  kind: string
+  allDay: boolean
+  startsAt: Date
+  endsAt: Date
+  location?: string | null
+  href?: string
+  readOnly?: boolean
+}
+
+function eventTooltip(e: MonthEvent): string {
+  const parts = [e.description, e.location].filter(Boolean)
+  return parts.length > 0 ? `${e.title} — ${parts.join(' · ')}` : e.title
+}
+
+function CalendarDayEvent({
+  event,
+  dayKey,
+  canManage,
+}: {
+  event: MonthEvent
+  dayKey: string
+  canManage: boolean
+}) {
+  const tone = KIND_TONE[event.kind] ?? KIND_TONE.OTHER
+  const chip = event.href ? (
+    <Link
+      href={event.href}
+      title={eventTooltip(event)}
+      className={cn('min-w-0 flex-1 truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4 hover:underline', tone)}
+    >
+      {event.title}
+    </Link>
+  ) : (
+    <div title={eventTooltip(event)} className={cn('min-w-0 flex-1 truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4', tone)}>
+      {event.title}
+    </div>
+  )
+
+  if (canManage && !event.readOnly) {
+    return (
+      <div key={`${dayKey}-${event.id}`} className="flex items-start gap-0.5">
+        {chip}
+        <EditCalendarEventButton event={toDraft(event)} />
+      </div>
+    )
+  }
+
+  return (
+    <div key={`${dayKey}-${event.id}`} title={eventTooltip(event)}>
+      {event.href ? (
+        <Link href={event.href} className={cn('block truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4 hover:underline', tone)}>
+          {event.title}
+        </Link>
+      ) : (
+        <div className={cn('truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4', tone)}>{event.title}</div>
+      )}
+    </div>
+  )
+}
+
 function toDraft(e: {
   id: string
   title: string
@@ -81,7 +145,7 @@ export default async function CalendarPage({
         tone="admissions"
         eyebrow="Calendar"
         title={monthLabel}
-        description="Holidays, exams, PTMs and school events"
+        description="Holidays, exams, PTMs and school events. Exam papers from the date sheet appear automatically."
         actions={canManage ? <NewCalendarEventButton /> : null}
       />
 
@@ -151,33 +215,9 @@ export default async function CalendarPage({
                 </div>
 
                 <div className="mt-1 space-y-1">
-                  {day.events.slice(0, 3).map((e) =>
-                    canManage ? (
-                      <div key={`${day.date}-${e.id}`} className="flex items-start gap-0.5">
-                        <div
-                          title={e.title}
-                          className={cn(
-                            'min-w-0 flex-1 truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
-                            KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
-                          )}
-                        >
-                          {e.title}
-                        </div>
-                        <EditCalendarEventButton event={toDraft(e)} />
-                      </div>
-                    ) : (
-                      <div
-                        key={`${day.date}-${e.id}`}
-                        title={e.title}
-                        className={cn(
-                          'truncate rounded-[4px] px-1.5 py-0.5 text-xs leading-4',
-                          KIND_TONE[e.kind] ?? KIND_TONE.OTHER,
-                        )}
-                      >
-                        {e.title}
-                      </div>
-                    ),
-                  )}
+                  {day.events.slice(0, 3).map((e) => (
+                    <CalendarDayEvent key={`${day.date}-${e.id}`} event={e} dayKey={day.date} canManage={canManage} />
+                  ))}
                   {day.events.length > 3 ? (
                     <p className="text-xs text-ink-subtle px-1.5">
                       +{day.events.length - 3} more
@@ -210,19 +250,34 @@ export default async function CalendarPage({
                   <li key={e.id} className="py-2.5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm text-ink truncate">{e.title}</p>
+                        {e.href ? (
+                          <Link href={e.href} className="text-sm text-ink truncate hover:underline block">
+                            {e.title}
+                          </Link>
+                        ) : (
+                          <p className="text-sm text-ink truncate">{e.title}</p>
+                        )}
                         <p className="text-xs text-ink-subtle">
+                          {e.description && e.readOnly ? `${e.description} · ` : ''}
                           {e.startsAt.toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
                             timeZone: 'UTC',
                           })}
+                          {!e.allDay
+                            ? ` · ${e.startsAt.toLocaleTimeString('en-IN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                                timeZone: 'UTC',
+                              })}`
+                            : ''}
                           {e.location ? ` · ${e.location}` : ''}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Badge tone="neutral">{humanizeStatus(e.kind)}</Badge>
-                        {canManage ? <EditCalendarEventButton event={toDraft(e)} /> : null}
+                        {canManage && !e.readOnly ? <EditCalendarEventButton event={toDraft(e)} /> : null}
                       </div>
                     </div>
                   </li>
