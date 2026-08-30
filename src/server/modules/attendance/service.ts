@@ -3,7 +3,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, attendancePercent, toDateInput } from '@/lib/dates'
-import { studentIdScopeWhere } from '@/server/scope'
+import { assertMarkableSection, studentIdScopeWhere } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import type {
   AttendanceReportQuery,
@@ -59,6 +59,7 @@ export async function getRegister(
     },
   })
   if (!section) throw notFound('Section')
+  await assertMarkableSection(ctx, sectionId)
 
   const [enrollments, existing, leaves] = await Promise.all([
     ctx.db.enrollment.findMany({
@@ -180,6 +181,7 @@ export async function markAttendance(
     },
   })
   if (!section) throw notFound('Section')
+  await assertMarkableSection(ctx, input.sectionId)
 
   const enrolled = await ctx.db.enrollment.findMany({
     where: { sectionId: input.sectionId, isCurrent: true, student: { deletedAt: null } },

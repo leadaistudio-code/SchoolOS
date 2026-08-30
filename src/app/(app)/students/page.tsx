@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { GraduationCap, HeartHandshake, Plus, Upload, Users } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import { classLevelScopeWhere, studentScopeWhere } from '@/server/scope'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
 import { studentListFilterSchema } from '@/server/modules/students/schema'
 import { parseListQuery } from '@/lib/query'
@@ -26,12 +27,17 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
   const ctx = await requireContext('students.view')
   const params = await searchParams
 
+  const scope = await studentScopeWhere(ctx)
+  const classScope = await classLevelScopeWhere(ctx)
+
   const [activeCount, classCount, parentLinks] = await Promise.all([
-    ctx.db.student.count({ where: { status: 'ACTIVE', deletedAt: null } }),
-    ctx.db.classLevel.count({ where: { deletedAt: null } }),
+    ctx.db.student.count({ where: { status: 'ACTIVE', deletedAt: null, ...scope } }),
+    ctx.db.classLevel.count({ where: { deletedAt: null, ...classScope } }),
     ctx.db.studentGuardian.groupBy({
       by: ['studentId'],
-      where: { student: { status: 'ACTIVE', deletedAt: null } },
+      where: {
+        student: { status: 'ACTIVE', deletedAt: null, ...scope },
+      },
     }),
   ])
 

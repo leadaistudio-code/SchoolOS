@@ -1,6 +1,11 @@
 import { subDays, startOfMonth } from 'date-fns'
 import { attendanceDate } from '@/lib/dates'
 import type { AppContext } from '@/server/context'
+import {
+  accessibleStudentIds,
+  teachingClassLevelIds,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 import { headcountGrowth } from './growth'
 
 export type AdminDashboard = Awaited<ReturnType<typeof getAdminDashboard>>
@@ -286,6 +291,70 @@ export async function getAdminDashboard(ctx: AppContext) {
     recentPayments,
     recentNotices,
     recentActivity,
+  }
+}
+
+/** Scoped dashboard for teacher-only accounts. */
+export async function getTeacherDashboard(ctx: AppContext) {
+  const studentIds = await accessibleStudentIds(ctx)
+  const classLevelIds = await teachingClassLevelIds(ctx)
+  const subjectIds = await teachingClassSubjectIds(ctx)
+  const ids = studentIds ?? []
+
+  const today = attendanceDate(new Date())
+
+  const [studentCount, classes, subjects, outstanding, overdueCount, sections] = await Promise.all([
+    ctx.db.student.count({
+      where: { status: 'ACTIVE', deletedAt: null, id: { in: ids } },
+    }),
+    classLevelIds && classLevelIds.length > 0
+      ? ctx.db.classLevel.findMany({
+          where: { id: { in: classLevelIds }, deletedAt: null },
+          orderBy: { numeric: 'asc' },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    subjectIds && subjectIds.length > 0
+      ? ctx.db.classSubject.findMany({
+          where: { id: { in: subjectIds } },
+          select: {
+            classLevel: { select: { name: true } },
+            subject: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
+    ctx.db.feeInvoice.aggregate({
+      where: {
+        studentId: { in: ids },
+        balanceMinor: { gt: 0 },
+        status: { notIn: ['CANCELLED', 'DRAFT'] },
+      },
+      _sum: { balanceMinor: true },
+    }),
+    ctx.db.feeInvoice.count({
+      where: {
+        studentId: { in: ids },
+        balanceMinor: { gt: 0 },
+        dueOn: { lt: today },
+        status: { notIn: ['CANCELLED', 'DRAFT'] },
+      },
+    }),
+    ctx.db.section.count({
+      where: {
+        deletedAt: null,
+        ...(classLevelIds && classLevelIds.length > 0 ? { classLevelId: { in: classLevelIds } } : {}),
+      },
+    }),
+  ])
+
+  return {
+    studentCount,
+    classCount: classes.length,
+    sectionCount: sections,
+    classes,
+    subjects: subjects.map((s) => `${s.subject.name} · ${s.classLevel.name}`),
+    outstandingMinor: outstanding._sum.balanceMinor ?? 0,
+    overdueCount,
   }
 }
 

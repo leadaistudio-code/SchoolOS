@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { differenceInCalendarDays } from 'date-fns'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
@@ -750,6 +750,14 @@ export async function getInvoice(ctx: AppContext, id: string) {
 export async function outstandingByClass(ctx: AppContext) {
   ctx.require('fees.view')
   const today = attendanceDate(new Date())
+  const studentIds = await accessibleStudentIds(ctx)
+
+  if (studentIds !== null && studentIds.length === 0) return []
+
+  const studentFilter =
+    studentIds !== null
+      ? Prisma.sql`AND i."studentId" IN (${Prisma.join(studentIds)})`
+      : Prisma.empty
 
   return ctx.db.$queryRaw<
     { className: string; students: bigint; outstanding: bigint; overdue: bigint }[]
@@ -764,6 +772,7 @@ export async function outstandingByClass(ctx: AppContext) {
     WHERE i."tenantId" = ${ctx.tenant.id}
       AND i."balanceMinor" > 0
       AND i.status <> 'CANCELLED'
+      ${studentFilter}
     GROUP BY cl.name, cl.numeric
     ORDER BY cl.numeric ASC`
 }

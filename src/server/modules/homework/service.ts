@@ -4,7 +4,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
-import { accessibleStudentIds } from '@/server/scope'
+import { accessibleStudentIds, isPortalOnlyRole, teachingClassSubjectIds } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 
@@ -86,13 +86,13 @@ export async function listHomework(
   ctx.require('homework.view')
 
   const ownStudentIds = await accessibleStudentIds(ctx)
-  const isSelfScoped = ownStudentIds !== null
+  const isPortalScoped = isPortalOnlyRole(ctx.user.roleKeys)
+  const teachingSubjects = await teachingClassSubjectIds(ctx)
   const today = attendanceDate(new Date())
 
   const where: Prisma.HomeworkWhereInput = {
     deletedAt: null,
-    // A student never sees a draft, and only sees their own classes.
-    ...(isSelfScoped
+    ...(isPortalScoped && ownStudentIds !== null
       ? {
           isPublished: true,
           classLevel: {
@@ -101,6 +101,9 @@ export async function listHomework(
             },
           },
         }
+      : {}),
+    ...(teachingSubjects !== null
+      ? { classSubjectId: { in: teachingSubjects } }
       : {}),
     ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
     ...(filter.sectionId ? { sectionId: filter.sectionId } : {}),
@@ -130,7 +133,7 @@ export async function listHomework(
         teacher: { select: { firstName: true, lastName: true } },
         _count: { select: { attachments: true } },
         submissions: {
-          where: isSelfScoped ? { studentId: { in: ownStudentIds } } : undefined,
+          where: isPortalScoped && ownStudentIds !== null ? { studentId: { in: ownStudentIds } } : undefined,
           select: { status: true, score: true, submittedAt: true, studentId: true },
         },
       },
@@ -140,14 +143,16 @@ export async function listHomework(
 
   // Expected head-counts only matter to staff, so they are not computed for
   // the portal view.
-  const expectedBySection = isSelfScoped
+  const expectedBySection = isPortalScoped && ownStudentIds !== null
     ? new Map<string, number>()
     : await expectedCounts(ctx, rows.map((r) => ({ classLevelId: r.classLevel.id })))
+
+  const portalView = isPortalScoped && ownStudentIds !== null
 
   return {
     total,
     rows: rows.map((h) => {
-      const mine = isSelfScoped ? h.submissions[0] : undefined
+      const mine = isPortalScoped && ownStudentIds !== null ? h.submissions[0] : undefined
       const submitted = h.submissions.filter(
         (s) => s.status === 'SUBMITTED' || s.status === 'REVIEWED' || s.status === 'LATE',
       ).length
@@ -165,11 +170,11 @@ export async function listHomework(
         maxScore: h.maxScore,
         attachmentCount: h._count.attachments,
         expected: expectedBySection.get(h.classLevel.id) ?? 0,
-        submitted: isSelfScoped ? 0 : submitted,
-        reviewed: isSelfScoped ? 0 : h.submissions.filter((s) => s.status === 'REVIEWED').length,
+        submitted: portalView ? 0 : submitted,
+        reviewed: portalView ? 0 : h.submissions.filter((s) => s.status === 'REVIEWED').length,
         mySubmission: mine
           ? { status: mine.status, score: mine.score, submittedAt: mine.submittedAt }
-          : isSelfScoped
+          : portalView
             ? { status: 'PENDING', score: null, submittedAt: null }
             : null,
         isOverdue: h.dueOn < today,

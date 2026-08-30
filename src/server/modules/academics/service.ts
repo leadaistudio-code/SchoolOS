@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { AppContext } from '@/server/context'
+import { classLevelScopeWhere, teachingClassSubjectIds } from '@/server/scope'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { findOrRestore } from '@/server/db/soft-delete'
@@ -77,8 +78,10 @@ export async function getClassTree(ctx: AppContext) {
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
   if (!session) return []
 
+  const classScope = await classLevelScopeWhere(ctx)
+
   return ctx.db.classLevel.findMany({
-    where: { sessionId: session.id, deletedAt: null },
+    where: { sessionId: session.id, deletedAt: null, ...classScope },
     orderBy: { numeric: 'asc' },
     select: {
       id: true,
@@ -692,8 +695,13 @@ export async function unassignSubjectFromClass(ctx: AppContext, id: string) {
  * across the alphabet.
  */
 export async function listClassSubjects(ctx: AppContext) {
+  const subjectScope = await teachingClassSubjectIds(ctx)
+
   return ctx.db.classSubject.findMany({
-    where: { classLevel: { deletedAt: null } },
+    where: {
+      classLevel: { deletedAt: null },
+      ...(subjectScope !== null ? { id: { in: subjectScope } } : {}),
+    },
     orderBy: [{ classLevel: { numeric: 'asc' } }, { subject: { name: 'asc' } }],
     select: {
       id: true,

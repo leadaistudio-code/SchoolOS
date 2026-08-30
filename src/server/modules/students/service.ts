@@ -4,7 +4,7 @@ import { attendanceDate } from '@/lib/dates'
 import { audit } from '@/server/audit'
 import { assertWithinLimit, FEATURE } from '@/server/entitlements'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
-import { studentScopeWhere, assertStudentAccess } from '@/server/scope'
+import { classLevelScopeWhere, studentScopeWhere, assertStudentAccess } from '@/server/scope'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { PROFILE_PHOTO_CATEGORY } from '@/lib/student-documents'
 import {
@@ -445,8 +445,10 @@ export async function getClassOptions(ctx: AppContext) {
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
   if (!session) return []
 
+  const classScope = await classLevelScopeWhere(ctx)
+
   return ctx.db.classLevel.findMany({
-    where: { sessionId: session.id, deletedAt: null },
+    where: { sessionId: session.id, deletedAt: null, ...classScope },
     orderBy: { numeric: 'asc' },
     select: {
       id: true,

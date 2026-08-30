@@ -4,7 +4,8 @@ import { startOfMonth } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { outstandingByClass } from '@/server/modules/finance/service'
 import { attendanceDate, formatDay } from '@/lib/dates'
-import { isSelfScoped } from '@/lib/rbac/roles'
+import { isSelfScoped, isTeacherScoped } from '@/lib/rbac/roles'
+import { studentIdScopeWhere } from '@/server/scope'
 import {
   ColorBanner,
   ColorTile,
@@ -26,37 +27,54 @@ export default async function FinancePage() {
   // the school's collection dashboard.
   if (isSelfScoped(ctx.user.roleKeys)) return <ParentFinance />
 
+  const invoiceScope = await studentIdScopeWhere(ctx)
+  const scopedFinance = isTeacherScoped(ctx.user.roleKeys)
+
   const today = attendanceDate(new Date())
   const monthStart = startOfMonth(new Date())
+
+  const invoiceWhere = { ...invoiceScope, status: { not: 'CANCELLED' as const } }
+  const openInvoiceWhere = { ...invoiceScope, status: { not: 'CANCELLED' as const }, balanceMinor: { gt: 0 } }
 
   const [billed, collectedToday, collectedMonth, outstanding, overdue, byClass, recent] =
     await Promise.all([
       ctx.db.feeInvoice.aggregate({
-        where: { status: { not: 'CANCELLED' } },
+        where: invoiceWhere,
         _sum: { totalMinor: true },
         _count: { _all: true },
       }),
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: today } },
+        where: {
+          status: 'SUCCESS',
+          paidAt: { gte: today },
+          ...(invoiceScope.studentId ? { studentId: invoiceScope.studentId } : {}),
+        },
         _sum: { amountMinor: true },
         _count: { _all: true },
       }),
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: monthStart } },
+        where: {
+          status: 'SUCCESS',
+          paidAt: { gte: monthStart },
+          ...(invoiceScope.studentId ? { studentId: invoiceScope.studentId } : {}),
+        },
         _sum: { amountMinor: true },
       }),
       ctx.db.feeInvoice.aggregate({
-        where: { status: { not: 'CANCELLED' }, balanceMinor: { gt: 0 } },
+        where: openInvoiceWhere,
         _sum: { balanceMinor: true },
       }),
       ctx.db.feeInvoice.aggregate({
-        where: { status: { not: 'CANCELLED' }, balanceMinor: { gt: 0 }, dueOn: { lt: today } },
+        where: { ...openInvoiceWhere, dueOn: { lt: today } },
         _sum: { balanceMinor: true },
         _count: { _all: true },
       }),
       outstandingByClass(ctx),
       ctx.db.feePayment.findMany({
-        where: { status: 'SUCCESS' },
+        where: {
+          status: 'SUCCESS',
+          ...(invoiceScope.studentId ? { studentId: invoiceScope.studentId } : {}),
+        },
         orderBy: { paidAt: 'desc' },
         take: 8,
         select: {
@@ -82,7 +100,11 @@ export default async function FinancePage() {
         tone="fees"
         eyebrow="Finance"
         title={`${collectionRate}% collected`}
-        description={`${formatNumber(billed._count._all)} invoices this session · ${formatMoney(outstandingMinor, currency)} still outstanding`}
+        description={
+          scopedFinance
+            ? `${formatMoney(outstandingMinor, currency)} outstanding across your students · read-only view`
+            : `${formatNumber(billed._count._all)} invoices this session · ${formatMoney(outstandingMinor, currency)} still outstanding`
+        }
         actions={
           <>
             {ctx.can('fees.invoice') ? (

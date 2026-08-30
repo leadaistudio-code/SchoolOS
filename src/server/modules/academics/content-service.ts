@@ -5,7 +5,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, notFound } from '@/server/api/response'
 import { attendanceDate } from '@/lib/dates'
-import { accessibleStudentIds } from '@/server/scope'
+import { accessibleStudentIds, isPortalOnlyRole, teachingClassSubjectIds } from '@/server/scope'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
@@ -46,16 +46,19 @@ export async function listClasswork(
   ctx.require('classwork.view')
 
   const ownStudentIds = await accessibleStudentIds(ctx)
+  const isPortalScoped = isPortalOnlyRole(ctx.user.roleKeys)
+  const teachingSubjects = await teachingClassSubjectIds(ctx)
 
   const where: Prisma.ClassworkWhereInput = {
     deletedAt: null,
-    ...(ownStudentIds !== null
+    ...(isPortalScoped && ownStudentIds !== null
       ? {
           classLevel: {
             enrollments: { some: { studentId: { in: ownStudentIds }, isCurrent: true } },
           },
         }
       : {}),
+    ...(teachingSubjects !== null ? { classSubjectId: { in: teachingSubjects } } : {}),
     ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
     ...(filter.sectionId ? { sectionId: filter.sectionId } : {}),
     ...(filter.subjectId ? { classSubject: { subjectId: filter.subjectId } } : {}),

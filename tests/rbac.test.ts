@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PERMISSIONS, PERMISSION_KEYS, isValidPermission } from '../src/lib/rbac/permissions'
-import { ROLE, SYSTEM_ROLES, isSelfScoped } from '../src/lib/rbac/roles'
+import { ROLE, SYSTEM_ROLES, isSelfScoped, isTeacherScoped } from '../src/lib/rbac/roles'
 
 describe('permission catalogue', () => {
   it('has no duplicate keys', () => {
@@ -70,15 +70,18 @@ describe('system roles', () => {
     }
   })
 
-  it('teachers can mark attendance but cannot collect or refund fees', () => {
+  it('teachers can mark attendance and view scoped fees but cannot collect or refund', () => {
     const teacher = SYSTEM_ROLES.find((r) => r.key === ROLE.TEACHER)!
 
     expect(teacher.permissions).toContain('attendance.mark')
     expect(teacher.permissions).toContain('exams.marks')
+    expect(teacher.permissions).toContain('fees.view')
     expect(teacher.permissions).not.toContain('fees.collect')
     expect(teacher.permissions).not.toContain('fees.refund')
     expect(teacher.permissions).not.toContain('exams.publish')
     expect(teacher.permissions).not.toContain('students.delete')
+    expect(teacher.permissions).not.toContain('parents.view')
+    expect(teacher.permissions).not.toContain('reports.view')
   })
 
   it('accountants own fees but cannot edit academic results', () => {
@@ -114,5 +117,10 @@ describe('self-scoped role detection', () => {
 
   it('never self-scopes an empty role list', () => {
     expect(isSelfScoped([])).toBe(false)
+  })
+
+  it('treats a teacher-only account as teacher-scoped', () => {
+    expect(isTeacherScoped([ROLE.TEACHER])).toBe(true)
+    expect(isTeacherScoped([ROLE.TEACHER, ROLE.PARENT])).toBe(false)
   })
 })

@@ -13,6 +13,116 @@ export type ScopedStudent = {
   rollNumber: number | null
 }
 
+export function isTeacherOnlyRole(roleKeys: string[]): boolean {
+  return roleKeys.length > 0 && roleKeys.every((r) => r === ROLE.TEACHER)
+}
+
+export function isPortalOnlyRole(roleKeys: string[]): boolean {
+  return (
+    roleKeys.length > 0 &&
+    roleKeys.every((r) => r === ROLE.PARENT || r === ROLE.STUDENT)
+  )
+}
+
+/** Staff row for a teacher-only account, or null when the caller is not teacher-only. */
+export const teachingStaffId = cache(async (ctx: AppContext): Promise<string | null> => {
+  if (!isTeacherOnlyRole(ctx.user.roleKeys)) return null
+
+  const staff = await ctx.db.staff.findFirst({
+    where: { userId: ctx.user.userId, deletedAt: null },
+    select: { id: true },
+  })
+  return staff?.id ?? null
+})
+
+/** Class levels the teacher is assigned to via subject or as class teacher. */
+export const teachingClassLevelIds = cache(
+  async (ctx: AppContext): Promise<string[] | null> => {
+    const staffId = await teachingStaffId(ctx)
+    if (staffId === null) return null
+    if (!staffId) return []
+
+    const [fromSubjects, fromClassTeacher] = await Promise.all([
+      ctx.db.classSubject.findMany({
+        where: { teacherId: staffId },
+        select: { classLevelId: true },
+      }),
+      ctx.db.section.findMany({
+        where: { classTeacherId: staffId, deletedAt: null },
+        select: { classLevelId: true },
+      }),
+    ])
+
+    return [
+      ...new Set([
+        ...fromSubjects.map((r) => r.classLevelId),
+        ...fromClassTeacher.map((r) => r.classLevelId),
+      ]),
+    ]
+  },
+)
+
+/** Sections a teacher-only user may mark attendance for. */
+export const markableSectionIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
+  const staffId = await teachingStaffId(ctx)
+  if (staffId === null) return null
+  if (!staffId) return []
+
+  const session = await ctx.db.academicSession.findFirst({
+    where: { isCurrent: true },
+    select: { id: true },
+  })
+  if (!session) return []
+
+  const rows = await ctx.db.section.findMany({
+    where: {
+      deletedAt: null,
+      classLevel: { sessionId: session.id, deletedAt: null },
+      OR: [
+        { classTeacherId: staffId },
+        { classLevel: { subjects: { some: { teacherId: staffId } } } },
+      ],
+    },
+    select: { id: true },
+  })
+  return rows.map((r) => r.id)
+})
+
+async function teachingStudentIds(ctx: AppContext): Promise<string[]> {
+  const classLevelIds = await teachingClassLevelIds(ctx)
+  if (!classLevelIds || classLevelIds.length === 0) return []
+
+  const staffId = await teachingStaffId(ctx)
+  if (!staffId) return []
+
+  const session = await ctx.db.academicSession.findFirst({
+    where: { isCurrent: true },
+    select: { id: true },
+  })
+  if (!session) return []
+
+  const ownedSections = await ctx.db.section.findMany({
+    where: { classTeacherId: staffId, deletedAt: null },
+    select: { id: true },
+  })
+  const sectionIds = ownedSections.map((s) => s.id)
+
+  const enrollments = await ctx.db.enrollment.findMany({
+    where: {
+      sessionId: session.id,
+      isCurrent: true,
+      student: { deletedAt: null, status: 'ACTIVE' },
+      OR: [
+        { classLevelId: { in: classLevelIds } },
+        ...(sectionIds.length > 0 ? [{ sectionId: { in: sectionIds } }] : []),
+      ],
+    },
+    select: { studentId: true },
+  })
+
+  return [...new Set(enrollments.map((e) => e.studentId))]
+}
+
 /**
  * Row-level scoping.
  *
@@ -25,10 +135,11 @@ export const accessibleStudentIds = cache(
   async (ctx: AppContext): Promise<string[] | null> => {
     const roles = ctx.user.roleKeys
 
-    // Staff roles see the whole school; null means "no row restriction".
-    const selfOnly = roles.every(
-      (r) => r === ROLE.PARENT || r === ROLE.STUDENT,
-    )
+    if (isTeacherOnlyRole(roles)) {
+      return teachingStudentIds(ctx)
+    }
+
+    const selfOnly = isPortalOnlyRole(roles)
     if (!selfOnly) return null
 
     if (roles.includes(ROLE.PARENT)) {
@@ -87,6 +198,15 @@ export async function assertClassSubjectAccess(ctx: AppContext, classSubjectId: 
   }
 }
 
+/** Throws unless a teacher-only user may mark attendance for this section. */
+export async function assertMarkableSection(ctx: AppContext, sectionId: string) {
+  const ids = await markableSectionIds(ctx)
+  if (ids === null) return
+  if (!ids.includes(sectionId)) {
+    throw new ForbiddenError('You cannot access attendance for this section')
+  }
+}
+
 /** Prisma `where` fragment that applies the row restriction, if any. */
 export async function studentScopeWhere(ctx: AppContext) {
   const ids = await accessibleStudentIds(ctx)
@@ -96,6 +216,11 @@ export async function studentScopeWhere(ctx: AppContext) {
 export async function studentIdScopeWhere(ctx: AppContext) {
   const ids = await accessibleStudentIds(ctx)
   return ids === null ? {} : { studentId: { in: ids } }
+}
+
+export async function classLevelScopeWhere(ctx: AppContext) {
+  const ids = await teachingClassLevelIds(ctx)
+  return ids === null ? {} : { id: { in: ids } }
 }
 
 /**
