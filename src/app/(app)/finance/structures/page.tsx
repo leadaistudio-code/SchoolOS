@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireContext } from '@/server/context'
+import { getClassTree } from '@/server/modules/academics/service'
 import { listFeeHeads, listStructures } from '@/server/modules/finance/service'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,13 +9,28 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney } from '@/lib/utils'
+import { NewFeeHeadButton, NewStructureButton } from './structure-forms'
 
 export const metadata = { title: 'Fee structure' }
 
 export default async function StructuresPage() {
   const ctx = await requireContext('fees.view')
-  const [structures, heads] = await Promise.all([listStructures(ctx), listFeeHeads(ctx)])
+  const canStructure = ctx.can('fees.structure')
+
+  const [structures, heads, classes] = await Promise.all([
+    listStructures(ctx),
+    listFeeHeads(ctx),
+    canStructure ? getClassTree(ctx) : Promise.resolve([]),
+  ])
+
   const currency = ctx.tenant.currency
+  const classOptions = classes.map((c) => ({ id: c.id, label: c.name }))
+  const feeHeadOptions = heads.map((h) => ({
+    id: h.id,
+    code: h.code,
+    name: h.name,
+    frequency: h.frequency,
+  }))
 
   return (
     <div className="space-y-4">
@@ -22,14 +38,22 @@ export default async function StructuresPage() {
         title="Fee structure"
         description={`${structures.length} structures · ${heads.length} fee heads`}
         actions={
-          ctx.can('fees.invoice') ? (
-            <Link
-              href="/finance/invoices"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Generate invoices
-            </Link>
-          ) : null
+          <>
+            {canStructure ? (
+              <>
+                <NewFeeHeadButton />
+                <NewStructureButton feeHeads={feeHeadOptions} classes={classOptions} />
+              </>
+            ) : null}
+            {ctx.can('fees.invoice') ? (
+              <Link
+                href="/finance/invoices"
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                Generate invoices
+              </Link>
+            ) : null}
+          </>
         }
       />
 
@@ -39,7 +63,19 @@ export default async function StructuresPage() {
             <Card>
               <EmptyState
                 title="No fee structures yet"
-                description="A structure groups fee heads and their amounts for a class, and is what invoices are generated from."
+                description="Create fee heads first, then build a structure with amounts for each class. Invoices are generated from structures."
+                action={
+                  canStructure ? (
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <NewFeeHeadButton label="Add fee head" />
+                      <NewStructureButton
+                        feeHeads={feeHeadOptions}
+                        classes={classOptions}
+                        label="Add structure"
+                      />
+                    </div>
+                  ) : undefined
+                }
               />
             </Card>
           ) : (
@@ -90,16 +126,23 @@ export default async function StructuresPage() {
 
         <Card>
           <CardHeader>
-            <div>
-              <CardTitle>Fee heads</CardTitle>
-              <p className="text-xs text-ink-muted mt-0.5">
-                The building blocks every structure draws on
-              </p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle>Fee heads</CardTitle>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  The building blocks every structure draws on
+                </p>
+              </div>
+              {canStructure ? <NewFeeHeadButton label="Add" /> : null}
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {heads.length === 0 ? (
-              <EmptyState title="No fee heads" description="Add heads such as Tuition or Transport." />
+              <EmptyState
+                title="No fee heads"
+                description="Add heads such as Tuition, Transport or Exam fee."
+                action={canStructure ? <NewFeeHeadButton label="Add the first fee head" /> : undefined}
+              />
             ) : (
               <ul className="divide-y divide-[var(--border)]">
                 {heads.map((h) => (
@@ -108,7 +151,8 @@ export default async function StructuresPage() {
                       <p className="text-sm text-ink truncate">{h.name}</p>
                       <p className="text-xs text-ink-subtle">
                         {h.code} · {h.frequency.toLowerCase().replace('_', ' ')}
-                        {h.isDeposit ? ' · refundable deposit' : ''}
+                        {h.isDeposit ? ' · deposit' : ''}
+                        {h.isRefundable ? ' · refundable' : ''}
                       </p>
                     </div>
                     <Badge tone={h._count.items > 0 ? 'brand' : 'neutral'}>

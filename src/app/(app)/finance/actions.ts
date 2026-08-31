@@ -13,9 +13,13 @@ import {
 } from '@/server/modules/finance/payments'
 import {
   concessionSchema,
+  createFeeHead,
+  createStructure,
+  feeHeadSchema,
   generateInvoices,
   generateInvoicesSchema,
   grantConcession,
+  structureSchema,
   type GenerationResult,
 } from '@/server/modules/finance/service'
 
@@ -38,6 +42,33 @@ export async function grantConcessionAction(payload: unknown): Promise<ActionRes
     return { ok: true, message: 'Concession granted. It will apply the next time an invoice is generated.' }
   } catch (err) {
     return fail(err, 'The concession could not be granted')
+  }
+}
+
+export async function createFeeHeadAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const created = await createFeeHead(ctx, feeHeadSchema.parse(payload))
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/concessions')
+    return { ok: true, message: `${created.name} (${created.code}) added to fee heads.` }
+  } catch (err) {
+    return fail(err, 'The fee head could not be created')
+  }
+}
+
+export async function createStructureAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const created = await createStructure(ctx, structureSchema.parse(payload))
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/invoices')
+    return {
+      ok: true,
+      message: `${created.name} created. Generate invoices when you are ready to bill students.`,
+    }
+  } catch (err) {
+    return fail(err, 'The fee structure could not be created')
   }
 }
 
