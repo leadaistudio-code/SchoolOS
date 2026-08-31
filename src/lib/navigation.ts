@@ -169,12 +169,21 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Overview', href: '/finance', icon: 'LayoutDashboard', permission: 'fees.view' },
       { label: 'Fee Structure', href: '/finance/structures', icon: 'ListTree', permission: 'fees.structure' },
+      { label: 'Optional fees', href: '/finance/optional-fees', icon: 'Sparkles', permission: 'fees.structure' },
       { label: 'Invoices', href: '/finance/invoices', icon: 'ReceiptText', permission: 'fees.view' },
       { label: 'Collect Payment', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
       { label: 'Payments', href: '/finance/payments', icon: 'CreditCard', permission: 'fees.view' },
       { label: 'Outstanding', href: '/finance/outstanding', icon: 'AlertCircle', permission: 'fees.view' },
       { label: 'Concessions', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
     ],
+  },
+  {
+    label: 'Expense tracker',
+    href: '/finance/expenses',
+    icon: 'WalletCards',
+    section: 'FINANCE' as const,
+    permission: 'expenses.view',
+    mobile: true,
   },
   {
     label: 'Feedback',

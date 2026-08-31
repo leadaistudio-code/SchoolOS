@@ -168,6 +168,7 @@ export const structureSchema = z.object({
         feeHeadId: z.string().min(1),
         amount: rupees,
         dueOn: isoDate.optional(),
+        isOptional: z.coerce.boolean().default(false),
       }),
     )
     .min(1, 'Add at least one fee head'),
@@ -204,6 +205,7 @@ export async function listStructures(ctx: AppContext) {
       code: i.feeHead.code,
       amountMinor: i.amountMinor,
       dueOn: i.dueOn ? toDateInput(i.dueOn) : '',
+      isOptional: i.isOptional,
     })),
   }))
 }
@@ -250,6 +252,7 @@ export async function createStructure(ctx: AppContext, input: z.infer<typeof str
         feeHeadId: i.feeHeadId,
         amountMinor: i.amount,
         dueOn: i.dueOn ? attendanceDate(i.dueOn) : null,
+        isOptional: i.isOptional,
       })),
     })
 
@@ -329,6 +332,7 @@ export async function updateStructure(ctx: AppContext, input: z.infer<typeof str
         feeHeadId: i.feeHeadId,
         amountMinor: i.amount,
         dueOn: i.dueOn ? attendanceDate(i.dueOn) : null,
+        isOptional: i.isOptional,
       })),
     })
 
@@ -471,18 +475,197 @@ export async function concessionStudents(ctx: AppContext) {
   })
 }
 
+/* -------------------------------------------------------- optional fee opt-ins */
+
+export const setStudentFeeOptionsSchema = z.object({
+  feeHeadId: z.string().min(1),
+  studentIds: z.array(z.string().min(1)).max(2000),
+})
+
+/**
+ * Replaces who is opted into an optional fee head for the current session.
+ * Students not listed are cleared for this head so a single save is the source of truth.
+ */
+export async function setStudentFeeOptions(
+  ctx: AppContext,
+  input: z.infer<typeof setStudentFeeOptionsSchema>,
+) {
+  ctx.require('fees.structure')
+
+  const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
+  if (!session) {
+    throw new ApiException(409, 'NO_ACTIVE_SESSION', 'Create an academic session first')
+  }
+
+  const head = await ctx.db.feeHead.findFirst({
+    where: { id: input.feeHeadId, deletedAt: null },
+    select: { id: true, name: true, code: true },
+  })
+  if (!head) throw notFound('Fee head')
+
+  const uniqueIds = [...new Set(input.studentIds)]
+  if (uniqueIds.length > 0) {
+    const students = await ctx.db.student.findMany({
+      where: { id: { in: uniqueIds }, deletedAt: null },
+      select: { id: true },
+    })
+    if (students.length !== uniqueIds.length) throw notFound('Student')
+  }
+
+  await ctx.db.$transaction(async (tx) => {
+    await tx.studentFeeOption.deleteMany({
+      where: {
+        sessionId: session.id,
+        feeHeadId: head.id,
+        ...(uniqueIds.length > 0 ? { studentId: { notIn: uniqueIds } } : {}),
+      },
+    })
+
+    for (const studentId of uniqueIds) {
+      await tx.studentFeeOption.upsert({
+        where: {
+          tenantId_studentId_sessionId_feeHeadId: {
+            tenantId: ctx.tenant.id,
+            studentId,
+            sessionId: session.id,
+            feeHeadId: head.id,
+          },
+        },
+        create: {
+          tenantId: ctx.tenant.id,
+          studentId,
+          sessionId: session.id,
+          feeHeadId: head.id,
+          active: true,
+        },
+        update: { active: true },
+      })
+    }
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_option.set',
+    module: 'fees',
+    entityType: 'FeeHead',
+    entityId: head.id,
+    summary: `Set ${uniqueIds.length} students opted into ${head.name} (${head.code})`,
+  })
+
+  return { feeHeadId: head.id, count: uniqueIds.length }
+}
+
+export async function listOptionalFeeHeads(ctx: AppContext) {
+  ctx.require('fees.view')
+  const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
+  if (!session) return []
+
+  const items = await ctx.db.feeStructureItem.findMany({
+    where: {
+      isOptional: true,
+      structure: { sessionId: session.id, deletedAt: null },
+      feeHead: { deletedAt: null },
+    },
+    select: {
+      feeHeadId: true,
+      amountMinor: true,
+      feeHead: { select: { id: true, code: true, name: true } },
+    },
+  })
+
+  const byHead = new Map<
+    string,
+    { id: string; code: string; name: string; amountMinor: number }
+  >()
+  for (const item of items) {
+    const existing = byHead.get(item.feeHeadId)
+    if (!existing || item.amountMinor > existing.amountMinor) {
+      byHead.set(item.feeHeadId, {
+        id: item.feeHead.id,
+        code: item.feeHead.code,
+        name: item.feeHead.name,
+        amountMinor: item.amountMinor,
+      })
+    }
+  }
+  return [...byHead.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function listStudentsForFeeOption(
+  ctx: AppContext,
+  feeHeadId: string,
+  filters?: { classLevelId?: string; sectionId?: string },
+) {
+  ctx.require('fees.view')
+  const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
+  if (!session) return { optedStudentIds: [] as string[], students: [] }
+
+  const [opts, enrollments] = await Promise.all([
+    ctx.db.studentFeeOption.findMany({
+      where: { sessionId: session.id, feeHeadId, active: true },
+      select: { studentId: true },
+    }),
+    ctx.db.enrollment.findMany({
+      where: {
+        isCurrent: true,
+        sessionId: session.id,
+        student: { deletedAt: null, status: 'ACTIVE' },
+        ...(filters?.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters?.classLevelId ? { classLevelId: filters.classLevelId } : {}),
+      },
+      orderBy: [{ classLevel: { numeric: 'asc' } }, { section: { name: 'asc' } }],
+      select: {
+        studentId: true,
+        classLevel: { select: { name: true } },
+        section: { select: { name: true } },
+        student: {
+          select: { id: true, firstName: true, lastName: true, admissionNo: true },
+        },
+      },
+    }),
+  ])
+
+  return {
+    optedStudentIds: opts.map((o) => o.studentId),
+    students: enrollments.map((e) => ({
+      id: e.student.id,
+      name: `${e.student.firstName} ${e.student.lastName}`,
+      admissionNo: e.student.admissionNo,
+      className: e.classLevel.name,
+      sectionName: e.section.name,
+    })),
+  }
+}
+
 /* -------------------------------------------------------- invoice generation */
 
-export const generateInvoicesSchema = z.object({
-  structureId: z.string().min(1, 'Choose a fee structure'),
-  classLevelId: z.string().optional(),
-  sectionId: z.string().optional(),
-  title: z.string().trim().min(2).max(120),
-  issuedOn: isoDate,
-  dueOn: isoDate,
-  /** Preview returns what would be created without writing anything. */
-  dryRun: z.coerce.boolean().default(false),
-})
+export const generateInvoicesSchema = z
+  .object({
+    structureId: z.string().optional(),
+    structureIds: z.array(z.string().min(1)).max(40).optional(),
+    classLevelId: z.string().optional(),
+    sectionId: z.string().optional(),
+    title: z.string().trim().min(2).max(120),
+    issuedOn: isoDate,
+    dueOn: isoDate,
+    /** Preview returns what would be created without writing anything. */
+    dryRun: z.coerce.boolean().default(false),
+  })
+  .superRefine((input, ctx) => {
+    const ids = [
+      ...(input.structureIds ?? []),
+      ...(input.structureId ? [input.structureId] : []),
+    ]
+    if (ids.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['structureIds'],
+        message: 'Choose at least one fee structure',
+      })
+    }
+  })
 
 export type GenerationResult = {
   created: number
@@ -492,21 +675,21 @@ export type GenerationResult = {
     studentId: string
     studentName: string
     admissionNo: string
+    structureName: string
     grossMinor: number
     discountMinor: number
     netMinor: number
+    optionalMinor: number
     skipReason?: string
   }[]
 }
 
 /**
- * Bulk invoice generation.
+ * Bulk invoice generation across one or more fee structures.
  *
- * Concessions are applied per line at generation time, so the invoice a parent
- * sees already reflects their scholarship rather than requiring a mental
- * subtraction. A student who already has an invoice for this structure and
- * title is skipped rather than double-billed — running the job twice by
- * accident is the single most expensive mistake available in this module.
+ * Optional structure lines (e.g. Computer Science ₹500) are added only when the
+ * student has an active StudentFeeOption for that fee head. Concessions apply
+ * per line. Students already billed for the same structure + title are skipped.
  */
 export async function generateInvoices(
   ctx: AppContext,
@@ -514,115 +697,174 @@ export async function generateInvoices(
 ): Promise<GenerationResult> {
   ctx.require('fees.invoice')
 
-  const structure = await ctx.db.feeStructure.findFirst({
-    where: { id: input.structureId, deletedAt: null },
+  const structureIds = [
+    ...new Set([...(input.structureIds ?? []), ...(input.structureId ? [input.structureId] : [])]),
+  ]
+
+  const structures = await ctx.db.feeStructure.findMany({
+    where: { id: { in: structureIds }, deletedAt: null },
     include: { items: { include: { feeHead: true } }, session: true },
   })
-  if (!structure) throw notFound('Fee structure')
-  if (structure.items.length === 0) throw conflict('That structure has no fee heads')
-
-  const enrollments = await ctx.db.enrollment.findMany({
-    where: {
-      isCurrent: true,
-      sessionId: structure.sessionId,
-      student: { deletedAt: null, status: 'ACTIVE' },
-      ...(input.sectionId ? { sectionId: input.sectionId } : {}),
-      ...(input.classLevelId
-        ? { classLevelId: input.classLevelId }
-        : structure.classLevelId
-          ? { classLevelId: structure.classLevelId }
-          : {}),
-    },
-    select: {
-      studentId: true,
-      student: { select: { firstName: true, lastName: true, admissionNo: true } },
-    },
-  })
-
-  if (enrollments.length === 0) {
-    throw conflict('No active students match that class or section')
+  if (structures.length !== structureIds.length) throw notFound('Fee structure')
+  for (const structure of structures) {
+    if (structure.items.length === 0) {
+      throw conflict(`${structure.name} has no fee heads`)
+    }
   }
 
-  const studentIds = enrollments.map((e) => e.studentId)
-
-  const invoiceDate = attendanceDate(input.issuedOn)
-  const [concessions, alreadyInvoiced] = await Promise.all([
-    ctx.db.feeConcession.findMany({
-      where: {
-        studentId: { in: studentIds },
-        AND: [
-          { OR: [{ validFrom: null }, { validFrom: { lte: invoiceDate } }] },
-          { OR: [{ validTo: null }, { validTo: { gte: invoiceDate } }] },
-        ],
-      },
-    }),
-    ctx.db.feeInvoice.findMany({
-      where: { studentId: { in: studentIds }, structureId: structure.id, title: input.title },
-      select: { studentId: true },
-    }),
-  ])
-
-  const concessionsByStudent = new Map<string, typeof concessions>()
-  for (const c of concessions) {
-    concessionsByStudent.set(c.studentId, [...(concessionsByStudent.get(c.studentId) ?? []), c])
+  const sessionId = structures[0]!.sessionId
+  if (structures.some((s) => s.sessionId !== sessionId)) {
+    throw conflict('All selected structures must belong to the same academic session')
   }
-  const invoicedSet = new Set(alreadyInvoiced.map((i) => i.studentId))
+
+  const optionalHeadIds = [
+    ...new Set(
+      structures.flatMap((s) => s.items.filter((i) => i.isOptional).map((i) => i.feeHeadId)),
+    ),
+  ]
 
   const preview: GenerationResult['preview'] = []
   const toCreate: {
     studentId: string
+    structureId: string
+    sessionId: string
     lines: { feeHeadId: string; label: string; amountMinor: number; discountMinor: number }[]
   }[] = []
 
-  for (const enrollment of enrollments) {
-    const studentConcessions = concessionsByStudent.get(enrollment.studentId) ?? []
+  for (const structure of structures) {
+    const enrollments = await ctx.db.enrollment.findMany({
+      where: {
+        isCurrent: true,
+        sessionId: structure.sessionId,
+        student: { deletedAt: null, status: 'ACTIVE' },
+        ...(input.sectionId ? { sectionId: input.sectionId } : {}),
+        ...(input.classLevelId
+          ? { classLevelId: input.classLevelId }
+          : structure.classLevelId
+            ? { classLevelId: structure.classLevelId }
+            : {}),
+      },
+      select: {
+        studentId: true,
+        student: { select: { firstName: true, lastName: true, admissionNo: true } },
+      },
+    })
 
-    const lines = structure.items.map((item) => {
-      // A concession tied to a fee head applies only to that head; an untied
-      // one applies to every line.
-      const applicable = studentConcessions.filter(
-        (c) => !c.feeHeadId || c.feeHeadId === item.feeHeadId,
+    if (enrollments.length === 0) continue
+
+    const studentIds = enrollments.map((e) => e.studentId)
+    const invoiceDate = attendanceDate(input.issuedOn)
+
+    const [concessions, alreadyInvoiced, feeOptions] = await Promise.all([
+      ctx.db.feeConcession.findMany({
+        where: {
+          studentId: { in: studentIds },
+          AND: [
+            { OR: [{ validFrom: null }, { validFrom: { lte: invoiceDate } }] },
+            { OR: [{ validTo: null }, { validTo: { gte: invoiceDate } }] },
+          ],
+        },
+      }),
+      ctx.db.feeInvoice.findMany({
+        where: {
+          studentId: { in: studentIds },
+          structureId: structure.id,
+          title: input.title,
+        },
+        select: { studentId: true },
+      }),
+      optionalHeadIds.length > 0
+        ? ctx.db.studentFeeOption.findMany({
+            where: {
+              sessionId: structure.sessionId,
+              feeHeadId: { in: optionalHeadIds },
+              studentId: { in: studentIds },
+              active: true,
+            },
+            select: { studentId: true, feeHeadId: true },
+          })
+        : Promise.resolve([]),
+    ])
+
+    const concessionsByStudent = new Map<string, typeof concessions>()
+    for (const c of concessions) {
+      concessionsByStudent.set(c.studentId, [
+        ...(concessionsByStudent.get(c.studentId) ?? []),
+        c,
+      ])
+    }
+    const invoicedSet = new Set(alreadyInvoiced.map((i) => i.studentId))
+    const opted = new Set(feeOptions.map((o) => `${o.studentId}:${o.feeHeadId}`))
+
+    for (const enrollment of enrollments) {
+      const studentConcessions = concessionsByStudent.get(enrollment.studentId) ?? []
+
+      const applicableItems = structure.items.filter(
+        (item) =>
+          !item.isOptional || opted.has(`${enrollment.studentId}:${item.feeHeadId}`),
       )
 
-      let discount = 0
-      let remaining = item.amountMinor
-      for (const c of applicable) {
-        const applied = applyConcession(remaining, c.kind, c.value)
-        discount += applied.discount
-        remaining = applied.net
-      }
+      const lines = applicableItems.map((item) => {
+        const applicable = studentConcessions.filter(
+          (c) => !c.feeHeadId || c.feeHeadId === item.feeHeadId,
+        )
 
-      return {
-        feeHeadId: item.feeHeadId,
-        label: item.feeHead.name,
-        amountMinor: item.amountMinor,
+        let discount = 0
+        let remaining = item.amountMinor
+        for (const c of applicable) {
+          const applied = applyConcession(remaining, c.kind, c.value)
+          discount += applied.discount
+          remaining = applied.net
+        }
+
+        return {
+          feeHeadId: item.feeHeadId,
+          label: item.isOptional ? `${item.feeHead.name} (optional)` : item.feeHead.name,
+          amountMinor: item.amountMinor,
+          discountMinor: discount,
+        }
+      })
+
+      const optionalMinor = sumMinor(
+        applicableItems.filter((i) => i.isOptional).map((i) => i.amountMinor),
+      )
+      const gross = sumMinor(lines.map((l) => l.amountMinor))
+      const discount = sumMinor(lines.map((l) => l.discountMinor))
+
+      const skipReason = invoicedSet.has(enrollment.studentId)
+        ? 'Already invoiced for this title'
+        : lines.length === 0
+          ? 'No fee lines for this student'
+          : undefined
+
+      preview.push({
+        studentId: enrollment.studentId,
+        studentName: `${enrollment.student.firstName} ${enrollment.student.lastName}`,
+        admissionNo: enrollment.student.admissionNo,
+        structureName: structure.name,
+        grossMinor: gross,
         discountMinor: discount,
+        netMinor: gross - discount,
+        optionalMinor,
+        skipReason,
+      })
+
+      if (!skipReason) {
+        toCreate.push({
+          studentId: enrollment.studentId,
+          structureId: structure.id,
+          sessionId: structure.sessionId,
+          lines,
+        })
       }
-    })
-
-    const gross = sumMinor(lines.map((l) => l.amountMinor))
-    const discount = sumMinor(lines.map((l) => l.discountMinor))
-
-    const skipReason = invoicedSet.has(enrollment.studentId)
-      ? 'Already invoiced for this title'
-      : undefined
-
-    preview.push({
-      studentId: enrollment.studentId,
-      studentName: `${enrollment.student.firstName} ${enrollment.student.lastName}`,
-      admissionNo: enrollment.student.admissionNo,
-      grossMinor: gross,
-      discountMinor: discount,
-      netMinor: gross - discount,
-      skipReason,
-    })
-
-    if (!skipReason) toCreate.push({ studentId: enrollment.studentId, lines })
+    }
   }
 
-  const totalMinor = sumMinor(
-    preview.filter((p) => !p.skipReason).map((p) => p.netMinor),
-  )
+  if (preview.length === 0) {
+    throw conflict('No active students match that class or section')
+  }
+
+  const totalMinor = sumMinor(preview.filter((p) => !p.skipReason).map((p) => p.netMinor))
 
   if (input.dryRun) {
     return {
@@ -637,8 +879,6 @@ export async function generateInvoices(
   const dueOn = attendanceDate(input.dueOn)
   const yearLabel = financialYearLabel(issuedOn)
 
-  // One transaction for the whole batch: a half-generated fee run is worse
-  // than none, because nobody can tell which parents were billed.
   await ctx.db.$transaction(
     async (tx) => {
       for (const row of toCreate) {
@@ -656,8 +896,8 @@ export async function generateInvoices(
             tenantId: ctx.tenant.id,
             number,
             studentId: row.studentId,
-            sessionId: structure.sessionId,
-            structureId: structure.id,
+            sessionId: row.sessionId,
+            structureId: row.structureId,
             title: input.title,
             issuedOn,
             dueOn,
@@ -695,11 +935,16 @@ export async function generateInvoices(
     action: 'fee_invoice.generate',
     module: 'fees',
     entityType: 'FeeStructure',
-    entityId: structure.id,
-    summary: `Generated ${toCreate.length} invoices for "${input.title}" totalling ₹${totalMinor / 100}${preview.length - toCreate.length > 0 ? `, skipping ${preview.length - toCreate.length} already invoiced` : ''}`,
+    entityId: structures.map((s) => s.id).join(','),
+    summary: `Generated ${toCreate.length} invoices for "${input.title}" across ${structures.length} structure(s) totalling ₹${totalMinor / 100}${preview.length - toCreate.length > 0 ? `, skipping ${preview.length - toCreate.length}` : ''}`,
   })
 
-  await notifyNewInvoices(ctx, toCreate.map((t) => t.studentId), input.title, input.dueOn)
+  await notifyNewInvoices(
+    ctx,
+    [...new Set(toCreate.map((t) => t.studentId))],
+    input.title,
+    input.dueOn,
+  )
 
   return {
     created: toCreate.length,

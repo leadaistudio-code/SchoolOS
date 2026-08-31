@@ -52,6 +52,12 @@ export default async function StructuresPage() {
               <>
                 <NewFeeHeadButton />
                 <NewStructureButton feeHeads={feeHeadOptions} classes={classOptions} />
+                <Link
+                  href="/finance/optional-fees"
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  Optional fees
+                </Link>
               </>
             ) : null}
             {ctx.can('fees.invoice') ? (
@@ -110,6 +116,7 @@ export default async function StructuresPage() {
                             feeHeadId: item.feeHeadId,
                             amountMinor: item.amountMinor,
                             dueOn: item.dueOn,
+                            isOptional: item.isOptional,
                           })),
                         }}
                         feeHeads={feeHeadOptions}
@@ -135,7 +142,14 @@ export default async function StructuresPage() {
                       <TBody>
                         {s.items.map((item) => (
                           <TR key={item.id}>
-                            <TD className="text-sm text-ink">{item.label}</TD>
+                            <TD className="text-sm text-ink">
+                              {item.label}
+                              {item.isOptional ? (
+                                <Badge tone="brand" className="ml-2">
+                                  optional
+                                </Badge>
+                              ) : null}
+                            </TD>
                             <TD className="text-xs tnum">{item.code}</TD>
                             <TD align="right" className="text-sm font-medium text-ink">
                               {formatMoney(item.amountMinor, currency)}

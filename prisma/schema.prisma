@@ -500,6 +500,7 @@ model AcademicSession {
   classes           ClassLevel[]
   enrollments       Enrollment[]
   feeStructures     FeeStructure[]
+  studentFeeOptions StudentFeeOption[]
   exams             Exam[]
   curricula         Curriculum[]
   assessments       Assessment[]
@@ -1211,6 +1212,7 @@ model Student {
   invoices            FeeInvoice[]
   payments            FeePayment[]
   concessions         FeeConcession[]
+  feeOptions          StudentFeeOption[]
   marks               Mark[]
   results             Result[]
   certificates        Certificate[]
@@ -1555,8 +1557,9 @@ model FeeHead {
   sortOrder    Int          @default(0)
   deletedAt    DateTime?
 
-  items FeeStructureItem[]
-  lines FeeInvoiceLine[]
+  items       FeeStructureItem[]
+  lines       FeeInvoiceLine[]
+  feeOptions  StudentFeeOption[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1590,12 +1593,34 @@ model FeeStructureItem {
   amountMinor   Int
   dueDayOfMonth Int?
   dueOn         DateTime? @db.Date
+  /// When true, only students with a matching StudentFeeOption are billed this line.
+  isOptional    Boolean   @default(false)
 
   structure FeeStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
   feeHead   FeeHead      @relation(fields: [feeHeadId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, structureId, feeHeadId])
   @@index([tenantId])
+}
+
+/// Opt-in for optional fee lines (e.g. Computer Science ₹500 add-on).
+model StudentFeeOption {
+  id         String   @id @default(cuid())
+  tenantId   String
+  studentId  String
+  sessionId  String
+  feeHeadId  String
+  active     Boolean  @default(true)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feeHead FeeHead         @relation(fields: [feeHeadId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, studentId, sessionId, feeHeadId])
+  @@index([tenantId, sessionId, feeHeadId, active])
 }
 
 enum ConcessionKind {
@@ -2156,6 +2181,51 @@ model FeePenaltyRule {
   isActive  Boolean        @default(true)
 
   @@unique([tenantId, name])
+}
+
+enum ExpenseCategory {
+  SALARY
+  UTILITIES
+  MAINTENANCE
+  SUPPLIES
+  TRANSPORT
+  FOOD
+  EVENTS
+  ADMIN
+  ACADEMIC
+  OTHER
+}
+
+enum ExpensePaymentMode {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  CARD
+  OTHER
+}
+
+/// School operating expenses — tracked separately from student fee collection.
+model SchoolExpense {
+  id            String             @id @default(cuid())
+  tenantId      String
+  title         String
+  category      ExpenseCategory    @default(OTHER)
+  amountMinor   Int
+  expenseDate   DateTime           @db.Date
+  paymentMode   ExpensePaymentMode @default(CASH)
+  vendor        String?
+  referenceNo   String?
+  notes         String?
+  recordedById  String?
+  recordedByLabel String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
+
+  @@index([tenantId, expenseDate])
+  @@index([tenantId, category, expenseDate])
+  @@index([tenantId, deletedAt])
 }
 
 // ===========================================================================

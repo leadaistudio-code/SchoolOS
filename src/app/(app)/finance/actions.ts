@@ -22,6 +22,8 @@ import {
   generateInvoices,
   generateInvoicesSchema,
   grantConcession,
+  setStudentFeeOptions,
+  setStudentFeeOptionsSchema,
   structureSchema,
   structureUpdateSchema,
   updateFeeHead,
@@ -123,6 +125,25 @@ export async function deleteStructureAction(id: string): Promise<ActionResult> {
     return { ok: true, message: `${removed.name} removed.` }
   } catch (err) {
     return fail(err, 'The fee structure could not be removed')
+  }
+}
+
+export async function setStudentFeeOptionsAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const result = await setStudentFeeOptions(ctx, setStudentFeeOptionsSchema.parse(payload))
+    revalidatePath('/finance/optional-fees')
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/invoices')
+    return {
+      ok: true,
+      message:
+        result.count === 0
+          ? 'No students are opted into this optional fee.'
+          : `${result.count} student${result.count === 1 ? '' : 's'} will be charged this optional fee.`,
+    }
+  } catch (err) {
+    return fail(err, 'Could not save optional fee opt-ins')
   }
 }
 

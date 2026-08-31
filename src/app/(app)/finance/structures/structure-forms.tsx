@@ -37,7 +37,7 @@ export type StructureDraft = {
   classLevelId: string
   description: string
   invoiceCount: number
-  items: { feeHeadId: string; amountMinor: number; dueOn: string }[]
+  items: { feeHeadId: string; amountMinor: number; dueOn: string; isOptional?: boolean }[]
 }
 
 const FREQUENCIES = [
@@ -119,7 +119,7 @@ function FeeHeadFields({
   )
 }
 
-type StructureLine = { feeHeadId: string; amount: string; dueOn: string }
+type StructureLine = { feeHeadId: string; amount: string; dueOn: string; isOptional: boolean }
 
 function StructureLinesEditor({
   idPrefix,
@@ -199,6 +199,15 @@ function StructureLinesEditor({
                   <Trash2 className="size-3.5" aria-hidden />
                 </IconButton>
               </div>
+              <label className="flex items-center gap-2 sm:col-span-4">
+                <Checkbox
+                  checked={line.isOptional}
+                  onChange={(e) => onUpdateLine(index, { isOptional: e.target.checked })}
+                />
+                <span className="text-sm text-ink">
+                  Optional add-on — only billed for students who opted in (e.g. Computer Science ₹500)
+                </span>
+              </label>
             </li>
           ))}
         </ul>
@@ -214,6 +223,7 @@ function structureItemsFromLines(lines: StructureLine[]) {
       feeHeadId: l.feeHeadId,
       amount: Number(l.amount),
       dueOn: l.dueOn.trim() || undefined,
+      isOptional: l.isOptional,
     }))
 }
 
@@ -435,7 +445,7 @@ export function NewStructureButton({
     setDescription('')
     setLines(
       feeHeads.length > 0
-        ? [{ feeHeadId: feeHeads[0]!.id, amount: '', dueOn: '' }]
+        ? [{ feeHeadId: feeHeads[0]!.id, amount: '', dueOn: '', isOptional: false }]
         : [],
     )
     setOpen(true)
@@ -445,7 +455,7 @@ export function NewStructureButton({
     const used = new Set(lines.map((l) => l.feeHeadId))
     const next = feeHeads.find((h) => !used.has(h.id))
     if (!next) return
-    setLines((prev) => [...prev, { feeHeadId: next.id, amount: '', dueOn: '' }])
+    setLines((prev) => [...prev, { feeHeadId: next.id, amount: '', dueOn: '', isOptional: false }])
   }
 
   const updateLine = (index: number, patch: Partial<StructureLine>) => {
@@ -664,6 +674,7 @@ export function EditStructureButton({
         feeHeadId: item.feeHeadId,
         amount: String(item.amountMinor / 100),
         dueOn: item.dueOn,
+        isOptional: Boolean(item.isOptional),
       })),
     )
     setConfirmRemove(false)
@@ -674,7 +685,7 @@ export function EditStructureButton({
     const used = new Set(lines.map((l) => l.feeHeadId))
     const next = feeHeads.find((h) => !used.has(h.id))
     if (!next) return
-    setLines((prev) => [...prev, { feeHeadId: next.id, amount: '', dueOn: '' }])
+    setLines((prev) => [...prev, { feeHeadId: next.id, amount: '', dueOn: '', isOptional: false }])
   }
 
   const updateLine = (index: number, patch: Partial<StructureLine>) => {

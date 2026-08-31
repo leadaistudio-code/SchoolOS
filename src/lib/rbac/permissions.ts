@@ -108,6 +108,11 @@ export const PERMISSIONS: PermissionDef[] = [
     ['export', 'Export finance data'],
   ]),
 
+  ...mod('expenses', [
+    ['view', 'View school expenses'],
+    ['manage', 'Record and edit school expenses'],
+  ]),
+
   ...mod('exams', [
     ['view', 'View exams'],
     ['manage', 'Create and schedule exams'],
