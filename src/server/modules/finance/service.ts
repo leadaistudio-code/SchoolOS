@@ -85,6 +85,77 @@ export async function createFeeHead(ctx: AppContext, input: z.infer<typeof feeHe
   return created
 }
 
+export const feeHeadUpdateSchema = feeHeadSchema.extend({
+  id: z.string().min(1),
+})
+
+export async function updateFeeHead(ctx: AppContext, input: z.infer<typeof feeHeadUpdateSchema>) {
+  ctx.require('fees.structure')
+  const { id, ...data } = input
+  const code = data.code.toUpperCase()
+
+  const before = await ctx.db.feeHead.findFirst({ where: { id, deletedAt: null } })
+  if (!before) throw notFound('Fee head')
+
+  const duplicate = await ctx.db.feeHead.findFirst({
+    where: { code, deletedAt: null, id: { not: id } },
+  })
+  if (duplicate) throw conflict(`A fee head with the code ${code} already exists`)
+
+  const updated = await ctx.db.feeHead.update({
+    where: { id },
+    data: { ...data, code },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_head.update',
+    module: 'fees',
+    entityType: 'FeeHead',
+    entityId: id,
+    summary: `Updated fee head ${updated.name} (${updated.code})`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+export async function deleteFeeHead(ctx: AppContext, id: string) {
+  ctx.require('fees.structure')
+
+  const head = await ctx.db.feeHead.findFirst({
+    where: { id, deletedAt: null },
+    include: { _count: { select: { items: true } } },
+  })
+  if (!head) throw notFound('Fee head')
+
+  if (head._count.items > 0) {
+    throw conflict(
+      `This fee head is used in ${head._count.items} structure line(s). Remove it from structures first.`,
+    )
+  }
+
+  const archived = await ctx.db.feeHead.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_head.delete',
+    module: 'fees',
+    entityType: 'FeeHead',
+    entityId: id,
+    summary: `Removed fee head ${head.name} (${head.code})`,
+    before: head,
+  })
+  return archived
+}
+
 /* --------------------------------------------------------- fee structures */
 
 export const structureSchema = z.object({
@@ -120,15 +191,19 @@ export async function listStructures(ctx: AppContext) {
   return structures.map((s) => ({
     id: s.id,
     name: s.name,
+    classLevelId: s.classLevelId ?? '',
     className: s.classLevel?.name ?? 'All classes',
+    description: s.description ?? '',
     isActive: s.isActive,
     invoiceCount: s._count.invoices,
     totalMinor: sumMinor(s.items.map((i) => i.amountMinor)),
     items: s.items.map((i) => ({
       id: i.id,
+      feeHeadId: i.feeHeadId,
       label: i.feeHead.name,
       code: i.feeHead.code,
       amountMinor: i.amountMinor,
+      dueOn: i.dueOn ? toDateInput(i.dueOn) : '',
     })),
   }))
 }
@@ -193,6 +268,120 @@ export async function createStructure(ctx: AppContext, input: z.infer<typeof str
     after: created,
   })
   return created
+}
+
+export const structureUpdateSchema = structureSchema.extend({
+  id: z.string().min(1),
+})
+
+export async function updateStructure(ctx: AppContext, input: z.infer<typeof structureUpdateSchema>) {
+  ctx.require('fees.structure')
+  const { id, ...data } = input
+
+  const before = await ctx.db.feeStructure.findFirst({
+    where: { id, deletedAt: null },
+    include: { _count: { select: { invoices: true } } },
+  })
+  if (!before) throw notFound('Fee structure')
+
+  if (before._count.invoices > 0) {
+    throw conflict(
+      'Invoices have already been generated from this structure, so it can no longer be edited.',
+    )
+  }
+
+  const duplicate = await ctx.db.feeStructure.findFirst({
+    where: {
+      sessionId: before.sessionId,
+      name: data.name,
+      deletedAt: null,
+      id: { not: id },
+    },
+  })
+  if (duplicate) throw conflict(`A structure called ${data.name} already exists this session`)
+
+  const headIds = data.items.map((i) => i.feeHeadId)
+  if (new Set(headIds).size !== headIds.length) {
+    throw new ApiException(400, 'BAD_REQUEST', 'Each fee head can appear only once')
+  }
+
+  const heads = await ctx.db.feeHead.findMany({
+    where: { id: { in: headIds }, deletedAt: null },
+    select: { id: true },
+  })
+  if (heads.length !== headIds.length) throw notFound('Fee head')
+
+  const updated = await ctx.db.$transaction(async (tx) => {
+    const structure = await tx.feeStructure.update({
+      where: { id },
+      data: {
+        name: data.name,
+        classLevelId: data.classLevelId || null,
+        description: data.description,
+      },
+    })
+
+    await tx.feeStructureItem.deleteMany({ where: { structureId: id } })
+    await tx.feeStructureItem.createMany({
+      data: data.items.map((i) => ({
+        tenantId: ctx.tenant.id,
+        structureId: id,
+        feeHeadId: i.feeHeadId,
+        amountMinor: i.amount,
+        dueOn: i.dueOn ? attendanceDate(i.dueOn) : null,
+      })),
+    })
+
+    return structure
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_structure.update',
+    module: 'fees',
+    entityType: 'FeeStructure',
+    entityId: id,
+    summary: `Updated fee structure ${updated.name} with ${data.items.length} heads`,
+    before,
+    after: updated,
+  })
+  return updated
+}
+
+export async function deleteStructure(ctx: AppContext, id: string) {
+  ctx.require('fees.structure')
+
+  const structure = await ctx.db.feeStructure.findFirst({
+    where: { id, deletedAt: null },
+    include: { _count: { select: { invoices: true } } },
+  })
+  if (!structure) throw notFound('Fee structure')
+
+  if (structure._count.invoices > 0) {
+    throw conflict(
+      'Invoices have already been generated from this structure, so it cannot be removed.',
+    )
+  }
+
+  const archived = await ctx.db.feeStructure.update({
+    where: { id },
+    data: { deletedAt: new Date(), isActive: false },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_structure.delete',
+    module: 'fees',
+    entityType: 'FeeStructure',
+    entityId: id,
+    summary: `Removed fee structure ${structure.name}`,
+    before: structure,
+  })
+  return archived
 }
 
 /* -------------------------------------------------------------- concession */

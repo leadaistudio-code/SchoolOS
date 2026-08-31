@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney } from '@/lib/utils'
-import { NewFeeHeadButton, NewStructureButton } from './structure-forms'
+import { EditFeeHeadButton, EditStructureButton, NewFeeHeadButton, NewStructureButton } from './structure-forms'
 
 export const metadata = { title: 'Fee structure' }
 
@@ -30,6 +30,15 @@ export default async function StructuresPage() {
     code: h.code,
     name: h.name,
     frequency: h.frequency,
+  }))
+  const feeHeadDrafts = heads.map((h) => ({
+    id: h.id,
+    code: h.code,
+    name: h.name,
+    frequency: h.frequency,
+    isRefundable: h.isRefundable,
+    isDeposit: h.isDeposit,
+    inUseCount: h._count.items,
   }))
 
   return (
@@ -89,6 +98,24 @@ export default async function StructuresPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {canStructure ? (
+                      <EditStructureButton
+                        structure={{
+                          id: s.id,
+                          name: s.name,
+                          classLevelId: s.classLevelId,
+                          description: s.description,
+                          invoiceCount: s.invoiceCount,
+                          items: s.items.map((item) => ({
+                            feeHeadId: item.feeHeadId,
+                            amountMinor: item.amountMinor,
+                            dueOn: item.dueOn,
+                          })),
+                        }}
+                        feeHeads={feeHeadOptions}
+                        classes={classOptions}
+                      />
+                    ) : null}
                     {s.isActive ? <Badge tone="success">active</Badge> : <Badge>inactive</Badge>}
                     <span className="text-lg font-semibold text-ink tnum">
                       {formatMoney(s.totalMinor, currency)}
@@ -145,7 +172,9 @@ export default async function StructuresPage() {
               />
             ) : (
               <ul className="divide-y divide-[var(--border)]">
-                {heads.map((h) => (
+                {heads.map((h) => {
+                  const draft = feeHeadDrafts.find((d) => d.id === h.id)!
+                  return (
                   <li key={h.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="min-w-0">
                       <p className="text-sm text-ink truncate">{h.name}</p>
@@ -155,11 +184,15 @@ export default async function StructuresPage() {
                         {h.isRefundable ? ' · refundable' : ''}
                       </p>
                     </div>
-                    <Badge tone={h._count.items > 0 ? 'brand' : 'neutral'}>
-                      {h._count.items} in use
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge tone={h._count.items > 0 ? 'brand' : 'neutral'}>
+                        {h._count.items} in use
+                      </Badge>
+                      {canStructure ? <EditFeeHeadButton head={draft} /> : null}
+                    </div>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </CardContent>

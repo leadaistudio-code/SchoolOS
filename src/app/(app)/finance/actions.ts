@@ -15,11 +15,17 @@ import {
   concessionSchema,
   createFeeHead,
   createStructure,
+  deleteFeeHead,
+  deleteStructure,
   feeHeadSchema,
+  feeHeadUpdateSchema,
   generateInvoices,
   generateInvoicesSchema,
   grantConcession,
   structureSchema,
+  structureUpdateSchema,
+  updateFeeHead,
+  updateStructure,
   type GenerationResult,
 } from '@/server/modules/finance/service'
 
@@ -69,6 +75,54 @@ export async function createStructureAction(payload: unknown): Promise<ActionRes
     }
   } catch (err) {
     return fail(err, 'The fee structure could not be created')
+  }
+}
+
+export async function updateFeeHeadAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const updated = await updateFeeHead(ctx, feeHeadUpdateSchema.parse(payload))
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/concessions')
+    return { ok: true, message: `${updated.name} (${updated.code}) updated.` }
+  } catch (err) {
+    return fail(err, 'The fee head could not be updated')
+  }
+}
+
+export async function deleteFeeHeadAction(id: string): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const removed = await deleteFeeHead(ctx, id)
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/concessions')
+    return { ok: true, message: `${removed.name} removed from fee heads.` }
+  } catch (err) {
+    return fail(err, 'The fee head could not be removed')
+  }
+}
+
+export async function updateStructureAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const updated = await updateStructure(ctx, structureUpdateSchema.parse(payload))
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/invoices')
+    return { ok: true, message: `${updated.name} updated.` }
+  } catch (err) {
+    return fail(err, 'The fee structure could not be updated')
+  }
+}
+
+export async function deleteStructureAction(id: string): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const removed = await deleteStructure(ctx, id)
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/invoices')
+    return { ok: true, message: `${removed.name} removed.` }
+  } catch (err) {
+    return fail(err, 'The fee structure could not be removed')
   }
 }
 
