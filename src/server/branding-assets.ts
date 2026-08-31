@@ -211,3 +211,47 @@ export async function uploadAndSaveBrandingAsset(
   await saveBrandingAsset(tenantId, kind, storageKey)
   return storageKey
 }
+
+/** Clears a branding image from the school record and deletes the stored file when possible. */
+export async function deleteBrandingAsset(tenantId: string, kind: BrandingAssetKind) {
+  const school = await prisma.school.findFirst({
+    where: { tenantId },
+    select: {
+      id: true,
+      branding: {
+        select: {
+          logoUrl: true,
+          loginImageUrl: true,
+          faviconUrl: true,
+          darkLogoUrl: true,
+          signatureUrl: true,
+          letterheadHeaderUrl: true,
+          letterheadFooterUrl: true,
+        },
+      },
+    },
+  })
+  if (!school) throw new ApiException(404, 'NOT_FOUND', 'School not found')
+  if (!school.branding) return
+
+  const field = FIELD[kind]
+  const stored = school.branding[field]
+  if (!stored) return
+
+  await prisma.branding.update({
+    where: { schoolId: school.id },
+    data: { [field]: null },
+  })
+
+  const isExternal =
+    stored.startsWith('http://') ||
+    stored.startsWith('https://') ||
+    stored.startsWith('/api/v1/branding/')
+  if (!isExternal) {
+    try {
+      await storageProvider().delete(stored)
+    } catch {
+      // DB is already cleared; a missing object in storage is fine.
+    }
+  }
+}

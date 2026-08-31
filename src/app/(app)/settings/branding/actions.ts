@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireContext } from '@/server/context'
 import { audit } from '@/server/audit'
-import { uploadAndSaveBrandingAsset, type BrandingAssetKind } from '@/server/branding-assets'
+import { uploadAndSaveBrandingAsset, deleteBrandingAsset, type BrandingAssetKind } from '@/server/branding-assets'
 
 const hex = z
   .string()
@@ -83,6 +83,42 @@ export async function uploadBrandingAssetAction(
     return {
       ok: false,
       message: err instanceof Error ? err.message : 'The image could not be uploaded',
+    }
+  }
+}
+
+export async function deleteBrandingAssetAction(
+  formData: FormData,
+): Promise<BrandingResult> {
+  const ctx = await requireContext('settings.branding')
+  const kind = String(formData.get('kind') ?? '') as BrandingAssetKind
+
+  if (!ASSET_KINDS.has(kind)) {
+    return { ok: false, message: 'Unknown asset type' }
+  }
+
+  try {
+    await deleteBrandingAsset(ctx.tenant.id, kind)
+
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'branding.asset.delete',
+      module: 'settings',
+      entityType: 'Branding',
+      summary: `Removed ${kind} image`,
+    })
+
+    revalidatePath('/', 'layout')
+    revalidatePath('/settings/branding')
+    revalidatePath('/manifest.webmanifest')
+
+    return { ok: true, message: `${kind} image removed.` }
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : 'The image could not be removed',
     }
   }
 }

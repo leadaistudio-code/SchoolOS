@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Palette, RotateCcw, Save } from 'lucide-react'
-import { saveBrandingAction, uploadBrandingAssetAction } from './actions'
+import { saveBrandingAction, uploadBrandingAssetAction, deleteBrandingAssetAction } from './actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -111,6 +111,29 @@ export function BrandingForm({
     })
   }
 
+  const removeAsset = (
+    kind:
+      | 'logo'
+      | 'banner'
+      | 'favicon'
+      | 'darkLogo'
+      | 'signature'
+      | 'letterheadHeader'
+      | 'letterheadFooter',
+  ) => {
+    const form = new FormData()
+    form.set('kind', kind)
+    startAssetTransition(async () => {
+      const result = await deleteBrandingAssetAction(form)
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Image removed' : 'Could not remove',
+        description: result.message,
+      })
+      if (result.ok) router.refresh()
+    })
+  }
+
   const save = () =>
     startTransition(async () => {
       const result = await saveBrandingAction(values)
@@ -144,6 +167,7 @@ export function BrandingForm({
               previewUrl={logoUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('logo', file)}
+              onRemove={() => removeAsset('logo')}
             />
             <AssetUploadField
               label="Dark logo"
@@ -153,6 +177,7 @@ export function BrandingForm({
               previewUrl={darkLogoUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('darkLogo', file)}
+              onRemove={() => removeAsset('darkLogo')}
             />
             <AssetUploadField
               label="Login banner"
@@ -162,6 +187,7 @@ export function BrandingForm({
               previewUrl={bannerUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('banner', file)}
+              onRemove={() => removeAsset('banner')}
             />
             <AssetUploadField
               label="Favicon / app icon"
@@ -172,6 +198,7 @@ export function BrandingForm({
               pending={assetPending}
               accept="image/png,image/jpeg,image/webp,image/x-icon,.ico"
               onFile={(file) => uploadAsset('favicon', file)}
+              onRemove={() => removeAsset('favicon')}
             />
             <AssetUploadField
               label="Signature"
@@ -181,6 +208,7 @@ export function BrandingForm({
               previewUrl={signatureUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('signature', file)}
+              onRemove={() => removeAsset('signature')}
             />
           </CardContent>
         </Card>
@@ -203,6 +231,7 @@ export function BrandingForm({
               previewUrl={letterheadHeaderUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('letterheadHeader', file)}
+              onRemove={() => removeAsset('letterheadHeader')}
             />
             <AssetUploadField
               label="Letterhead footer"
@@ -212,6 +241,7 @@ export function BrandingForm({
               previewUrl={letterheadFooterUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('letterheadFooter', file)}
+              onRemove={() => removeAsset('letterheadFooter')}
             />
           </CardContent>
         </Card>
@@ -500,6 +530,7 @@ function AssetUploadField({
   previewUrl,
   pending,
   onFile,
+  onRemove,
   accept = 'image/jpeg,image/png,image/webp',
 }: {
   label: string
@@ -511,6 +542,7 @@ function AssetUploadField({
   previewUrl: string | null
   pending: boolean
   onFile: (file: File | null | undefined) => void
+  onRemove?: () => void
   accept?: string
 }) {
   return (
@@ -534,13 +566,20 @@ function AssetUploadField({
           No image yet
         </div>
       )}
-      <Input
-        type="file"
-        accept={accept}
-        disabled={pending}
-        className="text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
-        onChange={(e) => onFile(e.target.files?.[0])}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="file"
+          accept={accept}
+          disabled={pending}
+          className="min-w-0 flex-1 text-sm file:mr-2 file:rounded-[var(--radius-sm)] file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-xs"
+          onChange={(e) => onFile(e.target.files?.[0])}
+        />
+        {previewUrl && onRemove ? (
+          <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+            Remove
+          </Button>
+        ) : null}
+      </div>
     </div>
   )
 }
