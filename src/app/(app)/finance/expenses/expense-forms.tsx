@@ -11,7 +11,7 @@ import {
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_MODES,
-} from '@/server/modules/finance/expenses'
+} from '@/lib/finance/expense-options'
 import { Button, IconButton } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'

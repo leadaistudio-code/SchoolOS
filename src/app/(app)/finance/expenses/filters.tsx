@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { EXPENSE_CATEGORIES } from '@/server/modules/finance/expenses'
+import { EXPENSE_CATEGORIES } from '@/lib/finance/expense-options'
 import { Field, Select, Input } from '@/components/ui/input'
 
 export function ExpenseFilters() {

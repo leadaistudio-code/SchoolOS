@@ -4,6 +4,14 @@ import { audit } from '@/server/audit'
 import { notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_PAYMENT_MODES,
+  categoryLabel,
+  paymentModeLabel,
+} from '@/lib/finance/expense-options'
+
+export { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_MODES, categoryLabel, paymentModeLabel }
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
 
@@ -12,28 +20,6 @@ const rupees = z.coerce
   .min(0.01, 'Enter an amount greater than zero')
   .max(10_000_000, 'That amount looks wrong')
   .transform((v) => Math.round(v * 100))
-
-export const EXPENSE_CATEGORIES = [
-  { value: 'SALARY', label: 'Salary & wages' },
-  { value: 'UTILITIES', label: 'Utilities (power, water, internet)' },
-  { value: 'MAINTENANCE', label: 'Maintenance & repairs' },
-  { value: 'SUPPLIES', label: 'Supplies & stationery' },
-  { value: 'TRANSPORT', label: 'Transport & fuel' },
-  { value: 'FOOD', label: 'Food & canteen' },
-  { value: 'EVENTS', label: 'Events & functions' },
-  { value: 'ADMIN', label: 'Admin & office' },
-  { value: 'ACADEMIC', label: 'Academic materials' },
-  { value: 'OTHER', label: 'Other' },
-] as const
-
-export const EXPENSE_PAYMENT_MODES = [
-  { value: 'CASH', label: 'Cash' },
-  { value: 'UPI', label: 'UPI' },
-  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
-  { value: 'CHEQUE', label: 'Cheque' },
-  { value: 'CARD', label: 'Card' },
-  { value: 'OTHER', label: 'Other' },
-] as const
 
 const categoryEnum = z.enum([
   'SALARY',
@@ -234,12 +220,4 @@ export async function deleteExpense(ctx: AppContext, id: string) {
   })
 
   return archived
-}
-
-export function categoryLabel(value: string) {
-  return EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value
-}
-
-export function paymentModeLabel(value: string) {
-  return EXPENSE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
 }

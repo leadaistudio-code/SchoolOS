@@ -1,10 +1,6 @@
 import { requireContext } from '@/server/context'
-import {
-  categoryLabel,
-  expenseFilterSchema,
-  listExpenses,
-  paymentModeLabel,
-} from '@/server/modules/finance/expenses'
+import { expenseFilterSchema, listExpenses } from '@/server/modules/finance/expenses'
+import { categoryLabel, paymentModeLabel } from '@/lib/finance/expense-options'
 import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
