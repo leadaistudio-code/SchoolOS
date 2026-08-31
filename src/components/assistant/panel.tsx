@@ -22,6 +22,8 @@ import {
   SPEECH_LANGUAGES,
   normaliseLanguageTag,
 } from '@/lib/speech-languages'
+import { AssistantWelcome } from './welcome'
+import type { AssistantBriefing } from '@/server/assistant/briefing'
 
 /**
  * The assistant panel.
@@ -50,12 +52,6 @@ type Turn = {
   error?: string
 }
 
-const SUGGESTIONS = [
-  'What fees are pending?',
-  'Whose attendance is missing today?',
-  'How much did we collect this month?',
-  'Which students have attendance below 80%?',
-]
 
 export function AssistantPanel({
   open,
@@ -73,6 +69,8 @@ export function AssistantPanel({
   const [listening, setListening] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [language, setLanguage] = React.useState(DEFAULT_SPEECH_LANGUAGE)
+  const [briefing, setBriefing] = React.useState<AssistantBriefing | null>(null)
+  const [briefingLoading, setBriefingLoading] = React.useState(false)
 
   React.useEffect(() => {
     try {
@@ -112,6 +110,29 @@ export function AssistantPanel({
     return () => {
       stopListening.current?.()
       stopSpeaking()
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setBriefingLoading(true)
+    fetch('/api/v1/assistant/briefing')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Briefing unavailable')
+        return response.json() as Promise<AssistantBriefing>
+      })
+      .then((data) => {
+        if (!cancelled) setBriefing(data)
+      })
+      .catch(() => {
+        if (!cancelled) setBriefing(null)
+      })
+      .finally(() => {
+        if (!cancelled) setBriefingLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
   }, [open])
 
@@ -279,58 +300,54 @@ export function AssistantPanel({
   if (!open) return null
 
   return (
-    <aside
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[26rem] flex-col border-l border-line bg-surface shadow-pop"
-      role="complementary"
-      aria-label="School assistant"
-    >
-      <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <span className="grid size-8 place-items-center rounded-[10px] bg-[var(--product-50)] text-[var(--product-600)]">
-          <Sparkle className="size-4" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">Ask about {schoolName}</p>
-          <p className="truncate text-xs text-ink-subtle">
-            Answers come from your records, with a link to check each one
-          </p>
-        </div>
-        <IconButton label="Close assistant" onClick={onClose}>
-          <X className="size-4" aria-hidden />
-        </IconButton>
-      </header>
-
-      <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {turns.length === 0 ? (
-          <div>
-            <p className="text-sm text-ink-muted">
-              Ask a question about attendance, fees, students or classes. Every figure in an answer
-              is read from this school&rsquo;s records when you ask — nothing is remembered from a
-              previous answer.
-            </p>
-            <ul className="mt-4 space-y-2">
-              {SUGGESTIONS.map((suggestion) => (
-                <li key={suggestion}>
-                  <button
-                    type="button"
-                    onClick={() => void ask(suggestion)}
-                    className="w-full rounded-[10px] border border-line px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
-                  >
-                    {suggestion}
-                  </button>
-                </li>
-              ))}
-            </ul>
+    <>
+      <div
+        className="assistant-backdrop fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] no-print"
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside
+        className="assistant-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l border-line bg-surface shadow-pop"
+        role="complementary"
+        aria-label="School assistant"
+      >
+        <header className="relative overflow-hidden border-b border-line px-4 py-4">
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[color-mix(in_srgb,var(--product-500)_14%,var(--surface))] via-surface to-surface"
+            aria-hidden
+          />
+          <div className="relative flex items-center gap-3">
+            <span className="assistant-header-icon grid size-10 place-items-center rounded-[12px] bg-gradient-to-br from-[var(--product-500)] to-[var(--product-700)] text-white shadow-md">
+              <Sparkle className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">Campus Assistant</p>
+              <p className="truncate text-xs text-ink-subtle">{schoolName}</p>
+            </div>
+            <IconButton label="Close assistant" onClick={onClose}>
+              <X className="size-4" aria-hidden />
+            </IconButton>
           </div>
-        ) : null}
+        </header>
+
+        <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          {turns.length === 0 ? (
+            <AssistantWelcome
+              loading={briefingLoading}
+              briefing={briefing}
+              language={language}
+              onSuggestion={(text) => void ask(text)}
+            />
+          ) : null}
 
         {turns.map((turn, index) => (
           <div key={index} className={turn.role === 'user' ? 'flex justify-end' : undefined}>
             {turn.role === 'user' ? (
-              <p className="max-w-[85%] rounded-[12px] bg-[var(--surface-3)] px-3 py-2 text-sm text-ink">
+              <p className="max-w-[85%] rounded-[14px] bg-gradient-to-br from-[var(--product-500)] to-[var(--product-700)] px-3.5 py-2.5 text-sm text-white shadow-sm">
                 {turn.text}
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 rounded-[14px] border border-line bg-surface-2/70 px-3.5 py-3">
                 {turn.text ? (
                   <div className="space-y-2 text-sm leading-relaxed text-ink">
                     {turn.text.split('\n').map((line, lineIndex) =>
@@ -495,6 +512,7 @@ export function AssistantPanel({
         </p>
       </form>
     </aside>
+    </>
   )
 }
 
@@ -521,8 +539,9 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-[10px] border border-line px-2.5 py-1.5',
-          'text-xs font-medium text-ink-muted transition-colors hover:border-line-strong hover:text-ink',
+          'assistant-launcher inline-flex items-center gap-1.5 rounded-[10px] border border-line px-2.5 py-1.5',
+          'text-xs font-medium text-ink-muted transition-all hover:border-[var(--product-400)] hover:bg-[color-mix(in_srgb,var(--product-500)_8%,var(--surface))] hover:text-ink',
+          open && 'border-[var(--product-400)] bg-[color-mix(in_srgb,var(--product-500)_10%,var(--surface))] text-ink',
         )}
         aria-haspopup="dialog"
         aria-expanded={open}
