@@ -9,6 +9,7 @@ import {
 } from '@/server/modules/certificates/service'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DocumentLetterhead } from '@/components/print/document-letterhead'
 import { revokeCertificateAction } from '../actions'
 import { PrintCertificateButton } from '../print-button'
 
@@ -24,6 +25,7 @@ export default async function CertificateDetailPage({ params }: { params: Promis
     renderCertificateBody(certificate.template.bodyHtml, data?.variables ?? {})
   const verifyUrl = certificateVerifyUrl(certificate.verifyToken)
   const qrUrl = `/api/v1/verify/certificate/${certificate.verifyToken}/qr`
+  const school = ctx.tenant.school
 
   return (
     <div className="max-w-3xl">
@@ -47,7 +49,14 @@ export default async function CertificateDetailPage({ params }: { params: Promis
         </div>
       </div>
 
-      <article className="border border-line bg-surface p-6 sm:p-10 print:border-0">
+      <DocumentLetterhead
+        schoolName={school?.name ?? ctx.tenant.name}
+        logoUrl={school?.logoUrl}
+        letterheadHeaderUrl={school?.letterheadHeaderUrl}
+        letterheadFooterUrl={school?.letterheadFooterUrl}
+        footerText={school?.footerText}
+        signatureUrl={school?.signatureUrl}
+      >
         <header className="border-b border-line pb-4 text-center">
           <p className="caption">{certificate.template.name}</p>
           <p className="mt-1 text-sm text-ink-muted font-mono">{certificate.number}</p>
@@ -63,7 +72,7 @@ export default async function CertificateDetailPage({ params }: { params: Promis
           dangerouslySetInnerHTML={{ __html: body }}
         />
 
-        <footer className="border-t border-line pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="border-t border-line pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-xs text-ink-subtle">
             <p>
               Issued to {certificate.student.firstName} {certificate.student.lastName}
@@ -78,8 +87,8 @@ export default async function CertificateDetailPage({ params }: { params: Promis
               <p className="mt-2 text-[10px] text-ink-subtle break-all max-w-[160px]">{verifyUrl}</p>
             </div>
           ) : null}
-        </footer>
-      </article>
+        </div>
+      </DocumentLetterhead>
     </div>
   )
 }

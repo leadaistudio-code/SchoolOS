@@ -5,6 +5,7 @@ import { getAdmitCardPrint } from '@/server/modules/exams/admit-cards'
 import { formatDay } from '@/lib/dates'
 import { Badge } from '@/components/ui/badge'
 import { Notice } from '@/components/ui/states'
+import { DocumentLetterhead } from '@/components/print/document-letterhead'
 import { PrintAdmitCardButton } from '../print-button'
 import { AdmitCardRollbackButton } from '../rollback-button'
 
@@ -15,6 +16,7 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
   const { id } = await params
   const data = await getAdmitCardPrint(ctx, id)
   const { card, schoolName, schoolAddress, className, rollNumber, dateSheet, canPrint } = data
+  const school = ctx.tenant.school
 
   const canApprove = ctx.can('exams.admit_approve')
 
@@ -50,11 +52,17 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      <article className="border border-line bg-surface p-5 sm:p-8 print:border-0 print:p-0">
+      <DocumentLetterhead
+        schoolName={schoolName}
+        schoolAddress={schoolAddress}
+        logoUrl={school?.logoUrl}
+        letterheadHeaderUrl={school?.letterheadHeaderUrl}
+        letterheadFooterUrl={school?.letterheadFooterUrl}
+        footerText={school?.footerText}
+        signatureUrl={school?.signatureUrl}
+      >
         <header className="border-b border-line pb-4 text-center">
           <p className="caption">Examination admit card</p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">{schoolName}</h1>
-          {schoolAddress ? <p className="text-sm text-ink-muted">{schoolAddress}</p> : null}
           <p className="mt-3 text-lg font-semibold text-ink">{card.exam.name}</p>
           <p className="text-sm text-ink-muted">{card.exam.session.name}</p>
         </header>
@@ -143,19 +151,23 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
           )}
         </section>
 
-        <footer className="border-t border-line pt-4 grid gap-8 sm:grid-cols-2 text-sm">
-          <div>
-            <p className="caption">Principal / Authorised signatory</p>
-            <div className="mt-8 border-t border-line pt-1 text-ink-muted">Signature & stamp</div>
-          </div>
+        <div className="border-t border-line pt-4 grid gap-8 sm:grid-cols-2 text-sm">
+          {!school?.letterheadFooterUrl && !school?.signatureUrl ? (
+            <div>
+              <p className="caption">Principal / Authorised signatory</p>
+              <div className="mt-8 border-t border-line pt-1 text-ink-muted">Signature & stamp</div>
+            </div>
+          ) : (
+            <div />
+          )}
           <div className="sm:text-right">
             <p className="caption">Instructions</p>
             <p className="mt-1 text-ink-muted">
               Bring this admit card and school ID to every paper. Report 15 minutes before the start time.
             </p>
           </div>
-        </footer>
-      </article>
+        </div>
+      </DocumentLetterhead>
     </div>
   )
 }

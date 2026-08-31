@@ -26,6 +26,8 @@ export default async function BrandingPage() {
         faviconUrl={resolveBrandingAssetUrl(b?.faviconUrl, 'favicon')}
         darkLogoUrl={resolveBrandingAssetUrl(b?.darkLogoUrl, 'darkLogo')}
         signatureUrl={resolveBrandingAssetUrl(b?.signatureUrl, 'signature')}
+        letterheadHeaderUrl={resolveBrandingAssetUrl(b?.letterheadHeaderUrl, 'letterheadHeader')}
+        letterheadFooterUrl={resolveBrandingAssetUrl(b?.letterheadFooterUrl, 'letterheadFooter')}
         maxUploadMb={env().MAX_UPLOAD_MB}
         initial={{
           primaryHex: b?.primaryHex ?? '#E41F07',

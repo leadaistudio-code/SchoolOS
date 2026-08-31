@@ -4,6 +4,7 @@ import { requireContext } from '@/server/context'
 import { getReportCard } from '@/server/modules/exams/service'
 import { formatDay } from '@/lib/dates'
 import { Badge } from '@/components/ui/badge'
+import { DocumentLetterhead } from '@/components/print/document-letterhead'
 import { PrintReportCardButton } from './print-button'
 
 export const metadata = { title: 'Report card' }
@@ -11,15 +12,17 @@ export const metadata = { title: 'Report card' }
 /**
  * Report card.
  *
- * This screen is a document: it is printed, signed and filed, so it keeps a
- * formal centred masthead and a plain rule structure that survives being sent
- * to a monochrome office printer.
+ * This screen is a document: it is printed, signed and filed. School letterhead
+ * images (Settings → Branding) apply here the same as on receipts and certificates.
  */
 export default async function ReportCardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext('results.view')
   const { id } = await params
   const card = await getReportCard(ctx, id)
   const { result, template } = card
+  const school = ctx.tenant.school
+  const hasLetterheadHeader = Boolean(school?.letterheadHeaderUrl)
+  const hasLetterheadFooter = Boolean(school?.letterheadFooterUrl)
 
   return (
     <div className="max-w-4xl">
@@ -34,8 +37,15 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
         <PrintReportCardButton />
       </div>
 
-      <article className="border border-line bg-surface p-5 sm:p-8 print:border-0 print:p-0">
-        {template?.headerHtml ? (
+      <DocumentLetterhead
+        schoolName={school?.name ?? ctx.tenant.name}
+        logoUrl={school?.logoUrl}
+        letterheadHeaderUrl={school?.letterheadHeaderUrl}
+        letterheadFooterUrl={school?.letterheadFooterUrl}
+        footerText={school?.footerText}
+        signatureUrl={school?.signatureUrl}
+      >
+        {!hasLetterheadHeader && template?.headerHtml ? (
           <div
             className="mb-4 text-center prose prose-sm max-w-none"
             dangerouslySetInnerHTML={{ __html: template.headerHtml }}
@@ -64,7 +74,9 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
             <p className="mt-1 text-lg font-semibold text-ink">
               {card.className} · Section {card.sectionName}
             </p>
-            <p className="text-sm text-ink-muted">Rank in class {template?.showRank === false ? '—' : (result.rankInClass ?? '—')}</p>
+            <p className="text-sm text-ink-muted">
+              Rank in class {template?.showRank === false ? '—' : (result.rankInClass ?? '—')}
+            </p>
           </div>
         </section>
 
@@ -105,7 +117,7 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
           </table>
         </section>
 
-        <footer className="grid gap-3 border-t border-line pt-4 sm:grid-cols-4">
+        <div className="grid gap-3 border-t border-line pt-4 sm:grid-cols-4">
           <div>
             <p className="caption">Total</p>
             <p className="text-lg font-semibold text-ink tnum">
@@ -128,7 +140,7 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
               </Badge>
             </p>
           </div>
-        </footer>
+        </div>
         {template?.showAttendance && card.attendance ? (
           <section className="mt-4 border-t border-line pt-4 text-sm">
             <p className="caption">Attendance (session)</p>
@@ -138,13 +150,13 @@ export default async function ReportCardPage({ params }: { params: Promise<{ id:
             </p>
           </section>
         ) : null}
-        {template?.footerHtml ? (
+        {!hasLetterheadFooter && template?.footerHtml ? (
           <div
             className="mt-6 border-t border-line pt-4 prose prose-sm max-w-none text-center"
             dangerouslySetInnerHTML={{ __html: template.footerHtml }}
           />
         ) : null}
-      </article>
+      </DocumentLetterhead>
     </div>
   )
 }

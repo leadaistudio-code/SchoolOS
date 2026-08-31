@@ -56,6 +56,8 @@ export function BrandingForm({
   faviconUrl,
   darkLogoUrl,
   signatureUrl,
+  letterheadHeaderUrl,
+  letterheadFooterUrl,
   maxUploadMb,
 }: {
   initial: BrandingValues
@@ -64,6 +66,8 @@ export function BrandingForm({
   faviconUrl: string | null
   darkLogoUrl: string | null
   signatureUrl: string | null
+  letterheadHeaderUrl: string | null
+  letterheadFooterUrl: string | null
   /** Stated on the panel, because nothing here is resized after upload. */
   maxUploadMb: number
 }) {
@@ -81,7 +85,17 @@ export function BrandingForm({
 
   const [assetPending, startAssetTransition] = React.useTransition()
 
-  const uploadAsset = (kind: 'logo' | 'banner' | 'favicon' | 'darkLogo' | 'signature', file: File | null | undefined) => {
+  const uploadAsset = (
+    kind:
+      | 'logo'
+      | 'banner'
+      | 'favicon'
+      | 'darkLogo'
+      | 'signature'
+      | 'letterheadHeader'
+      | 'letterheadFooter',
+    file: File | null | undefined,
+  ) => {
     if (!file?.size) return
     const form = new FormData()
     form.set('kind', kind)
@@ -161,12 +175,43 @@ export function BrandingForm({
             />
             <AssetUploadField
               label="Signature"
-              hint="Printed on certificates and report cards"
+              hint="Printed on certificates and report cards when no letterhead footer is set"
               size="600 × 200 px"
               shape="Wide PNG, transparent background, dark ink"
               previewUrl={signatureUrl}
               pending={assetPending}
               onFile={(file) => uploadAsset('signature', file)}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Letterhead for printed documents</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6 sm:grid-cols-2">
+            <p className="sm:col-span-2 text-xs text-ink-muted">
+              Upload your school letterhead as images. Fee receipts, certificates, admit cards and
+              other printed documents will use the same header and footer everywhere. Prefer a wide
+              PNG or JPEG that matches A4 width (~2480 × 400–700 px for the header).
+            </p>
+            <AssetUploadField
+              label="Letterhead header"
+              hint="Top of receipts, certificates and admit cards"
+              size="2480 × 600 px"
+              shape="Wide landscape — school name, logo and address as on your paper letterhead"
+              previewUrl={letterheadHeaderUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('letterheadHeader', file)}
+            />
+            <AssetUploadField
+              label="Letterhead footer"
+              hint="Bottom of the same printed documents"
+              size="2480 × 400 px"
+              shape="Wide landscape — address, phone, affiliation strip as on your paper"
+              previewUrl={letterheadFooterUrl}
+              pending={assetPending}
+              onFile={(file) => uploadAsset('letterheadFooter', file)}
             />
           </CardContent>
         </Card>

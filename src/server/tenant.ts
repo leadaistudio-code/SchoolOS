@@ -18,6 +18,9 @@ export type ResolvedTenant = {
     code: string
     logoUrl: string | null
     faviconUrl: string | null
+    signatureUrl: string | null
+    letterheadHeaderUrl: string | null
+    letterheadFooterUrl: string | null
     primaryHex: string
     secondaryHex: string
     accentHex: string
@@ -109,6 +112,9 @@ export const resolveTenant = cache(async (): Promise<ResolvedTenant | null> => {
           code: tenant.school.code,
           logoUrl: resolveBrandingAssetUrl(b?.logoUrl, 'logo'),
           faviconUrl: resolveBrandingAssetUrl(b?.faviconUrl, 'favicon'),
+          signatureUrl: resolveBrandingAssetUrl(b?.signatureUrl, 'signature'),
+          letterheadHeaderUrl: resolveBrandingAssetUrl(b?.letterheadHeaderUrl, 'letterheadHeader'),
+          letterheadFooterUrl: resolveBrandingAssetUrl(b?.letterheadFooterUrl, 'letterheadFooter'),
           primaryHex: b?.primaryHex ?? '#E41F07',
           secondaryHex: b?.secondaryHex ?? '#0A0C0C',
           accentHex: b?.accentHex ?? '#FFA201',

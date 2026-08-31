@@ -260,6 +260,11 @@ model Branding {
   loginSubtext  String?
   loginImageUrl String?
 
+  /// Full-width letterhead header image used on printed documents.
+  letterheadHeaderUrl String?
+  /// Full-width letterhead footer image used on printed documents.
+  letterheadFooterUrl String?
+
   pdfHeaderHtml String?
   pdfFooterHtml String?
   footerText    String?

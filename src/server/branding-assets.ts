@@ -3,7 +3,14 @@ import { prisma } from '@/server/db/prisma'
 import { env } from '@/lib/env'
 import { ApiException } from '@/server/api/response'
 
-export type BrandingAssetKind = 'logo' | 'banner' | 'favicon' | 'darkLogo' | 'signature'
+export type BrandingAssetKind =
+  | 'logo'
+  | 'banner'
+  | 'favicon'
+  | 'darkLogo'
+  | 'signature'
+  | 'letterheadHeader'
+  | 'letterheadFooter'
 
 const IMAGE_TYPES = new Map<string, string>([
   ['image/jpeg', 'jpg'],
@@ -23,23 +30,31 @@ const SIGNATURES: Record<string, string[]> = {
 
 const FIELD: Record<
   BrandingAssetKind,
-  'logoUrl' | 'loginImageUrl' | 'faviconUrl' | 'darkLogoUrl' | 'signatureUrl'
+  | 'logoUrl'
+  | 'loginImageUrl'
+  | 'faviconUrl'
+  | 'darkLogoUrl'
+  | 'signatureUrl'
+  | 'letterheadHeaderUrl'
+  | 'letterheadFooterUrl'
 > = {
   logo: 'logoUrl',
   banner: 'loginImageUrl',
   favicon: 'faviconUrl',
   darkLogo: 'darkLogoUrl',
   signature: 'signatureUrl',
+  letterheadHeader: 'letterheadHeaderUrl',
+  letterheadFooter: 'letterheadFooterUrl',
 }
 
 function signatureMatches(buffer: Buffer, mimeType: string): boolean {
   const expected = SIGNATURES[mimeType]
-  if (!expected) return true // ico variants vary; allow after mime check
+  if (!expected) return true
   const head = buffer.subarray(0, 8).toString('hex')
   return expected.some((prefix) => head.startsWith(prefix))
 }
 
-/** Public URL served without authentication (login page, PWA, etc.). */
+/** Public URL served without authentication (login page, PWA, print docs). */
 export function brandingAssetPublicUrl(kind: BrandingAssetKind): string {
   return `/api/v1/branding/${kind}`
 }
@@ -140,6 +155,8 @@ export async function readBrandingAsset(tenantId: string, kind: BrandingAssetKin
           faviconUrl: true,
           darkLogoUrl: true,
           signatureUrl: true,
+          letterheadHeaderUrl: true,
+          letterheadFooterUrl: true,
         },
       },
     },
@@ -155,7 +172,11 @@ export async function readBrandingAsset(tenantId: string, kind: BrandingAssetKin
           ? b?.faviconUrl
           : kind === 'darkLogo'
             ? b?.darkLogoUrl
-            : b?.signatureUrl
+            : kind === 'signature'
+              ? b?.signatureUrl
+              : kind === 'letterheadHeader'
+                ? b?.letterheadHeaderUrl
+                : b?.letterheadFooterUrl
 
   if (!stored) return null
   if (stored.startsWith('http://') || stored.startsWith('https://')) return null

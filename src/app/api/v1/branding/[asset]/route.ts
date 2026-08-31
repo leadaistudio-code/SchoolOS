@@ -8,10 +8,12 @@ const ALLOWED = new Set<BrandingAssetKind>([
   'favicon',
   'darkLogo',
   'signature',
+  'letterheadHeader',
+  'letterheadFooter',
 ])
 
 /**
- * GET /api/v1/branding/{logo|banner|favicon|darkLogo|signature}
+ * GET /api/v1/branding/{logo|banner|favicon|darkLogo|signature|letterheadHeader|letterheadFooter}
  *
  * Public, tenant-scoped branding images. Resolved from Host — no session.
  */

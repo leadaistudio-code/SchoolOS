@@ -34,8 +34,11 @@ export default async function PrintPaperPage({
   const showKey = mode !== 'paper'
 
   const template = assessment.template
+  const school = ctx.tenant.school
+  const letterheadHeader = school?.letterheadHeaderUrl
+  const letterheadFooter = school?.letterheadFooterUrl
   const schoolName =
-    template?.headingOverride ?? ctx.tenant.school?.name ?? ctx.tenant.name
+    template?.headingOverride ?? school?.name ?? ctx.tenant.name
 
   let number = 0
 
@@ -55,10 +58,21 @@ export default async function PrintPaperPage({
       <PrintBar assessmentId={assessment.id} mode={mode} />
 
       <div className="paper">
+        {letterheadHeader ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={letterheadHeader}
+            alt=""
+            className="mb-3 block w-full h-auto max-h-[42mm] object-contain object-top"
+          />
+        ) : null}
+
         {showPaper && (
           <section>
             <header className="border-b-2 border-black pb-3 text-center">
-              <h1 className="text-xl uppercase tracking-wide">{schoolName}</h1>
+              {!letterheadHeader || template?.headingOverride ? (
+                <h1 className="text-xl uppercase tracking-wide">{schoolName}</h1>
+              ) : null}
               <h2 className="mt-1 text-base">{assessment.title}</h2>
               <p className="mt-0.5 text-sm">
                 {assessment.type.name} · {assessment.classSubject.classLevel.name}
@@ -146,7 +160,9 @@ export default async function PrintPaperPage({
         {showKey && (
           <section className={showPaper ? 'page-break mt-10' : ''}>
             <header className="border-b-2 border-black pb-3 text-center">
-              <h1 className="text-xl uppercase tracking-wide">{schoolName}</h1>
+              {!letterheadHeader || template?.headingOverride ? (
+                <h1 className="text-xl uppercase tracking-wide">{schoolName}</h1>
+              ) : null}
               <h2 className="mt-1 text-base">{assessment.title} — Answer Key</h2>
               <p className="mt-0.5 text-sm">
                 {assessment.classSubject.classLevel.name} · {assessment.classSubject.subject.name} ·{' '}
@@ -190,6 +206,15 @@ export default async function PrintPaperPage({
             })()}
           </section>
         )}
+
+        {letterheadFooter ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={letterheadFooter}
+            alt=""
+            className="mt-6 block w-full h-auto max-h-[28mm] object-contain object-bottom"
+          />
+        ) : null}
       </div>
     </div>
   )

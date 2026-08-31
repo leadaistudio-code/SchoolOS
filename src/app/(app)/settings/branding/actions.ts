@@ -43,6 +43,8 @@ const ASSET_KINDS = new Set<BrandingAssetKind>([
   'favicon',
   'darkLogo',
   'signature',
+  'letterheadHeader',
+  'letterheadFooter',
 ])
 
 export async function uploadBrandingAssetAction(
