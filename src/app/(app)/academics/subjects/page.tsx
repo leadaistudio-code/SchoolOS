@@ -86,6 +86,7 @@ export default async function SubjectsPage() {
           value={formatNumber(subjects.length)}
           sub="Subjects the school teaches"
           tone="students"
+          href="#catalogue"
           icon={<NotebookPen className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -94,6 +95,7 @@ export default async function SubjectsPage() {
           value={formatNumber(assignments.length)}
           sub="Taught in a class"
           tone="admissions"
+          href="#assignments"
           icon={<Link2 className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -102,12 +104,13 @@ export default async function SubjectsPage() {
           value={formatNumber(electives)}
           sub="Optional subjects"
           tone="pending"
+          href="#catalogue"
           icon={<BookMarked className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="catalogue" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <CardHeader>
           <CardTitle>Catalogue</CardTitle>
           <span className="text-xs text-ink-subtle">Every subject the school teaches</span>
@@ -180,7 +183,7 @@ export default async function SubjectsPage() {
         )}
       </Card>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="assignments" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <CardHeader>
           <CardTitle>Taught in</CardTitle>
           <span className="text-xs text-ink-subtle">

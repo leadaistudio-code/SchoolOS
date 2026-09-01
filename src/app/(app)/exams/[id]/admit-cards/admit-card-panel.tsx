@@ -39,16 +39,26 @@ type Row = {
 export function AdmitCardPanel({
   examId,
   rows,
+  statusFilter,
   canGenerate,
   canApprove,
 }: {
   examId: string
   rows: Row[]
+  statusFilter?: 'PENDING' | 'APPROVED' | 'REJECTED'
   canGenerate: boolean
   canApprove: boolean
 }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
+
+  const filtered = statusFilter ? rows.filter((row) => row.status === statusFilter) : rows
+
+  React.useEffect(() => {
+    if (statusFilter && typeof window !== 'undefined') {
+      document.getElementById('students')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [statusFilter])
 
   const run = (fn: () => Promise<{ ok: boolean; message: string }>, title: string) =>
     startTransition(async () => {
@@ -62,6 +72,16 @@ export function AdmitCardPanel({
 
   return (
     <div className="space-y-4">
+      {statusFilter ? (
+        <p className="text-sm text-ink-muted">
+          Showing <span className="font-medium text-ink">{statusFilter.toLowerCase()}</span> cards
+          ({filtered.length} of {rows.length}).{' '}
+          <Link href={`/exams/${examId}/admit-cards#students`} className="text-brand-600 hover:underline">
+            Show all
+          </Link>
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {canGenerate ? (
           <>
@@ -85,6 +105,14 @@ export function AdmitCardPanel({
           No admit cards yet. Generate cards for every student enrolled in this exam&apos;s classes. The
           principal approves each card after confirming fees are paid.
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-ink-muted">
+          No {statusFilter?.toLowerCase()} admit cards. Pick another status above, or{' '}
+          <Link href={`/exams/${examId}/admit-cards#students`} className="text-brand-600 hover:underline">
+            show all students
+          </Link>
+          .
+        </p>
       ) : (
         <TableWrap>
           <Table>
@@ -98,7 +126,7 @@ export function AdmitCardPanel({
               </tr>
             </THead>
             <TBody>
-              {rows.map((row) => {
+              {filtered.map((row) => {
                 const enrollment = row.student.enrollments[0]
                 const classLabel = enrollment
                   ? `${enrollment.classLevel.name}${enrollment.section ? ` · ${enrollment.section.name}` : ''}`

@@ -55,6 +55,7 @@ export default async function AdmissionsPage() {
           value={formatNumber(openLeads)}
           sub="Not yet enrolled or lost"
           tone="admissions"
+          href="#kanban"
           icon={<UserSearch className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -63,6 +64,7 @@ export default async function AdmissionsPage() {
           value={formatNumber(enrolled)}
           sub="Converted to students"
           tone="students"
+          href="#kanban"
           icon={<UserCheck className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -77,7 +79,7 @@ export default async function AdmissionsPage() {
         />
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="kanban" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <CardHeader>
           <CardTitle>Kanban</CardTitle>
         </CardHeader>

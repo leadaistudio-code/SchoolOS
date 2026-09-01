@@ -55,6 +55,7 @@ export default async function LibraryPage({
           value={formatNumber(books.length)}
           sub="Titles listed"
           tone="students"
+          href="#books"
           icon={<BookOpen className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -63,6 +64,7 @@ export default async function LibraryPage({
           value={formatNumber(available)}
           sub="Ready to loan"
           tone="attendance"
+          href="/library/loans"
           icon={<LibraryIcon className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -71,13 +73,14 @@ export default async function LibraryPage({
           value={formatNumber(categories.length)}
           sub="Shelving groups"
           tone="admissions"
+          href="#books"
           icon={<Tags className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card variant="elevated" className="overflow-hidden">
+        <Card id="books" variant="elevated" className="scroll-mt-20 overflow-hidden">
           <CardHeader>
             <CardTitle>Books · {books.length}</CardTitle>
           </CardHeader>

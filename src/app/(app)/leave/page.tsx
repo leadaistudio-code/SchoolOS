@@ -63,6 +63,8 @@ export default async function LeavePage({
           value={formatNumber(total)}
           sub="Matching these filters"
           tone="leave"
+          href="/leave#leave-requests"
+          active={!filter.status}
           icon={<ClipboardList className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -71,12 +73,14 @@ export default async function LeavePage({
           value={formatNumber(pendingCount)}
           sub="Awaiting a decision"
           tone={pendingCount > 0 ? 'overdue' : 'pending'}
+          href="?status=PENDING#leave-requests"
+          active={filter.status === 'PENDING'}
           icon={<Clock className="size-5" aria-hidden />}
           delayMs={80}
         />
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="leave-requests" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <LeaveFilters canApprove={canApprove} />
         <LeaveList rows={rows} canApprove={canApprove} />
       </Card>

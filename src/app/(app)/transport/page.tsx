@@ -85,6 +85,7 @@ export default async function TransportPage() {
           value={`${data.occupancyPercent}%`}
           sub={data.occupancyPercent > 95 ? 'Effectively full' : 'Room to add riders'}
           tone={data.occupancyPercent > 95 ? 'overdue' : 'attendance'}
+          href="/transport/assignments"
           icon={<Gauge className="size-5" aria-hidden />}
           delayMs={120}
         />
@@ -93,6 +94,7 @@ export default async function TransportPage() {
           value={formatNumber(needsAttention)}
           sub={`${formatNumber(data.alerts.length)} document${data.alerts.length === 1 ? '' : 's'} · ${formatNumber(data.withoutDriver)} without a driver`}
           tone={needsAttention > 0 ? 'overdue' : 'pending'}
+          href="#fleet"
           icon={<AlertTriangle className="size-5" aria-hidden />}
           delayMs={160}
         />
@@ -134,7 +136,7 @@ export default async function TransportPage() {
         </Card>
       ) : null}
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="fleet" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <CardHeader>
           <CardTitle>Fleet</CardTitle>
           <Link href="/transport/buses" className="text-sm text-[var(--brand-600)] hover:underline">

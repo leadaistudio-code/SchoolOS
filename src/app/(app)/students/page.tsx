@@ -84,7 +84,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
           value={formatNumber(activeCount)}
           sub="Currently enrolled"
           tone="students"
-          href="/students"
+          href="/students#student-list"
           icon={<Users className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -112,7 +112,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         />
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="student-list" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <StudentFilters classes={await getClassOptions(ctx)} />
         <Suspense key={JSON.stringify(params)} fallback={<TableSkeleton rows={10} cols={6} />}>
           <StudentResults params={params} />

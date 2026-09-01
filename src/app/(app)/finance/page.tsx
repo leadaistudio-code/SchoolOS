@@ -136,6 +136,7 @@ export default async function FinancePage() {
           value={formatMoney(collectedMonth._sum.amountMinor ?? 0, currency)}
           sub={`of ${formatMoney(billedMinor, currency)} billed`}
           tone="attendance"
+          href="/finance/payments"
           icon={<TrendingUp className="size-5" aria-hidden />}
           delayMs={80}
         />

@@ -44,6 +44,7 @@ export default async function FrontOfficePage() {
           value={formatNumber(visitors.length)}
           sub={`${formatNumber(stillIn)} still on campus`}
           tone="parents"
+          href="#visitors"
           icon={<DoorOpen className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -52,6 +53,7 @@ export default async function FrontOfficePage() {
           value={formatNumber(stillIn)}
           sub="Checked in, not out"
           tone="attendance"
+          href="#visitors"
           icon={<UserRound className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -60,6 +62,7 @@ export default async function FrontOfficePage() {
           value={formatNumber(appointments.length)}
           sub={`${formatNumber(scheduled)} still scheduled`}
           tone="pending"
+          href="#appointments"
           icon={<CalendarClock className="size-5" aria-hidden />}
           delayMs={120}
         />
@@ -67,7 +70,7 @@ export default async function FrontOfficePage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <Card variant="elevated">
+          <Card id="visitors" variant="elevated" className="scroll-mt-20">
             <CardHeader>
               <CardTitle>Today&apos;s visitors</CardTitle>
             </CardHeader>
@@ -101,7 +104,7 @@ export default async function FrontOfficePage() {
             </CardContent>
           </Card>
 
-          <Card variant="elevated">
+          <Card id="appointments" variant="elevated" className="scroll-mt-20">
             <CardHeader>
               <CardTitle>Appointments</CardTitle>
             </CardHeader>

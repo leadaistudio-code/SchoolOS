@@ -98,6 +98,7 @@ export function ColorTile({
   tone,
   icon,
   delayMs,
+  active,
 }: {
   label: string
   value: string
@@ -106,6 +107,8 @@ export function ColorTile({
   tone: SeriesKey
   icon?: React.ReactNode
   delayMs?: number
+  /** Highlights the tile when it matches the current filter or view. */
+  active?: boolean
 }) {
   const body = (
     <>
@@ -118,15 +121,19 @@ export function ColorTile({
     </>
   )
 
-  const className =
-    'rise-in lift relative block overflow-hidden rounded-[var(--radius-lg)] p-4 text-white transition-[transform,box-shadow] duration-150'
+  const className = cn(
+    'rise-in lift relative block overflow-hidden rounded-[var(--radius-lg)] p-4 text-white transition-[transform,box-shadow,opacity] duration-150',
+    href &&
+      'cursor-pointer hover:scale-[1.01] hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80',
+    active && 'ring-2 ring-white/90 ring-offset-2 ring-offset-[color-mix(in_srgb,var(--surface)_30%,transparent)]',
+  )
   const style = {
     backgroundImage: seriesSolidGradient(tone),
     ...(delayMs ? { animationDelay: `${delayMs}ms` } : {}),
   } as React.CSSProperties
 
   return href ? (
-    <Link href={href} className={className} style={style}>
+    <Link href={href} className={className} style={style} aria-current={active ? 'page' : undefined}>
       {body}
     </Link>
   ) : (

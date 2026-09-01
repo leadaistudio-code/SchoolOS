@@ -69,6 +69,7 @@ export default async function ClassesPage() {
             value={formatNumber(classes.length)}
             sub="Class levels this session"
             tone="admissions"
+            href="#class-tree"
             icon={<GraduationCap className="size-5" aria-hidden />}
             delayMs={40}
           />
@@ -77,6 +78,7 @@ export default async function ClassesPage() {
             value={formatNumber(totalSections)}
             sub="Across all classes"
             tone="students"
+            href="#class-tree"
             icon={<Layers className="size-5" aria-hidden />}
             delayMs={80}
           />
@@ -105,7 +107,7 @@ export default async function ClassesPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div id="class-tree" className="scroll-mt-20 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {classes.map((c) => {
             const enrolled = c.sections.reduce((s, sec) => s + sec._count.enrollments, 0)
             const capacity = c.sections.reduce((s, sec) => s + sec.capacity, 0)

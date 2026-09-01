@@ -35,6 +35,7 @@ export default async function InventoryPage() {
           value={formatNumber(assets.length)}
           sub="Registered items"
           tone="pending"
+          href="#assets"
           icon={<Package className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -43,6 +44,7 @@ export default async function InventoryPage() {
           value={formatNumber(categories.length)}
           sub="Asset groups"
           tone="admissions"
+          href="#assets"
           icon={<Tags className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -51,13 +53,14 @@ export default async function InventoryPage() {
           value={formatNumber(disposed)}
           sub="Written off"
           tone="overdue"
+          href="#assets"
           icon={<Boxes className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card variant="elevated">
+        <Card id="assets" variant="elevated" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Assets · {assets.length}</CardTitle>
           </CardHeader>

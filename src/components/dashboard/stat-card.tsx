@@ -94,7 +94,10 @@ export function StatCard({
     </>
   )
 
-  const className = 'widget rise-in lift block p-4'
+  const className = cn(
+    'widget rise-in lift block p-4 transition-[transform,box-shadow] duration-150',
+    href && 'cursor-pointer hover:scale-[1.01] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--product-500)]',
+  )
   const style = delayMs ? { animationDelay: `${delayMs}ms` } : undefined
 
   return href ? (

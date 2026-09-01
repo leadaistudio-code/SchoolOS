@@ -62,6 +62,7 @@ export default async function AttendancePage({
             value={formatNumber(sections.length)}
             sub="Classes you can mark"
             tone="attendance"
+            href="#register"
             icon={<Layers className="size-5" aria-hidden />}
             delayMs={40}
           />
@@ -71,6 +72,7 @@ export default async function AttendancePage({
               value={formatNumber(pending.length)}
               sub={onDate === today ? 'Outstanding today' : `Outstanding for ${onDate}`}
               tone={pending.length > 0 ? 'overdue' : 'pending'}
+              href="#pending-sections"
               icon={<AlertCircle className="size-5" aria-hidden />}
               delayMs={80}
             />
@@ -80,6 +82,7 @@ export default async function AttendancePage({
             value={onDate === today ? 'Today' : onDate}
             sub="Change date in the picker below"
             tone="students"
+            href="#register"
             icon={<CalendarCheck className="size-5" aria-hidden />}
             delayMs={120}
           />
@@ -95,7 +98,7 @@ export default async function AttendancePage({
         </Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px] items-start">
-          <Card variant="elevated" className="overflow-hidden">
+          <Card id="register" variant="elevated" className="scroll-mt-20 overflow-hidden">
             <SectionPicker
               sections={sections}
               sectionId={sectionId}
@@ -127,7 +130,7 @@ function PendingSectionsList({
   onDate: string
 }) {
   return (
-    <Card variant="elevated">
+    <Card id="pending-sections" variant="elevated" className="scroll-mt-20">
       <CardHeader>
         <CardTitle>Not yet marked</CardTitle>
       </CardHeader>

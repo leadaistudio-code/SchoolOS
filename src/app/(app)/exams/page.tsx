@@ -60,6 +60,7 @@ export default async function ExamsPage({
           value={formatNumber(total)}
           sub="All examination records"
           tone="late"
+          href="#exams-list"
           icon={<FileCheck className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -68,6 +69,7 @@ export default async function ExamsPage({
           value={formatNumber(activeExams)}
           sub="On this page of results"
           tone="admissions"
+          href="#exams-list"
           icon={<Calendar className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -82,7 +84,7 @@ export default async function ExamsPage({
         />
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="exams-list" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <SearchBar placeholder="Search exams" />
 
         {rows.length === 0 ? (

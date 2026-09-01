@@ -60,6 +60,7 @@ export default async function FeedbackPage() {
             value={responseRate}
             sub={`${formatNumber(responses)} of ${formatNumber(assignments)} submitted`}
             tone="attendance"
+            href="/feedback/campaigns"
             icon={<ClipboardCheck className="size-5" aria-hidden />}
             delayMs={80}
           />

@@ -69,6 +69,7 @@ export default async function NoticesPage({
           value={formatNumber(total)}
           sub="Matching these filters"
           tone="pending"
+          href="#notices-list"
           icon={<Megaphone className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -77,6 +78,7 @@ export default async function NoticesPage({
           value={formatNumber(pinned)}
           sub="Shown at the top"
           tone="admissions"
+          href="#notices-list"
           icon={<Pin className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -86,13 +88,14 @@ export default async function NoticesPage({
             value={formatNumber(drafts)}
             sub="Not yet published"
             tone="staff"
+            href="#notices-list"
             icon={<Paperclip className="size-5" aria-hidden />}
             delayMs={120}
           />
         ) : null}
       </div>
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="notices-list" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <SearchBar placeholder="Search notices" />
 
         {rows.length === 0 ? (

@@ -38,6 +38,7 @@ export default async function EventsPage() {
           value={formatNumber(events.length)}
           sub="On the calendar"
           tone="admissions"
+          href="#events-list"
           icon={<CalendarRange className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -46,6 +47,7 @@ export default async function EventsPage() {
           value={formatNumber(upcoming)}
           sub="Still to take place"
           tone="students"
+          href="#events-list"
           icon={<CalendarDays className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -54,13 +56,14 @@ export default async function EventsPage() {
           value={formatNumber(participants)}
           sub="Across all events"
           tone="parents"
+          href="#events-list"
           icon={<Users className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card variant="elevated">
+        <Card id="events-list" variant="elevated" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Calendar · {events.length}</CardTitle>
           </CardHeader>

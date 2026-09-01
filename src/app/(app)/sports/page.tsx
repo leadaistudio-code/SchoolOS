@@ -43,6 +43,7 @@ export default async function SportsPage() {
           value={formatNumber(sports.length)}
           sub="Programmes on offer"
           tone="attendance"
+          href="#sports-list"
           icon={<Trophy className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -51,6 +52,7 @@ export default async function SportsPage() {
           value={formatNumber(teamCount)}
           sub="Across all sports"
           tone="students"
+          href="#sports-list"
           icon={<Medal className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -59,13 +61,14 @@ export default async function SportsPage() {
           value={formatNumber(memberCount)}
           sub="Students on teams"
           tone="parents"
+          href="#sports-list"
           icon={<Users className="size-5" aria-hidden />}
           delayMs={120}
         />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card variant="elevated">
+        <Card id="sports-list" variant="elevated" className="scroll-mt-20">
           <CardHeader>
             <CardTitle>Sports · {sports.length}</CardTitle>
           </CardHeader>

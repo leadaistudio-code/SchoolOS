@@ -71,6 +71,8 @@ export default async function StaffPage({
           value={formatNumber(totalStaff)}
           sub="All staff types"
           tone="staff"
+          href="/staff#directory"
+          active={!params.staffType}
           icon={<Briefcase className="size-5" aria-hidden />}
           delayMs={40}
         />
@@ -79,6 +81,8 @@ export default async function StaffPage({
           value={formatNumber(teachingStaff)}
           sub="Teaching staff"
           tone="admissions"
+          href="?staffType=TEACHING#directory"
+          active={params.staffType === 'TEACHING'}
           icon={<BookOpen className="size-5" aria-hidden />}
           delayMs={80}
         />
@@ -102,7 +106,7 @@ export default async function StaffPage({
         }}
       />
 
-      <Card variant="elevated" className="overflow-hidden">
+      <Card id="directory" variant="elevated" className="scroll-mt-20 overflow-hidden">
         <SearchBar placeholder="Search name, employee code, phone or designation">
           <StaffTypeFilter />
         </SearchBar>
