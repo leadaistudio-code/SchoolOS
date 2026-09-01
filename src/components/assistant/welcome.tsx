@@ -5,28 +5,35 @@ import Link from 'next/link'
 import { ArrowRight, Sparkle, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/shell/icon'
-import { stopSpeaking } from './speech'
+import { speak, stopSpeaking } from './speech'
 import type { AssistantActionItem, AssistantBriefing } from '@/server/assistant/briefing'
+import type { VoiceSessionPhase } from './use-voice-session'
 
-function AssistantOrb({ speaking }: { speaking: boolean }) {
+function AssistantOrb({ phase }: { phase: VoiceSessionPhase }) {
+  const speaking = phase === 'speaking'
+  const listening = phase === 'listening'
+  const thinking = phase === 'processing'
+
   return (
     <div className="relative mx-auto size-20" aria-hidden>
       <span
         className={cn(
-          'absolute inset-0 rounded-full bg-gradient-to-br from-[var(--product-400)] via-[var(--product-600)] to-[var(--chart-admissions)] opacity-80 blur-md',
-          speaking && 'animate-pulse',
+          'absolute inset-0 rounded-full bg-gradient-to-br from-[var(--product-400)] via-[var(--product-600)] to-[var(--chart-admissions)] opacity-80 blur-md transition-opacity',
+          (speaking || listening || thinking) && 'opacity-100 animate-pulse',
         )}
       />
       <span
         className={cn(
-          'absolute inset-1 rounded-full bg-gradient-to-br from-[var(--product-500)] to-[var(--product-700)] shadow-lg',
+          'absolute inset-1 rounded-full bg-gradient-to-br from-[var(--product-500)] to-[var(--product-700)] shadow-lg transition-transform',
           speaking && 'assistant-orb-speak',
+          listening && 'scale-105',
+          thinking && 'assistant-orb-think',
         )}
       />
       <span className="absolute inset-0 grid place-items-center">
         <Sparkle className="size-8 text-white drop-shadow-sm" />
       </span>
-      {speaking ? (
+      {speaking || listening ? (
         <span className="assistant-wave absolute -bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5">
           {[0, 1, 2, 3, 4].map((bar) => (
             <span
@@ -100,23 +107,37 @@ export function AssistantWelcome({
   loading,
   briefing,
   language,
+  handsfree,
+  voicePhase,
+  liveTranscript,
+  greetingDone,
+  onGreetingDone,
   onSuggestion,
+  onToggleVoiceGreeting,
+  voiceGreetingEnabled,
 }: {
   loading: boolean
   briefing: AssistantBriefing | null
   language: string
+  handsfree: boolean
+  voicePhase: VoiceSessionPhase
+  liveTranscript: string
+  greetingDone: boolean
+  onGreetingDone: () => void
   onSuggestion: (text: string) => void
+  onToggleVoiceGreeting: () => void
+  voiceGreetingEnabled: boolean
 }) {
-  const [speaking, setSpeaking] = React.useState(false)
-  const [voiceEnabled, setVoiceEnabled] = React.useState(true)
   const [typedHeadline, setTypedHeadline] = React.useState('')
   const [typingDone, setTypingDone] = React.useState(false)
   const spokenRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
+    if (loading) return
     if (!briefing) {
       setTypedHeadline('')
       setTypingDone(false)
+      onGreetingDone()
       return
     }
 
@@ -134,55 +155,51 @@ export function AssistantWelcome({
     }, 28)
 
     return () => window.clearInterval(timer)
-  }, [briefing])
+  }, [briefing, loading, onGreetingDone])
 
   React.useEffect(() => {
-    if (!briefing || !voiceEnabled) return
+    if (loading) return
+    if (!briefing || !voiceGreetingEnabled) {
+      onGreetingDone()
+      return
+    }
     if (spokenRef.current === briefing.greeting.spoken) return
     spokenRef.current = briefing.greeting.spoken
 
-    setSpeaking(true)
     stopSpeaking()
-
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setSpeaking(false)
-      return
-    }
-
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(briefing.greeting.spoken)
-    utterance.lang = language
-    utterance.rate = 0.98
-    utterance.onend = () => setSpeaking(false)
-    utterance.onerror = () => setSpeaking(false)
-    window.speechSynthesis.speak(utterance)
-
+    const cancel = speak(briefing.greeting.spoken, {
+      lang: language,
+      onEnd: onGreetingDone,
+      onStart: () => {},
+    })
     return () => {
-      stopSpeaking()
-      setSpeaking(false)
+      cancel()
     }
-  }, [briefing, language, voiceEnabled])
+  }, [briefing, loading, language, voiceGreetingEnabled, onGreetingDone])
 
-  const suggestions = [
-    'What fees are pending?',
-    'Whose attendance is missing today?',
-    'Summarise today for me',
-  ]
+  const suggestions =
+    briefing?.followUpPrompts?.length ? briefing.followUpPrompts : [
+      'What fees are pending?',
+      'Whose attendance is missing today?',
+      'Summarise today for me',
+    ]
+
+  const phaseLabel =
+    voicePhase === 'listening'
+      ? liveTranscript || 'Listening…'
+      : voicePhase === 'processing'
+        ? 'Just a moment…'
+        : voicePhase === 'speaking'
+          ? 'Speaking…'
+          : handsfree && greetingDone
+            ? 'Say something, or tap the mic'
+            : null
 
   if (loading) {
     return (
       <div className="assistant-welcome flex flex-col items-center px-2 py-8 text-center">
-        <AssistantOrb speaking={false} />
-        <p className="mt-5 text-sm text-ink-muted">Preparing your briefing…</p>
-        <div className="mt-4 flex gap-1.5" aria-hidden>
-          {[0, 1, 2].map((dot) => (
-            <span
-              key={dot}
-              className="size-1.5 animate-pulse rounded-full bg-[var(--product-500)]"
-              style={{ animationDelay: `${dot * 160}ms` }}
-            />
-          ))}
-        </div>
+        <AssistantOrb phase="processing" />
+        <p className="mt-5 text-sm text-ink-muted">Getting your briefing ready…</p>
       </div>
     )
   }
@@ -200,14 +217,10 @@ export function AssistantWelcome({
   return (
     <div className="assistant-welcome space-y-5">
       <div className="relative overflow-hidden rounded-[16px] border border-line bg-gradient-to-br from-[color-mix(in_srgb,var(--product-500)_12%,var(--surface))] via-surface to-[color-mix(in_srgb,var(--chart-admissions)_10%,var(--surface))] px-4 py-5">
-        <div
-          className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-[var(--product-500)] opacity-[0.07] blur-2xl"
-          aria-hidden
-        />
         <div className="relative flex flex-col items-center text-center">
-          <AssistantOrb speaking={speaking && voiceEnabled} />
+          <AssistantOrb phase={voicePhase === 'idle' && handsfree ? 'listening' : voicePhase} />
           <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--product-600)]">
-            Hi {greeting.roleTitle === 'School Admin' ? 'Admin' : greeting.roleTitle.split(' ')[0]}
+            Campus Assistant
           </p>
           <h2 className="mt-1 min-h-[1.75rem] text-xl font-semibold text-ink">
             {typedHeadline}
@@ -216,26 +229,35 @@ export function AssistantWelcome({
             ) : null}
           </h2>
           <p className="mt-2 max-w-[18rem] text-sm leading-relaxed text-ink-muted">
-            How can I help you today?
+            {greeting.subline}
           </p>
+          {phaseLabel ? (
+            <p
+              className={cn(
+                'mt-3 max-w-[20rem] text-sm',
+                voicePhase === 'listening' && liveTranscript
+                  ? 'font-medium text-ink'
+                  : 'text-ink-subtle italic',
+              )}
+              aria-live="polite"
+            >
+              {phaseLabel}
+            </p>
+          ) : null}
           <button
             type="button"
-            onClick={() => {
-              if (voiceEnabled) stopSpeaking()
-              setVoiceEnabled((current) => !current)
-              setSpeaking(false)
-            }}
+            onClick={onToggleVoiceGreeting}
             className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-2.5 py-1 text-[11px] text-ink-muted transition-colors hover:border-line-strong hover:text-ink"
           >
-            {voiceEnabled ? (
+            {voiceGreetingEnabled ? (
               <>
                 <Volume2 className="size-3.5" aria-hidden />
-                Voice greeting on
+                Voice on
               </>
             ) : (
               <>
                 <VolumeX className="size-3.5" aria-hidden />
-                Voice greeting off
+                Voice off
               </>
             )}
           </button>
@@ -243,7 +265,7 @@ export function AssistantWelcome({
       </div>
 
       <div>
-        <p className="caption mb-2.5">{greeting.subline}</p>
+        <p className="caption mb-2.5">Today&apos;s priorities</p>
         <div className="space-y-2">
           {actionItems.map((item, index) => (
             <ActionCard

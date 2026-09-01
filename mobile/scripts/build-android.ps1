@@ -126,21 +126,22 @@ Copy-Item $apk $out -Force
 Write-Host ("APK  {0}  {1:N1} MB" -f $out, ((Get-Item $out).Length / 1MB)) -ForegroundColor Green
 Write-Host ("     SHA-256 {0}" -f (Get-FileHash $out -Algorithm SHA256).Hash.ToLower())
 
+$apksigner = Get-ChildItem -Path (Join-Path $sdk 'build-tools') -Recurse -Filter 'apksigner.bat' |
+    Sort-Object FullName -Descending | Select-Object -First 1
+if ($apksigner) {
+    $cert = & $apksigner.FullName verify --print-certs $out 2>&1 |
+        Select-String -Pattern 'Signer #1 certificate SHA-1 digest:' |
+        ForEach-Object { ($_ -replace '.*digest:\s*', '').Trim() }
+    if ($cert) {
+        Write-Host ("     Upload cert SHA-1 {0}" -f $cert) -ForegroundColor Cyan
+        Write-Host '     Play expects SHA-1 E3:A5:55:E6:36:AB:24:14:BA:47:E0:03:89:AC:2D:22:DD:7C:D9:5F' -ForegroundColor DarkGray
+    }
+}
+
 if ($Bundle) {
     $aab = Join-Path $work 'android\app\build\outputs\bundle\release\app-release.aab'
     $outB = Join-Path $releases 'MyCampusView-v2.0.0.aab'
     Copy-Item $aab $outB -Force
     Write-Host ("AAB  {0}  {1:N1} MB" -f $outB, ((Get-Item $outB).Length / 1MB)) -ForegroundColor Green
-
-    $apksigner = Get-ChildItem -Path (Join-Path $sdk 'build-tools') -Recurse -Filter 'apksigner.bat' |
-        Sort-Object FullName -Descending | Select-Object -First 1
-    if ($apksigner) {
-        $cert = & $apksigner.FullName verify --print-certs $outB 2>&1 |
-            Select-String -Pattern 'Signer #1 certificate SHA-1 digest:' |
-            ForEach-Object { ($_ -replace '.*digest:\s*', '').Trim() }
-        if ($cert) {
-            Write-Host ("     Upload cert SHA-1 {0}" -f $cert) -ForegroundColor Cyan
-            Write-Host '     Play expects SHA-1 48:ED:2E:8C:53:29:48:95:2E:89:9F:64:9D:C8:9D:9D:75:E8:DD:13' -ForegroundColor DarkGray
-        }
-    }
+    Write-Host '     Upload this .aab to Google Play Console.' -ForegroundColor DarkGray
 }

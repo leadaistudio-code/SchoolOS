@@ -525,8 +525,18 @@ h6 {
   animation: rise-in 240ms ease-out both;
 }
 
-.assistant-header-icon {
-  animation: assistant-orb-speak 3s ease-in-out infinite;
+@keyframes assistant-orb-think {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.02) rotate(3deg);
+  }
+}
+
+.assistant-orb-think {
+  animation: assistant-orb-think 1.5s ease-in-out infinite;
 }
 
 /* ==========================================================================

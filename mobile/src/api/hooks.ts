@@ -142,6 +142,14 @@ export function useAskAssistant() {
   })
 }
 
+export function useAssistantBriefing() {
+  return useQuery({
+    queryKey: ['assistant', 'briefing'],
+    queryFn: () => api.get<T.AssistantBriefing>('/assistant/briefing').then((r) => r.data),
+    staleTime: 60_000,
+  })
+}
+
 /* ---------------------------------------------------------------- parents */
 
 export function useParents(search: string) {

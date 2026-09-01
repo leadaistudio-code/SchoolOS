@@ -1,4 +1,5 @@
 import { route } from '@/server/api/handler'
+import { ok } from '@/server/api/response'
 import { assertFeature } from '@/server/entitlements'
 import { FEATURE } from '@/lib/features'
 import { getAssistantBriefing } from '@/server/assistant/briefing'
@@ -13,7 +14,7 @@ export const GET = route(
   async (_req, ctx) => {
     await assertFeature(ctx.tenant.id, FEATURE.MODULE_AI_ASSIST)
     const briefing = await getAssistantBriefing(ctx)
-    return Response.json(briefing)
+    return ok(briefing)
   },
   { permission: 'assistant.use', rateLimitKey: 'api' },
 )

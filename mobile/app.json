@@ -11,7 +11,11 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mycampusview.app"
+      "bundleIdentifier": "com.mycampusview.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "MyCampusView uses the microphone so you can ask the school assistant by voice.",
+        "NSSpeechRecognitionUsageDescription": "MyCampusView transcribes your speech so the assistant can answer your questions."
+      }
     },
     "android": {
       "package": "com.mycampusview.app",
@@ -27,6 +31,7 @@
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
       ],

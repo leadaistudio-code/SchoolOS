@@ -26,6 +26,10 @@ export type AssistantBriefing = {
     subline: string
   }
   actionItems: AssistantActionItem[]
+  /** Suggested spoken questions derived from today's priorities. */
+  followUpPrompts: string[]
+  /** True when at least one urgent item needs attention. */
+  hasUrgent: boolean
 }
 
 function timeGreeting(hour: number): string {
@@ -52,11 +56,108 @@ function roleTitle(roleKeys: string[]): string {
   return ROLE_BY_KEY.get(first as never)?.name ?? first.replace(/_/g, ' ')
 }
 
-function shortRoleSpoken(title: string): string {
-  if (title === 'Principal') return 'Principal'
-  if (title === 'School Admin') return 'Admin'
-  if (title === 'Platform Super Admin') return 'Admin'
-  return title.split(' ')[0] ?? title
+/** Natural spoken line for urgent items — one flowing sentence, not a list. */
+function spokenUrgentLine(item: AssistantActionItem): string {
+  switch (item.id) {
+    case 'attendance-unmarked':
+      return item.count === 1
+        ? 'one student still is not marked'
+        : `${item.count} students still are not marked`
+    case 'admit-cards':
+      return item.count === 1
+        ? 'one admit card is waiting on you'
+        : `${item.count} admit cards are waiting on you`
+    case 'leave':
+      return item.count === 1
+        ? 'one leave request needs your approval'
+        : `${item.count} leave requests need your approval`
+    case 'fees-overdue':
+      return item.count === 1
+        ? 'one invoice is past due'
+        : `${item.count} invoices are past due`
+    case 'library':
+      return item.count === 1
+        ? 'one library book is overdue'
+        : `${item.count} library books are overdue`
+    case 'admissions':
+      return item.count === 1
+        ? 'one admission follow-up is due today'
+        : `${item.count} admission follow-ups are due today`
+    case 'teacher-fees':
+      return item.count === 1
+        ? 'one overdue invoice in your classes'
+        : `${item.count} overdue invoices in your classes`
+    default:
+      return item.detail.toLowerCase()
+  }
+}
+
+function composeGreeting(options: {
+  time: string
+  honor: string | null
+  firstName: string
+  urgentItems: AssistantActionItem[]
+}): { spoken: string; headline: string; subline: string } {
+  const { time, honor, firstName, urgentItems } = options
+  const address = honor ?? firstName
+  const headline = honor ? `${time}, ${honor}` : `${time}, ${firstName}`
+
+  if (urgentItems.length === 0) {
+    return {
+      spoken: `${time} ${address}. You are all caught up for now. What should we look at?`,
+      headline,
+      subline: 'Nothing urgent on your plate right now.',
+    }
+  }
+
+  const parts = urgentItems.slice(0, 2).map(spokenUrgentLine)
+  let headsUp: string
+  if (parts.length === 1) {
+    headsUp = `Quick heads-up — ${parts[0]}.`
+  } else {
+    headsUp = `Quick heads-up — ${parts[0]}, and ${parts[1]}.`
+  }
+
+  return {
+    spoken: `${time} ${address}. ${headsUp} What would you like to do first?`,
+    headline,
+    subline: 'Here is what needs your attention today.',
+  }
+}
+
+function followUpPromptsFromItems(items: AssistantActionItem[]): string[] {
+  const prompts: string[] = []
+  for (const item of items) {
+    if (!item.urgent || item.count === 0) continue
+    switch (item.id) {
+      case 'attendance-unmarked':
+        prompts.push('Which classes still need attendance marked?')
+        break
+      case 'admit-cards':
+        prompts.push('How many admit cards are pending approval?')
+        break
+      case 'leave':
+        prompts.push('Who has leave waiting for approval?')
+        break
+      case 'fees-overdue':
+        prompts.push('How much fee is overdue?')
+        break
+      case 'library':
+        prompts.push('Which library books are overdue?')
+        break
+      case 'admissions':
+        prompts.push('Which admission leads need a follow-up today?')
+        break
+      case 'teacher-fees':
+        prompts.push('Show me overdue fees in my classes')
+        break
+    }
+    if (prompts.length >= 2) break
+  }
+  if (prompts.length === 0) {
+    prompts.push('What is today\'s attendance?', 'How much fee came in today?')
+  }
+  return prompts.slice(0, 2)
 }
 
 /**
@@ -90,14 +191,8 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
   ])
 
   const title = roleTitle(ctx.user.roleKeys)
-  const spokenRole = shortRoleSpoken(title)
   const honor = honorific(staffGender?.gender)
   const firstName = ctx.user.firstName
-
-  const honorPhrase = honor ? `${time} ${honor}` : `${time}, ${firstName}`
-  const spoken = `Hi ${spokenRole}. ${honorPhrase}. How can I help you today?`
-  const headline = honor ? `${time}, ${honor}` : `${time}, ${firstName}`
-  const subline = 'Here are your top priorities for today.'
 
   const attendanceMap = Object.fromEntries(
     attendanceToday.map((row) => [row.status, row._count._all]),
@@ -303,6 +398,9 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
   })
 
   const actionItems = sorted.slice(0, 3)
+  const urgentItems = sorted.filter((item) => item.urgent && item.count > 0)
+  const greetingCopy = composeGreeting({ time, honor, firstName, urgentItems })
+  const followUpPrompts = followUpPromptsFromItems(actionItems)
 
   return {
     greeting: {
@@ -310,13 +408,12 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
       timeGreeting: time,
       honorific: honor,
       firstName,
-      spoken,
-      headline,
-      subline:
-        actionItems.some((item) => item.urgent)
-          ? 'Here are the top three things that need your attention today.'
-          : subline,
+      spoken: greetingCopy.spoken,
+      headline: greetingCopy.headline,
+      subline: greetingCopy.subline,
     },
     actionItems,
+    followUpPrompts,
+    hasUrgent: urgentItems.length > 0,
   }
 }

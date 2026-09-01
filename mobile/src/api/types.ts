@@ -171,6 +171,29 @@ export type AssistantReply = {
   pendingAction?: { id: string; summary: string } | null
 }
 
+export type AssistantBriefing = {
+  greeting: {
+    roleTitle: string
+    timeGreeting: string
+    honorific: string | null
+    firstName: string
+    spoken: string
+    headline: string
+    subline: string
+  }
+  actionItems: Array<{
+    id: string
+    label: string
+    detail: string
+    count: number
+    href: string
+    icon: string
+    urgent: boolean
+  }>
+  followUpPrompts: string[]
+  hasUrgent: boolean
+}
+
 /* ---------------------------------------------------------------- parents */
 
 export type Parent = {
