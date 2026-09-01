@@ -9,17 +9,26 @@ import { speak, stopSpeaking } from './speech'
 import type { AssistantActionItem, AssistantBriefing } from '@/server/assistant/briefing'
 import type { VoiceSessionPhase } from './use-voice-session'
 
-function AssistantOrb({ phase }: { phase: VoiceSessionPhase }) {
+function AssistantOrb({
+  phase,
+  speechActive,
+}: {
+  phase: VoiceSessionPhase
+  speechActive?: boolean
+}) {
   const speaking = phase === 'speaking'
   const listening = phase === 'listening'
   const thinking = phase === 'processing'
+  const active = listening || speaking || speechActive
 
   return (
     <div className="relative mx-auto size-20" aria-hidden>
       <span
         className={cn(
           'absolute inset-0 rounded-full bg-gradient-to-br from-[var(--product-400)] via-[var(--product-600)] to-[var(--chart-admissions)] opacity-80 blur-md transition-opacity',
-          (speaking || listening || thinking) && 'opacity-100 animate-pulse',
+          active && 'opacity-100',
+          speechActive && 'assistant-orb-speak scale-110',
+          (listening || thinking) && !speechActive && 'animate-pulse',
         )}
       />
       <span
@@ -111,6 +120,7 @@ export function AssistantWelcome({
   voicePhase,
   liveTranscript,
   greetingDone,
+  speechActive,
   onGreetingDone,
   onSuggestion,
   onToggleVoiceGreeting,
@@ -124,6 +134,7 @@ export function AssistantWelcome({
   voicePhase: VoiceSessionPhase
   liveTranscript: string
   greetingDone: boolean
+  speechActive?: boolean
   onGreetingDone: () => void
   onSuggestion: (text: string) => void
   onToggleVoiceGreeting: () => void
@@ -208,7 +219,7 @@ export function AssistantWelcome({
   if (loading) {
     return (
       <div className="assistant-welcome flex flex-col items-center px-2 py-8 text-center">
-        <AssistantOrb phase="processing" />
+        <AssistantOrb phase="processing" speechActive={false} />
         <p className="mt-5 text-sm text-ink-muted">Getting your briefing ready…</p>
       </div>
     )
@@ -228,7 +239,10 @@ export function AssistantWelcome({
     <div className="assistant-welcome space-y-5">
       <div className="relative overflow-hidden rounded-[16px] border border-line bg-gradient-to-br from-[color-mix(in_srgb,var(--product-500)_12%,var(--surface))] via-surface to-[color-mix(in_srgb,var(--chart-admissions)_10%,var(--surface))] px-4 py-5">
         <div className="relative flex flex-col items-center text-center">
-          <AssistantOrb phase={voicePhase === 'idle' && handsfree ? 'listening' : voicePhase} />
+          <AssistantOrb
+            phase={voicePhase === 'idle' && handsfree ? 'listening' : voicePhase}
+            speechActive={speechActive}
+          />
           <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--product-600)]">
             Campus Assistant
           </p>

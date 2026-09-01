@@ -10,6 +10,12 @@ const TOOL_ACTIVITY: Record<string, string> = {
   list_classes: 'Fetching your classes',
   faculty_readiness: 'Checking faculty readiness',
   draft_notice: 'Drafting that notice for you',
+  attendance_compare: 'Comparing attendance weeks',
+  fees_compare: 'Comparing fee collections',
+  pending_leave: 'Checking pending leave',
+  draft_fee_reminder: 'Preparing a fee reminder',
+  draft_attendance_nudge: 'Preparing an attendance nudge',
+  draft_leave_approvals: 'Preparing leave approvals',
 }
 
 export function activityForTool(toolName: string): string {
@@ -28,6 +34,8 @@ export function activityForLabel(label: string): string {
     'Classes and sections': TOOL_ACTIVITY.list_classes!,
     'Faculty readiness': TOOL_ACTIVITY.faculty_readiness!,
     'Notice draft': TOOL_ACTIVITY.draft_notice!,
+    'Comparing attendance weeks': TOOL_ACTIVITY.attendance_compare!,
+    'Comparing fee collections': TOOL_ACTIVITY.fees_compare!,
     Records: 'Just a moment',
   }
   return byLabel[label] ?? 'Just a moment'

@@ -539,6 +539,16 @@ h6 {
   animation: assistant-orb-think 1.5s ease-in-out infinite;
 }
 
+.assistant-floating-mic-active {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--product-500) 25%, transparent),
+    var(--shadow-pop, 0 8px 24px rgb(0 0 0 / 0.12));
+}
+
+.assistant-morning {
+  animation: assistant-fade-up 360ms ease-out both;
+}
+
 /* ==========================================================================
    BRAND MARK MOTION
    --------------------------------------------------------------------------

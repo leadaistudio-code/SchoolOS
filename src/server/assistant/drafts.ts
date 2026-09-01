@@ -3,6 +3,7 @@ import { randomToken } from '@/server/crypto'
 import { prisma } from '@/server/db/prisma'
 import type { AppContext } from '@/server/context'
 import { createNotice, noticeCreateSchema } from '@/server/modules/notices/service'
+import { decideLeave } from '@/server/modules/leave/service'
 import { audit } from '@/server/audit'
 import { ApiException } from '@/server/api/response'
 
@@ -14,14 +15,6 @@ import { ApiException } from '@/server/api/response'
  * instructions in a prompt: `tools.ts` can only *return* a draft, and the write
  * happens here, in a function the model cannot call, from an HTTP request the
  * user's own click produced.
- *
- * The consequence worth stating plainly: no misread question, and no instruction
- * smuggled into a student record, can send a message to parents. The worst it
- * can do is put a draft in front of somebody, who then declines it.
- *
- * Drafts are stored as `Job` rows on the `assistant` queue — the same durable
- * mechanism the demo form uses. They carry the user and tenant that created
- * them, are single-use, and expire.
  */
 
 const TTL_MINUTES = 30
@@ -38,15 +31,17 @@ const noticeDraftSchema = z.object({
   classLevelId: z.string().optional(),
 })
 
-export type StoredDraft = { kind: 'notice'; summary: string; payload: unknown }
+const leaveApprovalsSchema = z.object({
+  leaveRequestIds: z.array(z.string().min(8)).min(1).max(10),
+  decisionNote: z.string().max(500).optional(),
+})
 
-/**
- * Records a draft and returns its id.
- *
- * The id is a random token, not the row id: it is handed to a browser, and a
- * guessable identifier for "an action somebody may approve" is worth avoiding
- * even though the confirm route checks ownership anyway.
- */
+export type StoredDraft = {
+  kind: 'notice' | 'fee_reminder' | 'attendance_nudge' | 'leave_approvals'
+  summary: string
+  payload: unknown
+}
+
 export async function storeDraft(ctx: AppContext, draft: StoredDraft): Promise<string> {
   const draftId = randomToken(24)
 
@@ -71,16 +66,22 @@ export async function storeDraft(ctx: AppContext, draft: StoredDraft): Promise<s
   return draftId
 }
 
-/**
- * Executes a draft the user has approved.
- *
- * Every check is made again here, at the moment of the write: that the draft
- * exists, that it belongs to this school, that the person approving it is the
- * person it was drafted for, that it has not expired, that it has not already
- * run, and that they still hold the permission. None of that is inferred from
- * the earlier conversation — a permission could have been revoked since, and the
- * approval is the only moment that matters.
- */
+async function publishNoticeDraft(ctx: AppContext, input: z.infer<typeof noticeDraftSchema>) {
+  return createNotice(
+    ctx,
+    noticeCreateSchema.parse({
+      title: input.title,
+      body: input.body,
+      priority: 'NORMAL',
+      audienceKind: input.audienceKind,
+      ...(input.audienceKind === 'CLASS' ? { classLevelId: input.classLevelId } : {}),
+      isPublished: true,
+      notifyNow: true,
+      pinned: false,
+    }),
+  )
+}
+
 export async function confirmDraft(ctx: AppContext, draftId: string) {
   const jobs = await prisma.job.findMany({
     where: { tenantId: ctx.tenant.id, queue: 'assistant', name: 'assistant.draft' },
@@ -109,58 +110,56 @@ export async function confirmDraft(ctx: AppContext, draftId: string) {
     throw new ApiException(409, 'CONFLICT', 'That draft has already been sent.')
   }
   if (payload.createdBy !== ctx.user.userId) {
-    // A draft belongs to the person it was drafted for. Another administrator
-    // approving somebody else's drafted message is not an approval.
     throw new ApiException(403, 'FORBIDDEN', 'That draft was prepared for someone else.')
   }
   if (new Date(payload.expiresAt).getTime() < Date.now()) {
     throw new ApiException(410, 'GONE', 'That draft has expired. Ask again and I will prepare a fresh one.')
   }
 
-  if (payload.kind !== 'notice') {
+  let result: { noticeId?: string; title?: string; approvedLeave?: number }
+
+  if (
+    payload.kind === 'notice' ||
+    payload.kind === 'fee_reminder' ||
+    payload.kind === 'attendance_nudge'
+  ) {
+    const input = noticeDraftSchema.parse(payload.input)
+    const notice = await publishNoticeDraft(ctx, input)
+    result = { noticeId: notice.id, title: input.title }
+  } else if (payload.kind === 'leave_approvals') {
+    const input = leaveApprovalsSchema.parse(payload.input)
+    let approved = 0
+    for (const id of input.leaveRequestIds) {
+      await decideLeave(ctx, id, {
+        status: 'APPROVED',
+        decisionNote: input.decisionNote ?? 'Approved via Campus Assistant',
+      })
+      approved += 1
+    }
+    result = { approvedLeave: approved }
+  } else {
     throw new ApiException(400, 'BAD_REQUEST', `Unknown draft type: ${payload.kind}`)
   }
-
-  const input = noticeDraftSchema.parse(payload.input)
-
-  // `createNotice` asserts `notices.create` itself and writes its own audit
-  // entry. This is a plain call to the same function the notice screen uses.
-  const notice = await createNotice(
-    ctx,
-    noticeCreateSchema.parse({
-      title: input.title,
-      body: input.body,
-      priority: 'NORMAL',
-      audienceKind: input.audienceKind,
-      ...(input.audienceKind === 'CLASS' ? { classLevelId: input.classLevelId } : {}),
-      isPublished: true,
-      notifyNow: true,
-      pinned: false,
-    }),
-  )
 
   await prisma.job.update({
     where: { id: row.id },
     data: {
-      payload: { ...payload, draftId, executedAt: new Date().toISOString(), noticeId: notice.id } as never,
+      payload: { ...payload, draftId, executedAt: new Date().toISOString(), result } as never,
       status: 'SUCCEEDED',
     },
   })
 
-  // Audited separately from `notice.create`, because the reviewable fact is not
-  // just that a notice exists — it is that the assistant drafted it and a named
-  // person approved it.
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
     actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
     action: 'assistant.draft.approved',
     module: 'assistant',
-    entityType: 'Notice',
-    entityId: notice.id,
-    summary: `Approved an assistant-drafted notice: ${payload.summary}`,
-    after: { draftId, title: input.title, audience: input.audienceKind },
+    entityType: payload.kind === 'leave_approvals' ? 'LeaveRequest' : 'Notice',
+    entityId: result.noticeId ?? draftId,
+    summary: `Approved an assistant draft: ${payload.summary}`,
+    after: { draftId, kind: payload.kind, ...result },
   })
 
-  return { noticeId: notice.id, title: input.title }
+  return result
 }

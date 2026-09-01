@@ -61,6 +61,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
 
   const [phase, setPhase] = React.useState<VoiceSessionPhase>('idle')
   const [liveTranscript, setLiveTranscript] = React.useState('')
+  const [speechActive, setSpeechActive] = React.useState(false)
   const sessionActiveRef = React.useRef(false)
   const phaseRef = React.useRef<VoiceSessionPhase>('idle')
 
@@ -159,6 +160,8 @@ export function useVoiceSession(options: VoiceSessionOptions) {
           }
 
           if (!preview) return
+
+          setSpeechActive(true)
 
           // Barge-in: user started talking over the assistant.
           if (bargeInModeRef.current && phaseRef.current === 'speaking') {
@@ -316,6 +319,7 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   return {
     phase,
     liveTranscript,
+    speechActive,
     beginSession,
     endSession,
     speakAnswer,

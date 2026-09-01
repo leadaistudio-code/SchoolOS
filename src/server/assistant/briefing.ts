@@ -125,7 +125,30 @@ function composeGreeting(options: {
   }
 }
 
-function followUpPromptsFromItems(items: AssistantActionItem[]): string[] {
+function roleDefaultPrompts(roleKeys: string[]): string[] {
+  const keys = new Set(roleKeys)
+  if (keys.has('PRINCIPAL') || keys.has('SCHOOL_ADMIN')) {
+    return ['Give me today\'s school overview', 'How does this week\'s attendance compare to last week?']
+  }
+  if (keys.has('ACCOUNTANT')) {
+    return ['How much fee came in today?', 'Compare this week\'s collections to last week']
+  }
+  if (keys.has('TEACHER')) {
+    return ['Whose attendance is missing in my class?', 'What homework is due today?']
+  }
+  if (keys.has('FRONT_DESK')) {
+    return ['Any admission follow-ups due today?', 'Who has leave waiting?']
+  }
+  if (keys.has('HR')) {
+    return ['How many staff are in today?', 'Any leave requests pending?']
+  }
+  return ['What is today\'s attendance?', 'How much fee came in today?']
+}
+
+function followUpPromptsFromItems(
+  items: AssistantActionItem[],
+  roleKeys: string[],
+): string[] {
   const prompts: string[] = []
   for (const item of items) {
     if (!item.urgent || item.count === 0) continue
@@ -155,7 +178,7 @@ function followUpPromptsFromItems(items: AssistantActionItem[]): string[] {
     if (prompts.length >= 2) break
   }
   if (prompts.length === 0) {
-    prompts.push('What is today\'s attendance?', 'How much fee came in today?')
+    return roleDefaultPrompts(roleKeys).slice(0, 2)
   }
   return prompts.slice(0, 2)
 }
@@ -400,7 +423,7 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
   const actionItems = sorted.slice(0, 3)
   const urgentItems = sorted.filter((item) => item.urgent && item.count > 0)
   const greetingCopy = composeGreeting({ time, honor, firstName, urgentItems })
-  const followUpPrompts = followUpPromptsFromItems(actionItems)
+  const followUpPrompts = followUpPromptsFromItems(actionItems, ctx.user.roleKeys)
 
   return {
     greeting: {

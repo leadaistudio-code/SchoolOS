@@ -1,5 +1,7 @@
 'use client'
 
+import { formatForSpeech } from '@/lib/spoken-format'
+
 /**
  * Voice input and output for the campus assistant.
  *
@@ -87,11 +89,13 @@ export function speak(text: string, options: SpeakOptions | string = 'en-IN'): (
 
   window.speechSynthesis.cancel()
 
-  const cleaned = text
-    .replace(/\*\*/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\n{2,}/g, '. ')
-    .trim()
+  const cleaned = formatForSpeech(
+    text
+      .replace(/\*\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\n{2,}/g, '. ')
+      .trim(),
+  )
 
   if (!cleaned) {
     opts.onEnd?.()

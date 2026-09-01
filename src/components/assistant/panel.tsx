@@ -25,6 +25,8 @@ import {
 } from '@/lib/speech-languages'
 import { activityForLabel } from './activity-messages'
 import { AssistantWelcome } from './welcome'
+import { MorningBriefingPrompt } from './morning-briefing'
+import { AssistantFloatingMic } from './floating-mic'
 import {
   readHandsfreePreference,
   useVoiceSession,
@@ -65,6 +67,7 @@ export function AssistantPanel({
   const [voiceGreeting, setVoiceGreeting] = React.useState(true)
   const [greetingDone, setGreetingDone] = React.useState(false)
   const [sessionKey, setSessionKey] = React.useState(0)
+  const [offline, setOffline] = React.useState(false)
 
   const stopManualListen = React.useRef<(() => void) | null>(null)
   const scroller = React.useRef<HTMLDivElement>(null)
@@ -156,6 +159,7 @@ export function AssistantPanel({
         if (!cancelled) {
           setBriefing(null)
           setGreetingDone(true)
+          setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
         }
       })
       .finally(() => {
@@ -415,12 +419,23 @@ export function AssistantPanel({
               voicePhase={voicePhase}
               liveTranscript={voice.liveTranscript}
               greetingDone={greetingDone}
+              speechActive={voice.speechActive}
               onGreetingDone={handleGreetingDone}
               onSuggestion={(text) => void askRef.current(text)}
               onToggleVoiceGreeting={() => setVoiceGreeting((v) => !v)}
               voiceGreetingEnabled={voiceGreeting}
               sessionKey={sessionKey}
             />
+          ) : null}
+
+          {offline && turns.length === 0 ? (
+            <div className="rounded-[14px] border border-[var(--warning)]/40 bg-[var(--warning-bg)] px-4 py-4 text-sm text-ink">
+              <p className="font-medium text-ink">You are offline</p>
+              <p className="mt-1 text-ink-muted">
+                I cannot reach the school server right now, so I cannot answer live questions. Check
+                your connection, or open attendance and fees from the menu directly.
+              </p>
+            </div>
           ) : null}
 
           {turns.map((turn, index) => (
@@ -462,7 +477,7 @@ export function AssistantPanel({
                         <div className="mt-3 flex gap-2">
                           <Button size="sm" onClick={() => void approve(draft, index)}>
                             <Check className="size-3.5" aria-hidden />
-                            Send it
+                            {draft.kind === 'leave_approvals' ? 'Approve' : 'Send it'}
                           </Button>
                           <Button
                             size="sm"
@@ -627,6 +642,11 @@ export function AssistantPanel({
 export function AssistantLauncher({ schoolName }: { schoolName: string }) {
   const [open, setOpen] = React.useState(false)
   const [hasUrgent, setHasUrgent] = React.useState(false)
+  const [handsfree, setHandsfree] = React.useState(true)
+
+  React.useEffect(() => {
+    setHandsfree(readHandsfreePreference())
+  }, [open])
 
   React.useEffect(() => {
     let cancelled = false
@@ -688,6 +708,22 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
         </kbd>
       </button>
       <AssistantPanel open={open} onClose={() => setOpen(false)} schoolName={schoolName} />
+      <MorningBriefingPrompt
+        onOpenAssistant={() => {
+          void primeMicrophone()
+          setOpen(true)
+        }}
+      />
+      <AssistantFloatingMic
+        open={open}
+        handsfree={handsfree}
+        phase="idle"
+        speechActive={false}
+        onOpen={() => {
+          void primeMicrophone()
+          setOpen(true)
+        }}
+      />
     </>
   )
 }
