@@ -173,12 +173,13 @@ export function listen(options: {
       'not-allowed':
         'Microphone access was refused. Allow the microphone for this site — in Chrome, the icon at the right of the address bar.',
       'service-not-allowed': 'Microphone access was blocked by your browser or your school network.',
-      'no-speech': 'I did not catch anything. Try again, or type it.',
+      'no-speech': '',
       network: 'Speech recognition needs a network connection.',
       aborted: '',
     }
     const message = messages[event.error] ?? 'The microphone stopped working. Try typing instead.'
     if (message) options.onError(message)
+    else options.onEnd()
   }
 
   recognition.onend = options.onEnd

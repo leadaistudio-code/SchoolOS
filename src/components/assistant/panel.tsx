@@ -172,7 +172,7 @@ export function AssistantPanel({
 
     stopManualListen.current?.()
     setManualListening(false)
-    voice.interrupt()
+    voice.pauseForProcessing()
     setQuestion('')
     setNotice(null)
     setBusy(true)
@@ -276,7 +276,7 @@ export function AssistantPanel({
     if (answer && handsfree && canSpeak) {
       speakAnswerRef.current(answer)
     } else if (handsfree && canSpeak && greetingDone) {
-      voice.beginSession()
+      voice.resumeListening()
     }
     return answer
   }
@@ -523,6 +523,7 @@ export function AssistantPanel({
 
           {handsfree && voice.liveTranscript && turns.length > 0 ? (
             <p className="text-sm italic text-ink-muted" aria-live="polite">
+              {voicePhase === 'speaking' ? 'Interrupting: ' : ''}
               {voice.liveTranscript}
             </p>
           ) : null}
@@ -611,7 +612,7 @@ export function AssistantPanel({
           <p className="mt-2 px-1 text-[11px] leading-snug text-ink-subtle">
             {canSpeak
               ? handsfree
-                ? 'Handsfree mode: speak your question, hear the answer, then speak again. Say "stop" or "thank you" to end. Voice is transcribed by your browser. '
+                ? 'Handsfree mode: speak your question, hear the answer, then speak again — you can interrupt while it is speaking. Say "stop" or "thank you" to end. Voice is transcribed by your browser. '
                 : 'Voice uses your browser\'s speech recognition. '
               : 'Voice input needs Chrome or Edge. '}
             Answers link to the record they came from — always worth checking.

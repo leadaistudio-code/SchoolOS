@@ -200,7 +200,7 @@ export function AssistantWelcome({
       : voicePhase === 'processing'
         ? 'Just a moment…'
         : voicePhase === 'speaking'
-          ? 'Speaking…'
+          ? 'Speaking… (talk anytime to interrupt)'
           : handsfree && greetingDone
             ? 'Say something, or tap the mic'
             : null
