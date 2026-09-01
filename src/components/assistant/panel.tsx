@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button, IconButton } from '@/components/ui/button'
-import { listen, speak, speechSupported, stopSpeaking } from './speech'
+import { listen, speak, speechSupported, stopSpeaking, primeMicrophone } from './speech'
 import { parseAgentEvent } from '@/lib/assistant-events'
 import {
   DEFAULT_SPEECH_LANGUAGE,
@@ -64,6 +64,7 @@ export function AssistantPanel({
   const [handsfree, setHandsfree] = React.useState(true)
   const [voiceGreeting, setVoiceGreeting] = React.useState(true)
   const [greetingDone, setGreetingDone] = React.useState(false)
+  const [sessionKey, setSessionKey] = React.useState(0)
 
   const stopManualListen = React.useRef<(() => void) | null>(null)
   const scroller = React.useRef<HTMLDivElement>(null)
@@ -124,6 +125,7 @@ export function AssistantPanel({
   React.useEffect(() => {
     if (open) {
       setGreetingDone(false)
+      setSessionKey((key) => key + 1)
       if (handsfree && canSpeak) voice.beginSession()
     } else {
       voice.endSession()
@@ -417,6 +419,7 @@ export function AssistantPanel({
               onSuggestion={(text) => void askRef.current(text)}
               onToggleVoiceGreeting={() => setVoiceGreeting((v) => !v)}
               voiceGreetingEnabled={voiceGreeting}
+              sessionKey={sessionKey}
             />
           ) : null}
 
@@ -645,6 +648,7 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
+        void primeMicrophone()
         setOpen((current) => !current)
       }
       if (event.key === 'Escape') setOpen(false)
@@ -657,7 +661,10 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          void primeMicrophone()
+          setOpen(true)
+        }}
         className={cn(
           'assistant-launcher relative inline-flex items-center gap-1.5 rounded-[10px] border border-line px-2.5 py-1.5',
           'text-xs font-medium text-ink-muted transition-all hover:border-[var(--product-400)] hover:bg-[color-mix(in_srgb,var(--product-500)_8%,var(--surface))] hover:text-ink',

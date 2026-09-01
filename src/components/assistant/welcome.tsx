@@ -115,6 +115,7 @@ export function AssistantWelcome({
   onSuggestion,
   onToggleVoiceGreeting,
   voiceGreetingEnabled,
+  sessionKey,
 }: {
   loading: boolean
   briefing: AssistantBriefing | null
@@ -127,10 +128,16 @@ export function AssistantWelcome({
   onSuggestion: (text: string) => void
   onToggleVoiceGreeting: () => void
   voiceGreetingEnabled: boolean
+  /** Changes when the panel reopens so greeting state resets. */
+  sessionKey: number
 }) {
   const [typedHeadline, setTypedHeadline] = React.useState('')
   const [typingDone, setTypingDone] = React.useState(false)
   const spokenRef = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    spokenRef.current = null
+  }, [sessionKey])
 
   React.useEffect(() => {
     if (loading) return
@@ -163,7 +170,10 @@ export function AssistantWelcome({
       onGreetingDone()
       return
     }
-    if (spokenRef.current === briefing.greeting.spoken) return
+    if (spokenRef.current === briefing.greeting.spoken) {
+      onGreetingDone()
+      return
+    }
     spokenRef.current = briefing.greeting.spoken
 
     stopSpeaking()

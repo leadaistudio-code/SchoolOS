@@ -57,23 +57,27 @@ export function useVoiceSession(options: VoiceSessionOptions) {
   const sessionActiveRef = React.useRef(false)
   const phaseRef = React.useRef<VoiceSessionPhase>('idle')
 
-  const setPhaseSafe = React.useCallback(
-    (next: VoiceSessionPhase) => {
-      phaseRef.current = next
-      setPhase(next)
-      options.onPhaseChange?.(next)
-    },
-    [options],
-  )
+  // Keep latest callbacks without re-creating listeners every parent render.
+  const optionsRef = React.useRef(options)
+  optionsRef.current = options
+
+  const setPhaseSafe = React.useCallback((next: VoiceSessionPhase) => {
+    phaseRef.current = next
+    setPhase(next)
+    optionsRef.current.onPhaseChange?.(next)
+  }, [])
 
   const stopListening = React.useCallback(() => {
     stopListenRef.current?.()
     stopListenRef.current = null
   }, [])
 
+  const startListeningRef = React.useRef<() => void>(() => {})
+
   const startListening = React.useCallback(() => {
-    if (!options.enabled || !options.active || !speechSupported()) return
-    if (options.busy || !options.greetingDone) return
+    const opts = optionsRef.current
+    if (!opts.enabled || !opts.active || !speechSupported()) return
+    if (opts.busy || !opts.greetingDone) return
     if (!sessionActiveRef.current) return
 
     stopListening()
@@ -82,9 +86,10 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     setPhaseSafe('listening')
 
     stopListenRef.current = listen({
-      lang: options.language,
+      lang: opts.language,
       continuous: true,
       onResult: ({ transcript, final }) => {
+        const current = optionsRef.current
         if (final) {
           const trimmed = transcript.trim()
           setLiveTranscript('')
@@ -96,49 +101,55 @@ export function useVoiceSession(options: VoiceSessionOptions) {
           if (isStopPhrase(trimmed)) {
             sessionActiveRef.current = false
             setPhaseSafe('idle')
-            options.onStopSession()
-            speak('Alright. I am here whenever you need me.', { lang: options.language })
+            current.onStopSession()
+            speak('Alright. I am here whenever you need me.', { lang: current.language })
             return
           }
           setPhaseSafe('processing')
-          options.onQuestion(trimmed)
+          current.onQuestion(trimmed)
         } else {
           setLiveTranscript(transcript)
-          options.onTranscript(transcript)
+          current.onTranscript(transcript)
         }
       },
       onError: (message) => {
-        options.onError?.(message)
-        setPhaseSafe('idle')
+        optionsRef.current.onError?.(message)
+        // Chrome often blocks mic without a fresh user gesture — retry once after a beat.
+        if (sessionActiveRef.current && optionsRef.current.greetingDone && !optionsRef.current.busy) {
+          window.setTimeout(() => startListeningRef.current(), 600)
+        } else {
+          setPhaseSafe('idle')
+        }
       },
       onEnd: () => {
+        const current = optionsRef.current
         if (
           sessionActiveRef.current &&
-          !options.busy &&
-          options.greetingDone &&
+          !current.busy &&
+          current.greetingDone &&
           phaseRef.current === 'listening'
         ) {
           window.setTimeout(() => startListeningRef.current(), 300)
         }
       },
     })
-  }, [options, setPhaseSafe, stopListening])
+  }, [setPhaseSafe, stopListening])
 
-  const startListeningRef = React.useRef(startListening)
   startListeningRef.current = startListening
 
   const speakAnswer = React.useCallback(
     (text: string) => {
-      if (!options.enabled || !text.trim()) {
+      const opts = optionsRef.current
+      if (!opts.enabled || !text.trim()) {
         startListeningRef.current()
         return
       }
       stopListening()
       setPhaseSafe('speaking')
       stopSpeakRef.current = speak(text, {
-        lang: options.language,
+        lang: opts.language,
         onEnd: () => {
-          if (sessionActiveRef.current && options.enabled) {
+          if (sessionActiveRef.current && optionsRef.current.enabled) {
             setPhaseSafe('listening')
             startListeningRef.current()
           } else {
@@ -147,17 +158,18 @@ export function useVoiceSession(options: VoiceSessionOptions) {
         },
       })
     },
-    [options.enabled, options.language, setPhaseSafe, stopListening],
+    [setPhaseSafe, stopListening],
   )
 
   const beginSession = React.useCallback(() => {
-    if (!options.enabled || !speechSupported()) return
+    const opts = optionsRef.current
+    if (!opts.enabled || !speechSupported()) return
     sessionActiveRef.current = true
     preloadVoices()
-    if (options.greetingDone && !options.busy) {
+    if (opts.greetingDone && !opts.busy) {
       startListeningRef.current()
     }
-  }, [options.enabled, options.greetingDone, options.busy])
+  }, [])
 
   const endSession = React.useCallback(() => {
     sessionActiveRef.current = false
@@ -176,20 +188,25 @@ export function useVoiceSession(options: VoiceSessionOptions) {
     }
   }, [])
 
+  // Start listening when greeting finishes or panel becomes ready.
   React.useEffect(() => {
-    if (!options.active) {
+    const opts = optionsRef.current
+    if (!opts.active) {
       endSession()
       return
     }
-    if (!options.enabled) {
+    if (!opts.enabled) {
       setPhaseSafe('idle')
       return
     }
-    if (options.greetingDone && !options.busy && sessionActiveRef.current && phaseRef.current === 'idle') {
-      startListeningRef.current()
+    if (opts.greetingDone && !opts.busy && sessionActiveRef.current) {
+      if (phaseRef.current === 'idle' || phaseRef.current === 'speaking') {
+        startListeningRef.current()
+      }
     }
   }, [options.active, options.enabled, options.greetingDone, options.busy, endSession, setPhaseSafe])
 
+  // Tear down only on unmount — not when callback identities change.
   React.useEffect(() => () => endSession(), [endSession])
 
   return {

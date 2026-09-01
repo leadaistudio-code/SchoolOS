@@ -117,6 +117,21 @@ export function stopSpeaking() {
   window.speechSynthesis.cancel()
 }
 
+/**
+ * Request microphone access while a user gesture is still active (panel open click).
+ * Browsers block SpeechRecognition.start() without permission / gesture.
+ */
+export async function primeMicrophone(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return false
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    for (const track of stream.getTracks()) track.stop()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function listen(options: {
   lang?: string
   continuous?: boolean
