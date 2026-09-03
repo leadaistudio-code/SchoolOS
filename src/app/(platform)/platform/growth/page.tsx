@@ -5,11 +5,12 @@ import { parseListQuery } from '@/lib/query'
 import { dashboard, listFollowUps, listSchools } from '@/server/modules/platform/growth/service'
 import { schoolListFilterSchema } from '@/server/modules/platform/growth/schema'
 import { PageHeader } from '@/components/page-header'
-import { Metric, MetricRow } from '@/components/ui/metric'
+import { ColorTile } from '@/components/dashboard/color-tiles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
+import type { SeriesKey } from '@/lib/chart-tones'
 import { formatMoney, formatNumber } from '@/lib/utils'
 import { STAGE_LABELS, STALE_DAYS, type CrmStage } from '@/lib/growth-crm'
 import { completeFollowUpAction } from './actions'
@@ -59,62 +60,104 @@ export default async function GrowthDashboardPage() {
         }
       />
 
-      <MetricRow>
-        <Metric
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ColorTile
+          href="/platform/growth/schools"
+          tone="admissions"
           label="Prospects"
           value={formatNumber(k.total)}
-          sub={`${formatNumber(k.newThisMonth)} new this month`}
-          href="/platform/growth/schools"
-          trend={
+          sub={
             k.newPrevMonth > 0
-              ? {
-                  value: Math.round(((k.newThisMonth - k.newPrevMonth) / k.newPrevMonth) * 100),
-                  label: 'new vs last month',
-                }
-              : undefined
+              ? `${formatNumber(k.newThisMonth)} new · ${Math.round(((k.newThisMonth - k.newPrevMonth) / k.newPrevMonth) * 100)}% vs last month`
+              : `${formatNumber(k.newThisMonth)} new this month`
           }
+          delayMs={0}
         />
-        <Metric
+        <ColorTile
+          href="/platform/growth/today"
+          tone={k.followUpsOverdue > 0 ? 'overdue' : 'attendance'}
           label="Follow-ups today"
           value={formatNumber(k.followUpsToday)}
           sub={`${formatNumber(k.followUpsOverdue)} overdue`}
-          emphasis={k.followUpsOverdue > 0 ? 'danger' : undefined}
+          delayMs={40}
         />
-        <Metric
+        <ColorTile
+          href="/platform/growth/pipeline"
+          tone="fees"
           label="Pipeline"
           value={formatMoney(k.pipelineValue)}
           sub={`${formatMoney(k.weighted)} weighted`}
-          href="/platform/growth/pipeline"
+          delayMs={80}
         />
-        <Metric
+        <ColorTile
+          href="/platform/growth/schools?stage=WON"
+          tone="attendance"
           label="Won"
           value={formatNumber(k.won)}
           sub={k.conversion !== null ? `${k.conversion}% of decided` : `${formatNumber(k.lost)} lost`}
-          emphasis={k.won > 0 ? 'success' : undefined}
+          delayMs={120}
         />
-      </MetricRow>
+      </div>
 
-      <MetricRow>
-        <Metric label="Contacted" value={formatNumber(k.contacted)} href="/platform/growth/schools?stage=CONTACTED" />
-        <Metric label="Visits logged" value={formatNumber(k.visits)} />
-        <Metric
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <Kpi
+          href="/platform/growth/schools?stage=CONTACTED"
+          label="Contacted"
+          value={formatNumber(k.contacted)}
+          tone="parents"
+          delayMs={160}
+        />
+        <Kpi label="Visits logged" value={formatNumber(k.visits)} tone="transport" delayMs={200} />
+        <Kpi
+          href="/platform/growth/schools?stage=MEETING_SCHEDULED"
           label="Meetings scheduled"
           value={formatNumber(k.meetings)}
-          href="/platform/growth/schools?stage=MEETING_SCHEDULED"
+          tone="staff"
+          delayMs={240}
         />
-        <Metric
+        <Kpi
+          href="/platform/growth/pipeline"
           label="Expected ARR"
           value={formatMoney(k.expectedArr)}
           sub={`${formatMoney(k.wonArr)} won ARR`}
+          tone="fees"
+          delayMs={280}
         />
-      </MetricRow>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi href="/platform/growth/today" label="Meetings today" value={k.meetingsToday} />
-        <Kpi href="/platform/growth/today" label="Open tasks" value={k.tasksOpen} warn={k.tasksOpen > 0} />
-        <Kpi href="/platform/growth/templates" label="Messages sent" value={k.messagesSent} />
-        <Kpi href="/platform/growth/schools?noNextAction=on" label="No next action" value={k.noNext} warn={k.noNext > 0} />
-        <Kpi href={`/platform/growth/schools?stale=on`} label={`${STALE_DAYS}+ days silent`} value={k.stale} warn={k.stale > 0} />
+        <Kpi
+          href="/platform/growth/today"
+          label="Meetings today"
+          value={formatNumber(k.meetingsToday)}
+          tone="attendance"
+          delayMs={320}
+        />
+        <Kpi
+          href="/platform/growth/today"
+          label="Open tasks"
+          value={formatNumber(k.tasksOpen)}
+          tone={k.tasksOpen > 0 ? 'pending' : 'leave'}
+          delayMs={360}
+        />
+        <Kpi
+          href="/platform/growth/templates"
+          label="Messages sent"
+          value={formatNumber(k.messagesSent)}
+          tone="late"
+          delayMs={400}
+        />
+        <Kpi
+          href="/platform/growth/schools?noNextAction=on"
+          label="No next action"
+          value={formatNumber(k.noNext)}
+          tone={k.noNext > 0 ? 'overdue' : 'leave'}
+          delayMs={440}
+        />
+        <Kpi
+          href="/platform/growth/schools?stale=on"
+          label={`${STALE_DAYS}+ days silent`}
+          value={formatNumber(k.stale)}
+          tone={k.stale > 0 ? 'overdue' : 'pending'}
+          delayMs={480}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -201,18 +244,22 @@ export default async function GrowthDashboardPage() {
   )
 }
 
-function Kpi({ href, label, value, warn }: { href: string; label: string; value: number; warn?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-[var(--radius)] border border-line bg-surface px-4 py-3 hover:border-[var(--brand-500)]"
-    >
-      <p className="text-xs text-ink-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tnum ${warn ? 'text-[var(--danger)]' : 'text-ink'}`}>
-        {formatNumber(value)}
-      </p>
-    </Link>
-  )
+function Kpi({
+  href,
+  label,
+  value,
+  sub,
+  tone,
+  delayMs,
+}: {
+  href?: string
+  label: string
+  value: string
+  sub?: string
+  tone: SeriesKey
+  delayMs?: number
+}) {
+  return <ColorTile href={href} label={label} value={value} sub={sub} tone={tone} delayMs={delayMs} />
 }
 
 function AttentionLine({
