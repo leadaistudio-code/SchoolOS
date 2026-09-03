@@ -3,6 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   PLATFORM_MODELS,
+  PLATFORM_ONLY_MODELS,
   TENANT_OPTIONAL_MODELS,
   TENANT_SCOPED_MODELS,
 } from '../src/server/db/tenant-models'
@@ -95,5 +96,16 @@ describe('schema conventions', () => {
       (m) => m[1],
     )
     expect(floatMoney, 'Money fields must be Int minor units').toEqual([])
+  })
+
+  it('lists every Growth CRM model as platform-only', () => {
+    const crmModels: string[] = []
+    for (const match of schema.matchAll(/model\s+(Crm\w+)\s*\{([\s\S]*?)\n\}/g)) {
+      const [, name, body] = match
+      if (!name || !body) continue
+      expect(body, `${name} must not carry tenantId`).not.toMatch(/^\s*tenantId\s+String/m)
+      crmModels.push(name)
+    }
+    expect(crmModels.sort()).toEqual([...PLATFORM_ONLY_MODELS].sort())
   })
 })

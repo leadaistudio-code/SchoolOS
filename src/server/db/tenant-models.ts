@@ -77,6 +77,7 @@ export const TENANT_SCOPED_MODELS = [
   'ExamSubject',
   'Mark',
   'Result',
+  'AdmitCard',
   'ReportCardTemplate',
   'CertificateTemplate',
   'Certificate',
@@ -213,4 +214,27 @@ export const PLATFORM_MODELS = new Set<string>([
   'TenantEntitlementOverride',
   'UsageMetric',
 ])
+
+/**
+ * Platform-console models with no tenantId. tenantDb() must refuse them so a
+ * school request cannot list Growth CRM prospects through the unscoped path
+ * that non-tenant models currently take.
+ */
+export const PLATFORM_ONLY_MODELS = new Set<string>([
+  'CrmSchool',
+  'CrmContact',
+  'CrmOpportunity',
+  'CrmActivity',
+  'CrmFollowUp',
+  'CrmVisit',
+  'CrmMeeting',
+  'CrmTask',
+  'CrmReminderSend',
+  'CrmTemplate',
+  'CrmCommunication',
+])
+
+export function isPlatformOnly(model: string | undefined): boolean {
+  return !!model && PLATFORM_ONLY_MODELS.has(model)
+}
 

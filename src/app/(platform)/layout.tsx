@@ -25,6 +25,13 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   const nav = [
     { label: 'Overview', href: '/platform' },
+    ...(ctx.user.permissions.has('platform.crm')
+      ? [
+          { label: 'Growth CRM', href: '/platform/growth' },
+          { label: 'Today', href: '/platform/growth/today' },
+          { label: 'Templates', href: '/platform/growth/templates' },
+        ]
+      : []),
     { label: 'Schools', href: '/platform/tenants' },
     { label: 'Plans', href: '/platform/plans' },
     { label: 'Billing', href: '/platform/billing' },
@@ -47,7 +54,10 @@ export default async function PlatformLayout({ children }: { children: React.Rea
               </span>
             </Link>
 
-            <nav className="hidden sm:flex items-center gap-1 ml-4" aria-label="Platform navigation">
+            <nav
+              className="flex items-center gap-1 ml-2 min-w-0 overflow-x-auto sm:ml-4"
+              aria-label="Platform navigation"
+            >
               {nav.map((item) => (
                 <Link
                   key={item.href}
@@ -62,7 +72,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
-              <span className="hidden sm:block text-sm text-ink-muted">
+              <span className="hidden md:block text-sm text-ink-muted">
                 {ctx.user.firstName} {ctx.user.lastName}
               </span>
               <form action="/api/v1/auth/logout" method="post">

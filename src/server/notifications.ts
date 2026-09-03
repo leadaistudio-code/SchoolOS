@@ -1,6 +1,7 @@
 import type { AppContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
-import { emailProvider, smsProvider, whatsappProvider } from '@/server/providers'
+import { emailProvider, smsProvider } from '@/server/providers'
+import { sendParentMessage } from '@/server/messaging/send'
 import { tenantEmailProvider } from '@/server/mail/smtp'
 
 export type NotificationChannelValue = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
@@ -109,6 +110,7 @@ export async function deliverNotification(notificationId: string): Promise<void>
 
   for (const delivery of notification.deliveries) {
     let result = { ok: false, providerMessageId: undefined as string | undefined, error: 'Unsupported channel' as string | undefined }
+    let deliveredVia: string | null = null
 
     try {
       if (delivery.channel === 'EMAIL' && notification.user.email) {
@@ -125,16 +127,27 @@ export async function deliverNotification(notificationId: string): Promise<void>
           text: notification.body,
         })
         result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
+      } else if (delivery.channel === 'WHATSAPP' && notification.user.phone) {
+        const r = await sendParentMessage({
+          to: notification.user.phone,
+          body: `${notification.title}\n\n${notification.body}`,
+        })
+        result = {
+          ok: r.ok,
+          providerMessageId: r.providerMessageId,
+          error: r.ok ? undefined : r.error,
+        }
+        deliveredVia = r.channel ?? 'whatsapp'
+        if (r.ok && r.channel === 'sms' && r.failedWhatsApp) {
+          console.warn('[notifications] WhatsApp failed; delivered by SMS', {
+            notificationId: notification.id,
+            error: r.failedWhatsApp,
+          })
+        }
       } else if (delivery.channel === 'SMS' && notification.user.phone) {
         const r = await smsProvider().send({
           to: notification.user.phone,
           body: `${notification.title}: ${notification.body}`,
-        })
-        result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
-      } else if (delivery.channel === 'WHATSAPP' && notification.user.phone) {
-        const r = await whatsappProvider().send({
-          to: notification.user.phone,
-          body: `${notification.title}\n\n${notification.body}`,
         })
         result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
       } else {
@@ -148,7 +161,7 @@ export async function deliverNotification(notificationId: string): Promise<void>
       where: { id: delivery.id },
       data: {
         status: result.ok ? 'SENT' : 'FAILED',
-        provider: result.providerMessageId ? delivery.channel.toLowerCase() : null,
+        provider: result.ok ? (deliveredVia ?? delivery.channel.toLowerCase()) : null,
         providerMessageId: result.providerMessageId ?? null,
         attempts: { increment: 1 },
         lastError: result.ok ? null : (result.error ?? 'Unknown error'),

@@ -234,6 +234,12 @@ export const PERMISSIONS: PermissionDef[] = [
     ['impersonate', 'Impersonate tenant users'],
     ['health', 'View system health'],
     ['support', 'Manage support tickets'],
+    ['crm', 'View Growth CRM'],
+    ['crm_create', 'Create Growth CRM records'],
+    ['crm_edit', 'Edit Growth CRM records'],
+    ['crm_delete', 'Delete Growth CRM records'],
+    ['crm_assign', 'Assign Growth CRM owners'],
+    ['crm_comms', 'Send Growth CRM WhatsApp, SMS and email'],
   ]),
 ]
 

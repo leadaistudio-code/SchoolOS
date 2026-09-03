@@ -4,7 +4,7 @@ import { prisma } from '@/server/db/prisma'
 import { audit } from '@/server/audit'
 import { hmacSha256, randomToken, sha256, timingSafeEqual } from '@/server/crypto'
 import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
-import { whatsappProvider } from '@/server/providers'
+import { smsProvider, whatsappProvider } from '@/server/providers'
 import { createPasswordResetTicket } from '@/server/modules/platform/support'
 import { maskPhone, normalizePhone } from './phone'
 import { requestMeta } from './session'
@@ -159,10 +159,28 @@ export async function requestWhatsappOtp(
     variables: { '1': code },
   })
 
-  if (!result.ok) {
+  let delivered = result
+  let deliveryChannel: 'whatsapp' | 'sms' = 'whatsapp'
+
+  if (!result.ok && env().MESSAGING_WHATSAPP_FAILOVER_SMS) {
+    const sms = smsProvider()
+    if (sms.name !== 'log') {
+      const fallback = await sms.send({
+        to: phone,
+        body: `${code} is your ${tenant.name} password reset code. It expires in ${OTP_TTL_MINUTES} minutes.`,
+      })
+      if (fallback.ok) {
+        delivered = fallback
+        deliveryChannel = 'sms'
+        console.warn('[auth] WhatsApp OTP failed; sent by SMS instead', result.error)
+      }
+    }
+  }
+
+  if (!delivered.ok) {
     // Delivery failed - a wrong number on WhatsApp, an expired access token, a
     // template Meta has not approved. Retire the challenge and fall back.
-    console.error('[auth] whatsapp OTP send failed', result.error)
+    console.error('[auth] whatsapp OTP send failed', delivered.error)
     await prisma.verificationToken.update({
       where: { id: challenge.id },
       data: { usedAt: new Date() },
@@ -179,7 +197,7 @@ export async function requestWhatsappOtp(
     module: 'auth',
     entityType: 'User',
     entityId: user.id,
-    summary: `Sent a WhatsApp reset code to ${masked}`,
+    summary: `Sent a ${deliveryChannel === 'sms' ? 'SMS' : 'WhatsApp'} reset code to ${masked}`,
   })
 
   return { ok: true, challengeToken, maskedPhone: masked }

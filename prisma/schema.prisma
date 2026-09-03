@@ -346,6 +346,13 @@ model User {
   parent            Parent?
   sentMessages      Message[]           @relation("MessageSender")
   pushSubscriptions PushSubscription[]
+  crmSchoolsOwned        CrmSchool[]       @relation("CrmSchoolOwner")
+  crmSchoolsCreated      CrmSchool[]       @relation("CrmSchoolCreatedBy")
+  crmOpportunitiesOwned  CrmOpportunity[]  @relation("CrmOpportunityOwner")
+  crmFollowUpsAssigned   CrmFollowUp[]     @relation("CrmFollowUpAssignee")
+  crmTasksOwned          CrmTask[]         @relation("CrmTaskOwner")
+  crmMeetingsCreated     CrmMeeting[]      @relation("CrmMeetingCreatedBy")
+  crmVisitsCreated       CrmVisit[]        @relation("CrmVisitCreatedBy")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -3958,4 +3965,361 @@ model GpsIngestToken {
   createdAt   DateTime  @default(now())
 
   @@index([tenantId, revokedAt])
+}
+
+// ===========================================================================
+// GROWTH CRM (platform-only — not tenant-scoped)
+//
+// A prospect is not a MyCampusView tenant. Records live on the platform
+// console and may later be linked to a Tenant via wonTenantId when a deal
+// is won and onboarding starts.
+// ===========================================================================
+
+enum CrmStage {
+  PROSPECT
+  CONTACTED
+  MEETING_SCHEDULED
+  DEMO_COMPLETED
+  FOLLOW_UP
+  PROPOSAL_SENT
+  NEGOTIATION
+  PILOT
+  WON
+  LOST
+  ON_HOLD
+  NOT_INTERESTED
+}
+
+enum CrmTemperature {
+  COLD
+  WARM
+  HOT
+}
+
+enum CrmFollowUpStatus {
+  PENDING
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum CrmMeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmTaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model CrmSchool {
+  id   String @id @default(cuid())
+  name String
+
+  schoolType  String?
+  board       String?
+  studentCount Int?
+  branchCount  Int?
+  city         String?
+  state        String?
+  address      String?
+  website      String?
+  phone        String?
+  email        String?
+  currentErp       String?
+  currentErpVendor String?
+  erpRenewalOn     DateTime? @db.Date
+
+  leadSource    String?
+  campaign      String?
+  sourceDetails String?
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+
+  ownerId     String?
+  createdById String?
+  owner     User? @relation("CrmSchoolOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy User? @relation("CrmSchoolCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  temperature       CrmTemperature @default(COLD)
+  temperatureManual Boolean        @default(false)
+  stage             CrmStage       @default(PROSPECT)
+  stageChangedAt    DateTime       @default(now())
+
+  dealValueMinor Int @default(0)
+  arrMinor       Int @default(0)
+  probability    Int @default(10)
+  expectedCloseOn DateTime? @db.Date
+  competitor         String?
+  primaryObjection   String?
+  budgetRange        String?
+  decisionTimeline   String?
+  nextFollowUpAt     DateTime?
+  nextAction         String?
+  lastActivityAt     DateTime?
+
+  lostReason     String?
+  lostCompetitor String?
+  lostNotes      String?
+  recontactOn    DateTime? @db.Date
+
+  /// Set when this prospect becomes an onboarded MyCampusView tenant.
+  wonTenantId String?
+  notes       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  contacts      CrmContact[]
+  opportunities CrmOpportunity[]
+  activities    CrmActivity[]
+  followUps     CrmFollowUp[]
+  visits        CrmVisit[]
+  meetings      CrmMeeting[]
+  tasks         CrmTask[]
+  communications CrmCommunication[]
+
+  @@index([stage, nextFollowUpAt])
+  @@index([ownerId])
+  @@index([lastActivityAt])
+  @@index([leadSource])
+  @@index([name])
+  @@index([city])
+  @@index([phone])
+  @@index([wonTenantId])
+}
+
+model CrmContact {
+  id           String  @id @default(cuid())
+  schoolId     String
+  fullName     String
+  designation  String?
+  mobile       String?
+  whatsapp     String?
+  email        String?
+  preferredChannel String?
+  isDecisionMaker Boolean @default(false)
+  isInfluencer    Boolean @default(false)
+  isPrimary       Boolean @default(false)
+  notes           String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  school    CrmSchool     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  followUps CrmFollowUp[]
+  tasks     CrmTask[]
+  communications CrmCommunication[]
+
+  @@index([schoolId])
+  @@index([mobile])
+  @@index([email])
+}
+
+model CrmOpportunity {
+  id             String    @id @default(cuid())
+  schoolId       String
+  title          String    @default("MyCampusView")
+  stage          CrmStage  @default(PROSPECT)
+  stageChangedAt DateTime  @default(now())
+  dealValueMinor Int       @default(0)
+  arrMinor       Int       @default(0)
+  probability    Int       @default(10)
+  expectedCloseOn DateTime? @db.Date
+  ownerId        String?
+  owner          User?     @relation("CrmOpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  lostReason     String?
+  lostCompetitor String?
+  lostNotes      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([schoolId])
+}
+
+model CrmActivity {
+  id         String   @id @default(cuid())
+  schoolId   String
+  contactId  String?
+  type       String
+  summary    String
+  body       String?
+  meta       Json?
+  actorId    String?
+  actorLabel String?
+  createdAt  DateTime @default(now())
+
+  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([type])
+}
+
+model CrmFollowUp {
+  id            String            @id @default(cuid())
+  schoolId      String
+  contactId     String?
+  dueAt         DateTime
+  type          String            @default("CALL")
+  priority      String            @default("NORMAL")
+  note          String?
+  status        CrmFollowUpStatus @default(PENDING)
+  assignedToId  String?
+  assignedTo    User?             @relation("CrmFollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  completedById String?
+  createdById   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  school  CrmSchool   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([dueAt, status])
+  @@index([schoolId, status])
+  @@index([assignedToId, status])
+}
+
+model CrmVisit {
+  id               String    @id @default(cuid())
+  schoolId         String
+  visitedAt        DateTime
+  endedAt          DateTime?
+  teamMembers      String?
+  contactsMet      String?
+  purpose          String?
+  meetingType      String?
+  summary          String
+  painPoints       String?
+  currentErp       String?
+  liked            String?
+  objections       String?
+  competitors      String?
+  outcome          String?
+  nextAction       String?
+  documentsRequested String?
+  dealConfidence   String?
+  createdById      String?
+  createdBy        User?     @relation("CrmVisitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+
+  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, visitedAt])
+  @@index([visitedAt])
+}
+
+model CrmMeeting {
+  id              String           @id @default(cuid())
+  schoolId        String
+  startsAt        DateTime
+  endsAt          DateTime?
+  meetingType     String           @default("Discovery")
+  mode            String           @default("PHYSICAL")
+  location        String?
+  meetingLink     String?
+  agenda          String?
+  notes           String?
+  contactIds      String[]         @default([])
+  attendeeIds     String[]         @default([])
+  status          CrmMeetingStatus @default(SCHEDULED)
+  createdById     String?
+  createdBy       User?            @relation("CrmMeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([startsAt, status])
+  @@index([schoolId, status])
+}
+
+model CrmTask {
+  id          String        @id @default(cuid())
+  schoolId    String
+  contactId   String?
+  title       String
+  description String?
+  dueAt       DateTime?
+  priority    String        @default("NORMAL")
+  status      CrmTaskStatus @default(TODO)
+  ownerId     String?
+  owner       User?         @relation("CrmTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedAt DateTime?
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  school  CrmSchool   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([dueAt, status])
+  @@index([schoolId, status])
+  @@index([ownerId, status])
+}
+
+/// Idempotency log for Growth CRM reminder emails. Platform-only.
+model CrmReminderSend {
+  id        String   @id @default(cuid())
+  kind      String
+  targetKey String
+  sentAt    DateTime @default(now())
+
+  @@unique([kind, targetKey])
+  @@index([sentAt])
+}
+
+/// Sales message templates. Platform-only — not tenant NotificationTemplate.
+model CrmTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  channel   String
+  subject   String?
+  body      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  communications CrmCommunication[]
+
+  @@index([channel, isActive])
+  @@index([category])
+}
+
+/// Outbound WhatsApp / SMS / email from Growth CRM. Platform-only.
+model CrmCommunication {
+  id                String   @id @default(cuid())
+  schoolId          String
+  contactId         String?
+  channel           String
+  to                String
+  subject           String?
+  body              String
+  status            String
+  provider          String?
+  providerMessageId String?
+  error             String?
+  templateId        String?
+  actorId           String?
+  actorLabel        String?
+  createdAt         DateTime @default(now())
+
+  school   CrmSchool    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  contact  CrmContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  template CrmTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([channel, status])
 }

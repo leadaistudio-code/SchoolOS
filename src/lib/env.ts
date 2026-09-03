@@ -86,7 +86,7 @@ const serverSchema = z.object({
   SMS_DRIVER: z.enum(['log', 'msg91', 'twilio']).default('log'),
   SMS_SENDER_ID: z.string().optional(),
 
-  WHATSAPP_DRIVER: z.enum(['log', 'meta_cloud', 'gupshup']).default('log'),
+  WHATSAPP_DRIVER: z.enum(['log', 'meta_cloud', 'gupshup', 'twilio']).default('log'),
   WHATSAPP_API_VERSION: z.string().default('v21.0'),
   /** The sending number's id in the WhatsApp Business account, not the number. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
@@ -113,6 +113,23 @@ const serverSchema = z.object({
   /** The registered sending number, digits only with country code. */
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
   GUPSHUP_API_URL: z.string().default('https://api.gupshup.io/wa/api/v1/template/msg'),
+
+  /** Twilio — shared credentials for WhatsApp (primary) and SMS (failover). */
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  /** E.164 sender for SMS, e.g. +14155550100 or an approved alphanumeric ID. */
+  TWILIO_SMS_FROM: z.string().optional(),
+  /** WhatsApp-enabled Twilio number, e.g. +14155238886 (whatsapp: prefix added automatically). */
+  TWILIO_WHATSAPP_FROM: z.string().optional(),
+  /** Optional Messaging Service that routes WhatsApp and SMS with failover rules in Twilio. */
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  /**
+   * When true, WHATSAPP_OTP_TEMPLATE is treated as a Twilio Content SID (HX…)
+   * rather than a Meta template name.
+   */
+  TWILIO_WHATSAPP_USE_CONTENT_SID: bool.default('true'),
+  /** Try SMS automatically when a WhatsApp send fails. */
+  MESSAGING_WHATSAPP_FAILOVER_SMS: bool.default('true'),
 
   /**
    * Applied when somebody types a local number. Parents enter ten digits, the

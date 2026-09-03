@@ -19,6 +19,7 @@ import type {
   StorageProvider,
   WhatsAppProvider,
 } from './types'
+import { twilioConfigured, twilioSmsProvider, twilioWhatsAppProvider } from './twilio'
 
 /* ------------------------------------------------------------------ email */
 
@@ -227,6 +228,13 @@ const logSms: SmsProvider = {
 }
 
 export function smsProvider(): SmsProvider {
+  if (env().SMS_DRIVER === 'twilio') {
+    if (!twilioConfigured()) {
+      warnMissingTwilio('SMS')
+      return logSms
+    }
+    return twilioSmsProvider()
+  }
   return logSms
 }
 
@@ -450,6 +458,18 @@ export function whatsappProvider(): WhatsAppProvider {
     return gupshupWhatsApp(apiKey, appName, source)
   }
 
+  if (driver === 'twilio') {
+    if (!twilioConfigured()) {
+      warnMissingWhatsApp('TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN')
+      return logWhatsApp
+    }
+    if (!env().TWILIO_WHATSAPP_FROM && !env().TWILIO_MESSAGING_SERVICE_SID) {
+      warnMissingWhatsApp('TWILIO_WHATSAPP_FROM or TWILIO_MESSAGING_SERVICE_SID')
+      return logWhatsApp
+    }
+    return twilioWhatsAppProvider()
+  }
+
   return logWhatsApp
 }
 
@@ -461,6 +481,16 @@ function warnMissingWhatsApp(required: string) {
     `[whatsapp] WHATSAPP_DRIVER="${env().WHATSAPP_DRIVER}" needs ${required}; ` +
       'falling back to the log driver. Reset codes will not be delivered until ' +
       'they are set.',
+  )
+}
+
+let warnedMissingTwilio = false
+function warnMissingTwilio(channel: 'SMS' | 'WhatsApp') {
+  if (warnedMissingTwilio) return
+  warnedMissingTwilio = true
+  console.warn(
+    `[${channel.toLowerCase()}] Twilio driver selected but credentials are incomplete; ` +
+      'falling back to the log driver.',
   )
 }
 

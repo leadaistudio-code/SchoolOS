@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
-import { isTenantOwnedOptional, isTenantScoped, isTenantSharedOptional } from './tenant-models'
+import { isPlatformOnly, isTenantOwnedOptional, isTenantScoped, isTenantSharedOptional } from './tenant-models'
 
 export class TenantIsolationError extends Error {
   constructor(message: string) {
@@ -83,6 +83,10 @@ export function tenantDb(tenantId: string) {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
+          if (isPlatformOnly(model)) {
+            throw new TenantIsolationError(`${model} is platform-only and cannot be queried from a school context`)
+          }
+
           const owned = isTenantOwnedOptional(model)
           const shared = isTenantSharedOptional(model)
 

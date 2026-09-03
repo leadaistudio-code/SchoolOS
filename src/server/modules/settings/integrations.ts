@@ -191,21 +191,39 @@ export async function providerStatus(ctx: AppContext): Promise<ProviderStatus[]>
       key: 'sms',
       label: 'SMS',
       driver: e.SMS_DRIVER,
-      live: e.SMS_DRIVER !== 'log',
+      live:
+        e.SMS_DRIVER === 'twilio'
+          ? !!(e.TWILIO_ACCOUNT_SID && e.TWILIO_AUTH_TOKEN && (e.TWILIO_SMS_FROM || e.TWILIO_MESSAGING_SERVICE_SID))
+          : e.SMS_DRIVER !== 'log',
       detail:
         e.SMS_DRIVER === 'log'
           ? 'Messages are written to the server log, not sent'
-          : `Delivered through ${e.SMS_DRIVER}`,
+          : e.SMS_DRIVER === 'twilio'
+            ? e.MESSAGING_WHATSAPP_FAILOVER_SMS
+              ? 'Delivered through Twilio; also used when WhatsApp fails'
+              : 'Delivered through Twilio'
+            : `Delivered through ${e.SMS_DRIVER}`,
     },
     {
       key: 'whatsapp',
       label: 'WhatsApp',
       driver: e.WHATSAPP_DRIVER,
-      live: e.WHATSAPP_DRIVER !== 'log',
+      live:
+        e.WHATSAPP_DRIVER === 'twilio'
+          ? !!(
+              e.TWILIO_ACCOUNT_SID &&
+              e.TWILIO_AUTH_TOKEN &&
+              (e.TWILIO_WHATSAPP_FROM || e.TWILIO_MESSAGING_SERVICE_SID)
+            )
+          : e.WHATSAPP_DRIVER !== 'log',
       detail:
         e.WHATSAPP_DRIVER === 'log'
           ? 'Messages are written to the server log, not sent'
-          : `Delivered through ${e.WHATSAPP_DRIVER}`,
+          : e.WHATSAPP_DRIVER === 'twilio'
+            ? e.MESSAGING_WHATSAPP_FAILOVER_SMS
+              ? 'Primary channel via Twilio; falls back to SMS on failure'
+              : 'Delivered through Twilio'
+            : `Delivered through ${e.WHATSAPP_DRIVER}`,
     },
     {
       key: 'payment',
