@@ -9,7 +9,7 @@ import { whatsappProvider } from '../src/server/providers'
  *   npm run whatsapp:doctor -- +919876543210    also send a real code there
  *
  * This exists because the failure is silent by design. `WHATSAPP_DRIVER`
- * defaults to `log`, and the log driver reports success — so the reset screen
+ * defaults to `log`, and the log driver reports success - so the reset screen
  * advances to "enter your code" exactly as it would on a working system, and
  * nothing is ever sent. Nobody finds out until a locked-out parent phones the
  * office.
@@ -53,7 +53,7 @@ async function main() {
   console.log(`  copy-code button    ${e.WHATSAPP_OTP_COPY_BUTTON ? 'yes' : 'no'}`)
 
   if (e.WHATSAPP_DRIVER === 'log') {
-    fail('WHATSAPP_DRIVER is "log" — codes are printed to the server log, never sent.')
+    fail('WHATSAPP_DRIVER is "log" - codes are printed to the server log, never sent.')
     note('This is the default. Set WHATSAPP_DRIVER=twilio (or meta_cloud / gupshup) to send for real.')
     note('The reset screen still advances to "enter your code", which is why this looks like')
     note('a delivery problem rather than a configuration one.')
@@ -101,7 +101,7 @@ async function main() {
 
     if (missing.length > 0) {
       fail(`Twilio is selected but ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not set.`)
-      note('WHATSAPP_OTP_TEMPLATE must be a Twilio Content SID (HX…) when using the twilio driver.')
+      note('WHATSAPP_OTP_TEMPLATE must be a Twilio Content SID (HX...) when using the twilio driver.')
       process.exit(1)
     }
     pass('Twilio credentials are present.')
@@ -150,11 +150,11 @@ async function checkMetaNumber(phoneNumberId: string, token: string, version: st
       // The three ways this goes wrong, and what each looks like.
       if (json?.error?.code === 190) {
         note('Code 190 means the access token is invalid or has expired.')
-        note('A temporary token from the API Setup page lasts 24 hours — for a deployment you')
+        note('A temporary token from the API Setup page lasts 24 hours - for a deployment you')
         note('need a permanent token from a System User in Business Settings.')
       } else if (json?.error?.code === 100) {
         note('Code 100 usually means WHATSAPP_PHONE_NUMBER_ID is wrong.')
-        note('It is the long numeric "Phone number ID" on the API Setup page — not the phone')
+        note('It is the long numeric "Phone number ID" on the API Setup page - not the phone')
         note('number itself, and not the WhatsApp Business Account ID.')
       } else if (json?.error?.code === 200) {
         note('Code 200 means the token lacks permission for this number.')
@@ -172,7 +172,7 @@ async function checkMetaNumber(phoneNumberId: string, token: string, version: st
     }
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error))
-    note('Meta could not be reached at all — check outbound network access from this host.')
+    note('Meta could not be reached at all - check outbound network access from this host.')
     process.exit(1)
   }
 }
@@ -203,7 +203,7 @@ async function sendTest(recipient: string) {
   })
 
   if (result.ok) {
-    pass(`Accepted by ${provider.name}${result.providerMessageId ? ` — id ${result.providerMessageId}` : ''}`)
+    pass(`Accepted by ${provider.name}${result.providerMessageId ? ` - id ${result.providerMessageId}` : ''}`)
     note('Accepted means Meta took the message, not that it was delivered. If it does not')
     note('arrive: check WhatsApp is installed on that number, and that the number is on the')
     note("app's recipient list while the app is still unpublished.")
