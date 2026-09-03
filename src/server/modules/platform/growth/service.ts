@@ -34,6 +34,7 @@ import {
 import type {
   ActivityCreateInput,
   ContactCreateInput,
+  FieldCaptureInput,
   FollowUpCreateInput,
   MeetingCreateInput,
   SchoolCreateInput,
@@ -247,6 +248,130 @@ export async function createSchool(ctx: PlatformContext, input: SchoolCreateInpu
     entityType: 'CrmSchool',
     entityId: school.id,
     summary: `Added prospect ${school.name}`,
+  })
+
+  return school
+}
+
+/**
+ * One-shot field capture for sales reps on campus.
+ * Creates the prospect, primary contact, visit log, and next follow-up together
+ * so the funnel always has an owner, a contact, and a next action.
+ */
+export async function captureFieldLead(ctx: PlatformContext, input: FieldCaptureInput) {
+  assertPerm(ctx, 'platform.crm_create')
+
+  const duplicates = await findDuplicates(ctx, {
+    name: input.name,
+    phone: input.contactMobile,
+  })
+  if (duplicates.length > 0 && !input.confirmDuplicate) {
+    throw conflict(
+      `A similar school already exists (${duplicates.map((d) => d.name).join(', ')}). Tick “create anyway” if this is a different campus.`,
+    )
+  }
+
+  const stage = (input.stage ?? 'CONTACTED') as CrmStage
+  const probability = STAGE_PROBABILITY[stage]
+  const { temperature } = computeTemperature({
+    stage,
+    lastActivityAt: new Date(),
+  })
+  const ownerId = ctx.user.userId
+  const mobile = phoneOrNull(input.contactMobile) ?? input.contactMobile.trim()
+  const nextAction = input.nextAction
+
+  const school = await ctx.db.crmSchool.create({
+    data: {
+      name: input.name,
+      city: input.city,
+      phone: mobile,
+      currentErp: input.currentErp ?? null,
+      primaryObjection: input.primaryObjection ?? null,
+      leadSource: input.leadSource ?? 'SCHOOL_VISIT',
+      ownerId,
+      createdById: ownerId,
+      temperature,
+      temperatureManual: false,
+      stage,
+      stageChangedAt: new Date(),
+      probability,
+      nextFollowUpAt: input.nextFollowUpAt,
+      nextAction,
+      lastActivityAt: new Date(),
+      notes: input.visitSummary,
+      opportunities: {
+        create: {
+          title: 'MyCampusView',
+          stage,
+          stageChangedAt: new Date(),
+          probability,
+          ownerId,
+        },
+      },
+      contacts: {
+        create: {
+          fullName: input.contactName,
+          designation: input.contactDesignation ?? 'PRINCIPAL',
+          mobile,
+          whatsapp: mobile,
+          isPrimary: true,
+          isDecisionMaker: input.isDecisionMaker,
+        },
+      },
+    },
+    include: { contacts: true },
+  })
+
+  const contact = school.contacts[0]
+  const visitedAt = new Date()
+
+  await ctx.db.crmVisit.create({
+    data: {
+      schoolId: school.id,
+      visitedAt,
+      contactsMet: input.contactName,
+      purpose: 'Field visit',
+      meetingType: 'First meeting',
+      summary: input.visitSummary,
+      currentErp: input.currentErp ?? null,
+      objections: input.primaryObjection ?? null,
+      nextAction,
+      createdById: ownerId,
+    },
+  })
+
+  const followUp = await ctx.db.crmFollowUp.create({
+    data: {
+      schoolId: school.id,
+      contactId: contact?.id ?? null,
+      dueAt: input.nextFollowUpAt,
+      type: 'CALL',
+      priority: 'NORMAL',
+      note: nextAction,
+      assignedToId: ownerId,
+      createdById: ownerId,
+    },
+  })
+
+  await writeActivity(ctx, {
+    schoolId: school.id,
+    type: 'VISIT',
+    summary: `Field capture · met ${input.contactName}`,
+    body: input.visitSummary,
+    contactId: contact?.id,
+    meta: { followUpId: followUp.id, source: 'field_capture' },
+  })
+
+  await audit({
+    tenantId: null,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'crm.field_capture',
+    module: 'growth',
+    entityType: 'CrmSchool',
+    entityId: school.id,
+    summary: `Field capture for ${school.name}`,
   })
 
   return school

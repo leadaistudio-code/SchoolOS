@@ -37,6 +37,11 @@ export default async function GrowthDashboardPage() {
         description={`${formatNumber(k.total)} prospects · ${formatNumber(k.followUpsOverdue)} overdue`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {canCreate ? (
+              <Link href="/platform/growth/capture" className={buttonVariants({ size: 'sm' })}>
+                Field capture
+              </Link>
+            ) : null}
             <Link href="/platform/growth/today" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               Today
             </Link>

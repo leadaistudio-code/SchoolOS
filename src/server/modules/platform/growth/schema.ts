@@ -236,3 +236,31 @@ export const sendMessageSchema = z
     path: ['body'],
   })
 export type SendMessageInput = z.infer<typeof sendMessageSchema>
+
+/** Mobile field capture — only the fields needed to keep the funnel trackable. */
+export const fieldCaptureSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the school name').max(200),
+  city: z.string().trim().min(2, 'Enter the city').max(80),
+  contactName: z.string().trim().min(2, 'Enter who you met').max(120),
+  contactDesignation: z.enum(CONTACT_ROLES).optional().or(z.literal('')).transform((v) => v || 'PRINCIPAL'),
+  contactMobile: z.string().trim().min(8, 'Enter a mobile number').max(20),
+  isDecisionMaker: optionalBool,
+  leadSource: z.enum(LEAD_SOURCES).optional().or(z.literal('')).transform((v) => v || 'SCHOOL_VISIT'),
+  currentErp: empty,
+  primaryObjection: empty,
+  visitSummary: z.string().trim().min(5, 'Note what was discussed').max(4000),
+  nextFollowUpAt: z
+    .string()
+    .trim()
+    .min(8, 'Pick the next follow-up date')
+    .superRefine((v, ctx) => {
+      if (Number.isNaN(new Date(v).getTime())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Pick a valid follow-up date' })
+      }
+    })
+    .transform((v) => new Date(v)),
+  nextAction: z.string().trim().min(2, 'Write the next action').max(200),
+  stage: z.enum(CRM_STAGES).optional().or(z.literal('')).transform((v) => v || 'CONTACTED'),
+  confirmDuplicate: optionalBool,
+})
+export type FieldCaptureInput = z.infer<typeof fieldCaptureSchema>

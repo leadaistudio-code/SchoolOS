@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 const ITEMS = [
+  { href: '/platform/growth/capture', label: 'Field capture' },
   { href: '/platform/growth/schools/new', label: 'New school' },
   { href: '/platform/growth/log?kind=call', label: 'Log call' },
   { href: '/platform/growth/log?kind=visit', label: 'Log visit' },

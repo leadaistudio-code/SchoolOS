@@ -24,11 +24,10 @@ export default async function GrowthTodayPage() {
       />
 
       <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <QuickLink href="/platform/growth/capture" label="Field capture" />
         <QuickLink href="/platform/growth/log?kind=visit" label="Log visit" />
         <QuickLink href="/platform/growth/log?kind=call" label="Log call" />
-        <QuickLink href="/platform/growth/log?kind=note" label="Add note" />
         <QuickLink href="/platform/growth/log?kind=follow-up" label="Follow-up" />
-        <QuickLink href="/platform/growth/log?kind=message" label="Send message" />
       </div>
 
       <Board

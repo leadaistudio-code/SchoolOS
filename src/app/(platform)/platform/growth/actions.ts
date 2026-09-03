@@ -7,6 +7,7 @@ import { requirePlatformContext } from '@/server/context'
 import { ApiException } from '@/server/api/response'
 import { emptyFormState, type FormState } from '@/lib/form-state'
 import {
+  captureFieldLead,
   completeFollowUp,
   completeMeeting,
   createContact,
@@ -45,6 +46,7 @@ import {
   taskStatusSchema,
   templateCreateSchema,
   visitLogSchema,
+  fieldCaptureSchema,
 } from '@/server/modules/platform/growth/schema'
 
 function fieldErrors(err: ZodError): Record<string, string> {
@@ -76,6 +78,19 @@ export async function createSchoolAction(_prev: FormState, formData: FormData): 
   } catch (error) {
     if (typeof error === 'object' && error && 'digest' in error) throw error
     return fail(error, 'Could not create the school')
+  }
+}
+
+export async function captureFieldLeadAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requirePlatformContext('platform.crm_create')
+  try {
+    const school = await captureFieldLead(ctx, fieldCaptureSchema.parse(raw(formData)))
+    revalidatePath('/platform/growth')
+    revalidatePath('/platform/growth/today')
+    redirect(`/platform/growth/schools/${school.id}`)
+  } catch (error) {
+    if (typeof error === 'object' && error && 'digest' in error) throw error
+    return fail(error, 'Could not save the field capture')
   }
 }
 

@@ -28,6 +28,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     ...(ctx.user.permissions.has('platform.crm')
       ? [
           { label: 'Growth CRM', href: '/platform/growth' },
+          { label: 'Capture', href: '/platform/growth/capture' },
           { label: 'Today', href: '/platform/growth/today' },
           { label: 'Templates', href: '/platform/growth/templates' },
         ]

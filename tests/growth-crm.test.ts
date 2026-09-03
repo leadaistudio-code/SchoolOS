@@ -29,6 +29,7 @@ import {
   sendMessageSchema,
   stageChangeSchema,
   taskCreateSchema,
+  fieldCaptureSchema,
 } from '../src/server/modules/platform/growth/schema'
 import { buildSchoolListWhere } from '../src/server/modules/platform/growth/service'
 
@@ -234,6 +235,32 @@ describe('Growth CRM schemas', () => {
 
   it('rejects a send with neither body nor template', () => {
     expect(() => sendMessageSchema.parse({ channel: 'SMS' })).toThrow()
+  })
+
+  it('requires school, contact, visit note and next follow-up for field capture', () => {
+    const parsed = fieldCaptureSchema.parse({
+      name: 'Green Valley School',
+      city: 'Noida',
+      contactName: 'Anita Sharma',
+      contactMobile: '9876543210',
+      visitSummary: 'Interested in fees module',
+      nextFollowUpAt: '2026-09-05T10:00',
+      nextAction: 'Send proposal',
+    })
+    expect(parsed.leadSource).toBe('SCHOOL_VISIT')
+    expect(parsed.stage).toBe('CONTACTED')
+    expect(parsed.nextFollowUpAt).toBeInstanceOf(Date)
+    expect(() =>
+      fieldCaptureSchema.parse({
+        name: 'X',
+        city: 'Noida',
+        contactName: 'Anita',
+        contactMobile: '98',
+        visitSummary: 'Hi',
+        nextFollowUpAt: '',
+        nextAction: '',
+      }),
+    ).toThrow()
   })
 })
 
