@@ -566,6 +566,7 @@ model Section {
   classwork             Classwork[]
   assessments           Assessment[]
   assessmentAssignments AssessmentAssignment[]
+  subjects              SectionSubject[]
 
   @@unique([tenantId, classLevelId, name])
   @@index([tenantId])
@@ -604,9 +605,30 @@ model ClassSubject {
   questions                 Question[]
   assessments               Assessment[]
   teacherRefreshAssessments TeacherRefreshAssessment[]
+  sections                  SectionSubject[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
+}
+
+/// Which sections of a class take a given class-subject.
+///
+/// ClassSubject alone means "this class studies the subject". SectionSubject
+/// narrows that to specific sections (electives, stream splits). When a
+/// ClassSubject has no SectionSubject rows, every section of the class takes
+/// it — that keeps existing schools working until they map electives.
+model SectionSubject {
+  id             String @id @default(cuid())
+  tenantId       String
+  sectionId      String
+  classSubjectId String
+
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sectionId, classSubjectId])
+  @@index([tenantId, classSubjectId])
+  @@index([tenantId, sectionId])
 }
 
 // ===========================================================================

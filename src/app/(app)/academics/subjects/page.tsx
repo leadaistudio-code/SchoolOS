@@ -32,7 +32,7 @@ export default async function SubjectsPage() {
   const [subjects, assignments, classes, teachers] = await Promise.all([
     listSubjects(ctx),
     listClassSubjects(ctx),
-    canManage ? getClassTree(ctx) : Promise.resolve([]),
+    getClassTree(ctx),
     canManage ? teacherOptions(ctx) : Promise.resolve([]),
   ])
 
@@ -64,7 +64,7 @@ export default async function SubjectsPage() {
             ? `${formatNumber(subjects.length)} subjects · ${formatNumber(assignments.length)} class pairings`
             : 'Subjects catalogue'
         }
-        description="What the school teaches, and where each subject is assigned."
+        description="What the school teaches, where each subject is assigned, and which sections take it."
         actions={
           canManage ? (
             <>
@@ -187,7 +187,7 @@ export default async function SubjectsPage() {
         <CardHeader>
           <CardTitle>Taught in</CardTitle>
           <span className="text-xs text-ink-subtle">
-            What each class studies, and who teaches it
+            What each class studies, which sections take it, and who teaches it
           </span>
         </CardHeader>
         {assignments.length === 0 ? (
@@ -218,6 +218,7 @@ export default async function SubjectsPage() {
                 <tr>
                   <TH>Class</TH>
                   <TH>Subject</TH>
+                  <TH>Sections</TH>
                   <TH>Teacher</TH>
                   <TH>Syllabus</TH>
                   <TH align="right">Periods a week</TH>
@@ -225,13 +226,26 @@ export default async function SubjectsPage() {
                 </tr>
               </THead>
               <TBody>
-                {assignments.map((a) => (
+                {assignments.map((a) => {
+                  const classSections =
+                    classes.find((c) => c.id === a.classLevel.id)?.sections.map((s) => ({
+                      id: s.id,
+                      label: s.name,
+                    })) ?? []
+                  const mappedSectionIds = a.sections.map((row) => row.section.id)
+                  const sectionLabel =
+                    mappedSectionIds.length === 0
+                      ? 'All'
+                      : a.sections.map((row) => row.section.name).join(', ')
+
+                  return (
                   <TR key={a.id}>
                     <TD className="text-sm text-ink">{a.classLevel.name}</TD>
                     <TD className="text-sm text-ink">
                       {a.subject.name}
                       <span className="ml-1.5 text-xs tnum text-ink-subtle">{a.subject.code}</span>
                     </TD>
+                    <TD className="text-sm text-ink-muted">{sectionLabel}</TD>
                     <TD className="text-sm text-ink-muted">
                       {a.teacher ? (
                         `${a.teacher.firstName} ${a.teacher.lastName}`
@@ -262,12 +276,15 @@ export default async function SubjectsPage() {
                           subjectLabel={a.subject.name}
                           teacherId={a.teacher?.id ?? null}
                           teachers={teacherOpts}
+                          sections={classSections}
+                          selectedSectionIds={mappedSectionIds}
                           hasSyllabusOrTimetable={a._count.curricula > 0 || a._count.timetable > 0}
                         />
                       </TD>
                     ) : null}
                   </TR>
-                ))}
+                  )
+                })}
               </TBody>
             </Table>
           </TableWrap>

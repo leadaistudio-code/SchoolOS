@@ -54,6 +54,12 @@ export const subjectUpdateSchema = subjectCreateSchema.partial().extend({
 export const classSubjectUpdateSchema = z.object({
   id: z.string().min(1),
   teacherId: z.string().optional().nullable(),
+  /**
+   * Sections of the class that take this subject.
+   * Omit to leave mappings unchanged; pass [] to clear (all sections take it);
+   * pass specific ids to restrict.
+   */
+  sectionIds: z.array(z.string()).optional(),
 })
 
 /** The current academic session, or a clear error telling the admin to make one. */
@@ -707,8 +713,9 @@ export async function updateClassSubject(
     where: { id: input.id },
     include: {
       subject: { select: { name: true, code: true } },
-      classLevel: { select: { name: true } },
+      classLevel: { select: { id: true, name: true } },
       teacher: { select: { firstName: true, lastName: true } },
+      sections: { select: { sectionId: true } },
     },
   })
   if (!before) throw notFound('Class subject')
@@ -721,11 +728,45 @@ export async function updateClassSubject(
     if (!teacher) throw notFound('Teacher')
   }
 
-  const updated = await ctx.db.classSubject.update({
-    where: { id: input.id },
-    data: {
-      teacherId: input.teacherId === undefined ? undefined : input.teacherId || null,
-    },
+  let sectionIdsToWrite: string[] | undefined
+  if (input.sectionIds !== undefined) {
+    const classSections = await ctx.db.section.findMany({
+      where: { classLevelId: before.classLevelId, deletedAt: null },
+      select: { id: true },
+    })
+    const valid = new Set(classSections.map((s) => s.id))
+    const invalid = input.sectionIds.filter((id) => !valid.has(id))
+    if (invalid.length > 0) throw conflict('One or more sections do not belong to this class')
+
+    // Selecting every section is the same as "no restriction" — clear the join
+    // so admit cards and marks keep treating the subject as class-wide.
+    const allSelected =
+      classSections.length > 0 && input.sectionIds.length === classSections.length
+    sectionIdsToWrite = allSelected ? [] : [...new Set(input.sectionIds)]
+  }
+
+  const updated = await ctx.db.$transaction(async (tx) => {
+    const row = await tx.classSubject.update({
+      where: { id: input.id },
+      data: {
+        teacherId: input.teacherId === undefined ? undefined : input.teacherId || null,
+      },
+    })
+
+    if (sectionIdsToWrite !== undefined) {
+      await tx.sectionSubject.deleteMany({ where: { classSubjectId: input.id } })
+      if (sectionIdsToWrite.length > 0) {
+        await tx.sectionSubject.createMany({
+          data: sectionIdsToWrite.map((sectionId) => ({
+            tenantId: ctx.tenant.id,
+            sectionId,
+            classSubjectId: input.id,
+          })),
+        })
+      }
+    }
+
+    return row
   })
 
   await audit({
@@ -736,7 +777,13 @@ export async function updateClassSubject(
     module: 'academics',
     entityType: 'ClassSubject',
     entityId: updated.id,
-    summary: `Updated teacher for ${before.subject.name} in ${before.classLevel.name}`,
+    summary: `Updated ${before.subject.name} in ${before.classLevel.name}${
+      sectionIdsToWrite !== undefined
+        ? sectionIdsToWrite.length === 0
+          ? ' (all sections)'
+          : ` (${sectionIdsToWrite.length} section${sectionIdsToWrite.length === 1 ? '' : 's'})`
+        : ''
+    }`,
     before,
     after: updated,
   })
@@ -798,6 +845,12 @@ export async function listClassSubjects(ctx: AppContext) {
       classLevel: { select: { id: true, name: true } },
       subject: { select: { id: true, name: true, code: true, isElective: true } },
       teacher: { select: { id: true, firstName: true, lastName: true } },
+      sections: {
+        select: {
+          section: { select: { id: true, name: true } },
+        },
+        orderBy: { section: { name: 'asc' } },
+      },
       _count: { select: { curricula: true, timetable: true } },
     },
   })

@@ -325,9 +325,11 @@ export async function getAdmitCardPrint(ctx: AppContext, id: string) {
             include: {
               classSubject: {
                 select: {
+                  id: true,
                   classLevelId: true,
                   subject: { select: { name: true, code: true } },
                   classLevel: { select: { name: true } },
+                  sections: { select: { sectionId: true } },
                 },
               },
             },
@@ -347,7 +349,7 @@ export async function getAdmitCardPrint(ctx: AppContext, id: string) {
             take: 1,
             select: {
               classLevel: { select: { id: true, name: true } },
-              section: { select: { name: true } },
+              section: { select: { id: true, name: true } },
               rollNumber: true,
             },
           },
@@ -359,10 +361,16 @@ export async function getAdmitCardPrint(ctx: AppContext, id: string) {
 
   const enrollment = card.student.enrollments[0]
   const classLevelId = enrollment?.classLevel.id
+  const sectionId = enrollment?.section?.id
 
-  const dateSheet = classLevelId
-    ? card.exam.subjects.filter((p) => p.classSubject.classLevelId === classLevelId)
-    : card.exam.subjects
+  const dateSheet = card.exam.subjects.filter((p) => {
+    if (classLevelId && p.classSubject.classLevelId !== classLevelId) return false
+    const mapped = p.classSubject.sections
+    // No section rows ⇒ every section of the class takes this paper.
+    if (mapped.length === 0) return true
+    if (!sectionId) return true
+    return mapped.some((row) => row.sectionId === sectionId)
+  })
 
   const school = await ctx.db.school.findFirst({
     where: { tenantId: ctx.tenant.id },

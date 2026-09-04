@@ -672,6 +672,8 @@ export function EditAssignmentButton({
   subjectLabel,
   teacherId: initialTeacherId,
   teachers,
+  sections,
+  selectedSectionIds: initialSectionIds,
   hasSyllabusOrTimetable,
 }: {
   id: string
@@ -679,18 +681,37 @@ export function EditAssignmentButton({
   subjectLabel: string
   teacherId: string | null
   teachers: Option[]
+  /** Sections of this class — used to restrict who takes the subject. */
+  sections: Option[]
+  /**
+   * Empty means "all sections" (no SectionSubject rows). When non-empty, only
+   * those section ids are mapped.
+   */
+  selectedSectionIds: string[]
   hasSyllabusOrTimetable: boolean
 }) {
+  const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const [teacherId, setTeacherId] = React.useState(initialTeacherId ?? '')
+  const [sectionIds, setSectionIds] = React.useState<string[]>([])
   const [confirmRemove, setConfirmRemove] = React.useState(false)
 
   const openDialog = () => {
     setTeacherId(initialTeacherId ?? '')
+    // No restriction stored ⇒ show every section checked.
+    setSectionIds(
+      initialSectionIds.length > 0 ? [...initialSectionIds] : sections.map((s) => s.id),
+    )
     setConfirmRemove(false)
     setOpen(true)
+  }
+
+  const toggleSection = (sectionId: string, checked: boolean) => {
+    setSectionIds((prev) =>
+      checked ? [...prev, sectionId] : prev.filter((x) => x !== sectionId),
+    )
   }
 
   const submit = () =>
@@ -698,6 +719,7 @@ export function EditAssignmentButton({
       const result = await updateClassSubjectAction({
         id,
         teacherId: teacherId || null,
+        sectionIds,
       })
       if (!result.ok) {
         toast.push({
@@ -709,6 +731,7 @@ export function EditAssignmentButton({
       }
       toast.push({ tone: 'success', title: 'Assignment updated', description: result.message })
       setOpen(false)
+      router.refresh()
     })
 
   const remove = () =>
@@ -724,6 +747,7 @@ export function EditAssignmentButton({
       }
       toast.push({ tone: 'success', title: 'Assignment removed', description: result.message })
       setOpen(false)
+      router.refresh()
     })
 
   return (
@@ -736,11 +760,15 @@ export function EditAssignmentButton({
         open={open}
         onClose={() => setOpen(false)}
         title={`${subjectLabel} · ${classLabel}`}
-        description="Who teaches this subject in this class."
+        description="Who teaches this subject, and which sections take it. Admit cards only list papers mapped to the student’s section."
         footer={
           <>
-            <Button onClick={submit} loading={pending}>
-              Save teacher
+            <Button
+              onClick={submit}
+              loading={pending}
+              disabled={sections.length > 0 && sectionIds.length === 0}
+            >
+              Save
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -748,20 +776,50 @@ export function EditAssignmentButton({
           </>
         }
       >
-        <Field label="Teacher" htmlFor={`edit-teacher-${id}`}>
-          <Select
-            id={`edit-teacher-${id}`}
-            value={teacherId}
-            onChange={(e) => setTeacherId(e.target.value)}
+        <div className="grid gap-3">
+          <Field label="Teacher" htmlFor={`edit-teacher-${id}`}>
+            <Select
+              id={`edit-teacher-${id}`}
+              value={teacherId}
+              onChange={(e) => setTeacherId(e.target.value)}
+            >
+              <option value="">Not assigned yet</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Sections"
+            hint={
+              sections.length === 0
+                ? 'This class has no sections yet'
+                : 'Uncheck sections that do not take this subject (electives / stream splits). Leave all checked for every section.'
+            }
           >
-            <option value="">Not assigned yet</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            {sections.length === 0 ? (
+              <p className="text-sm text-ink-subtle">Add sections under Academics → Classes first.</p>
+            ) : (
+              <div className="grid max-h-48 gap-1.5 overflow-y-auto rounded-[var(--radius-sm)] border border-line p-2 sm:grid-cols-2">
+                {sections.map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-sm text-ink hover:bg-surface-2"
+                  >
+                    <Checkbox
+                      checked={sectionIds.includes(s.id)}
+                      onChange={(e) => toggleSection(s.id, e.target.checked)}
+                    />
+                    <span>{s.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </Field>
+        </div>
 
         <div className="mt-4 border-t border-line pt-3">
           {confirmRemove ? (

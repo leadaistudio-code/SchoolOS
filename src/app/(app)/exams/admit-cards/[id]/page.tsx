@@ -128,6 +128,7 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
                   <th className="pb-2 font-semibold text-ink-muted">Subject</th>
                   <th className="pb-2 font-semibold text-ink-muted">Time</th>
                   <th className="pb-2 font-semibold text-ink-muted">Room</th>
+                  <th className="w-[7.5rem] pb-2 font-semibold text-ink-muted">Examiner signature</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -144,6 +145,12 @@ export default async function AdmitCardPrintPage({ params }: { params: Promise<{
                       {paper.startTime ? `${paper.startTime}${paper.endTime ? ` – ${paper.endTime}` : ''}` : '—'}
                     </td>
                     <td className="py-2">{paper.roomName ?? '—'}</td>
+                    <td className="py-2 align-bottom">
+                      <div
+                        className="mt-4 min-h-[1.75rem] border-b border-ink/40"
+                        aria-hidden
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
