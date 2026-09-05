@@ -232,6 +232,11 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'CrmReminderSend',
   'CrmTemplate',
   'CrmCommunication',
+  'CrmDiscoveryLocation',
+  'CrmDiscoverySettings',
+  'CrmDiscoveryRun',
+  'CrmDiscoveryCandidate',
+  'CrmDiscoveryEvidence',
 ])
 
 export function isPlatformOnly(model: string | undefined): boolean {

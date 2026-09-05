@@ -1,7 +1,9 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import { requirePlatformContext } from '@/server/context'
 import { getSchool, listOperators, listTemplates } from '@/server/modules/platform/growth/service'
+import { getDiscoveryForCrmSchool } from '@/server/modules/platform/growth/discovery/service'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +56,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
     notFound()
   }
   const operators = await listOperators(ctx)
+  const discovery = await getDiscoveryForCrmSchool(ctx, school.id)
 
   const canEdit = ctx.user.permissions.has('platform.crm_edit')
   const canAssign = ctx.user.permissions.has('platform.crm_assign')
@@ -289,6 +292,55 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
         </div>
 
         <div className="space-y-4">
+          {discovery ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Lead Intelligence</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  <span className="text-ink-muted">Verification:</span>{' '}
+                  {discovery.verificationStatus.replaceAll('_', ' ')}
+                </p>
+                <p>
+                  <span className="text-ink-muted">Opportunity:</span> {discovery.opportunityScore}
+                  /100
+                </p>
+                <p>
+                  <span className="text-ink-muted">School status:</span>{' '}
+                  {discovery.schoolStatus?.replaceAll('_', ' ') ?? '—'}
+                </p>
+                <p>
+                  <span className="text-ink-muted">Opening:</span>{' '}
+                  {discovery.academicSession ?? discovery.openingEvidence?.slice(0, 80) ?? '—'}
+                </p>
+                {discovery.whyThisLead ? (
+                  <div>
+                    <p className="text-ink-muted">Why now</p>
+                    <p className="whitespace-pre-wrap text-ink">{discovery.whyThisLead}</p>
+                  </div>
+                ) : null}
+                {discovery.recommendedPitch ? (
+                  <div>
+                    <p className="text-ink-muted">Recommended pitch</p>
+                    <p className="whitespace-pre-wrap text-ink">{discovery.recommendedPitch}</p>
+                  </div>
+                ) : null}
+                <p className="text-xs text-ink-subtle">
+                  Sources: {discovery.evidence.length}
+                  {discovery.lastVerifiedAt
+                    ? ` · Last verified ${format(discovery.lastVerifiedAt, 'd MMM yyyy')}`
+                    : ''}
+                </p>
+                <Link
+                  href={`/platform/growth/discovery/${discovery.id}`}
+                  className="text-sm font-medium text-[var(--brand-600)] hover:underline"
+                >
+                  Open discovery record
+                </Link>
+              </CardContent>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Intelligence</CardTitle>

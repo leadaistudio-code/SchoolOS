@@ -27,6 +27,7 @@
     "assistant:doctor": "tsx scripts/assistant-doctor.ts",
     "jobs:refresh": "tsx scripts/run-refresh-jobs.ts",
     "jobs:growth": "tsx scripts/growth-crm-reminders.ts",
+    "jobs:discovery": "tsx scripts/run-lead-discovery.ts",
     "mail:doctor": "tsx scripts/mail-doctor.ts",
     "whatsapp:doctor": "tsx scripts/whatsapp-doctor.ts",
     "messaging:doctor": "tsx scripts/messaging-doctor.ts",

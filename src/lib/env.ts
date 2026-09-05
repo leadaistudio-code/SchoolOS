@@ -159,6 +159,13 @@ const serverSchema = z.object({
   // a principal is waiting for the reply.
   AI_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
 
+  /**
+   * Web search for AI School Lead Discovery (Growth CRM).
+   * `none` disables automated search; manual review / AI-on-evidence still works.
+   */
+  LEAD_DISCOVERY_SEARCH_DRIVER: z.enum(['none', 'serper', 'brave']).default('none'),
+  LEAD_DISCOVERY_SEARCH_API_KEY: z.string().optional(),
+
   RATE_LIMIT_DRIVER: z.enum(['memory', 'redis']).default('memory'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 

@@ -4345,3 +4345,160 @@ model CrmCommunication {
   @@index([schoolId, createdAt])
   @@index([channel, status])
 }
+
+// ---------------------------------------------------------------------------
+// AI School Lead Discovery (platform Growth CRM extension)
+// Staging + run history only — qualified leads still land in CrmSchool.
+// ---------------------------------------------------------------------------
+
+enum CrmDiscoveryVerification {
+  VERIFIED
+  STRONG_LEAD
+  NEEDS_VERIFICATION
+  REJECTED
+}
+
+enum CrmDiscoveryPriority {
+  HOT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum CrmDiscoveryRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model CrmDiscoveryLocation {
+  id           String   @id @default(cuid())
+  city         String
+  region       String?
+  state        String   @default("Haryana")
+  enabled      Boolean  @default(true)
+  searchRadius Int?
+  priority     Int      @default(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidates CrmDiscoveryCandidate[]
+  runs       CrmDiscoveryRun[]
+
+  @@unique([city, state])
+  @@index([enabled, priority])
+}
+
+model CrmDiscoverySettings {
+  id     String @id @default("default")
+  enabled Boolean @default(true)
+  /// Daily cron window label; actual schedule is external (CRON_SECRET).
+  frequency     String  @default("daily")
+  minConfidence Int     @default(60)
+  autoAddVerified   Boolean @default(true)
+  autoAddStrongLead Boolean @default(true)
+  autoAddNeedsVerification Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model CrmDiscoveryRun {
+  id           String                @id @default(cuid())
+  locationId   String?
+  status       CrmDiscoveryRunStatus @default(PENDING)
+  startedAt    DateTime              @default(now())
+  finishedAt   DateTime?
+  queries      Int                   @default(0)
+  resultsFound Int                   @default(0)
+  createdLeads Int                   @default(0)
+  updatedLeads Int                   @default(0)
+  duplicates   Int                   @default(0)
+  rejected     Int                   @default(0)
+  needsReview  Int                   @default(0)
+  errors       Json?
+  summary      String?
+  triggeredBy  String?
+
+  location CrmDiscoveryLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  candidates CrmDiscoveryCandidate[]
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+model CrmDiscoveryCandidate {
+  id     String @id @default(cuid())
+  runId  String?
+  locationId String?
+
+  schoolName   String
+  branchName   String?
+  schoolGroup  String?
+  area         String?
+  sector       String?
+  city         String?
+  state        String?
+  postalCode   String?
+
+  normalizedKey String
+
+  openingDate    DateTime? @db.Date
+  openingMonth   Int?
+  openingYear    Int?
+  academicSession String?
+  schoolStatus   String?
+  openingEvidence String?
+
+  contactPerson String?
+  designation   String?
+  phone         String?
+  alternatePhone String?
+  email         String?
+  website       String?
+
+  verificationStatus CrmDiscoveryVerification @default(NEEDS_VERIFICATION)
+  confidenceScore    Int                      @default(0)
+  salesPriority      CrmDiscoveryPriority     @default(MEDIUM)
+  opportunityScore   Int                      @default(0)
+
+  discoverySummary  String?
+  whyThisLead       String?
+  recommendedPitch  String?
+
+  crmSchoolId String? @unique
+  crmLinkedAt DateTime?
+  rejectedAt  DateTime?
+  rejectedReason String?
+
+  discoveredAt   DateTime  @default(now())
+  lastVerifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  run      CrmDiscoveryRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  location CrmDiscoveryLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  evidence CrmDiscoveryEvidence[]
+
+  @@index([normalizedKey])
+  @@index([verificationStatus, salesPriority])
+  @@index([city, discoveredAt])
+  @@index([crmSchoolId])
+}
+
+model CrmDiscoveryEvidence {
+  id          String   @id @default(cuid())
+  candidateId String
+  url         String
+  title       String?
+  sourceName  String?
+  sourceType  String
+  snippet     String?
+  publishedAt DateTime?
+  foundAt     DateTime @default(now())
+  weight      Int      @default(0)
+
+  candidate CrmDiscoveryCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([url])
+}

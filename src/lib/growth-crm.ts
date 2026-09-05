@@ -96,6 +96,7 @@ export const LEAD_SOURCES = [
   'COLD_CALL',
   'SCHOOL_VISIT',
   'PARTNER',
+  'AI_DISCOVERY',
   'OTHER',
 ] as const
 
@@ -113,6 +114,7 @@ export const LEAD_SOURCE_LABELS: Record<(typeof LEAD_SOURCES)[number], string> =
   COLD_CALL: 'Cold call',
   SCHOOL_VISIT: 'School visit',
   PARTNER: 'Partner',
+  AI_DISCOVERY: 'AI School Discovery',
   OTHER: 'Other',
 }
 

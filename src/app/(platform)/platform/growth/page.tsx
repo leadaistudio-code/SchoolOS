@@ -43,6 +43,9 @@ export default async function GrowthDashboardPage() {
                 Field capture
               </Link>
             ) : null}
+            <Link href="/platform/growth/discovery" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              AI Discovery
+            </Link>
             <Link href="/platform/growth/today" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               Today
             </Link>
