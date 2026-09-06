@@ -301,9 +301,7 @@ export async function getTeacherDashboard(ctx: AppContext) {
   const subjectIds = await teachingClassSubjectIds(ctx)
   const ids = studentIds ?? []
 
-  const today = attendanceDate(new Date())
-
-  const [studentCount, classes, subjects, outstanding, overdueCount, sections] = await Promise.all([
+  const [studentCount, classes, subjects, unpaidStudents, sections] = await Promise.all([
     ctx.db.student.count({
       where: { status: 'ACTIVE', deletedAt: null, id: { in: ids } },
     }),
@@ -323,22 +321,19 @@ export async function getTeacherDashboard(ctx: AppContext) {
           },
         })
       : Promise.resolve([]),
-    ctx.db.feeInvoice.aggregate({
-      where: {
-        studentId: { in: ids },
-        balanceMinor: { gt: 0 },
-        status: { notIn: ['CANCELLED', 'DRAFT'] },
-      },
-      _sum: { balanceMinor: true },
-    }),
-    ctx.db.feeInvoice.count({
-      where: {
-        studentId: { in: ids },
-        balanceMinor: { gt: 0 },
-        dueOn: { lt: today },
-        status: { notIn: ['CANCELLED', 'DRAFT'] },
-      },
-    }),
+    // Distinct students with any open balance — never expose rupee totals to teachers.
+    ids.length === 0
+      ? Promise.resolve([])
+      : ctx.db.feeInvoice.findMany({
+          where: {
+            studentId: { in: ids },
+            balanceMinor: { gt: 0 },
+            status: { notIn: ['CANCELLED', 'DRAFT'] },
+            student: { status: 'ACTIVE', deletedAt: null },
+          },
+          select: { studentId: true },
+          distinct: ['studentId'],
+        }),
     ctx.db.section.count({
       where: {
         deletedAt: null,
@@ -347,14 +342,17 @@ export async function getTeacherDashboard(ctx: AppContext) {
     }),
   ])
 
+  const unpaidCount = unpaidStudents.length
+  const paidCount = Math.max(0, studentCount - unpaidCount)
+
   return {
     studentCount,
     classCount: classes.length,
     sectionCount: sections,
     classes,
     subjects: subjects.map((s) => `${s.subject.name} · ${s.classLevel.name}`),
-    outstandingMinor: outstanding._sum.balanceMinor ?? 0,
-    overdueCount,
+    paidCount,
+    unpaidCount,
   }
 }
 

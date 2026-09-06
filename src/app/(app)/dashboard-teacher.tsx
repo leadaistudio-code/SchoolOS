@@ -5,12 +5,11 @@ import { WelcomeBanner } from '@/components/dashboard/welcome-banner'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { formatMoney, formatNumber } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
 
 export async function TeacherDashboard() {
   const ctx = await requireContext('dashboard.view')
   const data = await getTeacherDashboard(ctx)
-  const currency = ctx.tenant.currency
   const schoolName = ctx.tenant.school?.name ?? ctx.tenant.name
 
   const headline =
@@ -51,20 +50,21 @@ export async function TeacherDashboard() {
           delayMs={40}
         />
         <StatCard
-          label="Fee outstanding"
-          value={formatMoney(data.outstandingMinor, currency)}
+          label="Fees paid"
+          value={formatNumber(data.paidCount)}
           icon="Wallet"
           tone="fees"
-          href="/finance/invoices"
-          sub={data.overdueCount > 0 ? `${formatNumber(data.overdueCount)} overdue invoices` : 'All clear'}
+          href="/students?dues=cleared"
+          sub={`${formatNumber(data.unpaidCount)} still due`}
           delayMs={80}
         />
         <StatCard
-          label="Subjects"
-          value={formatNumber(data.subjects.length)}
-          icon="BookOpen"
-          tone="staff"
-          href="/academics/subjects"
+          label="Fees unpaid"
+          value={formatNumber(data.unpaidCount)}
+          icon="AlertTriangle"
+          tone="overdue"
+          href="/students?dues=outstanding"
+          sub="Students with open dues"
           delayMs={120}
         />
       </div>
@@ -101,9 +101,12 @@ export async function TeacherDashboard() {
                 Students
               </Link>
             ) : null}
-            {ctx.can('fees.view') ? (
-              <Link href="/finance/invoices" className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
-                Fee invoices
+            {ctx.can('attendance.report') ? (
+              <Link
+                href="/attendance/reports"
+                className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+              >
+                Attendance reports
               </Link>
             ) : null}
             {ctx.can('exams.marks') ? (

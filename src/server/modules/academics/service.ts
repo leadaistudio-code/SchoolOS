@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import type { AppContext } from '@/server/context'
-import { classLevelScopeWhere, teachingClassSubjectIds } from '@/server/scope'
+import {
+  accessibleSectionIds,
+  classLevelScopeWhere,
+  isPortalOnlyRole,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { findOrRestore } from '@/server/db/soft-delete'
@@ -85,6 +90,7 @@ export async function getClassTree(ctx: AppContext) {
   if (!session) return []
 
   const classScope = await classLevelScopeWhere(ctx)
+  const sectionIds = await accessibleSectionIds(ctx)
 
   return ctx.db.classLevel.findMany({
     where: { sessionId: session.id, deletedAt: null, ...classScope },
@@ -95,7 +101,10 @@ export async function getClassTree(ctx: AppContext) {
       numeric: true,
       stream: true,
       sections: {
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(sectionIds === null ? {} : { id: { in: sectionIds } }),
+        },
         orderBy: { name: 'asc' },
         select: {
           id: true,
@@ -116,6 +125,9 @@ export async function markableSections(ctx: AppContext) {
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
   if (!session) return []
 
+  // Portal accounts never mark class registers — they use attendance reports.
+  if (isPortalOnlyRole(ctx.user.roleKeys)) return []
+
   // Anyone who can edit past attendance is treated as school-wide staff;
   // a plain teacher sees the sections they actually teach or own.
   const schoolWide = ctx.can('attendance.edit') || ctx.can('academics.manage')
@@ -127,16 +139,19 @@ export async function markableSections(ctx: AppContext) {
         select: { id: true },
       })
 
+  // No staff row and not school-wide ⇒ nothing to mark (do not open all sections).
+  if (!schoolWide && !staff) return []
+
   return ctx.db.section.findMany({
     where: {
       deletedAt: null,
       classLevel: { sessionId: session.id, deletedAt: null },
-      ...(schoolWide || !staff
+      ...(schoolWide
         ? {}
         : {
             OR: [
-              { classTeacherId: staff.id },
-              { classLevel: { subjects: { some: { teacherId: staff.id } } } },
+              { classTeacherId: staff!.id },
+              { classLevel: { subjects: { some: { teacherId: staff!.id } } } },
             ],
           }),
     },

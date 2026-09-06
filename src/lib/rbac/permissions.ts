@@ -100,6 +100,7 @@ export const PERMISSIONS: PermissionDef[] = [
 
   ...mod('fees', [
     ['view', 'View fees'],
+    ['status', 'View paid / unpaid fee status without amounts'],
     ['structure', 'Manage fee structures'],
     ['invoice', 'Generate invoices'],
     ['collect', 'Collect payments'],

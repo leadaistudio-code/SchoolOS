@@ -44,7 +44,7 @@ export default async function LibraryPage({
         description="Catalogue and availability."
         actions={
           <Link href="/library/loans" className={colorBannerSecondaryBtn()}>
-            Loans desk
+            {ctx.can('library.issue') ? 'Loans desk' : 'My loans'}
           </Link>
         }
       />

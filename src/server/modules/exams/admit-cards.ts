@@ -4,6 +4,7 @@ import { audit } from '@/server/audit'
 import { conflict, notFound } from '@/server/api/response'
 import { randomToken } from '@/server/crypto'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
+import { assertStudentAccess, studentIdScopeWhere } from '@/server/scope'
 import { getExamDetail } from './service'
 
 export const admitCardRejectSchema = z.object({
@@ -58,8 +59,10 @@ export async function listAdmitCards(ctx: AppContext, examId: string) {
   })
   if (!exam) throw notFound('Exam')
 
+  const scope = await studentIdScopeWhere(ctx)
+
   const rows = await ctx.db.admitCard.findMany({
-    where: { examId, tenantId: ctx.tenant.id },
+    where: { examId, tenantId: ctx.tenant.id, ...scope },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     include: {
       student: {
@@ -358,6 +361,7 @@ export async function getAdmitCardPrint(ctx: AppContext, id: string) {
     },
   })
   if (!card) throw notFound('Admit card')
+  await assertStudentAccess(ctx, card.student.id)
 
   const enrollment = card.student.enrollments[0]
   const classLevelId = enrollment?.classLevel.id

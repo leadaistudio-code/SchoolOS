@@ -123,6 +123,8 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
   const current = student.enrollments.find((e) => e.isCurrent)
   const dueMinor = student.invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
   const currency = ctx.tenant.currency
+  const canSeeFeeAmounts = ctx.can('fees.view')
+  const canSeeFeeStatus = canSeeFeeAmounts || ctx.can('fees.status')
 
   return (
     <div className="space-y-4">
@@ -196,14 +198,19 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
             </CardContent>
           </Card>
 
+          {canSeeFeeStatus ? (
           <Card>
             <CardHeader>
               <div>
                 <CardTitle>Fees</CardTitle>
                 <CardDescription>
-                  {dueMinor > 0
-                    ? `${formatMoney(dueMinor, currency)} outstanding`
-                    : 'No outstanding balance'}
+                  {canSeeFeeAmounts
+                    ? dueMinor > 0
+                      ? `${formatMoney(dueMinor, currency)} outstanding`
+                      : 'No outstanding balance'
+                    : dueMinor > 0
+                      ? 'Payment pending'
+                      : 'Fees paid / no dues'}
                 </CardDescription>
               </div>
               {ctx.can('fees.collect') && dueMinor > 0 ? (
@@ -216,7 +223,12 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
               ) : null}
             </CardHeader>
             <CardContent className="p-0">
-              {student.invoices.length === 0 ? (
+              {!canSeeFeeAmounts ? (
+                <EmptyState
+                  title={dueMinor > 0 ? 'Dues outstanding' : 'Cleared'}
+                  description="Fee amounts are only visible to finance staff. Teachers see paid / unpaid status only."
+                />
+              ) : student.invoices.length === 0 ? (
                 <EmptyState title="No invoices" description="Fee invoices will appear here once issued." />
               ) : (
                 <TableWrap>
@@ -255,6 +267,7 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
               )}
             </CardContent>
           </Card>
+          ) : null}
 
           <StudentDocumentsCard
             ctx={ctx}

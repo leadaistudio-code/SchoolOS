@@ -139,6 +139,7 @@ async function StudentResults({ params }: { params: Record<string, string | unde
       currency={ctx.tenant.currency}
       canEdit={ctx.can('students.edit')}
       canCreate={ctx.can('students.create')}
+      canSeeFeeAmounts={ctx.can('fees.view')}
     />
   )
 }

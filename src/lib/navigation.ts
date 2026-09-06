@@ -90,7 +90,8 @@ export const NAVIGATION: NavItem[] = [
     permission: 'attendance.view',
     mobile: true,
     children: [
-      { label: 'Student Attendance', href: '/attendance', icon: 'CalendarCheck', permission: 'attendance.view' },
+      // Marking register is staff-only; parents/students use Reports.
+      { label: 'Student Attendance', href: '/attendance', icon: 'CalendarCheck', permission: 'attendance.mark' },
       { label: 'Staff Attendance', href: '/attendance/staff', icon: 'Fingerprint', permission: 'staff_attendance.view' },
       { label: 'My Attendance', href: '/attendance/me', icon: 'MapPin', permission: 'staff_attendance.mark' },
       { label: 'Reports', href: '/attendance/reports', icon: 'BarChart3', permission: 'attendance.report' },
@@ -101,7 +102,8 @@ export const NAVIGATION: NavItem[] = [
     href: '/academics',
     icon: 'BookOpen',
     section: 'ACADEMICS' as const,
-    permission: 'academics.view',
+    // No group-level permission: children gate individually so parents still
+    // see homework / timetable / calendar without academics.view.
     children: [
       { label: 'Classes & Sections', href: '/academics/classes', icon: 'Layers', permission: 'academics.view' },
       { label: 'Subjects', href: '/academics/subjects', icon: 'BookMarked', permission: 'academics.view' },
@@ -117,7 +119,8 @@ export const NAVIGATION: NavItem[] = [
     href: '/my/assessments',
     icon: 'ClipboardCheck',
     section: 'ACADEMICS' as const,
-    permission: 'assessments.attempt',
+    // Parents use results.view (read-only child papers); students also hold it.
+    permission: 'results.view',
     mobile: true,
   },
   {

@@ -2,7 +2,12 @@ import { z } from 'zod'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
-import { assertClassSubjectAccess, teachingClassSubjectIds } from '@/server/scope'
+import {
+  accessibleClassLevelIds,
+  assertClassSubjectAccess,
+  isPortalOnlyRole,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 
 /**
  * The syllabus, as structure.
@@ -113,9 +118,15 @@ export async function listCoverage(ctx: AppContext, filter: CurriculumFilter = {
   const allowed = await teachingClassSubjectIds(ctx)
   if (allowed !== null && allowed.length === 0) return []
 
+  const portalClassLevels = allowed === null ? await accessibleClassLevelIds(ctx) : null
+  if (portalClassLevels !== null && portalClassLevels.length === 0) return []
+
+  const portalOnly = isPortalOnlyRole(ctx.user.roleKeys)
+
   const rows = await ctx.db.classSubject.findMany({
     where: {
       ...(allowed === null ? {} : { id: { in: allowed } }),
+      ...(portalClassLevels === null ? {} : { classLevelId: { in: portalClassLevels } }),
       ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
       ...(filter.subjectId ? { subjectId: filter.subjectId } : {}),
       classLevel: { sessionId, deletedAt: null },
@@ -126,7 +137,11 @@ export async function listCoverage(ctx: AppContext, filter: CurriculumFilter = {
       subject: { select: { id: true, name: true, code: true } },
       teacher: { select: { id: true, firstName: true, lastName: true } },
       curricula: {
-        where: { sessionId, deletedAt: null },
+        where: {
+          sessionId,
+          deletedAt: null,
+          ...(portalOnly ? { isPublished: true } : {}),
+        },
         select: {
           id: true,
           title: true,
@@ -141,8 +156,11 @@ export async function listCoverage(ctx: AppContext, filter: CurriculumFilter = {
     orderBy: [{ classLevel: { numeric: 'asc' } }, { subject: { name: 'asc' } }],
   })
 
+  // Portal users only see subjects that already have a published syllabus.
+  const visible = portalOnly ? rows.filter((r) => r.curricula.length > 0) : rows
+
   // Topic counts in one grouped query rather than one per chapter.
-  const curriculumIds = rows.flatMap((r) => r.curricula.map((c) => c.id))
+  const curriculumIds = visible.flatMap((r) => r.curricula.map((c) => c.id))
   const topicCounts = new Map<string, number>()
   if (curriculumIds.length > 0) {
     const chapters = await ctx.db.chapter.findMany({
@@ -157,7 +175,7 @@ export async function listCoverage(ctx: AppContext, filter: CurriculumFilter = {
     }
   }
 
-  return rows.map((row) => {
+  return visible.map((row) => {
     const curriculum = row.curricula[0] ?? null
     return {
       classSubjectId: row.id,
@@ -233,6 +251,9 @@ export async function getCurriculum(ctx: AppContext, id: string) {
 
   if (!curriculum) throw notFound('Syllabus')
   await assertClassSubjectAccess(ctx, curriculum.classSubjectId)
+  if (isPortalOnlyRole(ctx.user.roleKeys) && !curriculum.isPublished) {
+    throw notFound('Syllabus')
+  }
   return curriculum
 }
 

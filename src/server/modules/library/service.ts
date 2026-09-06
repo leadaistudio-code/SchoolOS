@@ -1,6 +1,7 @@
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { badRequest, conflict, notFound } from '@/server/api/response'
+import { studentIdScopeWhere } from '@/server/scope'
 import {
   FINE_PER_DAY_MINOR,
   bookSchema,
@@ -93,10 +94,11 @@ export async function listLoans(ctx: AppContext, status?: 'ISSUED' | 'OVERDUE' |
   ctx.require('library.view')
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
+  const scope = await studentIdScopeWhere(ctx)
 
   if (status === 'OVERDUE') {
     return ctx.db.libraryLoan.findMany({
-      where: { status: 'ISSUED', dueOn: { lt: today } },
+      where: { status: 'ISSUED', dueOn: { lt: today }, ...scope },
       include: {
         book: { select: { title: true } },
         student: { select: { firstName: true, lastName: true, admissionNo: true } },
@@ -107,7 +109,7 @@ export async function listLoans(ctx: AppContext, status?: 'ISSUED' | 'OVERDUE' |
   }
 
   return ctx.db.libraryLoan.findMany({
-    where: status ? { status } : undefined,
+    where: { ...(status ? { status } : {}), ...scope },
     include: {
       book: { select: { title: true } },
       student: { select: { firstName: true, lastName: true, admissionNo: true } },

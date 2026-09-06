@@ -2,7 +2,11 @@ import { z } from 'zod'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
-import { assertClassSubjectAccess, teachingClassSubjectIds } from '@/server/scope'
+import {
+  accessibleStudentIds,
+  assertClassSubjectAccess,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { OBJECTIVE_TYPES } from '@/lib/questions'
 
@@ -199,6 +203,8 @@ async function currentStudent(ctx: AppContext) {
     where: { userId: ctx.user.userId, deletedAt: null },
     select: {
       id: true,
+      firstName: true,
+      lastName: true,
       enrollments: {
         where: { isCurrent: true },
         select: { sectionId: true, classLevelId: true },
@@ -212,8 +218,35 @@ async function currentStudent(ctx: AppContext) {
   return student
 }
 
-export async function myAssessments(ctx: AppContext) {
-  const student = await currentStudent(ctx)
+type AssessmentListRow = {
+  assignmentId: string
+  studentId: string
+  studentName: string | null
+  title: string
+  subject: string
+  type: string
+  totalMarks: number
+  minutes: number
+  mode: string
+  opensAt: Date
+  dueAt: Date
+  state: string
+  canStart: boolean
+  attemptId: string | null
+  resultAttemptId: string | null
+  score: number | null
+}
+
+async function assessmentsForStudent(
+  ctx: AppContext,
+  student: {
+    id: string
+    firstName?: string
+    lastName?: string
+    enrollments: { sectionId: string | null; classLevelId: string }[]
+  },
+  opts?: { readOnly?: boolean },
+): Promise<AssessmentListRow[]> {
   const enrollment = student.enrollments[0]
   if (!enrollment) return []
 
@@ -256,23 +289,29 @@ export async function myAssessments(ctx: AppContext) {
   })
 
   const now = new Date()
+  const studentName =
+    student.firstName && student.lastName ? `${student.firstName} ${student.lastName}` : null
+
   return assignments.map((assignment) => {
     const latest = assignment.attempts[0] ?? null
     const attemptsUsed = assignment.attempts.length
     const open = now >= assignment.opensAt && now <= assignment.dueAt
 
-    const state = latest?.status === 'IN_PROGRESS'
-      ? 'in_progress'
-      : attemptsUsed >= assignment.attemptLimit
-        ? 'completed'
-        : now < assignment.opensAt
-          ? 'upcoming'
-          : now > assignment.dueAt
-            ? 'missed'
-            : 'available'
+    const state =
+      latest?.status === 'IN_PROGRESS'
+        ? 'in_progress'
+        : attemptsUsed >= assignment.attemptLimit
+          ? 'completed'
+          : now < assignment.opensAt
+            ? 'upcoming'
+            : now > assignment.dueAt
+              ? 'missed'
+              : 'available'
 
     return {
       assignmentId: assignment.id,
+      studentId: student.id,
+      studentName,
       title: assignment.assessment.title,
       subject: assignment.assessment.classSubject.subject.name,
       type: assignment.assessment.type.name,
@@ -282,17 +321,52 @@ export async function myAssessments(ctx: AppContext) {
       opensAt: assignment.opensAt,
       dueAt: assignment.dueAt,
       state,
-      canStart: open && assignment.mode !== 'OFFLINE' && attemptsUsed < assignment.attemptLimit,
+      canStart:
+        !opts?.readOnly &&
+        open &&
+        assignment.mode !== 'OFFLINE' &&
+        attemptsUsed < assignment.attemptLimit,
       attemptId: latest?.status === 'IN_PROGRESS' ? latest.id : null,
-      // Only set once released, so the portal cannot link to a result that
-      // does not exist yet — the API would refuse it anyway.
       resultAttemptId: latest?.publishedAt ? latest.id : null,
-      // A score exists as soon as it is computed; it is shown only once
-      // released. Those are different facts and the portal must not conflate
-      // them.
       score: latest?.publishedAt ? latest.totalScore : null,
     }
   })
+}
+
+export async function myAssessments(ctx: AppContext) {
+  // Students sit papers; parents only review published outcomes for their children.
+  if (ctx.can('assessments.attempt')) {
+    const student = await currentStudent(ctx)
+    return assessmentsForStudent(ctx, student)
+  }
+
+  ctx.require('results.view')
+  const ids = await accessibleStudentIds(ctx)
+  if (ids === null) {
+    throw new ApiException(403, 'NOT_A_STUDENT', 'This is only available to students or parents')
+  }
+  if (ids.length === 0) return []
+
+  const students = await ctx.db.student.findMany({
+    where: { id: { in: ids }, deletedAt: null },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      enrollments: {
+        where: { isCurrent: true },
+        select: { sectionId: true, classLevelId: true },
+        take: 1,
+      },
+    },
+  })
+
+  const rows: AssessmentListRow[] = []
+  for (const student of students) {
+    const childRows = await assessmentsForStudent(ctx, student, { readOnly: true })
+    rows.push(...childRows)
+  }
+  return rows
 }
 
 /**

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { conflict, notFound } from '@/server/api/response'
-import { assertClassSubjectAccess } from '@/server/scope'
+import { assertClassSubjectAccess, assertStudentAccess } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { OBJECTIVE_TYPES } from '@/lib/questions'
 
@@ -517,18 +517,13 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
   }
 }
 
-/** A student's own marked paper, once it has been released. */
+/** A student's own marked paper, once it has been released (parents: own child). */
 export async function myResult(ctx: AppContext, attemptId: string) {
-  const student = await ctx.db.student.findFirst({
-    where: { userId: ctx.user.userId, deletedAt: null },
-    select: { id: true },
-  })
-  if (!student) throw notFound('Student')
-
   const attempt = await ctx.db.assessmentAttempt.findFirst({
-    where: { id: attemptId, studentId: student.id },
+    where: { id: attemptId },
     select: {
       id: true,
+      studentId: true,
       totalScore: true,
       publishedAt: true,
       teacherComment: true,
@@ -574,6 +569,8 @@ export async function myResult(ctx: AppContext, attemptId: string) {
     },
   })
   if (!attempt) throw notFound('Result')
+
+  await assertStudentAccess(ctx, attempt.studentId)
 
   // The answer key travels with the result and not a moment earlier. Before
   // release there is nothing here to read.

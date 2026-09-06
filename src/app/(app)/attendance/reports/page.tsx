@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { subDays } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { attendanceReport } from '@/server/modules/attendance/service'
@@ -96,7 +97,12 @@ export default async function AttendanceReportsPage({
                 {rows.map((r) => (
                   <TR key={r.studentId}>
                     <TD>
-                      <span className="block text-sm text-ink">{r.name}</span>
+                      <Link
+                        href={`/attendance/reports/${r.studentId}?from=${from}&to=${to}`}
+                        className="block text-sm font-medium text-ink hover:underline"
+                      >
+                        {r.name}
+                      </Link>
                       <span className="block text-xs text-ink-subtle tnum">{r.admissionNo}</span>
                     </TD>
                     <TD className="text-sm text-ink-muted">
@@ -118,18 +124,19 @@ export default async function AttendanceReportsPage({
                       {r.percent === null ? (
                         <span className="text-sm text-ink-subtle">—</span>
                       ) : (
-                        <span
+                        <Link
+                          href={`/attendance/reports/${r.studentId}?from=${from}&to=${to}`}
                           className={cn(
-                            'text-sm tnum font-medium',
+                            'text-sm font-medium tabular-nums hover:underline',
                             r.percent < 75
                               ? 'text-[var(--danger)]'
                               : r.percent < 85
-                                ? 'text-warning'
+                                ? 'text-[var(--warning)]'
                                 : 'text-ink',
                           )}
                         >
                           {r.percent}%
-                        </span>
+                        </Link>
                       )}
                     </TD>
                   </TR>

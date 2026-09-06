@@ -83,11 +83,19 @@ export async function Student360({
   const latest = trend?.at(-1) ?? null
 
   const dueMinor = student.invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
+  const canSeeFeeAmounts = ctx.can('fees.view')
+  const canSeeFeeStatus = canSeeFeeAmounts || ctx.can('fees.status')
   const currency = ctx.tenant.currency
 
   const columns = ((): 2 | 3 | 4 => {
-    const n = 1 + (canAttendance ? 1 : 0) + (canResults ? 1 : 0) + (canFeedback ? 1 : 0)
-    return n >= 4 ? 4 : n === 3 ? 3 : 2
+    let n = 0
+    if (canAttendance) n += 1
+    if (canResults) n += 1
+    if (canFeedback) n += 1
+    if (canSeeFeeStatus) n += 1
+    if (n >= 4) return 4
+    if (n === 3) return 3
+    return 2
   })()
 
   return (
@@ -127,12 +135,28 @@ export async function Student360({
             sub="shared notes"
           />
         ) : null}
-        <Metric
-          label="Fees due"
-          value={formatMoney(dueMinor, currency)}
-          sub={dueMinor > 0 ? 'outstanding' : 'cleared'}
-          emphasis={dueMinor > 0 ? 'warning' : undefined}
-        />
+        {canSeeFeeStatus ? (
+          <Metric
+            label="Fees"
+            value={
+              canSeeFeeAmounts
+                ? formatMoney(dueMinor, currency)
+                : dueMinor > 0
+                  ? 'Due'
+                  : 'Paid'
+            }
+            sub={
+              canSeeFeeAmounts
+                ? dueMinor > 0
+                  ? 'outstanding'
+                  : 'cleared'
+                : dueMinor > 0
+                  ? 'Payment pending'
+                  : 'No dues'
+            }
+            emphasis={dueMinor > 0 ? 'warning' : undefined}
+          />
+        ) : null}
       </MetricRow>
 
       {canScore ? (

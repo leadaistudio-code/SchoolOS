@@ -23,8 +23,12 @@ export default async function LibraryLoansPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Loans desk"
-        description="Issue and return books. Overdue returns accrue ₹5/day."
+        title={ctx.can('library.issue') ? 'Loans desk' : 'My loans'}
+        description={
+          ctx.can('library.issue')
+            ? 'Issue and return books. Overdue returns accrue ₹5/day.'
+            : 'Books currently issued to you or your children.'
+        }
         actions={
           <Link href="/library" className="text-sm text-[var(--brand-600)] hover:underline">
             Catalogue

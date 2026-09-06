@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireContext } from '@/server/context'
+import { requireContext, ForbiddenError } from '@/server/context'
 import { myAssessments } from '@/server/modules/assessments/attempts'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,15 +19,16 @@ const STATE = {
 }
 
 /**
- * The student's list.
- *
- * Ordered by what they can do about it: what is open now, then what is coming,
- * then what is done. A list sorted by date alone buries the one test that
- * closes this afternoon under three that closed last month.
+ * Student list (can start) and parent read-only list (own children only).
  */
 export default async function MyAssessmentsPage() {
-  const ctx = await requireContext('assessments.attempt')
+  const ctx = await requireContext()
+  if (!ctx.can('assessments.attempt') && !ctx.can('results.view')) {
+    throw new ForbiddenError('Missing permission: results.view')
+  }
+
   const rows = await myAssessments(ctx)
+  const showChildName = rows.some((r) => r.studentName)
 
   const order = ['in_progress', 'available', 'upcoming', 'completed', 'missed']
   const sorted = [...rows].sort(
@@ -36,7 +37,14 @@ export default async function MyAssessmentsPage() {
 
   return (
     <div>
-      <PageHeader title="My assessments" description={`${rows.length} in total`} />
+      <PageHeader
+        title="My assessments"
+        description={
+          showChildName
+            ? `${rows.length} for your children`
+            : `${rows.length} in total`
+        }
+      />
 
       {sorted.length === 0 ? (
         <Card>
@@ -50,7 +58,7 @@ export default async function MyAssessmentsPage() {
           {sorted.map((row) => {
             const state = STATE[row.state as keyof typeof STATE] ?? STATE.upcoming
             return (
-              <Card key={row.assignmentId}>
+              <Card key={`${row.studentId}-${row.assignmentId}`}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-5">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -59,6 +67,9 @@ export default async function MyAssessmentsPage() {
                       {row.mode === 'OFFLINE' && <Badge tone="neutral">on paper</Badge>}
                       {row.mode === 'PRACTICE' && <Badge tone="info">practice</Badge>}
                     </div>
+                    {row.studentName ? (
+                      <p className="mt-1 text-sm text-ink-muted">{row.studentName}</p>
+                    ) : null}
                     <p className="mt-1 text-sm text-ink-muted">
                       {row.subject} · {row.type} · {row.totalMarks} marks · {row.minutes} minutes
                     </p>

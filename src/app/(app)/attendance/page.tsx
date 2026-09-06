@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { AlertCircle, CalendarCheck, Layers } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import { isPortalOnlyRole } from '@/server/scope'
 import { markableSections } from '@/server/modules/academics/service'
 import { getRegister, unmarkedSections } from '@/server/modules/attendance/service'
 import { toDateInput } from '@/lib/dates'
@@ -23,6 +25,9 @@ export default async function AttendancePage({
   searchParams: Promise<{ sectionId?: string; onDate?: string }>
 }) {
   const ctx = await requireContext('attendance.view')
+  if (isPortalOnlyRole(ctx.user.roleKeys)) {
+    redirect('/attendance/reports')
+  }
   const params = await searchParams
 
   const today = toDateInput(new Date())

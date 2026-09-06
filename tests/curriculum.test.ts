@@ -72,10 +72,11 @@ describe('curriculum permissions', () => {
     expect(principal?.permissions).toContain('curriculum.manage')
   })
 
-  it('does not grant students or parents any of it', () => {
+  it('lets students and parents view published syllabus for their own class', () => {
     for (const key of [ROLE.STUDENT, ROLE.PARENT]) {
       const role = SYSTEM_ROLES.find((r) => r.key === key)
-      expect(role?.permissions.some((p) => p.startsWith('curriculum.'))).toBe(false)
+      expect(role?.permissions).toContain('curriculum.view')
+      expect(role?.permissions).not.toContain('curriculum.manage')
     }
   })
 })

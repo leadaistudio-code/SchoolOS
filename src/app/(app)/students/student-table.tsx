@@ -22,6 +22,7 @@ export function StudentTable({
   currency,
   canEdit,
   canCreate,
+  canSeeFeeAmounts,
 }: {
   rows: StudentListRow[]
   total: number
@@ -32,6 +33,8 @@ export function StudentTable({
   currency: string
   canEdit: boolean
   canCreate: boolean
+  /** When false, show Paid/Due only — never rupee amounts (teachers). */
+  canSeeFeeAmounts: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -126,7 +129,18 @@ export function StudentTable({
                   )}
                 </TD>
                 <TD align="right">
-                  <DueAmount formatted={formatMoney(s.dueMinor, currency)} due={s.dueMinor > 0} />
+                  {canSeeFeeAmounts ? (
+                    <DueAmount formatted={formatMoney(s.dueMinor, currency)} due={s.dueMinor > 0} />
+                  ) : (
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        s.dueMinor > 0 ? 'text-[var(--danger)]' : 'text-ink-muted',
+                      )}
+                    >
+                      {s.dueMinor > 0 ? 'Due' : 'Paid'}
+                    </span>
+                  )}
                 </TD>
                 <TD>
                   <StatusBadge status={s.status} />

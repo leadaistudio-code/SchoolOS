@@ -133,7 +133,7 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
           value={attendancePct === null ? 'No data' : `${attendancePct}%`}
           sub={totalMarked ? `${present} of ${totalMarked} days present` : 'Not marked yet'}
           emphasis={attendancePct !== null && attendancePct < 75 ? 'warning' : undefined}
-          href="/attendance"
+          href="/attendance/reports"
         />
         <Metric
           label="Fees due"

@@ -3,7 +3,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, attendancePercent, toDateInput } from '@/lib/dates'
-import { assertMarkableSection, studentIdScopeWhere } from '@/server/scope'
+import { assertMarkableSection, assertStudentAccess, studentIdScopeWhere } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import type {
   AttendanceReportQuery,
@@ -442,6 +442,110 @@ export async function attendanceReport(
     .sort((a, b) => (a.percent ?? 101) - (b.percent ?? 101))
 
   return { rows, totals }
+}
+
+/**
+ * Day-by-day attendance for one student in a date range.
+ * Used by admins and teachers from the attendance report.
+ */
+export async function studentAttendanceDetail(
+  ctx: AppContext,
+  studentId: string,
+  query: { from: string; to: string },
+) {
+  ctx.require('attendance.view')
+  await assertStudentAccess(ctx, studentId)
+
+  const from = attendanceDate(query.from)
+  const to = attendanceDate(query.to)
+  if (to < from) throw new ApiException(400, 'BAD_REQUEST', 'The end date is before the start date')
+  if (differenceInCalendarDays(to, from) > 400) {
+    throw new ApiException(400, 'BAD_REQUEST', 'Choose a range of one year or less')
+  }
+
+  const student = await ctx.db.student.findFirst({
+    where: { id: studentId, deletedAt: null },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      admissionNo: true,
+      enrollments: {
+        where: { isCurrent: true },
+        take: 1,
+        select: {
+          classLevel: { select: { name: true } },
+          section: { select: { name: true } },
+          rollNumber: true,
+        },
+      },
+    },
+  })
+  if (!student) throw notFound('Student')
+
+  const days = await ctx.db.studentAttendance.findMany({
+    where: {
+      studentId,
+      onDate: { gte: from, lte: to },
+    },
+    orderBy: { onDate: 'desc' },
+    select: {
+      id: true,
+      onDate: true,
+      status: true,
+      minutesLate: true,
+      remarks: true,
+      sectionId: true,
+    },
+  })
+
+  const sectionIds = [...new Set(days.map((d) => d.sectionId))]
+  const sections =
+    sectionIds.length === 0
+      ? []
+      : await ctx.db.section.findMany({
+          where: { id: { in: sectionIds } },
+          select: {
+            id: true,
+            name: true,
+            classLevel: { select: { name: true } },
+          },
+        })
+  const sectionLabel = new Map(
+    sections.map((s) => [s.id, `${s.classLevel.name} ${s.name}`] as const),
+  )
+
+  const counts: Record<string, number> = {}
+  for (const d of days) counts[d.status] = (counts[d.status] ?? 0) + 1
+
+  return {
+    student: {
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      admissionNo: student.admissionNo,
+      className: student.enrollments[0]?.classLevel.name ?? null,
+      sectionName: student.enrollments[0]?.section.name ?? null,
+      rollNumber: student.enrollments[0]?.rollNumber ?? null,
+    },
+    from: query.from,
+    to: query.to,
+    percent: attendancePercent(counts),
+    counts: {
+      present: counts.PRESENT ?? 0,
+      absent: counts.ABSENT ?? 0,
+      late: counts.LATE ?? 0,
+      halfDay: counts.HALF_DAY ?? 0,
+      leave: counts.LEAVE ?? 0,
+    },
+    days: days.map((d) => ({
+      id: d.id,
+      onDate: toDateInput(d.onDate),
+      status: d.status,
+      minutesLate: d.minutesLate,
+      remarks: d.remarks,
+      classLabel: sectionLabel.get(d.sectionId) ?? null,
+    })),
+  }
 }
 
 /** Daily present-percentage series used by the dashboard and the reports page. */

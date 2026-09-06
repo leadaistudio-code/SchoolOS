@@ -191,12 +191,69 @@ export const teachingClassSubjectIds = cache(
 
 /** Throws unless the caller may act on this specific class-subject. */
 export async function assertClassSubjectAccess(ctx: AppContext, classSubjectId: string) {
-  const ids = await teachingClassSubjectIds(ctx)
-  if (ids === null) return
-  if (!ids.includes(classSubjectId)) {
-    throw new ForbiddenError('You do not teach this subject')
+  const teacherIds = await teachingClassSubjectIds(ctx)
+  if (teacherIds !== null) {
+    if (!teacherIds.includes(classSubjectId)) {
+      throw new ForbiddenError('You do not teach this subject')
+    }
+    return
+  }
+
+  const studentIds = await accessibleStudentIds(ctx)
+  if (studentIds === null) return
+  if (studentIds.length === 0) {
+    throw new ForbiddenError('You do not have access to this subject')
+  }
+
+  const classSubject = await ctx.db.classSubject.findFirst({
+    where: { id: classSubjectId },
+    select: { classLevelId: true },
+  })
+  if (!classSubject) {
+    throw new ForbiddenError('You do not have access to this subject')
+  }
+
+  const enrollment = await ctx.db.enrollment.findFirst({
+    where: {
+      studentId: { in: studentIds },
+      isCurrent: true,
+      classLevelId: classSubject.classLevelId,
+    },
+    select: { id: true },
+  })
+  if (!enrollment) {
+    throw new ForbiddenError('You do not have access to this subject')
   }
 }
+
+/**
+ * Class levels the portal user may see (own / children's), or `null` when
+ * unrestricted. Teachers are handled by `teachingClassLevelIds`.
+ */
+export const accessibleClassLevelIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
+  const studentIds = await accessibleStudentIds(ctx)
+  if (studentIds === null) return null
+  if (studentIds.length === 0) return []
+
+  const enrollments = await ctx.db.enrollment.findMany({
+    where: { studentId: { in: studentIds }, isCurrent: true },
+    select: { classLevelId: true },
+  })
+  return [...new Set(enrollments.map((e) => e.classLevelId))]
+})
+
+/** Sections for portal users' own / children enrollments, or `null` unrestricted. */
+export const accessibleSectionIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
+  const studentIds = await accessibleStudentIds(ctx)
+  if (studentIds === null) return null
+  if (studentIds.length === 0) return []
+
+  const enrollments = await ctx.db.enrollment.findMany({
+    where: { studentId: { in: studentIds }, isCurrent: true },
+    select: { sectionId: true },
+  })
+  return [...new Set(enrollments.map((e) => e.sectionId).filter((id): id is string => Boolean(id)))]
+})
 
 /** Throws unless a teacher-only user may mark attendance for this section. */
 export async function assertMarkableSection(ctx: AppContext, sectionId: string) {
@@ -219,8 +276,13 @@ export async function studentIdScopeWhere(ctx: AppContext) {
 }
 
 export async function classLevelScopeWhere(ctx: AppContext) {
-  const ids = await teachingClassLevelIds(ctx)
-  return ids === null ? {} : { id: { in: ids } }
+  const teacherIds = await teachingClassLevelIds(ctx)
+  if (teacherIds !== null) return { id: { in: teacherIds } }
+
+  const portalIds = await accessibleClassLevelIds(ctx)
+  if (portalIds !== null) return { id: { in: portalIds } }
+
+  return {}
 }
 
 /**

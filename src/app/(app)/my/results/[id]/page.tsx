@@ -1,4 +1,5 @@
 import { requireContext } from '@/server/context'
+import { redirect } from 'next/navigation'
 import { myResult } from '@/server/modules/assessments/evaluation'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,7 +17,10 @@ export const metadata = { title: 'Result' }
  */
 export default async function ResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const ctx = await requireContext('assessments.attempt')
+  const ctx = await requireContext()
+  if (!ctx.can('assessments.attempt') && !ctx.can('results.view')) {
+    redirect('/403')
+  }
   const result = await myResult(ctx, id)
 
   const percent =
