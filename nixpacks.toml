@@ -1,0 +1,3 @@
+# Force Node/Next.js builds. The connect/ folder is a Windows .NET connector
+# shipped in-repo for schools; Nixpacks must not treat the repo as a C# app.
+providers = ["node"]
