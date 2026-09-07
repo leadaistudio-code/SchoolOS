@@ -67,6 +67,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('calendar'),
       ...all('attendance'),
       ...all('staff_attendance'),
+      ...all('biometric'),
       ...all('leave'),
       'fees.view', 'fees.export', 'fees.concession',
       'expenses.view',

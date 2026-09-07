@@ -1455,6 +1455,11 @@ model StudentAttendance {
   status      AttendanceStatus
   minutesLate Int?
   remarks     String?
+  /// How the day was marked. Existing rows stay MANUAL when source is null-defaulted.
+  source      AttendanceSource @default(MANUAL)
+  /// First / last biometric punch of the day (UTC). Null for register-only marks.
+  firstPunchAt DateTime?
+  lastPunchAt  DateTime?
   markedById  String?
   markedAt    DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -3987,6 +3992,264 @@ model GpsIngestToken {
   createdAt   DateTime  @default(now())
 
   @@index([tenantId, revokedAt])
+}
+
+// ===========================================================================
+// DEVICE GATEWAY / MYCAMPUSVIEW CONNECT (biometric attendance)
+//
+// Schools keep existing hardware on their LAN. MyCampusView Connect (Windows
+// service) talks to the device and pushes events outbound over HTTPS. The
+// cloud never dials private IPs. Vendor SDKs stay inside Connect adapters;
+// these tables are brand-agnostic.
+// ===========================================================================
+
+enum DeviceConnectorStatus {
+  PENDING
+  ONLINE
+  OFFLINE
+  REVOKED
+  DISABLED
+}
+
+enum BiometricDeviceStatus {
+  ONLINE
+  OFFLINE
+  SYNCING
+  ERROR
+  DISABLED
+}
+
+enum BiometricDevicePurpose {
+  STUDENT
+  STAFF
+  BOTH
+  ACCESS_ONLY
+}
+
+enum BiometricVerificationMethod {
+  FINGERPRINT
+  RFID
+  PIN
+  FACE
+  UNKNOWN
+}
+
+enum BiometricEventDirection {
+  IN
+  OUT
+  UNKNOWN
+}
+
+enum DeviceRawEventStatus {
+  PENDING
+  PROCESSED
+  UNMAPPED
+  SKIPPED
+  FAILED
+  CONFLICT
+}
+
+enum DeviceUserSubjectType {
+  STUDENT
+  STAFF
+}
+
+enum DeviceCommandType {
+  SYNC_DEVICE
+  TEST_CONNECTION
+  READ_USERS
+  REFRESH_INFO
+  SYNC_DEVICE_TIME
+}
+
+enum DeviceCommandStatus {
+  PENDING
+  CLAIMED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+/// Windows Connect instance paired to one school (tenant).
+model DeviceConnector {
+  id              String                @id @default(cuid())
+  tenantId        String
+  name            String
+  /// Public identifier sent by Connect (not secret).
+  connectorKey    String                @unique
+  /// SHA-256 of the long-lived secret issued at pairing.
+  secretHash      String
+  secretPrefix    String
+  status          DeviceConnectorStatus @default(PENDING)
+  enabled         Boolean               @default(true)
+  version         String?
+  hostname        String?
+  osInfo          String?
+  pendingEvents   Int                   @default(0)
+  lastSeenAt      DateTime?
+  pairedAt        DateTime?
+  revokedAt       DateTime?
+  createdById     String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  devices  BiometricDevice[]
+  events   DeviceRawEvent[]
+  commands DeviceCommand[]
+  mappings DeviceUserMapping[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, lastSeenAt])
+}
+
+/// Short-lived single-use pairing code (e.g. MCV-74K9-PQ2M).
+model DevicePairingCode {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// Normalised uppercase code without separators for lookup.
+  codeHash    String    @unique
+  /// Display form shown to the admin once.
+  codeDisplay String
+  connectorName String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedByConnectorId String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, expiresAt])
+}
+
+/// Physical attendance device behind a connector (Realtime RS9W, future brands).
+model BiometricDevice {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  connectorId     String
+  name            String
+  brand           String
+  model           String
+  /// Free-text wing/gate label — there is no Campus entity in the schema yet.
+  locationLabel   String?
+  purpose         BiometricDevicePurpose @default(BOTH)
+  /// Connector-local device id (stable for that Connect install).
+  localDeviceId   String
+  serialNumber    String?
+  machineNumber   String?
+  networkAddress  String?
+  port            Int?
+  /// Encrypted connection password if the device uses one.
+  connectionSecretEnc String?
+  configJson      Json?
+  status          BiometricDeviceStatus  @default(OFFLINE)
+  syncEnabled     Boolean                @default(true)
+  active          Boolean                @default(true)
+  lastConnectedAt DateTime?
+  lastEventAt     DateTime?
+  lastSyncAt      DateTime?
+  lastError       String?
+  clockDriftSec   Int?
+  firmware        String?
+  userCount       Int?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  connector DeviceConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  events    DeviceRawEvent[]
+  mappings  DeviceUserMapping[]
+  commands  DeviceCommand[]
+
+  @@unique([tenantId, connectorId, localDeviceId])
+  @@index([tenantId, status])
+  @@index([tenantId, active])
+}
+
+model DeviceUserMapping {
+  id              String               @id @default(cuid())
+  tenantId        String
+  /// Scope: same external id may be shared across devices, or per-device.
+  connectorId     String?
+  deviceId        String?
+  externalUserId  String
+  displayName     String?
+  subjectType     DeviceUserSubjectType
+  studentId       String?
+  staffId         String?
+  active          Boolean              @default(true)
+  lastPunchAt     DateTime?
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  connector DeviceConnector? @relation(fields: [connectorId], references: [id], onDelete: SetNull)
+  device    BiometricDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, externalUserId])
+  @@index([tenantId, externalUserId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, staffId])
+  @@index([tenantId, active])
+}
+
+/// Immutable source-of-truth punch from hardware (or simulator).
+model DeviceRawEvent {
+  id                 String                      @id @default(cuid())
+  tenantId           String
+  connectorId        String
+  deviceId           String
+  externalUserId     String
+  /// Vendor log id when available; otherwise stable composite.
+  dedupeKey          String
+  deviceEventId      String?
+  deviceLocalAt      DateTime
+  receivedAt         DateTime                    @default(now())
+  verificationMethod BiometricVerificationMethod @default(UNKNOWN)
+  direction          BiometricEventDirection     @default(UNKNOWN)
+  rawPayload         Json?
+  status             DeviceRawEventStatus        @default(PENDING)
+  mappingId          String?
+  studentId          String?
+  staffId            String?
+  studentAttendanceId String?
+  staffAttendanceId   String?
+  processedAt        DateTime?
+  processError       String?
+  notifiedAt         DateTime?
+
+  connector DeviceConnector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  device    BiometricDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, deviceLocalAt])
+  @@index([tenantId, status, receivedAt])
+  @@index([tenantId, externalUserId, deviceLocalAt])
+  @@index([tenantId, deviceId, deviceLocalAt])
+  @@index([tenantId, studentId, deviceLocalAt])
+  @@index([tenantId, staffId, deviceLocalAt])
+}
+
+/// Cloud → connector command (connector polls; no inbound school firewall holes).
+model DeviceCommand {
+  id          String              @id @default(cuid())
+  tenantId    String
+  connectorId String
+  deviceId    String?
+  type        DeviceCommandType
+  payload     Json?
+  status      DeviceCommandStatus @default(PENDING)
+  resultJson  Json?
+  error       String?
+  createdById String?
+  createdAt   DateTime            @default(now())
+  claimedAt   DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime?
+
+  connector DeviceConnector  @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  device    BiometricDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, connectorId, status])
+  @@index([connectorId, status, createdAt])
 }
 
 // ===========================================================================

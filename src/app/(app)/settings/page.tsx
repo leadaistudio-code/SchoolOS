@@ -32,6 +32,14 @@ const TILES: Tile[] = [
     tone: 'transport',
   },
   {
+    href: '/settings/biometric',
+    title: 'Biometric',
+    description: 'Pair MyCampusView Connect and sync fingerprint attendance devices.',
+    permission: 'biometric.view',
+    icon: 'Fingerprint',
+    tone: 'attendance',
+  },
+  {
     href: '/settings/branding',
     title: 'Branding',
     description: 'School colours, sign-in page and document footers.',

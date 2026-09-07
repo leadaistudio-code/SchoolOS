@@ -1,6 +1,8 @@
 export const TEMPLATE_EVENTS = [
   { key: 'fee.due', label: 'Fee due reminder' },
   { key: 'attendance.absent', label: 'Student absence' },
+  { key: 'attendance.biometric_entry', label: 'Student biometric check-in' },
+  { key: 'attendance.biometric_exit', label: 'Student biometric check-out' },
   { key: 'result.published', label: 'Result published' },
   { key: 'admission.followup', label: 'Admission follow-up' },
   { key: 'leave.decision', label: 'Leave decision' },

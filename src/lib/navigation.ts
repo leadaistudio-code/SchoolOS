@@ -323,6 +323,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'School Profile', href: '/settings', icon: 'School', permission: 'settings.view' },
       { label: 'School location', href: '/settings/location', icon: 'MapPin', permission: 'settings.view' },
       { label: 'GPS trackers', href: '/settings/tracking', icon: 'Satellite', permission: 'transport.manage' },
+      { label: 'Biometric', href: '/settings/biometric', icon: 'Fingerprint', permission: 'biometric.view' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
       { label: 'Teacher knowledge refresh', href: '/settings/teacher-refresh', icon: 'BrainCircuit', permission: 'teacher_refresh.configure' },
       { label: 'Security', href: '/settings/security', icon: 'ShieldCheck', permission: 'settings.view' },

@@ -92,6 +92,12 @@ export const PERMISSIONS: PermissionDef[] = [
     ['mark', 'Mark own attendance'],
     ['manage', 'Manage / override staff attendance'],
   ]),
+  ...mod('biometric', [
+    ['view', 'View biometric connectors and devices'],
+    ['manage', 'Manage biometric connectors, devices and sync'],
+    ['mapping', 'Map biometric users to students and staff'],
+    ['logs', 'View raw biometric event logs'],
+  ]),
   ...mod('leave', [
     ['view', 'View leave requests'],
     ['apply', 'Apply for leave'],
