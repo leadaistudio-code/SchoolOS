@@ -82,7 +82,7 @@ export function BiometricConsole({ canManage }: { canManage: boolean }) {
   const [pairingCode, setPairingCode] = React.useState<string | null>(null)
   const [pairingName, setPairingName] = React.useState('Office Connector')
   const [mapExternalId, setMapExternalId] = React.useState('')
-  const [mapStudentId, setMapStudentId] = React.useState('')
+  const [mapAdmissionNo, setMapAdmissionNo] = React.useState('')
   const [loading, setLoading] = React.useState(false)
 
   const load = React.useCallback(async (next: Tab) => {
@@ -346,10 +346,14 @@ export function BiometricConsole({ canManage }: { canManage: boolean }) {
               </CardHeader>
               <CardContent className="flex flex-wrap items-end gap-3">
                 <Field label="Device user ID">
-                  <Input value={mapExternalId} onChange={(e) => setMapExternalId(e.target.value)} />
+                  <Input value={mapExternalId} onChange={(e) => setMapExternalId(e.target.value)} placeholder="e.g. 1520" />
                 </Field>
-                <Field label="Student ID (internal)">
-                  <Input value={mapStudentId} onChange={(e) => setMapStudentId(e.target.value)} placeholder="cuid from students" />
+                <Field label="Admission No">
+                  <Input
+                    value={mapAdmissionNo}
+                    onChange={(e) => setMapAdmissionNo(e.target.value)}
+                    placeholder="e.g. ADM-2026-158"
+                  />
                 </Field>
                 <Button
                   onClick={async () => {
@@ -358,14 +362,14 @@ export function BiometricConsole({ canManage }: { canManage: boolean }) {
                         action: 'upsert_mapping',
                         externalUserId: mapExternalId,
                         subjectType: 'STUDENT',
-                        studentId: mapStudentId,
+                        admissionNo: mapAdmissionNo,
                       })
                       toast.push({
                         tone: 'success',
                         title: `Mapped. Reprocessed ${result.reprocessed} events.`,
                       })
                       setMapExternalId('')
-                      setMapStudentId('')
+                      setMapAdmissionNo('')
                       await load('mappings')
                     } catch (err) {
                       toast.push({

@@ -75,7 +75,11 @@ export const mappingSchema = z.object({
   displayName: z.string().trim().max(120).optional().nullable(),
   subjectType: z.enum(['STUDENT', 'STAFF']),
   studentId: z.string().min(1).optional().nullable(),
+  /** Prefer this in the UI — resolved to studentId server-side. */
+  admissionNo: z.string().trim().min(1).max(80).optional().nullable(),
   staffId: z.string().min(1).optional().nullable(),
+  /** Prefer this for staff — resolved to staffId server-side. */
+  employeeCode: z.string().trim().min(1).max(80).optional().nullable(),
   deviceId: z.string().min(1).optional().nullable(),
   connectorId: z.string().min(1).optional().nullable(),
   active: z.boolean().optional(),

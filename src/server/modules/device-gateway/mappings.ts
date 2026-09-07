@@ -141,26 +141,53 @@ export async function upsertMapping(ctx: AppContext, input: unknown) {
   ctx.require('biometric.mapping')
   const data = mappingSchema.parse(input)
 
-  if (data.subjectType === 'STUDENT' && !data.studentId) {
-    throw badRequest('studentId is required for student mappings')
-  }
-  if (data.subjectType === 'STAFF' && !data.staffId) {
-    throw badRequest('staffId is required for staff mappings')
+  let studentId = data.studentId ?? null
+  let staffId = data.staffId ?? null
+  let displayName = data.displayName ?? null
+
+  if (data.subjectType === 'STUDENT') {
+    if (!studentId && data.admissionNo) {
+      const student = await ctx.db.student.findFirst({
+        where: { admissionNo: { equals: data.admissionNo.trim(), mode: 'insensitive' }, deletedAt: null },
+        select: { id: true, firstName: true, lastName: true, admissionNo: true },
+      })
+      if (!student) throw notFound('Student')
+      studentId = student.id
+      if (!displayName) {
+        displayName = `${student.firstName} ${student.lastName}`
+      }
+    }
+    if (!studentId) throw badRequest('Enter the student Admission No (e.g. ADM-2026-158)')
   }
 
-  if (data.studentId) {
-    const student = await ctx.db.student.findFirst({
-      where: { id: data.studentId, deletedAt: null },
-      select: { id: true },
-    })
-    if (!student) throw notFound('Student not found')
+  if (data.subjectType === 'STAFF') {
+    if (!staffId && data.employeeCode) {
+      const staff = await ctx.db.staff.findFirst({
+        where: { employeeCode: { equals: data.employeeCode.trim(), mode: 'insensitive' }, deletedAt: null },
+        select: { id: true, firstName: true, lastName: true },
+      })
+      if (!staff) throw notFound('Staff')
+      staffId = staff.id
+      if (!displayName) {
+        displayName = `${staff.firstName} ${staff.lastName}`
+      }
+    }
+    if (!staffId) throw badRequest('Enter the staff Employee Code')
   }
-  if (data.staffId) {
-    const staff = await ctx.db.staff.findFirst({
-      where: { id: data.staffId, deletedAt: null },
+
+  if (studentId) {
+    const student = await ctx.db.student.findFirst({
+      where: { id: studentId, deletedAt: null },
       select: { id: true },
     })
-    if (!staff) throw notFound('Staff not found')
+    if (!student) throw notFound('Student')
+  }
+  if (staffId) {
+    const staff = await ctx.db.staff.findFirst({
+      where: { id: staffId, deletedAt: null },
+      select: { id: true },
+    })
+    if (!staff) throw notFound('Staff')
   }
 
   const row = await ctx.db.deviceUserMapping.upsert({
@@ -173,20 +200,20 @@ export async function upsertMapping(ctx: AppContext, input: unknown) {
     create: {
       tenantId: ctx.tenant.id,
       externalUserId: data.externalUserId.trim(),
-      displayName: data.displayName ?? null,
+      displayName: displayName,
       subjectType: data.subjectType,
-      studentId: data.subjectType === 'STUDENT' ? data.studentId! : null,
-      staffId: data.subjectType === 'STAFF' ? data.staffId! : null,
+      studentId: data.subjectType === 'STUDENT' ? studentId : null,
+      staffId: data.subjectType === 'STAFF' ? staffId : null,
       deviceId: data.deviceId ?? null,
       connectorId: data.connectorId ?? null,
       active: data.active ?? true,
       createdById: ctx.user.userId,
     },
     update: {
-      displayName: data.displayName ?? null,
+      displayName: displayName,
       subjectType: data.subjectType,
-      studentId: data.subjectType === 'STUDENT' ? data.studentId! : null,
-      staffId: data.subjectType === 'STAFF' ? data.staffId! : null,
+      studentId: data.subjectType === 'STUDENT' ? studentId : null,
+      staffId: data.subjectType === 'STAFF' ? staffId : null,
       deviceId: data.deviceId ?? null,
       connectorId: data.connectorId ?? null,
       active: data.active ?? true,
