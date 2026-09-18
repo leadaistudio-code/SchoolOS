@@ -135,7 +135,9 @@ export function PapersTable({
                     {ASSESSMENT_STATUS_LABEL[row.status] ?? row.status}
                   </Badge>
                 </TD>
-                <TD className="text-sm text-ink-muted">{formatDay(row.createdAt)}</TD>
+                <TD className="text-sm text-ink-muted">
+                  {formatDay(new Date(row.createdAt))}
+                </TD>
                 {canDelete ? (
                   <TD align="right">
                     <IconButton
