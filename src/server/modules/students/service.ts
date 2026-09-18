@@ -4,7 +4,12 @@ import { attendanceDate } from '@/lib/dates'
 import { audit } from '@/server/audit'
 import { assertWithinLimit, FEATURE } from '@/server/entitlements'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
-import { classLevelScopeWhere, studentScopeWhere, assertStudentAccess } from '@/server/scope'
+import {
+  classLevelScopeWhere,
+  studentScopeWhere,
+  assertStudentAccess,
+  isPortalOnlyRole,
+} from '@/server/scope'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { PROFILE_PHOTO_CATEGORY } from '@/lib/student-documents'
 import {
@@ -16,6 +21,7 @@ import {
 
 export type StudentListRow = {
   id: string
+  userId: string | null
   admissionNo: string
   firstName: string
   lastName: string
@@ -100,6 +106,7 @@ export async function listStudents(
       ...skipTake(query),
       select: {
         id: true,
+        userId: true,
         admissionNo: true,
         firstName: true,
         lastName: true,
@@ -133,6 +140,7 @@ export async function listStudents(
     total,
     rows: rows.map((s) => ({
       id: s.id,
+      userId: s.userId,
       admissionNo: s.admissionNo,
       firstName: s.firstName,
       lastName: s.lastName,
@@ -153,6 +161,7 @@ export async function listStudents(
 
 export async function getStudent(ctx: AppContext, id: string) {
   await assertStudentAccess(ctx, id)
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
 
   const student = await ctx.db.student.findFirst({
     where: { id, deletedAt: null },
@@ -165,7 +174,10 @@ export async function getStudent(ctx: AppContext, id: string) {
           session: { select: { id: true, name: true } },
         },
       },
-      guardians: { include: { parent: true } },
+      guardians: {
+        ...(portal ? { where: { parent: { userId: ctx.user.userId } } } : {}),
+        include: { parent: true },
+      },
       documents: {
         where: { deletedAt: null, NOT: { category: PROFILE_PHOTO_CATEGORY } },
         orderBy: { createdAt: 'desc' },
@@ -414,6 +426,16 @@ export async function archiveStudent(ctx: AppContext, id: string, reason?: strin
       where: { studentId: id, isCurrent: true },
       data: { isCurrent: false, leftOn: new Date() },
     })
+    if (before.userId) {
+      await tx.user.update({
+        where: { id: before.userId },
+        data: { status: 'DISABLED' },
+      })
+      await tx.session.updateMany({
+        where: { userId: before.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    }
     return tx.student.update({
       where: { id },
       data: { deletedAt: new Date(), status: 'WITHDRAWN' },

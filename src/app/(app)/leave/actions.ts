@@ -71,6 +71,36 @@ export async function decideLeaveAction(
   }
 }
 
+export async function bulkDecideLeaveAction(
+  ids: string[],
+  status: 'APPROVED' | 'REJECTED',
+  decisionNote?: string,
+): Promise<ActionResult> {
+  const uniqueIds = [...new Set(ids)].filter(Boolean).slice(0, 250)
+  if (uniqueIds.length === 0) return { ok: false, message: 'Select at least one request.' }
+  const ctx = await requireContext('leave.approve')
+  const input = leaveDecisionSchema.parse({ status, decisionNote })
+  let updated = 0
+  const failed: string[] = []
+  for (const id of uniqueIds) {
+    try {
+      await decideLeave(ctx, id, input)
+      updated++
+    } catch (error) {
+      failed.push(error instanceof Error ? error.message : 'Decision failed')
+    }
+  }
+  revalidatePath('/leave')
+  revalidatePath('/staff/approvals')
+  revalidatePath('/attendance')
+  return {
+    ok: updated > 0 && failed.length === 0,
+    message: failed.length > 0
+      ? `${updated} updated; ${failed.length} failed. ${failed[0]}`
+      : `${updated} leave request${updated === 1 ? '' : 's'} ${status.toLowerCase()}.`,
+  }
+}
+
 export async function cancelLeaveAction(id: string): Promise<ActionResult> {
   const ctx = await requireContext('leave.apply')
   try {

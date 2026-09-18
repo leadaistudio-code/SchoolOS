@@ -32,7 +32,7 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
   return (
     <div
       className={cn(
-        'px-4 py-2.5 flex items-center justify-between gap-3 border-b border-line min-h-11',
+        'px-4 py-2.5 flex items-center justify-between gap-3 border-b border-line min-h-11 bg-surface-2/80 first:rounded-t-[calc(var(--radius)-1px)]',
         className,
       )}
       {...props}

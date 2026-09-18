@@ -41,6 +41,10 @@ export type NavItem = {
    * than letting someone discover it by clicking.
    */
   soon?: boolean
+  /** Only student/parent portal accounts. */
+  portalOnly?: boolean
+  /** Hidden from student/parent portal accounts (staff tools). */
+  staffOnly?: boolean
 }
 
 /**
@@ -62,8 +66,10 @@ export const NAVIGATION: NavItem[] = [
       { label: 'All Students', href: '/students', icon: 'Users', permission: 'students.view' },
       { label: 'Add Student', href: '/students/new', icon: 'UserPlus', permission: 'students.create' },
       { label: 'Bulk Import', href: '/students/import', icon: 'Upload', permission: 'students.import' },
+      { label: 'Bulk Photos', href: '/students/photo-import', icon: 'Upload', permission: 'students.edit' },
       { label: 'Promotions', href: '/students/promotions', icon: 'ArrowUpRight', permission: 'students.promote' },
       { label: 'Documents', href: '/students/documents', icon: 'FolderOpen', permission: 'students.documents' },
+      { label: 'ID Cards', href: '/students/id-cards', icon: 'IdCard', permission: 'students.id_cards' },
     ],
   },
   { label: 'Parents', href: '/parents', icon: 'Users2', section: 'PEOPLE' as const, permission: 'parents.view' },
@@ -139,6 +145,41 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Question Papers', href: '/assessments', icon: 'FileText', permission: 'assessments.view' },
       { label: 'Question Bank', href: '/assessments/bank', icon: 'Library', permission: 'questionbank.view' },
+      {
+        label: 'Academic Intelligence',
+        href: '/assessments/intelligence',
+        icon: 'Sparkles',
+        permission: 'assessments.view',
+        feature: FEATURE.MODULE_AI_ASSIST,
+      },
+      {
+        label: 'AI Assessment',
+        href: '/assessments/ai/new',
+        icon: 'WandSparkles',
+        permission: 'questionbank.generate',
+        feature: FEATURE.MODULE_AI_ASSIST,
+      },
+      {
+        label: 'AI Evaluation',
+        href: '/assessments/evaluation',
+        icon: 'ScanLine',
+        permission: 'assessments.evaluate',
+        feature: FEATURE.MODULE_AI_ASSIST,
+      },
+      {
+        label: 'Learning Insights',
+        href: '/assessments/insights',
+        icon: 'ChartNoAxesCombined',
+        permission: 'assessments.view',
+        feature: FEATURE.MODULE_AI_ASSIST,
+      },
+      {
+        label: 'AI Usage',
+        href: '/assessments/usage',
+        icon: 'Gauge',
+        permission: 'assessments.view',
+        feature: FEATURE.MODULE_AI_ASSIST,
+      },
     ],
   },
   {
@@ -149,6 +190,15 @@ export const NAVIGATION: NavItem[] = [
     permission: 'exams.view',
     children: [
       { label: 'Exams', href: '/exams', icon: 'FileCheck', permission: 'exams.view' },
+      {
+        label: 'My Admit Cards',
+        href: '/exams/my-admit-cards',
+        icon: 'IdCard',
+        permission: 'exams.view',
+        portalOnly: true,
+      },
+      { label: 'Admit Cards', href: '/exams/admit-cards', icon: 'IdCard', permission: 'exams.admit_cards' },
+      { label: 'Exam Attendance', href: '/exams/attendance', icon: 'ClipboardCheck', permission: 'exams.attendance' },
       { label: 'Marks Entry', href: '/exams/marks', icon: 'PencilRuler', permission: 'exams.marks' },
       { label: 'Grading Scales', href: '/exams/grades', icon: 'Scale', permission: 'exams.manage' },
       { label: 'Results', href: '/exams/results', icon: 'Trophy', permission: 'results.view' },
@@ -163,21 +213,20 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    label: 'Finance',
+    label: 'Fees & Collections',
     href: '/finance',
     icon: 'Wallet',
     section: 'FINANCE' as const,
     permission: 'fees.view',
     mobile: true,
     children: [
-      { label: 'Overview', href: '/finance', icon: 'LayoutDashboard', permission: 'fees.view' },
-      { label: 'Fee Structure', href: '/finance/structures', icon: 'ListTree', permission: 'fees.structure' },
-      { label: 'Optional fees', href: '/finance/optional-fees', icon: 'Sparkles', permission: 'fees.structure' },
-      { label: 'Invoices', href: '/finance/invoices', icon: 'ReceiptText', permission: 'fees.view' },
-      { label: 'Collect Payment', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
-      { label: 'Payments', href: '/finance/payments', icon: 'CreditCard', permission: 'fees.view' },
-      { label: 'Outstanding', href: '/finance/outstanding', icon: 'AlertCircle', permission: 'fees.view' },
-      { label: 'Concessions', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
+      { label: 'Dashboard', href: '/finance', icon: 'LayoutDashboard', permission: 'fees.view' },
+      { label: 'Fee Setup', href: '/finance/structures', icon: 'ListTree', permission: 'fees.structure' },
+      { label: 'Collect Fee', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
+      { label: 'Ledger', href: '/finance/students', icon: 'Users', permission: 'fees.accounts' },
+      { label: 'Discounts', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
+      { label: 'Dues', href: '/finance/dues', icon: 'AlertCircle', permission: 'fees.accounts' },
+      { label: 'Reports', href: '/finance/reports', icon: 'ReceiptText', permission: 'fees.report' },
     ],
   },
   {
@@ -195,14 +244,76 @@ export const NAVIGATION: NavItem[] = [
     section: 'ENGAGEMENT' as const,
     permission: 'feedback.view',
     children: [
-      { label: 'Overview', href: '/feedback', icon: 'LayoutDashboard', permission: 'feedback.view' },
-      { label: 'My feedback', href: '/feedback/mine', icon: 'ChartNoAxesCombined', permission: 'feedback.teacher_view_own' },
-      { label: 'Give student feedback', href: '/feedback/students', icon: 'MessageSquarePlus', permission: 'feedback.teacher_give_student' },
-      { label: 'Campaigns', href: '/feedback/campaigns', icon: 'Send', permission: 'feedback.campaign_manage' },
-      { label: 'Templates', href: '/feedback/templates', icon: 'ListChecks', permission: 'feedback.template_manage' },
-      { label: 'Moderation', href: '/feedback/moderation', icon: 'ShieldCheck', permission: 'feedback.moderate' },
-      { label: 'Confidential concerns', href: '/feedback/concerns', icon: 'ShieldAlert', permission: 'feedback.concern_view' },
-      { label: 'Action items', href: '/feedback/actions', icon: 'ListTodo', permission: 'feedback.action_manage' },
+      {
+        label: 'From teachers',
+        href: '/feedback/received',
+        icon: 'Inbox',
+        permission: 'feedback.view',
+        portalOnly: true,
+      },
+      {
+        label: 'Give feedback',
+        href: '/feedback',
+        icon: 'MessageSquarePlus',
+        permission: 'feedback.view',
+        portalOnly: true,
+      },
+      {
+        label: 'Overview',
+        href: '/feedback',
+        icon: 'LayoutDashboard',
+        permission: 'feedback.view',
+        staffOnly: true,
+      },
+      {
+        label: 'My feedback',
+        href: '/feedback/mine',
+        icon: 'ChartNoAxesCombined',
+        permission: 'feedback.teacher_view_own',
+        staffOnly: true,
+      },
+      {
+        label: 'Give student feedback',
+        href: '/feedback/students',
+        icon: 'MessageSquarePlus',
+        permission: 'feedback.teacher_give_student',
+        staffOnly: true,
+      },
+      {
+        label: 'Campaigns',
+        href: '/feedback/campaigns',
+        icon: 'Send',
+        permission: 'feedback.campaign_manage',
+        staffOnly: true,
+      },
+      {
+        label: 'Templates',
+        href: '/feedback/templates',
+        icon: 'ListChecks',
+        permission: 'feedback.template_manage',
+        staffOnly: true,
+      },
+      {
+        label: 'Moderation',
+        href: '/feedback/moderation',
+        icon: 'ShieldCheck',
+        permission: 'feedback.moderate',
+        staffOnly: true,
+      },
+      {
+        label: 'Confidential concerns',
+        href: '/feedback/concerns',
+        icon: 'ShieldAlert',
+        permission: 'feedback.concern_view',
+        staffOnly: true,
+      },
+      {
+        label: 'Action items',
+        href: '/feedback/actions',
+        icon: 'ListTodo',
+        permission: 'feedback.action_manage',
+        staffOnly: true,
+      },
     ],
   },
   {
@@ -254,7 +365,6 @@ export const NAVIGATION: NavItem[] = [
     href: '/transport',
     icon: 'Bus',
     section: 'OPERATIONS' as const,
-    permission: 'transport.view',
     feature: FEATURE.MODULE_TRANSPORT,
     children: [
       { label: 'Buses', href: '/transport/buses', icon: 'Bus', permission: 'transport.view' },
@@ -338,6 +448,8 @@ export const NAVIGATION: NavItem[] = [
 export type NavPredicate = {
   can: (permission: string) => boolean
   hasFeature: (feature: FeatureKey) => boolean
+  /** Student/parent portal accounts (no school-admin override). */
+  isPortal?: boolean
 }
 
 /** Filters the tree down to what this user may actually reach. */
@@ -346,6 +458,8 @@ export function visibleNavigation(items: NavItem[], p: NavPredicate): NavItem[] 
   for (const item of items) {
     if (item.feature && !p.hasFeature(item.feature)) continue
     if (item.permission && !p.can(item.permission)) continue
+    if (item.portalOnly && !p.isPortal) continue
+    if (item.staffOnly && p.isPortal) continue
     const children = item.children ? visibleNavigation(item.children, p) : undefined
     if (item.children && (!children || children.length === 0)) continue
     out.push({ ...item, children })

@@ -57,13 +57,411 @@ export const teacherStudentFeedbackSchema = z.object({
 export const actionItemSchema = z.object({ responseId: z.string().optional(), title: z.string().trim().min(2).max(180), description: z.string().trim().max(3000).optional(), category: z.string().trim().max(100).optional(), assigneeStaffId: z.string().optional(), priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'), dueAt: date, internalNotes: z.string().trim().max(3000).optional() })
 
 export async function ensureDefaultTemplate(ctx: AppContext) {
-  ctx.require('feedback.template_manage')
-  const existing = await ctx.db.feedbackTemplate.findFirst({ where: { name: 'Student teacher feedback', deletedAt: null } })
-  if (existing) return existing
-  return ctx.db.feedbackTemplate.create({ data: { tenantId: ctx.tenant.id, name: 'Student teacher feedback', audience: 'STUDENT', target: 'TEACHER', isAnonymousToTarget: true, minimumResponses: 5, createdById: ctx.user.userId, questions: { create: [...defaultQuestions.map(([label, category], sortOrder) => ({ tenantId: ctx.tenant.id, label, category, type: 'RATING_5' as const, sortOrder })), { tenantId: ctx.tenant.id, label: 'What do you like most about this teacher’s classes?', category: 'Appreciation', type: 'LONG_TEXT' as const, required: false, sortOrder: 10 }, { tenantId: ctx.tenant.id, label: 'What could make the classes better?', category: 'Suggestion', type: 'LONG_TEXT' as const, required: false, sortOrder: 11 }, { tenantId: ctx.tenant.id, label: 'Is there anything happening in this class that makes you uncomfortable or concerned?', category: 'Concern', type: 'YES_NO' as const, required: true, isConcern: true, sortOrder: 12 }] } } })
+  if (!ctx.can('feedback.template_manage') && !ctx.can('feedback.campaign_manage')) {
+    ctx.require('feedback.template_manage')
+  }
+  const existing = await ctx.db.feedbackTemplate.findFirst({
+    where: { name: 'Student teacher feedback', deletedAt: null },
+  })
+  if (!existing) {
+    await ctx.db.feedbackTemplate.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        name: 'Student teacher feedback',
+        audience: 'STUDENT',
+        target: 'TEACHER',
+        isAnonymousToTarget: true,
+        minimumResponses: 5,
+        createdById: ctx.user.userId,
+        questions: {
+          create: [
+            ...defaultQuestions.map(([label, category], sortOrder) => ({
+              tenantId: ctx.tenant.id,
+              label,
+              category,
+              type: 'RATING_5' as const,
+              sortOrder,
+            })),
+            {
+              tenantId: ctx.tenant.id,
+              label: 'What do you like most about this teacher’s classes?',
+              category: 'Appreciation',
+              type: 'LONG_TEXT' as const,
+              required: false,
+              sortOrder: 10,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'What could make the classes better?',
+              category: 'Suggestion',
+              type: 'LONG_TEXT' as const,
+              required: false,
+              sortOrder: 11,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label:
+                'Is there anything happening in this class that makes you uncomfortable or concerned?',
+              category: 'Concern',
+              type: 'YES_NO' as const,
+              required: true,
+              isConcern: true,
+              sortOrder: 12,
+            },
+          ],
+        },
+      },
+    })
+  }
+
+  const parentExisting = await ctx.db.feedbackTemplate.findFirst({
+    where: { name: 'Parent teacher feedback', deletedAt: null },
+  })
+  if (!parentExisting) {
+    await ctx.db.feedbackTemplate.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        name: 'Parent teacher feedback',
+        audience: 'PARENT',
+        target: 'TEACHER',
+        isAnonymousToTarget: true,
+        minimumResponses: 5,
+        createdById: ctx.user.userId,
+        questions: {
+          create: [
+            {
+              tenantId: ctx.tenant.id,
+              label: 'The teacher communicates clearly about my child’s progress.',
+              category: 'Communication',
+              type: 'RATING_5' as const,
+              sortOrder: 0,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'I feel welcome to ask the teacher questions.',
+              category: 'Support',
+              type: 'RATING_5' as const,
+              sortOrder: 1,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'The teacher supports my child’s learning effectively.',
+              category: 'Teaching',
+              type: 'RATING_5' as const,
+              sortOrder: 2,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'Overall, I am satisfied with this teacher.',
+              category: 'Overall experience',
+              type: 'RATING_5' as const,
+              sortOrder: 3,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'What is going well for your child with this teacher?',
+              category: 'Appreciation',
+              type: 'LONG_TEXT' as const,
+              required: false,
+              sortOrder: 4,
+            },
+            {
+              tenantId: ctx.tenant.id,
+              label: 'What could improve?',
+              category: 'Suggestion',
+              type: 'LONG_TEXT' as const,
+              required: false,
+              sortOrder: 5,
+            },
+          ],
+        },
+      },
+    })
+  }
+
+  return ctx.db.feedbackTemplate.findFirst({
+    where: { name: 'Student teacher feedback', deletedAt: null },
+  })
 }
 
-export async function listTemplates(ctx: AppContext) { ctx.require('feedback.template_manage'); return ctx.db.feedbackTemplate.findMany({ where: { deletedAt: null }, include: { _count: { select: { questions: true, campaigns: true } } }, orderBy: { updatedAt: 'desc' } }) }
+type CampaignRow = {
+  id: string
+  templateId: string
+  audience: string
+  target: string
+  sessionId: string | null
+  endsAt: Date | null
+  classLevelIds: unknown
+  sectionIds: unknown
+  subjectIds: unknown
+  teacherIds: unknown
+  studentIds: unknown
+}
+
+async function teachersForEnrollment(
+  ctx: AppContext,
+  classLevelId: string,
+  sectionId: string | null,
+  subjectIds: string[],
+  teacherIds: string[],
+): Promise<Array<{ subjectId: string | null; teacherId: string }>> {
+  const pairs = new Map<string, { subjectId: string | null; teacherId: string }>()
+  const allowTeacher = (id: string) => !teacherIds.length || teacherIds.includes(id)
+  const allowSubject = (id: string | null) =>
+    !subjectIds.length || (id !== null && subjectIds.includes(id))
+  const add = (teacherId: string | null | undefined, subjectId: string | null) => {
+    if (!teacherId || !allowTeacher(teacherId) || !allowSubject(subjectId)) return
+    pairs.set(`${teacherId}:${subjectId ?? ''}`, { teacherId, subjectId })
+  }
+
+  // Prefer the section timetable — that is who actually teaches this child’s class.
+  if (sectionId) {
+    const slots = await ctx.db.timetableSlot.findMany({
+      where: {
+        sectionId,
+        teacherId: { not: null },
+        ...(subjectIds.length
+          ? { classSubject: { subjectId: { in: subjectIds } } }
+          : {}),
+        ...(teacherIds.length ? { teacherId: { in: teacherIds } } : {}),
+      },
+      select: {
+        teacherId: true,
+        classSubject: { select: { subjectId: true } },
+      },
+    })
+    for (const slot of slots) {
+      add(slot.teacherId, slot.classSubject?.subjectId ?? null)
+    }
+
+    const section = await ctx.db.section.findFirst({
+      where: { id: sectionId },
+      select: { classTeacherId: true },
+    })
+    if (section?.classTeacherId) add(section.classTeacherId, null)
+  }
+
+  // Fall back to class-subject teachers when the timetable is empty.
+  if (pairs.size === 0) {
+    const rows = await ctx.db.classSubject.findMany({
+      where: {
+        classLevelId,
+        teacherId: { not: null },
+        ...(subjectIds.length ? { subjectId: { in: subjectIds } } : {}),
+        ...(teacherIds.length ? { teacherId: { in: teacherIds } } : {}),
+      },
+      select: {
+        subjectId: true,
+        teacherId: true,
+        sections: { select: { sectionId: true } },
+      },
+    })
+    for (const row of rows) {
+      if (
+        sectionId &&
+        row.sections.length > 0 &&
+        !row.sections.some((s) => s.sectionId === sectionId)
+      ) {
+        continue
+      }
+      add(row.teacherId, row.subjectId)
+    }
+  }
+
+  return [...pairs.values()]
+}
+
+function assignmentKey(
+  studentId: string | null | undefined,
+  parentId: string | null | undefined,
+  teacherId: string | null | undefined,
+  subjectId: string | null | undefined,
+) {
+  return `${studentId ?? ''}|${parentId ?? ''}|${teacherId ?? ''}|${subjectId ?? ''}`
+}
+
+/**
+ * Creates pending feedback forms for a campaign.
+ * Student→teacher and parent→teacher are supported. Forms are based on who
+ * teaches each enrolled student’s section (timetable first, then class subjects).
+ */
+async function createCampaignAssignments(
+  ctx: AppContext,
+  campaign: CampaignRow,
+  periodKey: string,
+): Promise<{ created: number; reason?: string }> {
+  if (campaign.target !== 'TEACHER') {
+    return {
+      created: 0,
+      reason: 'Only teacher-targeted campaigns can be assigned automatically yet.',
+    }
+  }
+  if (campaign.audience !== 'STUDENT' && campaign.audience !== 'PARENT') {
+    return {
+      created: 0,
+      reason: 'Audience must be Student or Parent for teacher feedback forms.',
+    }
+  }
+
+  const classIds = (campaign.classLevelIds as string[] | null) ?? []
+  const sectionIds = (campaign.sectionIds as string[] | null) ?? []
+  const subjectIds = (campaign.subjectIds as string[] | null) ?? []
+  const teacherIds = (campaign.teacherIds as string[] | null) ?? []
+  const studentIds = (campaign.studentIds as string[] | null) ?? []
+
+  const enrollments = await ctx.db.enrollment.findMany({
+    where: {
+      isCurrent: true,
+      ...(campaign.sessionId ? { sessionId: campaign.sessionId } : {}),
+      ...(classIds.length ? { classLevelId: { in: classIds } } : {}),
+      ...(sectionIds.length ? { sectionId: { in: sectionIds } } : {}),
+      ...(studentIds.length ? { studentId: { in: studentIds } } : {}),
+    },
+    select: {
+      studentId: true,
+      classLevelId: true,
+      sectionId: true,
+      student: {
+        select: {
+          guardians: {
+            select: { parent: { select: { id: true, userId: true } } },
+          },
+        },
+      },
+    },
+  })
+
+  if (enrollments.length === 0) {
+    return {
+      created: 0,
+      reason:
+        'No current student enrollments matched this campaign. Check the academic session and class filters.',
+    }
+  }
+
+  const allowedKeys = new Set<string>()
+  let created = 0
+  let teachingPairs = 0
+
+  for (const enrollment of enrollments) {
+    const teaching = await teachersForEnrollment(
+      ctx,
+      enrollment.classLevelId,
+      enrollment.sectionId,
+      subjectIds,
+      teacherIds,
+    )
+    teachingPairs += teaching.length
+
+    if (campaign.audience === 'STUDENT') {
+      for (const item of teaching) {
+        allowedKeys.add(
+          assignmentKey(enrollment.studentId, null, item.teacherId, item.subjectId),
+        )
+        const result = await ctx.db.feedbackAssignment.createMany({
+          data: [
+            {
+              tenantId: ctx.tenant.id,
+              campaignId: campaign.id,
+              templateId: campaign.templateId,
+              studentId: enrollment.studentId,
+              targetStaffId: item.teacherId,
+              subjectId: item.subjectId ?? undefined,
+              classLevelId: enrollment.classLevelId,
+              sectionId: enrollment.sectionId,
+              periodKey,
+              dueAt: campaign.endsAt,
+            },
+          ],
+          skipDuplicates: true,
+        })
+        created += result.count
+      }
+      continue
+    }
+
+    // PARENT → TEACHER: only guardians of this child × teachers of this child’s section.
+    for (const guardian of enrollment.student.guardians) {
+      const parent = guardian.parent
+      for (const item of teaching) {
+        allowedKeys.add(
+          assignmentKey(enrollment.studentId, parent.id, item.teacherId, item.subjectId),
+        )
+        const result = await ctx.db.feedbackAssignment.createMany({
+          data: [
+            {
+              tenantId: ctx.tenant.id,
+              campaignId: campaign.id,
+              templateId: campaign.templateId,
+              studentId: enrollment.studentId,
+              parentId: parent.id,
+              targetStaffId: item.teacherId,
+              subjectId: item.subjectId ?? undefined,
+              classLevelId: enrollment.classLevelId,
+              sectionId: enrollment.sectionId,
+              periodKey: `${periodKey}:p:${parent.id}`,
+              dueAt: campaign.endsAt,
+            },
+          ],
+          skipDuplicates: true,
+        })
+        created += result.count
+      }
+    }
+  }
+
+  // Drop pending forms that are no longer valid (e.g. teacher not on this child’s class).
+  const pending = await ctx.db.feedbackAssignment.findMany({
+    where: { campaignId: campaign.id, status: 'PENDING' },
+    select: {
+      id: true,
+      studentId: true,
+      parentId: true,
+      targetStaffId: true,
+      subjectId: true,
+    },
+  })
+  const staleIds = pending
+    .filter(
+      (row) =>
+        !allowedKeys.has(
+          assignmentKey(row.studentId, row.parentId, row.targetStaffId, row.subjectId),
+        ),
+    )
+    .map((row) => row.id)
+  if (staleIds.length) {
+    await ctx.db.feedbackAssignment.deleteMany({ where: { id: { in: staleIds } } })
+  }
+
+  if (created === 0 && teachingPairs === 0 && staleIds.length === 0) {
+    return {
+      created: 0,
+      reason:
+        'No teachers found on the class timetable or class subjects for enrolled students. Assign teachers to the timetable, then sync.',
+    }
+  }
+
+  if (created === 0 && campaign.audience === 'PARENT' && staleIds.length === 0) {
+    return {
+      created: 0,
+      reason:
+        'No parent links were found for enrolled students, or forms were already assigned. Link guardians on student profiles, then sync.',
+    }
+  }
+
+  return { created }
+}
+
+export async function listTemplates(ctx: AppContext) {
+  if (!ctx.can('feedback.template_manage') && !ctx.can('feedback.campaign_manage')) {
+    ctx.require('feedback.template_manage')
+  }
+  return ctx.db.feedbackTemplate.findMany({
+    where: { deletedAt: null },
+    include: { _count: { select: { questions: true, campaigns: true } } },
+    orderBy: { updatedAt: 'desc' },
+  })
+}
 export async function createTemplate(ctx: AppContext, input: z.infer<typeof templateSchema>) {
   ctx.require('feedback.template_manage')
   const created = await ctx.db.feedbackTemplate.create({ data: { tenantId: ctx.tenant.id, ...input, createdById: ctx.user.userId, questions: { create: input.questions.map((question, sortOrder) => ({ tenantId: ctx.tenant.id, ...question, choices: question.choices ?? undefined, sortOrder })) } }, include: { questions: true } })
@@ -83,34 +481,160 @@ export async function createCampaign(ctx: AppContext, input: z.infer<typeof camp
 
 export async function activateCampaign(ctx: AppContext, id: string) {
   ctx.require('feedback.campaign_manage')
-  const campaign = await ctx.db.feedbackCampaign.findFirst({ where: { id }, include: { template: true } }); if (!campaign) throw notFound('Feedback campaign')
-  // Already running: nothing new is created, but the caller still reads
-  // `created`, and an undefined there reaches the user as 'undefined feedback
-  // requests created'.
-  if (campaign.status === 'ACTIVE') return { campaign, created: 0 }
-  const periodKey = campaign.startsAt ? campaign.startsAt.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
-  let created = 0
-  if (campaign.audience === 'STUDENT' && campaign.target === 'TEACHER') {
-    const classIds = (campaign.classLevelIds as string[] | null) ?? []; const subjectIds = (campaign.subjectIds as string[] | null) ?? []; const teacherIds = (campaign.teacherIds as string[] | null) ?? []; const studentIds = (campaign.studentIds as string[] | null) ?? []
-    const session = campaign.sessionId ? { sessionId: campaign.sessionId } : { isCurrent: true }
-    const enrollments = await ctx.db.enrollment.findMany({ where: { isCurrent: true, ...(campaign.sessionId ? { sessionId: campaign.sessionId } : {}), ...(classIds.length ? { classLevelId: { in: classIds } } : {}), ...(studentIds.length ? { studentId: { in: studentIds } } : {}) }, select: { studentId: true, classLevelId: true, sectionId: true, student: { select: { userId: true } } } })
-    for (const enrollment of enrollments) {
-      if (!enrollment.student.userId) continue
-      const teaching = await ctx.db.classSubject.findMany({ where: { classLevelId: enrollment.classLevelId, teacherId: { not: null }, ...(subjectIds.length ? { subjectId: { in: subjectIds } } : {}), ...(teacherIds.length ? { teacherId: { in: teacherIds } } : {}) }, select: { subjectId: true, teacherId: true } })
-      for (const item of teaching) {
-        const result = await ctx.db.feedbackAssignment.createMany({ data: [{ tenantId: ctx.tenant.id, campaignId: campaign.id, templateId: campaign.templateId, studentId: enrollment.studentId, targetStaffId: item.teacherId, subjectId: item.subjectId, classLevelId: enrollment.classLevelId, sectionId: enrollment.sectionId, periodKey, dueAt: campaign.endsAt }], skipDuplicates: true }); created += result.count
-      }
+  const campaign = await ctx.db.feedbackCampaign.findFirst({
+    where: { id },
+    include: { template: true },
+  })
+  if (!campaign) throw notFound('Feedback campaign')
+
+  const periodKey = campaign.startsAt
+    ? campaign.startsAt.toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10)
+
+  if (campaign.status === 'ACTIVE') {
+    const synced = await createCampaignAssignments(ctx, campaign, periodKey)
+    if (synced.created === 0 && synced.reason) {
+      throw new ApiException(400, 'BAD_REQUEST', synced.reason)
     }
+    await record(
+      ctx,
+      'feedback_campaign.sync',
+      'FeedbackCampaign',
+      campaign.id,
+      `Synced ${campaign.name}; ${synced.created} feedback requests created`,
+      { created: synced.created },
+    )
+    return { campaign, created: synced.created }
   }
-  const updated = await ctx.db.feedbackCampaign.update({ where: { id: campaign.id }, data: { status: 'ACTIVE', startsAt: campaign.startsAt ?? new Date() } })
-  await record(ctx, 'feedback_campaign.activate', 'FeedbackCampaign', campaign.id, `Activated ${campaign.name}; ${created} feedback requests created`, { created })
-  return { campaign: updated, created }
+
+  const assigned = await createCampaignAssignments(ctx, campaign, periodKey)
+  if (assigned.created === 0) {
+    throw new ApiException(
+      400,
+      'BAD_REQUEST',
+      assigned.reason ??
+        'No feedback forms could be created. Assign subject teachers, then try again.',
+    )
+  }
+
+  const updated = await ctx.db.feedbackCampaign.update({
+    where: { id: campaign.id },
+    data: { status: 'ACTIVE', startsAt: campaign.startsAt ?? new Date() },
+  })
+  await record(
+    ctx,
+    'feedback_campaign.activate',
+    'FeedbackCampaign',
+    campaign.id,
+    `Activated ${campaign.name}; ${assigned.created} feedback requests created`,
+    { created: assigned.created },
+  )
+  return { campaign: updated, created: assigned.created }
+}
+
+/** Re-run assignment for an active campaign (e.g. after teachers were linked). */
+export async function syncCampaignAssignments(ctx: AppContext, id: string) {
+  ctx.require('feedback.campaign_manage')
+  const campaign = await ctx.db.feedbackCampaign.findFirst({ where: { id } })
+  if (!campaign) throw notFound('Feedback campaign')
+  if (campaign.status !== 'ACTIVE') {
+    throw new ApiException(400, 'BAD_REQUEST', 'Activate the campaign before syncing assignments')
+  }
+  const periodKey = campaign.startsAt
+    ? campaign.startsAt.toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10)
+  const result = await createCampaignAssignments(ctx, campaign, periodKey)
+  if (result.created === 0 && result.reason) {
+    throw new ApiException(400, 'BAD_REQUEST', result.reason)
+  }
+  await record(
+    ctx,
+    'feedback_campaign.sync',
+    'FeedbackCampaign',
+    campaign.id,
+    `Synced ${campaign.name}; ${result.created} feedback requests created`,
+    { created: result.created },
+  )
+  return result
 }
 
 export async function pendingForCurrentUser(ctx: AppContext) {
   ctx.require('feedback.submit')
-  const [student, parent] = await Promise.all([ctx.db.student.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } }), ctx.db.parent.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } })])
-  return ctx.db.feedbackAssignment.findMany({ where: { status: 'PENDING', OR: [{ studentId: student?.id ?? '__none__' }, { parentId: parent?.id ?? '__none__' }] }, include: { template: { include: { questions: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } } }, targetStaff: { select: { firstName: true, lastName: true } }, subject: { select: { name: true } } }, orderBy: { createdAt: 'asc' } })
+  const [student, parent] = await Promise.all([
+    ctx.db.student.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } }),
+    ctx.db.parent.findFirst({
+      where: { userId: ctx.user.userId },
+      select: {
+        id: true,
+        children: { select: { studentId: true } },
+      },
+    }),
+  ])
+
+  const childIds = parent?.children.map((c) => c.studentId) ?? []
+  const clauses: Array<Record<string, unknown>> = []
+  if (student) {
+    clauses.push({ studentId: student.id, parentId: null })
+  }
+  if (parent) {
+    clauses.push({
+      parentId: parent.id,
+      studentId: { in: childIds.length ? childIds : ['__none__'] },
+    })
+  }
+  if (clauses.length === 0) return []
+
+  return ctx.db.feedbackAssignment.findMany({
+    where: {
+      status: 'PENDING',
+      OR: clauses,
+    },
+    include: {
+      template: {
+        include: { questions: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } },
+      },
+      targetStaff: { select: { firstName: true, lastName: true } },
+      subject: { select: { name: true } },
+      student: { select: { firstName: true, lastName: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+/** Load one assigned form for the signed-in student/parent, including after submit. */
+export async function getAssignmentForRespondent(ctx: AppContext, assignmentId: string) {
+  ctx.require('feedback.submit')
+  const [student, parent] = await Promise.all([
+    ctx.db.student.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } }),
+    ctx.db.parent.findFirst({
+      where: { userId: ctx.user.userId },
+      select: { id: true, children: { select: { studentId: true } } },
+    }),
+  ])
+  const childIds = parent?.children.map((c) => c.studentId) ?? []
+  const clauses: Array<Record<string, unknown>> = []
+  if (student) clauses.push({ studentId: student.id, parentId: null })
+  if (parent) {
+    clauses.push({
+      parentId: parent.id,
+      studentId: { in: childIds.length ? childIds : ['__none__'] },
+    })
+  }
+  if (clauses.length === 0) return null
+
+  return ctx.db.feedbackAssignment.findFirst({
+    where: { id: assignmentId, OR: clauses },
+    include: {
+      template: {
+        include: {
+          questions: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+        },
+      },
+      targetStaff: { select: { firstName: true, lastName: true } },
+      subject: { select: { name: true } },
+      student: { select: { firstName: true, lastName: true } },
+    },
+  })
 }
 
 export async function submitResponse(ctx: AppContext, assignmentId: string, input: z.infer<typeof responseSchema>) {
@@ -155,7 +679,7 @@ export async function createTeacherStudentFeedback(ctx: AppContext, input: z.inf
   if (input.subjectId) { const assignment = await ctx.db.classSubject.findFirst({ where: { classLevelId: enrollment.classLevelId, subjectId: input.subjectId, teacherId: teacher.id } }); if (!assignment) throw new ApiException(403, 'FORBIDDEN', 'You do not teach this subject to this student') }
   const created = await ctx.db.teacherStudentFeedback.create({ data: { tenantId: ctx.tenant.id, studentId: input.studentId, teacherId: teacher.id, subjectId: input.subjectId, classLevelId: enrollment.classLevelId, sectionId: enrollment.sectionId, tags: input.tags, performance: input.performance, participation: input.participation, homework: input.homework, behaviour: input.behaviour, strengths: input.strengths, improvement: input.improvement, actions: input.actions, comment: input.comment, visibility: input.visibility } })
   const recipients = [input.visibility === 'STUDENT' || input.visibility === 'STUDENT_AND_PARENT' ? enrollment.student.userId : undefined, ...(input.visibility === 'PARENT' || input.visibility === 'STUDENT_AND_PARENT' ? enrollment.student.guardians.map((g) => g.parent.userId) : [])].filter((id): id is string => !!id)
-  await notify(ctx, { userIds: recipients, eventKey: 'feedback.student', title: 'New teacher feedback', body: 'Your teacher has shared feedback and recommended next steps.', linkUrl: '/feedback' })
+  await notify(ctx, { userIds: recipients, eventKey: 'feedback.student', title: 'New teacher feedback', body: 'Your teacher has shared feedback and recommended next steps.', linkUrl: '/feedback/received' })
   await record(ctx, 'teacher_student_feedback.create', 'TeacherStudentFeedback', created.id, 'Shared student feedback', created)
   return created
 }

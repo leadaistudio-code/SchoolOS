@@ -300,7 +300,7 @@ Call emit_questions exactly once with all of the questions. Write nothing else.`
             position,
           })),
         },
-        topics: { create: [{ tenantId: ctx.tenant.id, topicId: q.topicId }] },
+        topics: { create: [{ tenantId: ctx.tenant.id, topicId: q.topicId! }] },
       },
       select: { id: true },
     })

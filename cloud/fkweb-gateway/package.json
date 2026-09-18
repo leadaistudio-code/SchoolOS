@@ -1,0 +1,14 @@
+{
+  "name": "mycampusview-fkweb-cloud-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check protocol.mjs",
+    "test": "node --test protocol.test.mjs"
+  }
+}

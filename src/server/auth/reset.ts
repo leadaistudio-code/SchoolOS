@@ -152,7 +152,7 @@ async function deliver(
 }
 
 export type RedeemView =
-  | { valid: true; firstName: string; email: string | null }
+  | { valid: true; firstName: string; email: string | null; roleKeys: string[] }
   | { valid: false }
 
 /** Checks a link before showing its form, without spending the token. */
@@ -163,7 +163,16 @@ export async function inspectToken(
 ): Promise<RedeemView> {
   const row = await verifyToken(token, purpose, tenantId)
   if (!row) return { valid: false }
-  return { valid: true, firstName: row.firstName, email: row.email }
+  const roles = await prisma.userRole.findMany({
+    where: { userId: row.userId },
+    select: { role: { select: { key: true } } },
+  })
+  return {
+    valid: true,
+    firstName: row.firstName,
+    email: row.email,
+    roleKeys: roles.map((r) => r.role.key),
+  }
 }
 
 export type CompleteOutcome =
@@ -199,16 +208,24 @@ export async function completeWithToken(
   const row = await verifyToken(token, purpose, tenantId)
   if (!row) return { ok: false, field: 'token', message: EXPIRED }
 
-  const issues = checkPasswordPolicy(newPassword)
+  const current = await prisma.user.findUnique({
+    where: { id: row.userId },
+    select: {
+      passwordHash: true,
+      firstName: true,
+      lastName: true,
+      roles: { select: { role: { select: { key: true } } } },
+    },
+  })
+  if (!current) return { ok: false, field: 'token', message: EXPIRED }
+
+  const roleKeys = current.roles.map((r) => r.role.key)
+  const issues = checkPasswordPolicy(newPassword, { roleKeys })
   if (issues.length > 0) {
     return { ok: false, field: 'password', message: issues.join('. ') }
   }
 
-  const current = await prisma.user.findUnique({
-    where: { id: row.userId },
-    select: { passwordHash: true, firstName: true, lastName: true },
-  })
-  if (current?.passwordHash && (await verifyPassword(newPassword, current.passwordHash))) {
+  if (current.passwordHash && (await verifyPassword(newPassword, current.passwordHash))) {
     return {
       ok: false,
       field: 'password',

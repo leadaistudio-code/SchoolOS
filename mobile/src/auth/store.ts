@@ -82,6 +82,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       }
       await setStoredSession(refreshed)
       set({ status: 'signedIn', session: refreshed })
+      void import('@/notifications/push').then((m) => m.registerPushNotifications())
     } catch (error) {
       if (error instanceof ApiError && error.isAuth) {
         await clearStoredSession()
@@ -145,9 +146,15 @@ export const useAuth = create<AuthState>()((set, get) => ({
     await setStoredSession(session)
     await setLastSchoolSlug(session.tenantSlug)
     set({ status: 'signedIn', session, expiredMessage: null })
+
+    // Fire-and-forget: push is a courtesy; sign-in must not wait on FCM/Expo.
+    void import('@/notifications/push').then((m) => m.registerPushNotifications())
   },
 
   signOut: async () => {
+    await import('@/notifications/push')
+      .then((m) => m.unregisterPushNotifications())
+      .catch(() => {})
     // Told to the server so the row is revoked, not merely forgotten locally —
     // otherwise the token stays valid until it expires and the device keeps
     // showing in "signed-in devices".

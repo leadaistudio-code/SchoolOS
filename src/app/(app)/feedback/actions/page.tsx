@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Metric, MetricRow } from '@/components/ui/metric'
-import { formatDay } from '@/lib/dates'
-import { ActionControls, NewActionItemButton } from './controls'
+import { NewActionItemButton } from './controls'
+import { ActionItemList } from './action-item-list'
 
 export const metadata = { title: 'Feedback action items' }
 
@@ -18,13 +18,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   WAITING: 'neutral',
   RESOLVED: 'success',
   CLOSED: 'neutral',
-}
-
-const PRIORITY_TONE: Record<string, BadgeTone> = {
-  LOW: 'neutral',
-  MEDIUM: 'info',
-  HIGH: 'warning',
-  URGENT: 'danger',
 }
 
 const LIVE = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'WAITING']
@@ -85,54 +78,23 @@ export default async function FeedbackActionsPage() {
             action={<NewActionItemButton staff={staff} label="Raise the first action item" />}
           />
         ) : (
-          <ul className="divide-y divide-[var(--border)]">
-            {live.map((item) => (
-              <li key={item.id} className="p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={PRIORITY_TONE[item.priority] ?? 'neutral'}>
-                    {item.priority.toLowerCase()}
-                  </Badge>
-                  <Badge tone={STATUS_TONE[item.status] ?? 'neutral'}>
-                    {item.status.toLowerCase().replace(/_/g, ' ')}
-                  </Badge>
-                  {item.category ? (
-                    <span className="text-xs text-ink-subtle">{item.category}</span>
-                  ) : null}
-                  {item.dueAt ? (
-                    <span
-                      className={
-                        item.dueAt < now
-                          ? 'ml-auto text-xs tnum font-medium text-[var(--danger)]'
-                          : 'ml-auto text-xs tnum text-ink-subtle'
-                      }
-                    >
-                      Due {formatDay(item.dueAt)}
-                    </span>
-                  ) : null}
-                </div>
-
-                <p className="mt-2 text-base font-medium text-ink">{item.title}</p>
-                {item.description ? (
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-ink-muted">
-                    {item.description}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-ink-subtle">
-                  {item.assignee
-                    ? `Assigned to ${item.assignee.firstName} ${item.assignee.lastName}`
-                    : 'Nobody assigned'}
-                </p>
-
-                <ActionControls
-                  id={item.id}
-                  status={item.status}
-                  priority={item.priority}
-                  assigneeStaffId={item.assigneeStaffId ?? ''}
-                  staff={staff}
-                />
-              </li>
-            ))}
-          </ul>
+          <ActionItemList
+            staff={staff}
+            rows={live.map((item) => ({
+              id: item.id,
+              status: item.status,
+              priority: item.priority,
+              category: item.category,
+              dueAt: item.dueAt?.toISOString() ?? null,
+              overdue: !!item.dueAt && item.dueAt < now,
+              title: item.title,
+              description: item.description,
+              assigneeStaffId: item.assigneeStaffId,
+              assigneeName: item.assignee
+                ? `${item.assignee.firstName} ${item.assignee.lastName}`
+                : null,
+            }))}
+          />
         )}
       </Card>
 

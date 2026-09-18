@@ -6,6 +6,7 @@ import {
   registerParticipantSchema,
   type EventInput,
 } from './schema'
+import { accessibleStudentIds } from '@/server/scope'
 
 export async function listEvents(ctx: AppContext) {
   ctx.require('events.view')
@@ -19,10 +20,14 @@ export async function listEvents(ctx: AppContext) {
 
 export async function getEvent(ctx: AppContext, id: string) {
   ctx.require('events.view')
+  const allowedStudentIds = await accessibleStudentIds(ctx)
   const event = await ctx.db.schoolEvent.findFirst({
     where: { id, deletedAt: null },
     include: {
       participants: {
+        ...(allowedStudentIds === null
+          ? {}
+          : { where: { studentId: { in: allowedStudentIds } } }),
         orderBy: { registeredAt: 'desc' },
         take: 200,
       },

@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { requireContext } from '@/server/context'
 import { listIngestTokens, listTrackedBuses } from '@/server/modules/transport/ingest'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { TrackingSetup } from './tracking-setup'
 
 export const metadata = { title: 'GPS trackers' }
@@ -29,10 +29,11 @@ export default async function TrackingSetupPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="GPS trackers"
         description="Connect hardware trackers so buses report their position without a driver keeping a phone awake"
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'GPS trackers' }]}
+        icon="Satellite"
+        tone="info"
       />
 
       <TrackingSetup

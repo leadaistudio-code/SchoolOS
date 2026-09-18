@@ -128,7 +128,11 @@ function composeGreeting(options: {
 function roleDefaultPrompts(roleKeys: string[]): string[] {
   const keys = new Set(roleKeys)
   if (keys.has('PRINCIPAL') || keys.has('SCHOOL_ADMIN')) {
-    return ['Give me today\'s school overview', 'How does this week\'s attendance compare to last week?']
+    return [
+      'Give me today\'s school overview',
+      'Where are the learning topic gaps?',
+      'How does this week\'s attendance compare to last week?',
+    ]
   }
   if (keys.has('ACCOUNTANT')) {
     return ['How much fee came in today?', 'Compare this week\'s collections to last week']

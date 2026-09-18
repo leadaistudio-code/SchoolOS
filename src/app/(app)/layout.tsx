@@ -9,6 +9,7 @@ import { AssistantLauncher } from '@/components/assistant/panel'
 import { assistantConfigured } from '@/server/assistant/agent'
 import { FEATURE } from '@/lib/features'
 import { PwaRegister } from '@/components/pwa-register'
+import { isPortalOnlyRole } from '@/server/scope'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -33,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const navigation = visibleNavigation(NAVIGATION, {
     can: ctx.can,
     hasFeature: (feature) => entitlements[feature]?.enabled ?? false,
+    isPortal: isPortalOnlyRole(ctx.user.roleKeys),
   })
 
   const [unreadCount, unreadMessages, session] = await Promise.all([

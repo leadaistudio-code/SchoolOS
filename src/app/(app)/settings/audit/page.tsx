@@ -1,7 +1,7 @@
 import { requireContext } from '@/server/context'
 import { auditActivity, auditModules, listAuditLog } from '@/server/modules/settings/audit'
 import { parseListQuery } from '@/lib/query'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
@@ -42,10 +42,11 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <SettingsPageHeader
         title="Audit log"
         description={`${activity.total} recorded events · append-only`}
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Audit log' }]}
+        icon="ScrollText"
+        tone="danger"
       />
 
       <MetricRow>
@@ -60,6 +61,12 @@ export default async function AuditPage({
       </MetricRow>
 
       <Card className="overflow-hidden">
+        <SettingsPanelHeader
+          title="Recorded activity"
+          description="Search sensitive changes by person, module, date or record."
+          icon="ScrollText"
+          tone="danger"
+        />
         <SearchBar placeholder="Search summary, person or record id" />
         <AuditFilters
           modules={modules}

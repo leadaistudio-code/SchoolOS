@@ -3,6 +3,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { PERMISSIONS } from '@/lib/rbac/permissions'
+import { currentPortalUserWhere } from '@/server/modules/settings/users'
 
 export const roleSchema = z.object({
   name: z.string().trim().min(2, 'Name the role').max(60),
@@ -37,7 +38,22 @@ export async function listRoles(ctx: AppContext) {
       isSystem: true,
       tenantId: true,
       permissions: { select: { permission: { select: { key: true, module: true } } } },
-      _count: { select: { users: true } },
+      // Built-in roles are shared platform records, so an unfiltered relation
+      // count would include people from every school. Match the Users page by
+      // counting only non-deleted accounts in the current tenant.
+      _count: {
+        select: {
+          users: {
+            where: {
+              user: {
+                tenantId: ctx.tenant.id,
+                deletedAt: null,
+                ...currentPortalUserWhere,
+              },
+            },
+          },
+        },
+      },
     },
   })
 
@@ -172,7 +188,23 @@ export async function deleteRole(ctx: AppContext, id: string) {
 
   const role = await ctx.db.role.findFirst({
     where: { id, tenantId: ctx.tenant.id },
-    select: { id: true, name: true, isSystem: true, _count: { select: { users: true } } },
+    select: {
+      id: true,
+      name: true,
+      isSystem: true,
+      _count: {
+        select: {
+          users: {
+            where: {
+              user: {
+                tenantId: ctx.tenant.id,
+                deletedAt: null,
+              },
+            },
+          },
+        },
+      },
+    },
   })
   if (!role) throw notFound('Role')
   if (role.isSystem) throw new ApiException(409, 'CONFLICT', 'Built-in roles cannot be deleted')

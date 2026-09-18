@@ -1,9 +1,14 @@
 import { redirect } from 'next/navigation'
-import { CheckCircle2, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { LoginForm } from './login-form'
 import { MyCampusViewLogo } from '@/components/brand/logo'
 import { resolveTenant } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
+import {
+  destinationForExistingSession,
+  SESSION_MISMATCH_COPY,
+  tenantHomeUrlForUser,
+} from '@/server/auth/login-redirect'
 import { env } from '@/lib/env'
 
 export const metadata = { title: 'Sign in' }
@@ -29,10 +34,22 @@ export default async function LoginPage({
     searchParams,
   ])
 
+  let mismatchMessage: string | null = null
+  let schoolHomeUrl: string | null = null
+
   if (user) {
-    const next = params.next
-    const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
-    redirect(safeNext ?? (tenant ? '/' : '/platform'))
+    const destination = destinationForExistingSession({
+      user,
+      tenant,
+      next: params.next,
+    })
+    if (destination.kind === 'redirect') {
+      redirect(destination.href)
+    }
+    mismatchMessage = SESSION_MISMATCH_COPY[destination.reason]
+    if (destination.reason === 'tenant-on-platform' && user.tenantId) {
+      schoolHomeUrl = await tenantHomeUrlForUser(user.tenantId)
+    }
   }
 
   const school = tenant?.school
@@ -96,6 +113,39 @@ export default async function LoginPage({
                   aria-hidden
                 />
                 <p className="text-sm text-ink">{notice}</p>
+              </div>
+            ) : null}
+
+            {mismatchMessage ? (
+              <div
+                role="status"
+                className="mb-5 space-y-3 rounded-[var(--radius)] border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-warning-bg px-3.5 py-2.5"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle
+                    className="size-4.5 text-[var(--warning)] mt-0.5 shrink-0"
+                    aria-hidden
+                  />
+                  <p className="text-sm text-ink">{mismatchMessage}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-7">
+                  {schoolHomeUrl ? (
+                    <a
+                      href={schoolHomeUrl}
+                      className="text-sm font-medium text-[var(--brand-600)] hover:underline"
+                    >
+                      Open your school
+                    </a>
+                  ) : null}
+                  <form action="/api/v1/auth/logout" method="post">
+                    <button
+                      type="submit"
+                      className="text-sm font-medium text-ink underline-offset-2 hover:underline"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </div>
               </div>
             ) : null}
 

@@ -37,6 +37,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['export', 'Export'],
     ['promote', 'Promote / transfer'],
     ['documents', 'Manage documents'],
+    ['id_cards', 'Create and print student ID cards'],
   ]),
   ...mod('parents', [...CRUD, ['export', 'Export']]),
   ...mod('staff', [
@@ -107,11 +108,19 @@ export const PERMISSIONS: PermissionDef[] = [
   ...mod('fees', [
     ['view', 'View fees'],
     ['status', 'View paid / unpaid fee status without amounts'],
+    ['accounts', 'View student fee accounts and dues'],
     ['structure', 'Manage fee structures'],
+    ['structure_publish', 'Publish and assign fee structures'],
     ['invoice', 'Generate invoices'],
     ['collect', 'Collect payments'],
     ['refund', 'Issue refunds'],
+    ['refund_approve', 'Approve fee refunds'],
+    ['reverse', 'Reverse posted fee transactions'],
     ['concession', 'Manage concessions'],
+    ['reminder', 'Send fee reminders'],
+    ['report', 'View fee reports'],
+    ['settings', 'Manage advanced fee settings'],
+    ['owner_analytics', 'View fee projections and billing simulations'],
     ['export', 'Export finance data'],
   ]),
 
@@ -128,6 +137,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['delete', 'Delete exams'],
     ['admit_cards', 'Generate admit cards'],
     ['admit_approve', 'Approve admit cards after fee check'],
+    ['attendance', 'Scan and manage exam attendance'],
   ]),
   ...mod('results', [
     ['view', 'View results'],
@@ -221,6 +231,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['manage', 'Change school settings'],
     ['branding', 'Manage branding'],
     ['integrations', 'Manage integrations and secrets'],
+    ['export', 'Download a full school data archive'],
   ]),
   ...mod('support', [
     ['view', 'View support tickets'],

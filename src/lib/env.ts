@@ -145,19 +145,30 @@ const serverSchema = z.object({
   MAPS_DRIVER: z.enum(['none', 'google', 'mapbox']).default('none'),
   MAPS_API_KEY: z.string().optional(),
 
-  AI_DRIVER: z.enum(['none', 'anthropic', 'openai']).default('none'),
+  AI_DRIVER: z.enum(['none', 'anthropic', 'openai', 'gemini']).default('none'),
   AI_API_KEY: z.string().optional(),
   // The model the assistant runs on, pinned rather than latest-tracking: an
   // assistant that answers fee questions should not change behaviour because a
   // new model shipped on a Tuesday. Each driver has a default (see
   // server/assistant/providers); set this to whatever your key can reach.
   AI_MODEL: z.string().optional(),
-  // For Azure OpenAI, a gateway, or a self-hosted OpenAI-compatible endpoint.
+  // For Azure OpenAI, a gateway, Gemini proxy, or a self-hosted OpenAI-compatible endpoint.
   AI_BASE_URL: z.string().url().optional(),
   // How hard the assistant is allowed to think per question. Answering "what is
   // outstanding in Class 9" from tool results does not need deep reasoning, and
   // a principal is waiting for the reply.
-  AI_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
+  AI_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
+
+  /**
+   * Azure Speech (Neural TTS) for Campus Assistant voice output.
+   * When both key and region are set, answers are spoken with Indian English
+   * Neural voices (Neerja/Prabhat) instead of the browser's built-in TTS.
+   * See docs/ASSISTANT.md.
+   */
+  AZURE_SPEECH_KEY: z.string().optional(),
+  AZURE_SPEECH_REGION: z.string().optional(),
+  /** Override default en-IN voice, e.g. en-IN-PrabhatNeural. */
+  AZURE_SPEECH_VOICE: z.string().optional(),
 
   /**
    * Web search for AI School Lead Discovery (Growth CRM).
@@ -169,6 +180,11 @@ const serverSchema = z.object({
   RATE_LIMIT_DRIVER: z.enum(['memory', 'redis']).default('memory'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
+  WORKER_POLL_MS: z.coerce.number().int().min(250).max(60_000).default(2_000),
+  WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(5),
+  WORKER_STALE_MINUTES: z.coerce.number().int().min(1).max(1_440).default(15),
+  WORKER_NOTIFICATION_MAX_AGE_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+
   /**
    * Shared secret that guards the scheduled-job endpoint (`/api/cron/*`). No
    * scheduler ships with the app; an external trigger (a platform cron, a
@@ -177,6 +193,11 @@ const serverSchema = z.object({
    * which runs with database credentials already, still works.
    */
   CRON_SECRET: z.string().min(16).optional(),
+
+  /** Authenticates the dedicated public FKWeb receiver to the web application. */
+  FKWEB_GATEWAY_SECRET: z.string().min(32).optional(),
+  /** Public HTTP base shown to admins when provisioning a no-PC terminal. */
+  FKWEB_PUBLIC_URL: z.string().url().optional(),
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>

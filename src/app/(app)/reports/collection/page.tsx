@@ -18,7 +18,7 @@ export default async function CollectionReportPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>
 }) {
-  const ctx = await requireContext('reports.view')
+  const ctx = await requireContext('fees.report')
   const params = await searchParams
   const range = resolveRange(params, 89)
   const report = await collectionReport(ctx, range)

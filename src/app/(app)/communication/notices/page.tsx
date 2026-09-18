@@ -10,19 +10,11 @@ import {
   colorBannerPrimaryBtn,
 } from '@/components/dashboard/color-tiles'
 import { Card } from '@/components/ui/card'
-import { Badge, humanizeStatus } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
-import { Pagination } from '@/components/pagination'
+import { NoticeList } from './notice-list'
 
 export const metadata = { title: 'Notices' }
-
-const PRIORITY_TONE: Record<string, 'danger' | 'warning' | 'neutral' | 'info'> = {
-  URGENT: 'danger',
-  HIGH: 'warning',
-  NORMAL: 'neutral',
-  LOW: 'info',
-}
 
 export default async function NoticesPage({
   searchParams,
@@ -108,54 +100,16 @@ export default async function NoticesPage({
             }
           />
         ) : (
-          <>
-            <ul className="divide-y divide-[var(--border)]">
-              {rows.map((n) => (
-                <li key={n.id} className="p-4 hover:bg-surface-2">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/communication/notices/${n.id}`}
-                        className="text-base font-medium text-ink hover:text-[var(--brand-600)] inline-flex items-center gap-1.5"
-                      >
-                        {n.pinned ? (
-                          <Pin className="size-3.5 text-[var(--brand-600)]" aria-hidden />
-                        ) : null}
-                        {n.title}
-                      </Link>
-                      <p className="text-sm text-ink-muted mt-1 line-clamp-2">{n.body}</p>
-                      <p className="text-xs text-ink-subtle mt-1.5">
-                        {n.publishOn.toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                        {' · for '}
-                        {n.audience}
-                        {n.attachmentCount > 0 ? (
-                          <span className="inline-flex items-center gap-1 ml-1.5">
-                            <Paperclip className="size-3" aria-hidden />
-                            {n.attachmentCount}
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {!n.isPublished ? <Badge tone="neutral">draft</Badge> : null}
-                      {n.isExpired ? <Badge tone="neutral">expired</Badge> : null}
-                      {n.priority !== 'NORMAL' ? (
-                        <Badge tone={PRIORITY_TONE[n.priority] ?? 'neutral'}>
-                          {humanizeStatus(n.priority)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <Pagination total={total} page={query.page} pageSize={query.pageSize} label="notices" />
-          </>
+          <NoticeList
+            rows={rows.map((notice) => ({
+              ...notice,
+              publishOn: notice.publishOn.toISOString(),
+            }))}
+            total={total}
+            page={query.page}
+            pageSize={query.pageSize}
+            canExport={canPublish}
+          />
         )}
       </Card>
     </div>

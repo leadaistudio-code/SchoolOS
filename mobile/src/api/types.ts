@@ -292,3 +292,297 @@ export type TransportRoute = {
   } | null
   stops: TransportStop[]
 }
+
+/* -------------------------------------------------------------- timetable */
+
+export type TimetablePeriod = {
+  id: string
+  name: string
+  startTime: string
+  endTime: string
+  isBreak: boolean
+}
+
+export type TimetableCell = {
+  slotId: string | null
+  subject: string | null
+  subjectCode: string | null
+  /** Section view: teacher name. Teacher view: class + section. */
+  teacher: string | null
+  teacherId: string | null
+  roomName: string | null
+}
+
+export type TimetableGrid = {
+  staff?: { id: string; firstName: string; lastName: string }
+  section?: { id: string; name: string; className: string }
+  periods: TimetablePeriod[]
+  days: { value: number; label: string; short: string }[]
+  cells: Record<string, Record<number, TimetableCell>>
+  periodsPerWeek?: number
+}
+
+/* ------------------------------------------------------------------- exams */
+
+export type ExamRow = {
+  id: string
+  name: string
+  kind: string
+  status: string
+  startsOn: string
+  endsOn: string
+  gradingScale: { name: string } | null
+  _count: { classes: number; subjects: number }
+}
+
+export type ExamAttendanceDate = {
+  key: string
+  paperCount: number
+  subjects: string[]
+}
+
+export type ExamAttendanceRow = {
+  admitCardNumber: string
+  student: {
+    id: string
+    firstName: string
+    lastName: string
+    admissionNo: string
+    photoUrl: string | null
+    enrollments: {
+      rollNumber: number | null
+      classLevel: { name: string }
+      section: { name: string } | null
+    }[]
+  }
+  paperCount: number
+  papersMarked: number
+  attendance: {
+    status: string
+    source: string
+    checkedInAt: string | null
+    updatedAt: string
+  } | null
+}
+
+export type ExamAttendanceDesk = {
+  exam: { id: string; name: string }
+  dates: ExamAttendanceDate[]
+  selectedDate: string | null
+  dayPapers: { id: string; subjectName: string; className: string; startTime: string | null }[]
+  rows: ExamAttendanceRow[]
+}
+
+export type ExamScanResult = {
+  studentId: string
+  studentName: string
+  admissionNo: string
+  photoUrl: string | null
+  className: string
+  checkedInAt: string | null
+  duplicate: boolean
+  papersTotal: number
+}
+
+export type ExamMarksPaper = {
+  id: string
+  maxMarks: number
+  classSubject: {
+    classLevel: { name: string }
+    subject: { name: string }
+    teacherId: string | null
+  }
+}
+
+export type ExamMarksSetup = {
+  id: string
+  name: string
+  subjects: ExamMarksPaper[]
+}
+
+export type MarksRosterRow = {
+  studentId: string
+  rollNumber: number | null
+  student: { admissionNo: string; firstName: string; lastName: string }
+  mark: {
+    marksObtained: number | null
+    isAbsent: boolean
+    remarks: string | null
+  } | null
+}
+
+export type MarksRoster = {
+  exam: { id: string; name: string }
+  subject: { name: string }
+  maxMarks: number
+  passMarks: number
+  rows: MarksRosterRow[]
+}
+
+/* ---------------------------------------------------------- fee collection */
+
+export type InvoiceRow = {
+  id: string
+  number: string
+  title: string
+  studentId: string
+  studentName: string
+  admissionNo: string
+  className: string | null
+  issuedOn: string
+  dueOn: string
+  totalMinor: number
+  paidMinor: number
+  balanceMinor: number
+  status: string
+  daysOverdue: number
+}
+
+export type CollectResult = {
+  paymentId: string
+  receiptNumber: string
+  allocatedMinor: number
+  unallocatedMinor: number
+  discountedMinor: number
+  invoices: { number: string; appliedMinor: number; balanceMinor: number }[]
+}
+
+export type PaymentReceipt = {
+  id: string
+  amountMinor: number
+  mode: string
+  reference: string | null
+  notes: string | null
+  paidAt: string | null
+  createdAt: string
+  receipt: { number: string } | null
+  outstandingMinor: number
+  advanceMinor: number
+  collectedBy: { firstName: string; lastName: string } | null
+  student: {
+    id: string
+    firstName: string
+    lastName: string
+    admissionNo: string
+    enrollments: {
+      rollNumber: number | null
+      classLevel: { name: string }
+      section: { name: string } | null
+    }[]
+    guardians: { parent: { firstName: string; lastName: string } }[]
+  }
+  allocations: {
+    amountMinor: number
+    invoice: {
+      number: string
+      title: string
+      balanceMinor: number
+      totalMinor: number
+      paidMinor: number
+    }
+  }[]
+}
+
+export type TeachableSubject = {
+  id: string
+  classLevelId: string
+  subject: { name: string; code: string | null }
+  classLevel: {
+    id: string
+    name: string
+    sections: { id: string; name: string }[]
+  }
+}
+
+export type HomeworkSubmission = {
+  id: string
+  status: string
+  score: number | null
+  note: string | null
+  teacherComment: string | null
+  submittedAt: string | null
+  student: {
+    id: string
+    firstName: string
+    lastName: string
+    admissionNo: string
+  }
+}
+
+export type HomeworkDetail = {
+  homework: {
+    id: string
+    title: string
+    instructions: string | null
+    assignedOn: string
+    dueOn: string
+    maxScore: number | null
+    isPublished: boolean
+    classLevel: { id: string; name: string }
+    section: { id: string; name: string } | null
+    classSubject: { subject: { name: string } }
+    teacher: { firstName: string; lastName: string }
+  }
+  submissions: HomeworkSubmission[]
+  pending: {
+    rollNumber: number | null
+    student: { id: string; firstName: string; lastName: string; admissionNo: string }
+  }[]
+}
+
+export type LeaveType = {
+  id: string
+  name: string
+  isPaid: boolean
+}
+
+/* ----------------------------------------------------------- AI evaluation */
+
+export type EvaluationJobRow = {
+  id: string
+  status: string
+  createdAt: string
+  _count: { answers: number }
+  answerSheet: {
+    id: string
+    fileName: string
+    mimeType: string
+    status: string
+    pageCount: number
+    student: { firstName: string; lastName: string; admissionNo: string | null }
+    assignment: { assessment: { id: string; title: string } }
+  }
+}
+
+export type EvaluatedAnswerRow = {
+  id: string
+  questionNumber: number | null
+  assessmentQuestionId: string | null
+  extractedText: string | null
+  ocrConfidence: number | null
+  evaluationConfidence: number | null
+  suggestedMarks: number | null
+  maxMarks: number | null
+  feedback: string | null
+  needsReview: boolean
+  reviewStatus: string
+  teacherMarks: number | null
+  teacherFeedback: string | null
+}
+
+export type EvaluationJobDetail = {
+  id: string
+  status: string
+  answers: EvaluatedAnswerRow[]
+  answerSheet: {
+    id: string
+    fileName: string
+    mimeType: string
+    pageCount: number
+    student: { id: string; firstName: string; lastName: string; admissionNo: string | null }
+    assignment: {
+      id: string
+      assessment: { id: string; title: string; totalMarks: number }
+    }
+  }
+}

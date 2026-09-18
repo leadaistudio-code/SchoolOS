@@ -513,6 +513,40 @@ export async function deleteQuestion(ctx: AppContext, id: string) {
   })
 }
 
+/** Soft-delete many bank questions the caller can access. */
+export async function deleteQuestions(ctx: AppContext, ids: string[]) {
+  const unique = [...new Set(ids)].slice(0, 100)
+  if (unique.length === 0) return { deleted: 0 }
+
+  const rows = await ctx.db.question.findMany({
+    where: { id: { in: unique }, deletedAt: null },
+    select: { id: true, classSubjectId: true },
+  })
+  const allowed: string[] = []
+  for (const row of rows) {
+    try {
+      await assertClassSubjectAccess(ctx, row.classSubjectId)
+      allowed.push(row.id)
+    } catch {
+      // Skip questions outside the caller's teaching scope.
+    }
+  }
+  if (allowed.length === 0) return { deleted: 0 }
+
+  await ctx.db.question.updateMany({
+    where: { id: { in: allowed } },
+    data: { deletedAt: new Date() },
+  })
+  await audit({
+    ...actor(ctx),
+    action: 'question.bulk_delete',
+    entityType: 'Question',
+    entityId: allowed[0]!,
+    summary: `Deleted ${allowed.length} question${allowed.length === 1 ? '' : 's'} from the bank`,
+  })
+  return { deleted: allowed.length }
+}
+
 /** Counts by type and difficulty, for the bank header and later for blueprints. */
 export async function bankSummary(ctx: AppContext, classSubjectId?: string) {
   const allowed = await teachingClassSubjectIds(ctx)

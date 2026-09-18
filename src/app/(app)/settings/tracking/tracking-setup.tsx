@@ -108,8 +108,8 @@ export function TrackingSetup({
         device you will ever buy, and changing hardware later changes nothing here.
       </Notice>
 
-      <Card>
-        <CardHeader>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="min-h-16 bg-info-bg">
           <CardTitle>Where to send positions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -137,8 +137,8 @@ export function TrackingSetup({
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="min-h-16 bg-success-bg">
           <CardTitle>Ingest tokens</CardTitle>
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus aria-hidden />
@@ -208,8 +208,8 @@ export function TrackingSetup({
         ) : null}
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="min-h-16 bg-[var(--product-50)]">
           <CardTitle>Which device is in which bus</CardTitle>
           <span className="text-xs text-ink-subtle">
             {buses.filter((b) => b.gpsDeviceId).length} of {buses.length} linked

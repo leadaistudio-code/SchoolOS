@@ -1,9 +1,11 @@
 import { z } from 'zod'
+import type { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, notFound } from '@/server/api/response'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { generateTemporaryPassword, hashPassword } from '@/server/auth/password'
+import { ROLE } from '@/lib/rbac/roles'
 
 export const USER_SORT_FIELDS = ['createdAt', 'lastLoginAt', 'lastName', 'status'] as const
 
@@ -16,6 +18,16 @@ export const userRolesSchema = z.object({
   id: z.string().min(1),
   roleIds: z.array(z.string().min(1)).max(20).default([]),
 })
+
+/** Accounts that still belong to a current, non-archived person. */
+export const currentPortalUserWhere = {
+  status: { in: ['ACTIVE', 'INVITED'] },
+  AND: [
+    { OR: [{ staff: { is: null } }, { staff: { is: { deletedAt: null } } }] },
+    { OR: [{ student: { is: null } }, { student: { is: { deletedAt: null } } }] },
+    { OR: [{ parent: { is: null } }, { parent: { is: { deletedAt: null } } }] },
+  ],
+} satisfies Prisma.UserWhereInput
 
 /**
  * Portal accounts.
@@ -32,9 +44,13 @@ export async function listUsers(
 ) {
   ctx.require('users.view')
 
-  const where = {
+  const where: Prisma.UserWhereInput = {
     deletedAt: null,
-    ...(filter.status ? { status: filter.status as 'INVITED' | 'ACTIVE' | 'DISABLED' } : {}),
+    ...(filter.status === 'CURRENT'
+      ? currentPortalUserWhere
+      : filter.status
+        ? { status: filter.status as 'INVITED' | 'ACTIVE' | 'DISABLED' }
+        : {}),
     ...(filter.roleId ? { roles: { some: { roleId: filter.roleId } } } : {}),
     ...(query.q
       ? {
@@ -106,16 +122,62 @@ export async function userCounts(ctx: AppContext) {
 export async function setUserStatus(ctx: AppContext, input: z.infer<typeof userStatusSchema>) {
   ctx.require('users.edit')
 
-  const user = await ctx.db.user.findFirst({ where: { id: input.id, deletedAt: null } })
+  const user = await ctx.db.user.findFirst({
+    where: { id: input.id, deletedAt: null },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      staff: { select: { deletedAt: true } },
+      student: { select: { deletedAt: true } },
+      parent: { select: { deletedAt: true } },
+      roles: { select: { role: { select: { key: true } } } },
+    },
+  })
   if (!user) throw notFound('User')
+  if (user.status === input.status) return user
   if (user.id === ctx.user.userId && input.status === 'DISABLED') {
     throw new ApiException(409, 'CONFLICT', 'You cannot disable your own account')
+  }
+  if (
+    input.status !== 'DISABLED' &&
+    (user.staff?.deletedAt || user.student?.deletedAt || user.parent?.deletedAt)
+  ) {
+    throw new ApiException(
+      409,
+      'CONFLICT',
+      'This account belongs to an archived person and cannot be enabled.',
+    )
+  }
+  if (
+    input.status === 'DISABLED' &&
+    user.roles.some(({ role }) => role.key === ROLE.SCHOOL_ADMIN)
+  ) {
+    const otherAdmins = await ctx.db.user.count({
+      where: {
+        id: { not: user.id },
+        deletedAt: null,
+        status: { in: ['ACTIVE', 'INVITED'] },
+        roles: { some: { role: { key: ROLE.SCHOOL_ADMIN } } },
+      },
+    })
+    if (otherAdmins === 0) {
+      throw new ApiException(
+        409,
+        'CONFLICT',
+        'The final active school administrator cannot be disabled.',
+      )
+    }
   }
 
   const updated = await ctx.db.$transaction(async (tx) => {
     const next = await tx.user.update({ where: { id: input.id }, data: { status: input.status } })
     if (input.status === 'DISABLED') {
-      await tx.session.deleteMany({ where: { userId: input.id } })
+      await tx.session.updateMany({
+        where: { userId: input.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
     }
     return next
   })
@@ -136,7 +198,7 @@ export async function setUserStatus(ctx: AppContext, input: z.infer<typeof userS
 }
 
 /** How long a phone-dictated password stays usable. */
-const TEMP_PASSWORD_TTL_HOURS = 24
+export const TEMP_PASSWORD_TTL_HOURS = 24
 
 /**
  * Issues a temporary password for the school office to hand over directly.
@@ -233,29 +295,63 @@ export async function setTemporaryPassword(ctx: AppContext, id: string) {
  */
 export async function setUserRoles(ctx: AppContext, input: z.infer<typeof userRolesSchema>) {
   ctx.require('users.roles')
+  if (
+    !ctx.user.roleKeys.includes(ROLE.SCHOOL_ADMIN) &&
+    !ctx.user.roleKeys.includes(ROLE.SUPER_ADMIN)
+  ) {
+    throw new ApiException(403, 'FORBIDDEN', 'Only a school administrator can assign roles')
+  }
 
   const user = await ctx.db.user.findFirst({
     where: { id: input.id, deletedAt: null },
-    select: { id: true, firstName: true, lastName: true, roles: { select: { roleId: true } } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      roles: { select: { roleId: true, role: { select: { key: true } } } },
+    },
   })
   if (!user) throw notFound('User')
 
   const roles = await ctx.db.role.findMany({
     where: { id: { in: input.roleIds } },
-    select: { id: true, name: true },
+    select: { id: true, key: true, name: true },
   })
   if (roles.length !== input.roleIds.length) throw notFound('Role')
+  if (roles.some((role) => role.key === ROLE.SUPER_ADMIN)) {
+    throw new ApiException(403, 'FORBIDDEN', 'Platform administrator cannot be assigned by a school')
+  }
 
   // Locking yourself out of role management is a support ticket nobody enjoys.
   if (user.id === ctx.user.userId && input.roleIds.length === 0) {
     throw new ApiException(409, 'CONFLICT', 'You cannot remove every role from your own account')
+  }
+  const removingSchoolAdmin =
+    user.roles.some(({ role }) => role.key === ROLE.SCHOOL_ADMIN) &&
+    !roles.some((role) => role.key === ROLE.SCHOOL_ADMIN)
+  if (removingSchoolAdmin) {
+    const otherAdmins = await ctx.db.user.count({
+      where: {
+        id: { not: user.id },
+        deletedAt: null,
+        status: { in: ['ACTIVE', 'INVITED'] },
+        roles: { some: { role: { key: ROLE.SCHOOL_ADMIN } } },
+      },
+    })
+    if (otherAdmins === 0) {
+      throw new ApiException(
+        409,
+        'CONFLICT',
+        'The final active school administrator must keep the School Admin role.',
+      )
+    }
   }
 
   await ctx.db.$transaction(async (tx) => {
     await tx.userRole.deleteMany({ where: { userId: input.id } })
     if (input.roleIds.length > 0) {
       await tx.userRole.createMany({
-        data: input.roleIds.map((roleId) => ({ tenantId: ctx.tenant.id, userId: input.id, roleId })),
+        data: input.roleIds.map((roleId) => ({ userId: input.id, roleId })),
       })
     }
   })

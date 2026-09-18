@@ -134,15 +134,28 @@ export async function mapStudentImportAction(
   }
 }
 
-export async function commitStudentImportAction(batchId: string): Promise<ImportActionResult> {
+export async function commitStudentImportAction(
+  batchId: string,
+  options?: { pruneMissing?: boolean },
+): Promise<ImportActionResult> {
   try {
     const ctx = await requireContext('students.import')
-    const data = await commitStudentImport(ctx, batchId)
+    const data = await commitStudentImport(ctx, batchId, options)
     revalidatePath('/students/import')
     revalidatePath('/students')
+    revalidatePath('/staff')
+    revalidatePath('/parents')
+    const archivedStudents = data.packCommitStats?.studentsArchived ?? 0
+    const archivedStaff = data.packCommitStats?.staffArchived ?? 0
+    const pruneNote =
+      archivedStudents || archivedStaff
+        ? ` Archived ${archivedStudents} student(s) and ${archivedStaff} staff not in the file.`
+        : ''
     return {
       ok: true,
-      message: `Imported ${data.validRows} student${data.validRows === 1 ? '' : 's'}`,
+      message: data.isPack
+        ? `School pack imported.${pruneNote}`
+        : `Imported ${data.validRows} student${data.validRows === 1 ? '' : 's'}`,
       data,
     }
   } catch (error) {

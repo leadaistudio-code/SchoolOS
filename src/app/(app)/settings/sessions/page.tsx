@@ -1,6 +1,6 @@
 import { requireContext } from '@/server/context'
 import { listSessions } from '@/server/modules/settings/sessions'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, Notice } from '@/components/ui/states'
@@ -27,15 +27,16 @@ export default async function SessionsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <SettingsPageHeader
         title="Academic sessions"
         description={
           current
             ? `${current.name} is current · ${formatDay(current.startsOn)} to ${formatDay(current.endsOn)}`
             : 'No session is marked current'
         }
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Academic sessions' }]}
         actions={canManage ? <NewSessionButton hasAny={sessions.length > 0} /> : null}
+        icon="CalendarRange"
+        tone="success"
       />
 
       {!current && sessions.length > 0 ? (
@@ -46,6 +47,12 @@ export default async function SessionsPage() {
       ) : null}
 
       <Card className="overflow-hidden">
+        <SettingsPanelHeader
+          title="School years"
+          description="Dates, record counts and the session currently in use."
+          icon="CalendarRange"
+          tone="success"
+        />
         {sessions.length === 0 ? (
           <EmptyState
             title="No academic sessions"

@@ -58,7 +58,9 @@ export async function changePasswordAction(
     return { error: null, fieldErrors: { currentPassword: 'That is not your current password' } }
   }
 
-  const issues = checkPasswordPolicy(parsed.data.newPassword)
+  const issues = checkPasswordPolicy(parsed.data.newPassword, {
+    roleKeys: ctx.user.roleKeys,
+  })
   if (issues.length > 0) {
     return { error: null, fieldErrors: { newPassword: issues.join('. ') } }
   }

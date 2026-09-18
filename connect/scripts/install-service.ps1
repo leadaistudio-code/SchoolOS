@@ -8,7 +8,9 @@ param(
   [string]$PublishDir = "",
   [string]$ServiceName = "MyCampusViewConnect",
   [string]$DisplayName = "MyCampusView Connect",
-  [string]$Environment = "Production"
+  [string]$Environment = "Production",
+  [switch]$EnableFkWeb,
+  [int]$FkWebPort = 8080
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,6 +28,22 @@ if (-not (Test-Path $exe)) {
 $dataRoot = Join-Path $env:ProgramData "MyCampusView\Connect"
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $dataRoot "logs") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $dataRoot "fkweb-diagnostics") | Out-Null
+
+if ($EnableFkWeb) {
+  $ruleName = "MyCampusView Connect FKWeb"
+  Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue |
+    Remove-NetFirewallRule -ErrorAction SilentlyContinue
+  New-NetFirewallRule `
+    -DisplayName $ruleName `
+    -Direction Inbound `
+    -Action Allow `
+    -Protocol TCP `
+    -LocalPort $FkWebPort `
+    -Profile Any `
+    -RemoteAddress LocalSubnet | Out-Null
+  Write-Host "Allowed FKWeb TCP $FkWebPort from the private local subnet."
+}
 
 $existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($existing) {

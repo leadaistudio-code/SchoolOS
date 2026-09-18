@@ -56,6 +56,14 @@ export async function nextDocumentNumber(
 
   const column = params.kind === 'LEAD' ? 'reference' : 'number'
 
+  // A row lock cannot protect the very first number because no previous row
+  // exists yet. The transaction-scoped advisory lock serializes the complete
+  // tenant/kind/year sequence, including that empty-table case.
+  await tx.$queryRawUnsafe(
+    'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text AS locked',
+    `${params.tenantId}:${params.kind}:${params.sessionLabel}`,
+  )
+
   // FOR UPDATE takes a row lock; a concurrent transaction blocks here rather
   // than reading a stale maximum.
   const rows = await tx.$queryRawUnsafe<{ value: string }[]>(

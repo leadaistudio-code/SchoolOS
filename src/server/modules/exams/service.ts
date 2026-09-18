@@ -6,9 +6,10 @@ import { conflict, notFound } from '@/server/api/response'
 import { attendanceDate } from '@/lib/dates'
 import { currentSession } from '@/server/modules/academics/service'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
-import { accessibleStudentIds } from '@/server/scope'
+import { accessibleStudentIds, classLevelScopeWhere, isPortalOnlyRole } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { getDefaultReportCardTemplate } from './report-templates'
+import { classSubjectAppliesToSection } from './section-subjects'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
 
@@ -126,6 +127,32 @@ export const examPaperUpdateSchema = z.object({
   }
 })
 
+export const addExamPaperSchema = z
+  .object({
+    classSubjectId: z.string().min(1, 'Select a subject'),
+    maxMarks: z.coerce.number().positive().max(1000).default(100),
+    passMarks: z.coerce.number().min(0).max(1000).default(33),
+    examDate: isoDate.optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
+    startTime: optionalTime,
+    endTime: optionalTime,
+    roomName: z
+      .string()
+      .trim()
+      .max(80)
+      .optional()
+      .or(z.literal(''))
+      .transform((v) => (v ? v : undefined)),
+  })
+  .superRefine((value, context) => {
+    if (value.passMarks > value.maxMarks) {
+      context.addIssue({
+        code: 'custom',
+        path: ['passMarks'],
+        message: 'Pass marks cannot exceed maximum marks',
+      })
+    }
+  })
+
 export const examMetaUpdateSchema = z
   .object({
     name: z.string().trim().min(3).max(100).optional(),
@@ -154,7 +181,15 @@ export async function examSetup(ctx: AppContext) {
       name: true,
       subjects: {
         orderBy: { subject: { name: 'asc' } },
-        select: { id: true, subject: { select: { name: true, code: true } } },
+        select: {
+          id: true,
+          subject: { select: { name: true, code: true } },
+          sections: {
+            select: {
+              section: { select: { id: true, name: true } },
+            },
+          },
+        },
       },
     },
   })
@@ -233,11 +268,36 @@ export async function createGradingScale(ctx: AppContext, input: z.infer<typeof 
 
 export async function listExams(ctx: AppContext, query: ListQuery) {
   ctx.require('exams.view')
-  const where: Prisma.ExamWhereInput = { ...(query.q ? { name: { contains: query.q, mode: 'insensitive' } } : {}) }
+  const classScope = await classLevelScopeWhere(ctx)
+  const scoped = Object.keys(classScope).length > 0
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
+  const where: Prisma.ExamWhereInput = {
+    ...(query.q ? { name: { contains: query.q, mode: 'insensitive' } } : {}),
+    // Students/parents see assigned exams once scheduled — not only after results publish.
+    ...(portal
+      ? { status: { in: ['SCHEDULED', 'ONGOING', 'MARKS_ENTRY', 'PUBLISHED'] } }
+      : {}),
+    ...(scoped ? { classes: { some: { classLevel: classScope } } } : {}),
+  }
   const [rows, total] = await Promise.all([
     ctx.db.exam.findMany({
       where, orderBy: orderByFrom(query.sort, query.dir, EXAM_SORT_FIELDS, { createdAt: 'desc' }), ...skipTake(query),
-      select: { id: true, name: true, kind: true, status: true, startsOn: true, endsOn: true, gradingScaleId: true, gradingScale: { select: { name: true } }, _count: { select: { classes: true, subjects: true } } },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        status: true,
+        startsOn: true,
+        endsOn: true,
+        gradingScaleId: true,
+        gradingScale: { select: { name: true } },
+        _count: {
+          select: {
+            classes: scoped ? { where: { classLevel: classScope } } : true,
+            subjects: scoped ? { where: { classSubject: { classLevel: classScope } } } : true,
+          },
+        },
+      },
     }),
     ctx.db.exam.count({ where }),
   ])
@@ -260,15 +320,27 @@ export async function setExamGradingScale(ctx: AppContext, examId: string, gradi
 
 export async function getExamDetail(ctx: AppContext, examId: string) {
   ctx.require('exams.view')
+  const classScope = await classLevelScopeWhere(ctx)
+  const scoped = Object.keys(classScope).length > 0
+  const studentIds = await accessibleStudentIds(ctx)
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
   const exam = await ctx.db.exam.findFirst({
-    where: { id: examId },
+    where: {
+      id: examId,
+      ...(portal
+        ? { status: { in: ['SCHEDULED', 'ONGOING', 'MARKS_ENTRY', 'PUBLISHED'] } }
+        : {}),
+      ...(scoped ? { classes: { some: { classLevel: classScope } } } : {}),
+    },
     include: {
       gradingScale: { select: { id: true, name: true } },
       classes: {
+        ...(scoped ? { where: { classLevel: classScope } } : {}),
         include: { classLevel: { select: { id: true, name: true } } },
         orderBy: { classLevel: { numeric: 'asc' } },
       },
       subjects: {
+        ...(scoped ? { where: { classSubject: { classLevel: classScope } } } : {}),
         orderBy: [
           { classSubject: { classLevel: { numeric: 'asc' } } },
           { classSubject: { subject: { name: 'asc' } } },
@@ -278,11 +350,20 @@ export async function getExamDetail(ctx: AppContext, examId: string) {
             select: {
               classLevel: { select: { name: true } },
               subject: { select: { name: true, code: true } },
+              sections: {
+                select: { section: { select: { id: true, name: true } } },
+              },
             },
           },
         },
       },
-      _count: { select: { results: true } },
+      _count: {
+        select: {
+          results: studentIds === null
+            ? true
+            : { where: { studentId: { in: studentIds } } },
+        },
+      },
     },
   })
   if (!exam) throw notFound('Exam')
@@ -392,6 +473,135 @@ export async function updateExamPapers(
   return { updated: input.papers.length }
 }
 
+export type AvailableExamPaperOption = {
+  id: string
+  label: string
+  className: string
+  subjectName: string
+  subjectCode: string
+}
+
+/** Class subjects mapped to this exam’s classes that are not yet papers. */
+export async function listAvailableExamPapers(
+  ctx: AppContext,
+  examId: string,
+): Promise<AvailableExamPaperOption[]> {
+  ctx.require('exams.manage')
+  const exam = await ctx.db.exam.findFirst({
+    where: { id: examId },
+    select: {
+      classes: { select: { classLevelId: true } },
+      subjects: { select: { classSubjectId: true } },
+    },
+  })
+  if (!exam) throw notFound('Exam')
+
+  const classLevelIds = exam.classes.map((row) => row.classLevelId)
+  if (classLevelIds.length === 0) return []
+
+  const taken = new Set(exam.subjects.map((row) => row.classSubjectId))
+  const candidates = await ctx.db.classSubject.findMany({
+    where: { classLevelId: { in: classLevelIds } },
+    orderBy: [
+      { classLevel: { numeric: 'asc' } },
+      { subject: { name: 'asc' } },
+    ],
+    select: {
+      id: true,
+      classLevel: { select: { name: true } },
+      subject: { select: { name: true, code: true } },
+    },
+  })
+
+  return candidates
+    .filter((row) => !taken.has(row.id))
+    .map((row) => ({
+      id: row.id,
+      className: row.classLevel.name,
+      subjectName: row.subject.name,
+      subjectCode: row.subject.code,
+      label: `${row.classLevel.name} · ${row.subject.name} (${row.subject.code})`,
+    }))
+}
+
+/** Adds one paper (class + subject) to an existing exam, with optional schedule. */
+export async function addExamPaper(
+  ctx: AppContext,
+  examId: string,
+  raw: z.infer<typeof addExamPaperSchema>,
+) {
+  ctx.require('exams.manage')
+  const input = addExamPaperSchema.parse(raw)
+  const exam = await ctx.db.exam.findFirst({
+    where: { id: examId },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      classes: { select: { classLevelId: true } },
+      subjects: { select: { classSubjectId: true } },
+    },
+  })
+  if (!exam) throw notFound('Exam')
+  if (exam.status === 'PUBLISHED') throw conflict('Papers cannot be added after publishing')
+
+  const classLevelIds = exam.classes.map((row) => row.classLevelId)
+  if (classLevelIds.length === 0) {
+    throw conflict('Add at least one class to this exam before adding papers')
+  }
+  if (exam.subjects.some((row) => row.classSubjectId === input.classSubjectId)) {
+    throw conflict('That paper is already on this exam')
+  }
+
+  const classSubject = await ctx.db.classSubject.findFirst({
+    where: {
+      id: input.classSubjectId,
+      classLevelId: { in: classLevelIds },
+    },
+    select: {
+      id: true,
+      classLevel: { select: { name: true } },
+      subject: { select: { name: true, code: true } },
+    },
+  })
+  if (!classSubject) {
+    throw conflict('Choose a subject that belongs to a class on this exam')
+  }
+
+  const created = await ctx.db.$transaction(async (tx) => {
+    const paper = await tx.examSubject.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        examId,
+        classSubjectId: classSubject.id,
+        maxMarks: input.maxMarks,
+        passMarks: input.passMarks,
+        examDate: input.examDate ? attendanceDate(input.examDate) : null,
+        startTime: input.startTime ?? null,
+        endTime: input.endTime ?? null,
+        roomName: input.roomName ?? null,
+      },
+    })
+    if (exam.status === 'DRAFT' && input.examDate) {
+      await tx.exam.update({ where: { id: examId }, data: { status: 'SCHEDULED' } })
+    }
+    return paper
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'exam.paper.add',
+    module: 'exams',
+    entityType: 'ExamSubject',
+    entityId: created.id,
+    summary: `Added ${classSubject.classLevel.name} · ${classSubject.subject.name} to ${exam.name}`,
+  })
+
+  return created
+}
+
 export async function examMarksSetup(ctx: AppContext, examId: string) {
   ctx.require('exams.marks')
   const exam = await ctx.db.exam.findFirst({
@@ -414,23 +624,53 @@ export async function marksRoster(ctx: AppContext, examId: string, examSubjectId
   ctx.require('exams.marks')
   const subject = await ctx.db.examSubject.findFirst({
     where: { id: examSubjectId, examId },
-    select: { id: true, maxMarks: true, passMarks: true, exam: { select: { id: true, name: true, sessionId: true } }, classSubject: { select: { classLevelId: true, subject: { select: { name: true } }, teacherId: true } } },
+    select: {
+      id: true,
+      maxMarks: true,
+      passMarks: true,
+      exam: { select: { id: true, name: true, sessionId: true } },
+      classSubject: {
+        select: {
+          classLevelId: true,
+          subject: { select: { name: true } },
+          teacherId: true,
+          sections: { select: { sectionId: true } },
+        },
+      },
+    },
   })
   if (!subject) throw notFound('Exam subject')
   if (!ctx.can('exams.manage')) {
     const staff = await ctx.db.staff.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } })
     if (!staff || subject.classSubject.teacherId !== staff.id) throw notFound('Exam subject')
   }
+  const mappedSectionIds = subject.classSubject.sections.map((row) => row.sectionId)
   const students = await ctx.db.enrollment.findMany({
-    where: { sessionId: subject.exam.sessionId, classLevelId: subject.classSubject.classLevelId, isCurrent: true, student: { deletedAt: null } },
+    where: {
+      sessionId: subject.exam.sessionId,
+      classLevelId: subject.classSubject.classLevelId,
+      isCurrent: true,
+      student: { deletedAt: null },
+    },
     orderBy: [{ rollNumber: 'asc' }, { student: { firstName: 'asc' } }],
-    select: { studentId: true, rollNumber: true, student: { select: { admissionNo: true, firstName: true, lastName: true } } },
+    select: {
+      studentId: true,
+      rollNumber: true,
+      sectionId: true,
+      student: { select: { admissionNo: true, firstName: true, lastName: true } },
+    },
   })
+  const eligible = students.filter((enrollment) =>
+    classSubjectAppliesToSection(mappedSectionIds, enrollment.sectionId),
+  )
   const marks = await ctx.db.mark.findMany({ where: { examSubjectId }, select: { studentId: true, marksObtained: true, isAbsent: true, remarks: true } })
   const byStudent = new Map(marks.map((mark) => [mark.studentId, mark]))
   return {
-    exam: subject.exam, subject: subject.classSubject.subject, maxMarks: subject.maxMarks, passMarks: subject.passMarks,
-    rows: students.map((enrollment) => ({ ...enrollment, mark: byStudent.get(enrollment.studentId) ?? null })),
+    exam: subject.exam,
+    subject: subject.classSubject.subject,
+    maxMarks: subject.maxMarks,
+    passMarks: subject.passMarks,
+    rows: eligible.map((enrollment) => ({ ...enrollment, mark: byStudent.get(enrollment.studentId) ?? null })),
   }
 }
 

@@ -8,6 +8,7 @@ import { disconnectMailAction, saveMailSettingsAction, testMailAction } from './
 import { emptyFormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Checkbox, Field, FormActions, FormSection, Input } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
@@ -113,8 +114,9 @@ export function MailForm({
       )}
 
       <form action={formAction} noValidate>
-        <Card>
-          <CardContent className="space-y-6 pt-5">
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Outgoing mailbox" description="Connect SMTP once, then send every school email from this address." icon="AtSign" tone="info" />
+          <CardContent className="space-y-6 p-5">
             {state.error ? (
               <div
                 role="alert"
@@ -284,8 +286,9 @@ export function MailForm({
       </form>
 
       {settings ? (
-        <Card>
-          <CardContent className="space-y-3 pt-5">
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Test the connection" description="Send a private test before using this mailbox with families." icon="Mail" tone="success" />
+          <CardContent className="space-y-3 p-5">
             <div>
               <h2 className="text-base font-semibold text-ink">Send a test message</h2>
               <p className="mt-0.5 text-sm text-ink-muted">

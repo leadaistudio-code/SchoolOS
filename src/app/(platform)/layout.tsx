@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { LogOut } from 'lucide-react'
 import { getPlatformContext } from '@/server/context'
 import { MyCampusViewLogo } from '@/components/brand/logo'
@@ -18,9 +17,9 @@ export const dynamic = 'force-dynamic'
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getPlatformContext()
   if (!ctx) {
-    const h = await headers()
-    const path = h.get('x-pathname') ?? '/platform'
-    redirect(`/login?next=${encodeURIComponent(path)}`)
+    // Never bounce tenant sessions with ?next=/platform — that loops with login.
+    // Login will explain the mismatch and offer the school URL or sign-out.
+    redirect('/login')
   }
 
   const nav = [

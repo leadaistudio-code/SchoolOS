@@ -3,7 +3,8 @@ import { requireContext } from '@/server/context'
 import { AdminDashboard } from './dashboard-admin'
 import { SelfDashboard } from './dashboard-self'
 import { TeacherDashboard } from './dashboard-teacher'
-import { isSelfScoped, isTeacherScoped } from '@/lib/rbac/roles'
+import { RoleDashboard } from './dashboard-role'
+import { hasSchoolWideScope, isSelfScoped, isTeacherScoped } from '@/lib/rbac/roles'
 import { DashboardSkeleton } from '@/components/dashboard/skeletons'
 
 export const metadata = { title: 'Dashboard' }
@@ -15,10 +16,17 @@ export default async function DashboardPage() {
   // version of the staff dashboard.
   const selfScoped = isSelfScoped(ctx.user.roleKeys)
   const teacherScoped = isTeacherScoped(ctx.user.roleKeys)
+  const schoolWide = hasSchoolWideScope(ctx.user.roleKeys)
 
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      {selfScoped ? <SelfDashboard /> : teacherScoped ? <TeacherDashboard /> : <AdminDashboard />}
+      {selfScoped
+        ? <SelfDashboard />
+        : teacherScoped
+          ? <TeacherDashboard />
+          : schoolWide
+            ? <AdminDashboard />
+            : <RoleDashboard />}
     </Suspense>
   )
 }

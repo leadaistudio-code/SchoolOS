@@ -47,6 +47,7 @@ export function UserFilters({
         onChange={(e) => push('status', e.target.value)}
       >
         <option value="">Any status</option>
+        <option value="CURRENT">Current users</option>
         <option value="ACTIVE">Active</option>
         <option value="INVITED">Invited</option>
         <option value="DISABLED">Disabled</option>

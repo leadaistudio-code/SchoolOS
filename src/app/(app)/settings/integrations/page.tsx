@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { listCredentials, providerStatus } from '@/server/modules/settings/integrations'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Notice } from '@/components/ui/states'
 import { CredentialForm } from './credential-form'
@@ -52,10 +52,11 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <SettingsPageHeader
         title="Integrations"
         description="What this deployment is connected to, and the accounts this school uses."
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Integrations' }]}
+        icon="Plug"
+        tone="info"
       />
 
       {simulated.length > 0 ? (
@@ -66,10 +67,12 @@ export default async function IntegrationsPage() {
       ) : null}
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>Connected services</CardTitle>
-          <span className="text-xs text-ink-subtle">Set by whoever runs this deployment</span>
-        </CardHeader>
+        <SettingsPanelHeader
+          title="Connected services"
+          description="Provider connections configured for this deployment."
+          icon="Plug"
+          tone="info"
+        />
         <ul className="divide-y divide-[var(--border)]">
           {providers.map((provider) => (
             <li
@@ -79,7 +82,7 @@ export default async function IntegrationsPage() {
               <span className="min-w-0">
                 <span className="flex items-center gap-2">
                   <span className="text-base font-medium text-ink">{provider.label}</span>
-                  <Badge tone={provider.live ? 'success' : 'neutral'}>
+                  <Badge tone={provider.live ? 'success' : 'neutral'} dot>
                     {provider.live ? 'live' : 'not live'}
                   </Badge>
                   <span className="text-xs tnum text-ink-subtle">{provider.driver}</span>
@@ -100,12 +103,12 @@ export default async function IntegrationsPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>This school&apos;s accounts</CardTitle>
-          <span className="text-xs text-ink-subtle">
-            Stored encrypted — never shown again after saving
-          </span>
-        </CardHeader>
+        <SettingsPanelHeader
+          title="This school’s accounts"
+          description="Credentials are encrypted and never shown again after saving."
+          icon="KeyRound"
+          tone="success"
+        />
         <div className="divide-y divide-[var(--border)]">
           {credentials.map((credential) => (
             <CredentialForm

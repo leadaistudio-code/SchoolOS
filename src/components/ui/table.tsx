@@ -36,7 +36,11 @@ export function THead({
 }: React.HTMLAttributes<HTMLTableSectionElement> & { sticky?: boolean }) {
   return (
     <thead
-      className={cn('bg-surface-2', sticky && 'sticky top-0 z-10', className)}
+      className={cn(
+        'bg-[color-mix(in_srgb,var(--product-50)_58%,var(--surface))]',
+        sticky && 'sticky top-0 z-10',
+        className,
+      )}
       {...props}
     />
   )
@@ -67,7 +71,15 @@ export function TBody({ className, ...props }: React.HTMLAttributes<HTMLTableSec
 }
 
 export function TR({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('hover:bg-surface-2 transition-colors', className)} {...props} />
+  return (
+    <tr
+      className={cn(
+        'hover:bg-[color-mix(in_srgb,var(--product-50)_35%,var(--surface))] transition-colors',
+        className,
+      )}
+      {...props}
+    />
+  )
 }
 
 export function TD({

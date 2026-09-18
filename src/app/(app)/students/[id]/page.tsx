@@ -186,11 +186,22 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
                       <PersonCell
                         firstName={g.parent.firstName}
                         lastName={g.parent.lastName}
+                        href={`/parents/${g.parent.id}`}
                         secondary={`${g.relation.toLowerCase()}${
                           g.parent.phone ? ` · ${g.parent.phone}` : ''
                         }${g.parent.email ? ` · ${g.parent.email}` : ''}`}
                       />
-                      {g.isPrimary ? <Badge tone="brand">Primary</Badge> : null}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {g.isPrimary ? <Badge tone="brand">Primary</Badge> : null}
+                        {ctx.can('parents.edit') ? (
+                          <Link
+                            href={`/parents/${g.parent.id}/edit`}
+                            className={buttonVariants({ size: 'sm', variant: 'ghost' })}
+                          >
+                            Edit
+                          </Link>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>

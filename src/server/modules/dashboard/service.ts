@@ -1,6 +1,7 @@
 import { subDays, startOfMonth } from 'date-fns'
 import { attendanceDate } from '@/lib/dates'
-import type { AppContext } from '@/server/context'
+import { ForbiddenError, type AppContext } from '@/server/context'
+import { hasSchoolWideScope } from '@/lib/rbac/roles'
 import {
   accessibleStudentIds,
   teachingClassLevelIds,
@@ -16,7 +17,11 @@ export type AdminDashboard = Awaited<ReturnType<typeof getAdminDashboard>>
  * the page cost does not grow with the size of the school.
  */
 export async function getAdminDashboard(ctx: AppContext) {
+  if (!hasSchoolWideScope(ctx.user.roleKeys)) {
+    throw new ForbiddenError('School-wide dashboard access is restricted to school leadership')
+  }
   const db = ctx.db
+  const canSeeFinance = ctx.can('fees.view')
   // `onDate` and `dueOn` are calendar-date columns, so the comparison point
   // must be normalised the same way they are written.
   const today = attendanceDate(new Date())
@@ -58,25 +63,25 @@ export async function getAdminDashboard(ctx: AppContext) {
       where: { onDate: today },
       _count: { _all: true },
     }),
-    db.feePayment.aggregate({
+    canSeeFinance ? db.feePayment.aggregate({
       where: { status: 'SUCCESS', paidAt: { gte: today } },
       _sum: { amountMinor: true },
       _count: { _all: true },
-    }),
-    db.feePayment.aggregate({
+    }) : Promise.resolve({ _sum: { amountMinor: null }, _count: { _all: 0 } }),
+    canSeeFinance ? db.feePayment.aggregate({
       where: { status: 'SUCCESS', paidAt: { gte: monthStart } },
       _sum: { amountMinor: true },
-    }),
-    db.feeInvoice.aggregate({
+    }) : Promise.resolve({ _sum: { amountMinor: null } }),
+    canSeeFinance ? db.feeInvoice.aggregate({
       where: { status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] } },
       _sum: { balanceMinor: true },
-    }),
-    db.feeInvoice.count({
+    }) : Promise.resolve({ _sum: { balanceMinor: null } }),
+    canSeeFinance ? db.feeInvoice.count({
       where: {
         status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
         dueOn: { lt: today },
       },
-    }),
+    }) : Promise.resolve(0),
     db.leaveRequest.count({ where: { status: 'PENDING' } }),
     db.exam.findMany({
       where: { status: { in: ['SCHEDULED', 'ONGOING'] }, startsOn: { gte: today } },
@@ -90,7 +95,7 @@ export async function getAdminDashboard(ctx: AppContext) {
       take: 5,
       select: { id: true, title: true, kind: true, startsAt: true },
     }),
-    db.feePayment.findMany({
+    canSeeFinance ? db.feePayment.findMany({
       where: { status: 'SUCCESS' },
       orderBy: { paidAt: 'desc' },
       take: 6,
@@ -101,35 +106,43 @@ export async function getAdminDashboard(ctx: AppContext) {
         paidAt: true,
         student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },
       },
-    }),
+    }) : Promise.resolve([]),
     db.notice.findMany({
       where: { isPublished: true, deletedAt: null },
       orderBy: { publishOn: 'desc' },
       take: 5,
       select: { id: true, title: true, priority: true, publishOn: true },
     }),
-    db.$queryRaw<{ id: string; action: string; summary: string | null; createdAt: Date; actorLabel: string | null }[]>`
-      SELECT id, action, summary, "createdAt", "actorLabel"
-      FROM "AuditLog"
-      WHERE "tenantId" = ${ctx.tenant.id}
-      ORDER BY "createdAt" DESC
-      LIMIT 8`,
+    canSeeFinance
+      ? db.$queryRaw<{ id: string; action: string; summary: string | null; createdAt: Date; actorLabel: string | null }[]>`
+          SELECT id, action, summary, "createdAt", "actorLabel"
+          FROM "AuditLog"
+          WHERE "tenantId" = ${ctx.tenant.id}
+          ORDER BY "createdAt" DESC
+          LIMIT 8`
+      : db.$queryRaw<{ id: string; action: string; summary: string | null; createdAt: Date; actorLabel: string | null }[]>`
+          SELECT id, action, summary, "createdAt", "actorLabel"
+          FROM "AuditLog"
+          WHERE "tenantId" = ${ctx.tenant.id}
+            AND module <> 'fees'
+          ORDER BY "createdAt" DESC
+          LIMIT 8`,
     db.libraryLoan.count({ where: { status: 'ISSUED' } }),
     db.libraryLoan.count({ where: { status: { in: ['ISSUED', 'OVERDUE'] }, dueOn: { lt: today } } }),
     // Billing split. Three slices of one billed total, so the donut adds up:
     // what has been paid, what is not due yet, and what is late.
-    db.feeInvoice.aggregate({
+    canSeeFinance ? db.feeInvoice.aggregate({
       where: { cancelledAt: null },
       _sum: { paidMinor: true, totalMinor: true },
-    }),
-    db.feeInvoice.aggregate({
+    }) : Promise.resolve({ _sum: { paidMinor: null, totalMinor: null } }),
+    canSeeFinance ? db.feeInvoice.aggregate({
       where: { cancelledAt: null, balanceMinor: { gt: 0 }, dueOn: { gte: today } },
       _sum: { balanceMinor: true },
-    }),
-    db.feeInvoice.aggregate({
+    }) : Promise.resolve({ _sum: { balanceMinor: null } }),
+    canSeeFinance ? db.feeInvoice.aggregate({
       where: { cancelledAt: null, balanceMinor: { gt: 0 }, dueOn: { lt: today } },
       _sum: { balanceMinor: true },
-    }),
+    }) : Promise.resolve({ _sum: { balanceMinor: null } }),
     // The staff shown on the dashboard are the people a parent or a colleague
     // would want to reach, so leadership and teaching come before the rest.
     db.staff.findMany({

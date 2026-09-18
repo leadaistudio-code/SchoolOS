@@ -28,7 +28,11 @@ function buildDedupeKey(input: {
     .slice(0, 240)
 }
 
-export async function ingestEventBatch(auth: ConnectorAuth, body: unknown) {
+export async function ingestEventBatch(
+  auth: ConnectorAuth,
+  body: unknown,
+  options: { processSynchronously?: boolean } = {},
+) {
   const data = eventBatchSchema.parse(body)
   const db = tenantDb(auth.tenantId)
   const settings = await loadBiometricSettings(auth.tenantId)
@@ -102,7 +106,7 @@ export async function ingestEventBatch(auth: ConnectorAuth, body: unknown) {
         data: { lastEventAt: deviceLocalAt, lastSyncAt: new Date(), status: 'ONLINE', lastError: null },
       })
 
-      if (settings.autoProcess) {
+      if (settings.autoProcess && options.processSynchronously !== false) {
         await processRawEvent(auth.tenantId, created.id)
       }
 

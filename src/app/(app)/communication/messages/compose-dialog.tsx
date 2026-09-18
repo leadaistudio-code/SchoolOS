@@ -25,17 +25,32 @@ import type { RecipientOption } from '@/server/modules/messages/service'
 export function ComposeDialog({
   initialRecipients,
   triggerLabel = 'Compose',
+  preselectedIds = [],
+  autoOpen = false,
 }: {
   initialRecipients: RecipientOption[]
   triggerLabel?: string
+  preselectedIds?: string[]
+  autoOpen?: boolean
 }) {
   const router = useRouter()
   const toast = useToast()
-  const [open, setOpen] = React.useState(false)
-  const [chosen, setChosen] = React.useState<RecipientOption[]>([])
+  const [open, setOpen] = React.useState(autoOpen)
+  const [chosen, setChosen] = React.useState<RecipientOption[]>(() =>
+    initialRecipients.filter((recipient) => preselectedIds.includes(recipient.id)),
+  )
   const [search, setSearch] = React.useState('')
   const [options, setOptions] = React.useState(initialRecipients)
   const [state, formAction, pending] = useActionState(composeAction, emptyFormState)
+  const preselectedKey = preselectedIds.join('|')
+
+  React.useEffect(() => {
+    if (!autoOpen) return
+    setChosen(initialRecipients.filter((recipient) => preselectedIds.includes(recipient.id)))
+    setOpen(true)
+    // The joined key changes only when navigation supplies a new recipient set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen, preselectedKey])
 
   React.useEffect(() => {
     if (!open) return

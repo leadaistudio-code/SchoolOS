@@ -101,6 +101,52 @@ export async function setUserStatusAction(payload: unknown): Promise<Result> {
   }
 }
 
+const bulkUserStatusSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+  status: z.enum(['ACTIVE', 'DISABLED']),
+})
+
+export async function bulkSetUserStatusAction(payload: unknown): Promise<Result> {
+  try {
+    const ctx = await requireContext('users.edit')
+    const input = bulkUserStatusSchema.parse(payload)
+    const ids = [...new Set(input.ids)]
+    const users = await ctx.db.user.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true, status: true },
+    })
+    const eligible = users.filter(
+      (user) =>
+        user.status !== input.status &&
+        !(input.status === 'DISABLED' && user.id === ctx.user.userId),
+    )
+
+    let updated = 0
+    let failed = ids.length - eligible.length
+    for (let offset = 0; offset < eligible.length; offset += 10) {
+      const results = await Promise.allSettled(
+        eligible.slice(offset, offset + 10).map(({ id }) =>
+          setUserStatus(ctx, userStatusSchema.parse({ id, status: input.status })),
+        ),
+      )
+      for (const result of results) {
+        if (result.status === 'fulfilled') updated += 1
+        else failed += 1
+      }
+    }
+
+    revalidatePath('/settings/users')
+    return {
+      ok: failed === 0,
+      message: failed
+        ? `${updated} updated; ${failed} skipped or protected.`
+        : `${updated} account${updated === 1 ? '' : 's'} updated.`,
+    }
+  } catch (error) {
+    return failure(error, 'The selected accounts could not be updated')
+  }
+}
+
 /**
  * Sends the invitation link that lets a new account set its own password.
  *

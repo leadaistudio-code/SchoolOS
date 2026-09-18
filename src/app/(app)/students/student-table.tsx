@@ -2,15 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown, ArrowUp, FileDown, MessageSquare } from 'lucide-react'
 import type { StudentListRow } from '@/server/modules/students/service'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { StatusBadge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/states'
 import { Pagination } from '@/components/pagination'
 import { ClassSection, DueAmount, PersonCell } from '@/components/ui/identity'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { cn, formatMoney } from '@/lib/utils'
+import { BulkSelectionBar, downloadCsv, useBulkSelection } from '@/components/bulk-selection'
 
 export function StudentTable({
   rows,
@@ -23,6 +25,9 @@ export function StudentTable({
   canEdit,
   canCreate,
   canSeeFeeAmounts,
+  canExport,
+  canMessage,
+  canBroadcast,
 }: {
   rows: StudentListRow[]
   total: number
@@ -35,11 +40,17 @@ export function StudentTable({
   canCreate: boolean
   /** When false, show Paid/Due only — never rupee amounts (teachers). */
   canSeeFeeAmounts: boolean
+  canExport: boolean
+  canMessage: boolean
+  canBroadcast: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
   const filtered = params.toString().length > 0
+  const selection = useBulkSelection(rows.map((row) => row.id))
+  const selectedRows = rows.filter((row) => selection.selected.has(row.id))
+  const recipientIds = selectedRows.flatMap((row) => row.userId ? [row.userId] : [])
 
   const setParam = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params.toString())
@@ -77,10 +88,54 @@ export function StudentTable({
 
   return (
     <>
+      <BulkSelectionBar
+        count={selection.selected.size}
+        noun="student"
+        onClear={selection.clear}
+      >
+        {canExport ? (
+          <button
+            type="button"
+            className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+            onClick={() => downloadCsv(
+              'students-selected.csv',
+              ['Student', 'Admission no.', 'Class', 'Section', 'Guardian', 'Phone', 'Status'],
+              selectedRows.map((row) => [
+                `${row.firstName} ${row.lastName}`,
+                row.admissionNo,
+                row.className,
+                row.sectionName,
+                row.guardianName,
+                row.guardianPhone,
+                row.status,
+              ]),
+            )}
+          >
+            <FileDown aria-hidden />
+            Export
+          </button>
+        ) : null}
+        {canMessage && recipientIds.length > 0 && (recipientIds.length === 1 || canBroadcast) ? (
+          <Link
+            href={`/communication/messages?compose=1&to=${encodeURIComponent(recipientIds.join(','))}`}
+            className={buttonVariants({ size: 'sm' })}
+          >
+            <MessageSquare aria-hidden />
+            Message {recipientIds.length}
+          </Link>
+        ) : null}
+      </BulkSelectionBar>
       <TableWrap>
         <Table>
           <THead>
             <tr>
+              <TH>
+                <Checkbox
+                  checked={selection.allSelected}
+                  onChange={selection.toggleAll}
+                  aria-label="Select all students on this page"
+                />
+              </TH>
               <SortableTH label="Student" field="firstName" sort={sort} dir={dir} onSort={toggleSort} />
               <SortableTH
                 label="Admission no."
@@ -101,6 +156,13 @@ export function StudentTable({
           <TBody>
             {rows.map((s) => (
               <TR key={s.id}>
+                <TD>
+                  <Checkbox
+                    checked={selection.selected.has(s.id)}
+                    onChange={() => selection.toggle(s.id)}
+                    aria-label={`Select ${s.firstName} ${s.lastName}`}
+                  />
+                </TD>
                 <TD>
                   <PersonCell
                     firstName={s.firstName}

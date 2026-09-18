@@ -21,7 +21,7 @@ const AGEING_ORDER = ['Not yet due', '1-30 days', '31-60 days', '61-90 days', 'O
  * into Node to be added up.
  */
 export async function collectionReport(ctx: AppContext, range: ReportRange) {
-  ctx.require('reports.view')
+  ctx.require('fees.report')
 
   const db = ctx.db
   const tenantId = ctx.tenant.id

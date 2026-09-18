@@ -23,6 +23,18 @@ mobile/
 
 ---
 
+## Deploy paths (keep separate)
+
+| What | Where it ships | Command |
+|---|---|---|
+| **Web + API** | Railway service **MyCampusView WebApp** | `railway up --service "MyCampusView WebApp" --environment production -d` |
+| **Push delivery jobs** | Railway service **Background Worker** | `railway up --service "Background Worker" --environment production -d` |
+| **Mobile app** | Expo / Play Store (not Railway) | `cd mobile && npx expo start` or EAS Build |
+
+The phone talks to the same WebApp API (`EXPO_PUBLIC_API_URL`). Do **not** create a Railway service for the Expo client — native Android/iOS binaries are not Nixpacks/Node servers. WebApp’s `.railwayignore` excludes `mobile/` so a web deploy never uploads or builds the app.
+
+---
+
 ## Quick start
 
 ```bash
@@ -123,6 +135,8 @@ its login response, cookie and tenant resolution all work exactly as before.
 | `src/app/api/v1/site/school/[slug]/route.ts` | **New.** Public school lookup for the sign-in screen. Rate limited; returns only what a login page already shows. |
 | `src/app/api/v1/dashboard/route.ts` | **New.** Exposes the existing `getAdminDashboard` service, which the web renders in a server component. |
 | `src/app/api/v1/admissions/*` | **New.** The admissions module had a full service layer and no HTTP surface at all. These call `listLeadsByStage`, `getLead`, `moveLeadStage`, `listFollowUps`, `createFollowUp` — no logic is duplicated. |
+| `src/app/api/v1/timetable/route.ts` | `mine=1` resolves the staff row linked to the signed-in user (teachers on phones do not know their staffId). |
+| `src/app/api/v1/exams/[id]/attendance/route.ts` | **New.** Date-based exam attendance desk + barcode scan / manual mark — same services as the web desk. |
 
 Nothing was rewritten to suit mobile, and no business rule moved out of the
 backend.
@@ -140,7 +154,7 @@ means built and wired to the API; the rest are listed on the More screen under
 | Dashboard | `app/(app)/index.tsx` | `GET /dashboard` | Built |
 | Students | `students.tsx`, `student.tsx` | `GET /students`, `/students/:id` | Built |
 | Attendance | `attendance.tsx`, `register.tsx` | `GET/POST /attendance` | Built |
-| Fees | `fees.tsx` | `GET /finance/outstanding` | Built |
+| Fees | `fees.tsx`, `fee-collect.tsx` | `GET /finance/outstanding`, `GET /finance/invoices`, `POST /finance/collect` | Built |
 | Notices | `notices.tsx` | `GET /notices` | Built |
 | Admissions CRM | `admissions.tsx` | `GET /admissions` | Built |
 | Assistant | `assistant.tsx` | `POST /assistant` | Built |
@@ -148,20 +162,16 @@ means built and wired to the API; the rest are listed on the More screen under
 | Settings | `settings.tsx` | `/auth/me`, `/auth/logout` | Built |
 | Parents | `parents.tsx` | `GET /parents` | Built |
 | Staff | `staff.tsx` | `GET /staff` | Built |
-| Homework | `homework.tsx` | `GET /homework` | Built |
-| Leave | `leave.tsx` | `GET /leave`, `PATCH /leave/:id` | Built |
+| Homework | `homework.tsx`, `homework-new.tsx`, `homework-detail.tsx` | `GET/POST /homework`, subjects, review | Built |
+| Leave | `leave.tsx`, `leave-apply.tsx` | `GET/POST /leave`, `PATCH /leave/:id` | Built |
 | Transport | `transport.tsx` | `GET /transport/routes` | Built |
-| Timetable, Exams, Assessments, Feedback, Library, Reports | — | mostly server-actions only | Web only |
+| Timetable | `timetable.tsx` | `GET /timetable?mine=1` | Built |
+| Exams | `exams.tsx`, `exam-attendance.tsx` | `GET /exams`, attendance + camera scan | Built |
+| Assessments, Feedback, Library, Reports | — | mostly server-actions only | Web only |
 
-The web application has 125 pages across ~39 permission namespaces. Everything
-above is genuinely wired to live data; nothing on this list is a mock.
-
-Leave is the only one of these that writes. Approving from a phone is the
-point of it — a thirty-second decision that blocks somebody else's day, made
-between classrooms — so the two buttons are on the card rather than behind a
-detail screen. Who may decide is the server's answer, not the app's:
-`canDecide` comes back per request and already accounts for self-approval,
-which the service refuses.
+Push: the app registers an Expo token on sign-in (`POST /push/subscribe`). The
+worker delivers via Expo whenever `notify()` runs for a subscribed user. Taps
+open leave, fees, notices, exams, or homework from the payload `href`.
 
 ---
 
@@ -324,6 +334,33 @@ are in the repository.
 ./gradlew.bat bundleRelease
 ```
 
+Output: `android/app/build/outputs/bundle/release/app-release.aab`
+
+Package: `com.mycampusview.app` · current store version in `app.json`:
+**2.1.0** (`versionCode` **3**). Bump both before every new Play upload.
+
+### Play Console checklist (this upload)
+
+1. **Copy to a path without spaces** (ninja fails otherwise), then:
+   ```powershell
+   robocopy "C:\Users\aryan\Desktop\Lead AI Studio Project\School ERP\mobile" C:\mcvbuild `
+     /MIR /XD "android\build" "android\.gradle" ".cxx" ".expo" /NFL /NDL /NJH /NP /MT:16
+   cd C:\mcvbuild
+   npx expo prebuild --platform android --clean
+   # Re-apply keystore.properties / signing block if prebuild wiped it
+   cd android
+   .\gradlew.bat bundleRelease --no-daemon
+   ```
+2. Confirm API is production: leave `EXPO_PUBLIC_API_URL` unset so the bundle uses
+   `https://app.mycampusview.com/api/v1` (not `www`).
+3. Play Console → **MyCampusView** → **Production** (or Internal testing first) →
+   **Create new release** → upload the `.aab`.
+4. Release notes (example): attendance, fee collect + receipt, exam desk + camera
+   scan + marks, homework set/review, leave apply, push alerts.
+5. Smoke on a real phone after rollout: sign-in, register, fee collect, exam scan,
+   push permission prompt.
+6. Keep the **production keystore** backed up offline before publishing.
+
 ---
 
 ## Deliberate decisions
@@ -344,15 +381,8 @@ are in the repository.
 
 ## Not done
 
-- **Push notifications.** `expo-notifications` is installed and configured, and
-  the backend has a `POST /api/v1/push/subscribe` route, but nothing registers
-  a token or sends one yet. It needs an FCM sender key on the server side, which
-  is a credential this build does not have.
 - **Uploads and downloads.** `expo-image-picker`, `expo-document-picker` and
-  `expo-sharing` are installed and their Android permissions declared, but no
-  screen uses them yet — the modules that upload (student documents,
-  assessments) are the ones still web-only.
-- **Deep links.** The `mycampusview://` scheme and intent filter are registered
-  and expo-router maps URLs to routes, so links resolve; nothing generates them
-  yet because that is the push notification payload.
-- The web-only modules in the table above.
+  `expo-sharing` are installed and their Android permissions declared; fee
+  receipts share as text today. File attachments on homework still need the
+  upload API wired into the set-homework screen.
+- Assessments, feedback, library, and full reports remain web-only.

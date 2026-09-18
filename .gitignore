@@ -9,6 +9,15 @@ coverage
 .DS_Store
 /uploads
 /backups
+/.idea/
+/mobile/backup key/
+/Payment-Collection-Data-*.pdf
+/Payment-Collection-Data-*.xlsx
+/docs/Payment-Collection-Data-*.pdf
+/prisma/Payment-Collection-Data-*.pdf
+/prisma/_apni_fees_*.csv
+/prisma/_uolo_*.csv
+/prisma/_uolo_*.txt
 
 # Crash logs the editor drops in the project root
 debug.log

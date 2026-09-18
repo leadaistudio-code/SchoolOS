@@ -94,6 +94,7 @@ export type RecipientOption = {
 export async function recipientDirectory(
   ctx: AppContext,
   search?: string,
+  includeIds: string[] = [],
 ): Promise<RecipientOption[]> {
   ctx.require('messages.send')
 
@@ -130,7 +131,33 @@ export async function recipientDirectory(
     },
   })
 
-  return users.map((user) => ({
+  const missingIds = includeIds.filter((id) => !users.some((user) => user.id === id))
+  const included = missingIds.length > 0
+    ? await ctx.db.user.findMany({
+        where: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          id: {
+            in: allowed
+              ? missingIds.filter((id) => allowed.has(id))
+              : missingIds,
+            not: ctx.user.userId,
+          },
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          avatarUrl: true,
+          staff: { select: { designation: true } },
+          parent: { select: { id: true } },
+          student: { select: { id: true } },
+        },
+      })
+    : []
+
+  return [...users, ...included].map((user) => ({
     id: user.id,
     name: `${user.firstName} ${user.lastName}`,
     role: user.staff
@@ -390,6 +417,7 @@ export async function compose(ctx: AppContext, input: ComposeInput) {
 
   const recipients = [...new Set(input.recipientIds)].filter((id) => id !== ctx.user.userId)
   if (recipients.length === 0) throw conflict('Choose at least one recipient other than yourself.')
+  if (recipients.length > 1) ctx.require('messages.broadcast')
 
   await assertMayAddress(ctx, recipients)
 

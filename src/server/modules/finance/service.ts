@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { differenceInCalendarDays } from 'date-fns'
-import type { AppContext } from '@/server/context'
+import { ForbiddenError, type AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
-import { studentIdScopeWhere, accessibleStudentIds } from '@/server/scope'
+import { studentIdScopeWhere, accessibleStudentIds, isPortalOnlyRole } from '@/server/scope'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { notify } from '@/server/notifications'
@@ -44,7 +44,9 @@ export const feeHeadSchema = z.object({
 })
 
 export async function listFeeHeads(ctx: AppContext) {
-  ctx.require('fees.view')
+  if (!ctx.canAny('fees.structure', 'fees.concession', 'fees.invoice')) {
+    throw new ForbiddenError('You cannot view fee setup')
+  }
   return ctx.db.feeHead.findMany({
     where: { deletedAt: null },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -55,7 +57,15 @@ export async function listFeeHeads(ctx: AppContext) {
       frequency: true,
       isDeposit: true,
       isRefundable: true,
-      _count: { select: { items: true } },
+      _count: {
+        select: {
+          items: {
+            where: {
+              structure: { deletedAt: null, session: { isCurrent: true } },
+            },
+          },
+        },
+      },
     },
   })
 }
@@ -64,22 +74,38 @@ export async function createFeeHead(ctx: AppContext, input: z.infer<typeof feeHe
   ctx.require('fees.structure')
   const code = input.code.toUpperCase()
 
-  const existing = await ctx.db.feeHead.findFirst({ where: { code, deletedAt: null } })
-  if (existing) throw conflict(`A fee head with the code ${code} already exists`)
+  const existing = await ctx.db.feeHead.findFirst({ where: { code } })
+  if (existing?.deletedAt === null) {
+    throw conflict(`A fee head with the code ${code} already exists`)
+  }
 
-  const created = await ctx.db.feeHead.create({
-    data: { tenantId: ctx.tenant.id, ...input, code },
-  })
+  let created
+  try {
+    created = existing
+      ? await ctx.db.feeHead.update({
+          where: { id: existing.id },
+          data: { ...input, code, deletedAt: null },
+        })
+      : await ctx.db.feeHead.create({
+          data: { tenantId: ctx.tenant.id, ...input, code },
+        })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw conflict(`A fee head with the code ${code} already exists`)
+    }
+    throw error
+  }
 
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
     actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
-    action: 'fee_head.create',
+    action: existing ? 'fee_head.restore' : 'fee_head.create',
     module: 'fees',
     entityType: 'FeeHead',
     entityId: created.id,
-    summary: `Created fee head ${created.name} (${created.code})`,
+    summary: `${existing ? 'Restored' : 'Created'} fee head ${created.name} (${created.code})`,
+    before: existing ?? undefined,
     after: created,
   })
   return created
@@ -127,7 +153,17 @@ export async function deleteFeeHead(ctx: AppContext, id: string) {
 
   const head = await ctx.db.feeHead.findFirst({
     where: { id, deletedAt: null },
-    include: { _count: { select: { items: true } } },
+    include: {
+      _count: {
+        select: {
+          items: {
+            where: {
+              structure: { deletedAt: null, session: { isCurrent: true } },
+            },
+          },
+        },
+      },
+    },
   })
   if (!head) throw notFound('Fee head')
 
@@ -175,7 +211,7 @@ export const structureSchema = z.object({
 })
 
 export async function listStructures(ctx: AppContext) {
-  ctx.require('fees.view')
+  ctx.require('fees.structure')
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })
   if (!session) return []
 
@@ -196,6 +232,7 @@ export async function listStructures(ctx: AppContext) {
     className: s.classLevel?.name ?? 'All classes',
     description: s.description ?? '',
     isActive: s.isActive,
+    status: s.status,
     invoiceCount: s._count.invoices,
     totalMinor: sumMinor(s.items.map((i) => i.amountMinor)),
     items: s.items.map((i) => ({
@@ -406,6 +443,138 @@ export const concessionSchema = z.object({
   }
 })
 
+type RecalculatedInvoiceLine = {
+  id: string
+  amountMinor: number
+  taxPercent: number
+  desiredDiscountMinor: number
+}
+
+function discountsWithinPaidFloor(
+  lines: RecalculatedInvoiceLine[],
+  paidMinor: number,
+  lateFeeMinor: number,
+) {
+  const desiredMinor = sumMinor(lines.map((line) => line.desiredDiscountMinor))
+  const withBudget = (budgetMinor: number) => {
+    let remaining = budgetMinor
+    const discounts = lines.map((line) => {
+      const discountMinor = Math.min(line.desiredDiscountMinor, remaining)
+      remaining -= discountMinor
+      return discountMinor
+    })
+    const totals = computeInvoiceTotals(
+      lines.map((line, index) => ({
+        amountMinor: line.amountMinor,
+        discountMinor: discounts[index]!,
+        taxPercent: line.taxPercent,
+      })),
+      lateFeeMinor,
+    )
+    return { discounts, totals }
+  }
+
+  const desired = withBudget(desiredMinor)
+  if (desired.totals.totalMinor >= paidMinor) return desired
+
+  // Find the greatest discount budget that keeps the invoice total at or
+  // above money already paid. This also handles taxable invoice lines.
+  let low = 0
+  let high = desiredMinor
+  let best = withBudget(0)
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2)
+    const candidate = withBudget(middle)
+    if (candidate.totals.totalMinor >= paidMinor) {
+      best = candidate
+      low = middle + 1
+    } else {
+      high = middle - 1
+    }
+  }
+  return best
+}
+
+async function recalculateCurrentConcessions(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  studentId: string,
+) {
+  const [concessions, invoices] = await Promise.all([
+    tx.feeConcession.findMany({
+      where: { tenantId, studentId },
+      orderBy: { createdAt: 'asc' },
+    }),
+    tx.feeInvoice.findMany({
+      where: {
+        tenantId,
+        studentId,
+        status: { notIn: ['DRAFT', 'CANCELLED'] },
+        OR: [{ balanceMinor: { gt: 0 } }, { discountMinor: { gt: 0 } }],
+      },
+      include: { lines: { orderBy: { id: 'asc' } } },
+      orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
+    }),
+  ])
+
+  let previousOutstandingMinor = 0
+  let currentOutstandingMinor = 0
+  for (const invoice of invoices) {
+    previousOutstandingMinor += invoice.balanceMinor
+    const lines = invoice.lines.map((line) => {
+      let remainingMinor = line.amountMinor
+      let desiredDiscountMinor = 0
+      for (const concession of concessions.filter((item) =>
+        (!item.feeHeadId || item.feeHeadId === line.feeHeadId)
+        && (!item.validFrom || item.validFrom <= invoice.dueOn)
+        && (!item.validTo || item.validTo >= invoice.dueOn))) {
+        const applied = applyConcession(remainingMinor, concession.kind, concession.value)
+        remainingMinor = applied.net
+        desiredDiscountMinor += applied.discount
+      }
+      return {
+        id: line.id,
+        amountMinor: line.amountMinor,
+        taxPercent: line.taxPercent,
+        desiredDiscountMinor,
+      }
+    })
+    const recalculated = discountsWithinPaidFloor(lines, invoice.paidMinor, invoice.lateFeeMinor)
+    const balanceMinor = Math.max(0, recalculated.totals.totalMinor - invoice.paidMinor)
+    currentOutstandingMinor += balanceMinor
+
+    for (const [index, line] of lines.entries()) {
+      const discountMinor = recalculated.discounts[index]!
+      if (invoice.lines[index]!.discountMinor !== discountMinor) {
+        await tx.feeInvoiceLine.update({
+          where: { id: line.id },
+          data: { discountMinor },
+        })
+      }
+    }
+    await tx.feeInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        subtotalMinor: recalculated.totals.subtotalMinor,
+        discountMinor: recalculated.totals.discountMinor,
+        taxMinor: recalculated.totals.taxMinor,
+        totalMinor: recalculated.totals.totalMinor,
+        balanceMinor,
+        status: deriveInvoiceStatus({
+          totalMinor: recalculated.totals.totalMinor,
+          paidMinor: invoice.paidMinor,
+          dueOn: invoice.dueOn,
+        }),
+      },
+    })
+  }
+
+  return {
+    affectedInvoices: invoices.length,
+    outstandingChangeMinor: currentOutstandingMinor - previousOutstandingMinor,
+  }
+}
+
 export async function grantConcession(ctx: AppContext, input: z.infer<typeof concessionSchema>) {
   ctx.require('fees.concession')
 
@@ -424,21 +593,30 @@ export async function grantConcession(ctx: AppContext, input: z.infer<typeof con
     if (!feeHead) throw notFound('Fee head')
   }
 
-  const created = await ctx.db.feeConcession.create({
-    data: {
-      tenantId: ctx.tenant.id,
-      studentId: input.studentId,
-      name: input.name,
-      kind: input.kind,
-      // Percent is stored as-is; a flat concession is stored in paise.
-      value: input.kind === 'PERCENT' ? Math.round(input.value) : Math.round(input.value * 100),
-      feeHeadId: input.feeHeadId || null,
-      reason: input.reason,
-      approvedById: ctx.user.userId,
-      validFrom: input.validFrom ? attendanceDate(input.validFrom) : null,
-      validTo: input.validTo ? attendanceDate(input.validTo) : null,
-    },
-  })
+  const result = await ctx.db.$transaction(async (tx) => {
+    const created = await tx.feeConcession.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        studentId: input.studentId,
+        name: input.name,
+        kind: input.kind,
+        // Percent is stored as-is; a flat concession is stored in paise.
+        value: input.kind === 'PERCENT' ? Math.round(input.value) : Math.round(input.value * 100),
+        feeHeadId: input.feeHeadId || null,
+        reason: input.reason,
+        approvedById: ctx.user.userId,
+        validFrom: input.validFrom ? attendanceDate(input.validFrom) : null,
+        validTo: input.validTo ? attendanceDate(input.validTo) : null,
+      },
+    })
+    const recalculation = await recalculateCurrentConcessions(
+      tx as unknown as Prisma.TransactionClient,
+      ctx.tenant.id,
+      input.studentId,
+    )
+    return { created, recalculation }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  const { created } = result
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -451,7 +629,67 @@ export async function grantConcession(ctx: AppContext, input: z.infer<typeof con
     summary: `Granted ${input.kind === 'PERCENT' ? `${input.value}%` : `₹${input.value}`} concession "${input.name}" to ${student.firstName} ${student.lastName}`,
     after: created,
   })
-  return created
+  return { ...created, recalculation: result.recalculation }
+}
+
+export const concessionUpdateSchema = z.intersection(
+  concessionSchema,
+  z.object({ id: z.string().min(1) }),
+)
+
+export async function updateConcession(
+  ctx: AppContext,
+  input: z.infer<typeof concessionUpdateSchema>,
+) {
+  ctx.require('fees.concession')
+  if (input.kind === 'PERCENT' && input.value > 100) {
+    throw new ApiException(400, 'BAD_REQUEST', 'A percentage concession cannot exceed 100%')
+  }
+  const before = await ctx.db.feeConcession.findFirst({ where: { id: input.id } })
+  if (!before) throw notFound('Concession')
+  if (input.feeHeadId) {
+    const feeHead = await ctx.db.feeHead.findFirst({
+      where: { id: input.feeHeadId, deletedAt: null },
+      select: { id: true },
+    })
+    if (!feeHead) throw notFound('Fee head')
+  }
+
+  const result = await ctx.db.$transaction(async (tx) => {
+    const updated = await tx.feeConcession.update({
+      where: { id: before.id },
+      data: {
+        name: input.name,
+        kind: input.kind,
+        value: input.kind === 'PERCENT' ? Math.round(input.value) : Math.round(input.value * 100),
+        feeHeadId: input.feeHeadId || null,
+        reason: input.reason,
+        validFrom: input.validFrom ? attendanceDate(input.validFrom) : null,
+        validTo: input.validTo ? attendanceDate(input.validTo) : null,
+        approvedById: ctx.user.userId,
+      },
+    })
+    const recalculation = await recalculateCurrentConcessions(
+      tx as unknown as Prisma.TransactionClient,
+      ctx.tenant.id,
+      before.studentId,
+    )
+    return { updated, recalculation }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_concession.update',
+    module: 'fees',
+    entityType: 'FeeConcession',
+    entityId: before.id,
+    summary: `Updated concession "${result.updated.name}" and recalculated ${result.recalculation.affectedInvoices} current invoices`,
+    before,
+    after: result.updated,
+  })
+  return result
 }
 
 /** The concession register shown to finance staff before they generate invoices. */
@@ -1014,6 +1252,124 @@ export type InvoiceRow = {
   daysOverdue: number
 }
 
+export type StudentDueRow = {
+  studentId: string
+  studentName: string
+  admissionNo: string
+  className: string | null
+  oldestDueOn: Date
+  daysOverdue: number
+  balanceMinor: number
+  invoiceCount: number
+}
+
+/**
+ * One chase-list row per student, regardless of how many unpaid invoices they
+ * have. The detailed fee account remains the source of the invoice/ledger
+ * breakdown when the student's name is opened.
+ */
+export async function listStudentDues(
+  ctx: AppContext,
+  query: ListQuery,
+): Promise<{ rows: StudentDueRow[]; total: number }> {
+  ctx.require('fees.accounts')
+
+  const allowedStudentIds = await accessibleStudentIds(ctx)
+  const today = attendanceDate(new Date())
+  const openInvoiceWhere: Prisma.FeeInvoiceWhereInput = {
+    balanceMinor: { gt: 0 },
+    status: { notIn: ['CANCELLED', 'DRAFT'] },
+    ...(allowedStudentIds === null ? {} : { studentId: { in: allowedStudentIds } }),
+    ...(query.q
+      ? {
+          student: {
+            OR: [
+              { firstName: { contains: query.q, mode: 'insensitive' } },
+              { lastName: { contains: query.q, mode: 'insensitive' } },
+              { admissionNo: { contains: query.q, mode: 'insensitive' } },
+            ],
+          },
+        }
+      : {}),
+  }
+
+  const studentWhere: Prisma.StudentWhereInput = {
+    ...(allowedStudentIds === null ? {} : { id: { in: allowedStudentIds } }),
+    ...(query.q
+      ? {
+          OR: [
+            { firstName: { contains: query.q, mode: 'insensitive' } },
+            { lastName: { contains: query.q, mode: 'insensitive' } },
+            { admissionNo: { contains: query.q, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+    invoices: {
+      some: {
+        balanceMinor: { gt: 0 },
+        status: { notIn: ['CANCELLED', 'DRAFT'] },
+      },
+    },
+  }
+
+  const [groups, total] = await Promise.all([
+    ctx.db.feeInvoice.groupBy({
+      by: ['studentId'],
+      where: openInvoiceWhere,
+      _sum: { balanceMinor: true },
+      _min: { dueOn: true },
+      _count: { _all: true },
+      orderBy: [{ _min: { dueOn: 'asc' } }, { studentId: 'asc' }],
+      ...skipTake(query),
+    }),
+    ctx.db.student.count({ where: studentWhere }),
+  ])
+
+  const students = await ctx.db.student.findMany({
+    where: { id: { in: groups.map((group) => group.studentId) } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      admissionNo: true,
+      enrollments: {
+        where: { isCurrent: true },
+        take: 1,
+        select: {
+          classLevel: { select: { name: true } },
+          section: { select: { name: true } },
+        },
+      },
+    },
+  })
+  const studentsById = new Map(students.map((student) => [student.id, student]))
+
+  return {
+    total,
+    rows: groups.flatMap((group) => {
+      const student = studentsById.get(group.studentId)
+      const oldestDueOn = group._min.dueOn
+      if (!student || !oldestDueOn) return []
+      const enrollment = student.enrollments[0]
+
+      return [{
+        studentId: student.id,
+        studentName: `${student.firstName} ${student.lastName}`,
+        admissionNo: student.admissionNo,
+        className: enrollment
+          ? `${enrollment.classLevel.name} ${enrollment.section.name}`
+          : null,
+        oldestDueOn,
+        daysOverdue: oldestDueOn < today
+          ? differenceInCalendarDays(today, oldestDueOn)
+          : 0,
+        balanceMinor: group._sum.balanceMinor ?? 0,
+        invoiceCount: group._count._all,
+      }]
+    }),
+  }
+}
+
 export async function listInvoices(
   ctx: AppContext,
   query: ListQuery,
@@ -1153,7 +1509,9 @@ export async function getInvoice(ctx: AppContext, id: string) {
             },
           },
           guardians: {
-            where: { isPrimary: true },
+            where: isPortalOnlyRole(ctx.user.roleKeys)
+              ? { parent: { userId: ctx.user.userId } }
+              : { isPrimary: true },
             take: 1,
             select: { parent: { select: { firstName: true, lastName: true, phone: true } } },
           },

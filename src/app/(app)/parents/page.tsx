@@ -7,12 +7,9 @@ import { formatNumber } from '@/lib/utils'
 import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
 import { ParentsBannerScene } from '@/components/illustrations/school-scene'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { SearchBar } from '@/components/search-bar'
-import { Pagination } from '@/components/pagination'
-import { PersonCell } from '@/components/ui/identity'
+import { ParentTable } from './parent-table'
 
 export const metadata = { title: 'Parents' }
 
@@ -102,74 +99,16 @@ export default async function ParentsPage({
             }
           />
         ) : (
-          <>
-            <TableWrap>
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Parent</TH>
-                    <TH>Contact</TH>
-                    <TH>Children</TH>
-                    <TH>Portal access</TH>
-                    <TH align="right">
-                      <span className="sr-only">Actions</span>
-                    </TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {rows.map((p) => (
-                    <TR key={p.id}>
-                      <TD>
-                        <PersonCell
-                          firstName={p.firstName}
-                          lastName={p.lastName}
-                          secondary={p.occupation ?? undefined}
-                          href={`/parents/${p.id}`}
-                        />
-                      </TD>
-                      <TD className="text-sm text-ink-muted">
-                        {p.phone ? <span className="block">{p.phone}</span> : null}
-                        {p.email ? (
-                          <span className="block text-xs text-ink-subtle truncate max-w-56">
-                            {p.email}
-                          </span>
-                        ) : null}
-                        {!p.phone && !p.email ? '—' : null}
-                      </TD>
-                      <TD className="text-sm text-ink-muted">
-                        {p.childCount === 0 ? (
-                          <span className="text-ink-subtle">None linked</span>
-                        ) : (
-                          <>
-                            <span className="block">{p.children.slice(0, 2).join(', ')}</span>
-                            {p.childCount > 2 ? (
-                              <span className="block text-xs text-ink-subtle">
-                                +{p.childCount - 2} more
-                              </span>
-                            ) : null}
-                          </>
-                        )}
-                      </TD>
-                      <TD>
-                        <Badge tone={p.hasLogin ? 'success' : 'neutral'}>
-                          {p.hasLogin ? 'active' : 'no login'}
-                        </Badge>
-                      </TD>
-                      <TD align="right">
-                        <Link
-                          href={`/parents/${p.id}`}
-                          className="text-sm text-[var(--brand-600)] hover:underline"
-                        >
-                          View
-                        </Link>
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </TableWrap>
-            <Pagination total={total} page={query.page} pageSize={query.pageSize} label="parents" />
-          </>
+          <ParentTable
+            rows={rows}
+            total={total}
+            page={query.page}
+            pageSize={query.pageSize}
+            canExport={ctx.can('parents.export')}
+            canMessage={ctx.can('messages.send')}
+            canBroadcast={ctx.can('messages.broadcast')}
+            canEdit={ctx.can('parents.edit')}
+          />
         )}
       </Card>
     </div>

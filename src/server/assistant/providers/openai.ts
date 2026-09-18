@@ -40,16 +40,61 @@ export function openaiAdapter(options: {
     name: 'openai',
     model: options.model,
 
-    async turn({ system, turns, tools, onText }): Promise<ModelTurnResult> {
-      const stream = await client.chat.completions.create({
+    async turn({
+      system,
+      turns,
+      tools,
+      onText,
+      stream = true,
+      toolChoice,
+      maxOutputTokens,
+    }): Promise<ModelTurnResult> {
+      const messages = [{ role: 'system' as const, content: system }, ...toOpenAiMessages(turns)]
+      const openAiTools = tools.length ? toOpenAiTools(tools) : undefined
+      const choice =
+        toolChoice && tools.some((tool) => tool.name === toolChoice)
+          ? { type: 'function' as const, function: { name: toolChoice } }
+          : undefined
+
+      if (!stream) {
+        const completion = await client.chat.completions.create({
+          model: options.model,
+          messages,
+          tools: openAiTools,
+          tool_choice: choice,
+          parallel_tool_calls: openAiTools ? false : undefined,
+          max_tokens: maxOutputTokens ?? 8192,
+          stream: false,
+        })
+        const message = completion.choices[0]?.message
+        const text = message?.content ?? ''
+        if (text) onText(text)
+        const toolCalls: ModelToolCall[] = (message?.tool_calls ?? [])
+          .filter((call) => call.type === 'function')
+          .map((call) => ({
+            id: call.id,
+            name: call.function.name,
+            argumentsJson: call.function.arguments || '{}',
+          }))
+        return {
+          text,
+          toolCalls,
+          raw: message ?? { role: 'assistant', content: text || null },
+          refused: completion.choices[0]?.finish_reason === 'content_filter',
+        }
+      }
+
+      const response = await client.chat.completions.create({
         model: options.model,
         // No temperature: the assistant reports figures, and sampling variety is
         // not a feature when the answer is "₹4,20,000 outstanding".
-        messages: [{ role: 'system', content: system }, ...toOpenAiMessages(turns)],
-        tools: tools.length ? toOpenAiTools(tools) : undefined,
+        messages,
+        tools: openAiTools,
+        tool_choice: choice,
         // Let it call several read tools in one turn — outstanding fees and
         // unmarked registers are independent lookups.
-        parallel_tool_calls: tools.length ? true : undefined,
+        parallel_tool_calls: openAiTools && !choice ? true : undefined,
+        max_tokens: maxOutputTokens,
         stream: true,
       })
 
@@ -58,11 +103,11 @@ export function openaiAdapter(options: {
       const partials = new Map<number, { id: string; name: string; args: string }>()
       let refused = false
 
-      for await (const chunk of stream) {
-        const choice = chunk.choices[0]
-        if (!choice) continue
+      for await (const chunk of response) {
+        const choiceDelta = chunk.choices[0]
+        if (!choiceDelta) continue
 
-        const delta = choice.delta
+        const delta = choiceDelta.delta
 
         if (delta?.content) {
           text += delta.content
@@ -84,7 +129,7 @@ export function openaiAdapter(options: {
           })
         }
 
-        if (choice.finish_reason === 'content_filter') refused = true
+        if (choiceDelta.finish_reason === 'content_filter') refused = true
       }
 
       const toolCalls: ModelToolCall[] = [...partials.entries()]
@@ -127,7 +172,25 @@ export function openaiAdapter(options: {
  */
 export function toOpenAiMessages(turns: ModelTurn[]): ChatCompletionMessageParam[] {
   return turns.map((turn): ChatCompletionMessageParam => {
-    if (turn.role === 'user') return { role: 'user', content: turn.text }
+    if (turn.role === 'user') {
+      if (turn.parts && turn.parts.length > 0) {
+        return {
+          role: 'user',
+          content: turn.parts.map((part) => {
+            if (part.type === 'text') {
+              return { type: 'text' as const, text: part.text }
+            }
+            return {
+              type: 'image_url' as const,
+              image_url: {
+                url: `data:${part.mimeType};base64,${part.base64}`,
+              },
+            }
+          }),
+        }
+      }
+      return { role: 'user', content: turn.text }
+    }
 
     if (turn.role === 'tool') {
       return {

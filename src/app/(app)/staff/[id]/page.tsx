@@ -25,11 +25,17 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/tabl
 import { Avatar } from '@/components/ui/identity'
 import { EditableAvatar } from '@/components/ui/editable-avatar'
 import { BarList } from '@/components/reports/primitives'
-import { GeneratePayslipButton, OpenAppraisalButton, PayslipStatusControl, SetSalaryButton } from './panels'
+import {
+  GeneratePayslipButton,
+  OpenAppraisalButton,
+  PayslipDeductionButton,
+  PayslipStatusControl,
+  SetSalaryButton,
+} from './panels'
 import { AppraisalEditor } from '../appraisal-editor'
 import { Staff360 } from './staff-360'
 import { uploadStaffPhotoAction, removeStaffPhotoAction } from './photo-actions'
-import { issueStaffPortalLoginAction } from '../actions'
+import { issueStaffPortalLoginAction, issueStaffTempPasswordAction } from '../actions'
 import { Button } from '@/components/ui/button'
 
 export const metadata = { title: 'Staff profile' }
@@ -78,6 +84,11 @@ export default async function StaffDetailPage({
     !staff.user &&
     !!staff.phone &&
     (ctx.can('users.create') || ctx.can('staff.create') || ctx.can('staff.edit'))
+  const canTempPassword =
+    !!staff.phone &&
+    staff.user?.id !== ctx.user.userId &&
+    staff.user?.status !== 'DISABLED' &&
+    ctx.can('users.edit')
   const currency = ctx.tenant.currency
   const money = (minor: number) => formatMoney(minor, currency)
 
@@ -109,6 +120,13 @@ export default async function StaffDetailPage({
                 </Button>
               </form>
             ) : null}
+            {canTempPassword ? (
+              <form action={issueStaffTempPasswordAction.bind(null, id)}>
+                <Button type="submit" size="sm" variant="secondary">
+                  Temp password
+                </Button>
+              </form>
+            ) : null}
             {ctx.can('staff.edit') ? (
               <Link href={`/staff/${id}/edit`} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
                 Edit profile
@@ -126,8 +144,25 @@ export default async function StaffDetailPage({
         </Notice>
       ) : null}
 
+      {query.tempPassword ? (
+        <Notice tone="success" title="Temporary password issued">
+          Username is their phone. Temporary password:{' '}
+          <strong className="tnum">{query.tempPassword}</strong>
+          {query.tempExpires ? (
+            <>
+              {' '}
+              (valid until {format(new Date(query.tempExpires), 'dd MMM yyyy HH:mm')})
+            </>
+          ) : (
+            ' (valid for 24 hours)'
+          )}
+          . Share it with {staff.firstName} now — it is not stored and cannot be shown again. They
+          must change it at first sign-in.
+        </Notice>
+      ) : null}
+
       {query.issueError ? (
-        <Notice tone="danger" title="Could not issue portal login">
+        <Notice tone="danger" title="Could not issue password">
           {query.issueError}
         </Notice>
       ) : null}
@@ -435,7 +470,7 @@ function SalaryTab({
                   <TH>Month</TH>
                   <TH align="right">Days paid</TH>
                   <TH align="right">Gross</TH>
-                  <TH align="right">Loss of pay</TH>
+                  <TH align="right">Deductions</TH>
                   <TH align="right">Net</TH>
                   <TH>Status</TH>
                   {canManage ? <TH align="right">&nbsp;</TH> : null}
@@ -452,11 +487,21 @@ function SalaryTab({
                     </TD>
                     <TD align="right" className="text-sm">{money(p.grossMinor)}</TD>
                     <TD align="right" className="text-sm">
-                      {p.lopMinor > 0 ? (
-                        <span className="text-warning">−{money(p.lopMinor)}</span>
-                      ) : (
-                        '—'
-                      )}
+                      <span className={p.deductionsMinor + p.lopMinor > 0 ? 'text-warning' : undefined}>
+                        {p.deductionsMinor + p.lopMinor > 0
+                          ? `−${money(p.deductionsMinor + p.lopMinor)}`
+                          : '—'}
+                      </span>
+                      {p.lateCount > 0 || p.absentCount > 0 || p.halfDayCount > 0 ? (
+                        <span className="block text-xs text-ink-subtle">
+                          {p.absentCount} absent · {p.halfDayCount} half-day · {p.lateCount} late
+                        </span>
+                      ) : null}
+                      {p.manualDeductionMinor > 0 ? (
+                        <span className="block text-xs text-ink-subtle">
+                          Manual {money(p.manualDeductionMinor)}
+                        </span>
+                      ) : null}
                     </TD>
                     <TD align="right" className="text-sm font-medium text-ink">
                       {money(p.netMinor)}
@@ -468,7 +513,16 @@ function SalaryTab({
                     </TD>
                     {canManage ? (
                       <TD align="right">
-                        <PayslipStatusControl id={p.id} status={p.status} />
+                        <div className="flex items-center justify-end gap-1">
+                          {p.status === 'DRAFT' ? (
+                            <PayslipDeductionButton
+                              id={p.id}
+                              amountMinor={p.manualDeductionMinor}
+                              reason={p.manualDeductionReason}
+                            />
+                          ) : null}
+                          <PayslipStatusControl id={p.id} status={p.status} />
+                        </div>
                       </TD>
                     ) : null}
                   </TR>

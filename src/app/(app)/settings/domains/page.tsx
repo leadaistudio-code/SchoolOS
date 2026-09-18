@@ -1,5 +1,5 @@
 import { requireContext } from '@/server/context'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { DomainManager } from './domain-manager'
 import { listDomains } from '@/server/modules/domains/service'
 import { hasFeature } from '@/server/entitlements'
@@ -15,12 +15,14 @@ export default async function DomainsPage() {
   if (!allowed) {
     return (
       <div>
-        <PageHeader
+        <SettingsPageHeader
           title="Custom Domains"
           description="Add a custom domain to serve your portal (e.g. erp.yourschool.com)"
+          icon="Globe"
+          tone="info"
         />
-        <Card className="mt-8">
-          <CardContent className="py-8 text-sm text-ink-muted">
+        <Card variant="elevated" className="mt-6 overflow-hidden">
+          <CardContent className="bg-info-bg px-5 py-8 text-sm text-info">
             Custom domains are not included in this school&apos;s plan. Upgrade to Pro or
             Enterprise, or ask the platform team to enable <code>module.custom_domain</code>.
           </CardContent>
@@ -33,11 +35,13 @@ export default async function DomainsPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="Custom Domains"
         description="Add a custom domain to serve your portal (e.g. erp.yourschool.com). After DNS verification, use Check TLS to confirm HTTPS is live on the host."
+        icon="Globe"
+        tone="info"
       />
-      <div className="mt-8">
+      <div className="mt-6">
         <DomainManager
           initialDomains={domains.map((domain) => ({
             ...domain,

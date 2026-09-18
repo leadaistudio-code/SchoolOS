@@ -32,10 +32,15 @@ export async function ParentFinance() {
 
   if (children.length === 0) {
     return (
-      <EmptyState
-        title="No student linked to this account"
-        description="Please contact the school office."
-      />
+      <div className="max-w-4xl space-y-4">
+        <PageHeader title="Fees" description="Parent fee account" />
+        <Card variant="elevated">
+          <EmptyState
+            title="No student linked to this account"
+            description="Please contact the school office."
+          />
+        </Card>
+      </div>
     )
   }
 
@@ -67,6 +72,12 @@ export async function ParentFinance() {
 
   const totalDue = invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
   const overdue = invoices.filter((i) => i.balanceMinor > 0 && i.dueOn < today)
+  const dueNow = invoices
+    .filter((i) => i.balanceMinor > 0 && i.dueOn <= today)
+    .reduce((sum, i) => sum + i.balanceMinor, 0)
+  const upcoming = invoices
+    .filter((i) => i.balanceMinor > 0 && i.dueOn > today)
+    .reduce((sum, i) => sum + i.balanceMinor, 0)
   const nextDue = invoices.find((i) => i.balanceMinor > 0)
 
   return (
@@ -85,8 +96,8 @@ export async function ParentFinance() {
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
             <Metric
               className="px-0 py-0"
-              label="Total outstanding"
-              value={formatMoney(totalDue, currency)}
+              label="Due now"
+              value={formatMoney(dueNow || totalDue, currency)}
               emphasis={overdue.length > 0 ? 'danger' : undefined}
               sub={
                 overdue.length > 0
@@ -96,6 +107,12 @@ export async function ParentFinance() {
                     : undefined
               }
             />
+            {upcoming > 0 ? (
+              <div>
+                <p className="text-xs text-ink-muted">Upcoming</p>
+                <p className="text-base font-medium tnum text-ink">{formatMoney(upcoming, currency)}</p>
+              </div>
+            ) : null}
 
             <PayNow
               students={children.map((c) => ({

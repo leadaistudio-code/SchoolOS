@@ -46,11 +46,16 @@ export default async function MessagesPage({
   const folder = parseFolder(params.folder)
   const query = parseListQuery(params)
   const canSend = ctx.can('messages.send')
+  const preselectedRecipientIds = (params.to ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 50)
 
   const [{ rows }, counts, recipients] = await Promise.all([
     listThreads(ctx, folder, query),
     folderCounts(ctx),
-    canSend ? recipientDirectory(ctx) : Promise.resolve([]),
+    canSend ? recipientDirectory(ctx, undefined, preselectedRecipientIds) : Promise.resolve([]),
   ])
 
   // A thread id in the URL is read through the same participant filter as the
@@ -67,7 +72,15 @@ export default async function MessagesPage({
             : `${counts.inbox} conversation${counts.inbox === 1 ? '' : 's'} · nothing unread`
         }
         breadcrumbs={[{ label: 'Communication' }, { label: 'Messages' }]}
-        actions={canSend ? <ComposeDialog initialRecipients={recipients} /> : null}
+        actions={
+          canSend ? (
+            <ComposeDialog
+              initialRecipients={recipients}
+              preselectedIds={preselectedRecipientIds}
+              autoOpen={params.compose === '1' && preselectedRecipientIds.length > 0}
+            />
+          ) : null
+        }
       />
 
       <div className="grid gap-3 lg:grid-cols-[11rem_minmax(0,22rem)_minmax(0,1fr)]">

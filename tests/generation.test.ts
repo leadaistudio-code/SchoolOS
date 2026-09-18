@@ -106,6 +106,93 @@ describe('the off-syllabus screen', () => {
     })
     expect(result.kept).toHaveLength(0)
   })
+
+  it('keeps a textbook question only when its evidence occurs on the cited page', () => {
+    const result = screenGenerated(
+      [question({
+        topicId: undefined,
+        sourcePageNumber: 12,
+        evidence: 'Force is equal to mass multiplied by acceleration.',
+      })],
+      {
+        allowedTopicIds: new Set(),
+        allowedTypes,
+        sourceTextByPage: new Map([
+          [12, 'Force is equal to mass multiplied by acceleration. This is Newton’s second law.'],
+        ]),
+      },
+    )
+    expect(result.kept).toHaveLength(1)
+  })
+
+  it('rejects a textbook question whose evidence is not on the cited page', () => {
+    const result = screenGenerated(
+      [question({ topicId: undefined, sourcePageNumber: 7, evidence: 'An invented statement.' })],
+      {
+        allowedTopicIds: new Set(),
+        allowedTypes,
+        sourceTextByPage: new Map([[7, 'The textbook says something else.']]),
+      },
+    )
+    expect(result.kept).toHaveLength(0)
+    expect(result.rejected).toEqual(['not supported by the selected textbook pages'])
+  })
+})
+
+describe('parseEmitQuestions', () => {
+  it('accepts OpenAI strict-mode null optionals', async () => {
+    const { parseEmitQuestions } = await import('../src/server/modules/questions/generate')
+    const parsed = parseEmitQuestions(
+      JSON.stringify({
+        questions: [
+          {
+            topicId: null,
+            sourcePageNumber: 3,
+            evidence: 'Force equals mass times acceleration.',
+            text: 'State Newton’s second law.',
+            type: 'SHORT',
+            difficulty: 'MEDIUM',
+            marks: 2,
+            bloomLevel: null,
+            options: null,
+            solution: 'F = ma',
+            explanation: null,
+          },
+        ],
+      }),
+    )
+    expect(parsed.questions).toHaveLength(1)
+    expect(parsed.questions[0]?.type).toBe('SHORT')
+    expect(parsed.questions[0]?.sourcePageNumber).toBe(3)
+  })
+
+  it('maps display labels and string marks', async () => {
+    const { parseEmitQuestions } = await import('../src/server/modules/questions/generate')
+    const parsed = parseEmitQuestions(
+      JSON.stringify({
+        questions: [
+          {
+            text: 'Which quantity is a vector?',
+            type: 'Multiple choice',
+            difficulty: 'easy',
+            marks: '1',
+            solution: 'Force',
+            options: [
+              { text: 'Force', isCorrect: 'true' },
+              { text: 'Speed', isCorrect: false },
+              { text: 'Mass', isCorrect: false },
+              { text: 'Time', isCorrect: false },
+            ],
+          },
+        ],
+      }),
+      1,
+    )
+    expect(parsed.questions[0]?.type).toBe('MCQ')
+    expect(parsed.questions[0]?.difficulty).toBe('EASY')
+    expect(parsed.questions[0]?.marks).toBe(1)
+    expect(parsed.questions[0]?.options?.[0]?.isCorrect).toBe(true)
+  })
 })
 
 describe('generation request validation', () => {
@@ -131,6 +218,76 @@ describe('generation request validation', () => {
     const parsed = generateSchema.parse(base)
     expect(parsed.chapterIds).toEqual([])
     expect(parsed.topicIds).toEqual([])
+  })
+
+  it('requires a bounded page range for textbook generation', () => {
+    expect(generateSchema.safeParse({
+      ...base,
+      sourceMode: 'TEXTBOOK',
+      textbookId: 'book-1',
+      pageStart: 10,
+      pageEnd: 39,
+    }).success).toBe(true)
+    expect(generateSchema.safeParse({
+      ...base,
+      sourceMode: 'TEXTBOOK',
+      textbookId: 'book-1',
+      pageStart: 10,
+      pageEnd: 40,
+    }).success).toBe(false)
+  })
+
+  it('requires paper details when creating a complete draft paper', () => {
+    expect(generateSchema.safeParse({ ...base, createPaper: true }).success).toBe(false)
+    expect(generateSchema.safeParse({
+      ...base,
+      createPaper: true,
+      assessmentTypeId: 'type-1',
+      paperTitle: 'Mid-Term Examination',
+      durationMinutes: 90,
+    }).success).toBe(true)
+  })
+
+  it('accepts a balanced difficulty mix', () => {
+    expect(
+      generateSchema.safeParse({
+        ...base,
+        difficultyMix: { easy: 30, medium: 50, hard: 20 },
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects a difficulty mix that does not sum to 100', () => {
+    expect(
+      generateSchema.safeParse({
+        ...base,
+        difficultyMix: { easy: 30, medium: 50, hard: 10 },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('accepts chapter weightage that sums to 100', () => {
+    expect(
+      generateSchema.safeParse({
+        ...base,
+        chapterWeights: [
+          { chapterId: 'c1', percent: 60 },
+          { chapterId: 'c2', percent: 40 },
+        ],
+      }).success,
+    ).toBe(true)
+  })
+})
+
+describe('difficulty retargeting in screen', () => {
+  it('soft-corrects difficulty to the batch target', () => {
+    const result = screenGenerated([question({ difficulty: 'HARD' })], {
+      allowedTopicIds,
+      allowedTypes,
+      requiredDifficulty: 'EASY',
+    })
+    expect(result.kept).toHaveLength(1)
+    expect(result.kept[0]?.difficulty).toBe('EASY')
   })
 })
 

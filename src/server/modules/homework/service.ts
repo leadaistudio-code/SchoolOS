@@ -4,7 +4,12 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
-import { accessibleStudentIds, isPortalOnlyRole, teachingClassSubjectIds } from '@/server/scope'
+import {
+  accessibleSectionIds,
+  accessibleStudentIds,
+  isPortalOnlyRole,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 
@@ -87,6 +92,7 @@ export async function listHomework(
 
   const ownStudentIds = await accessibleStudentIds(ctx)
   const isPortalScoped = isPortalOnlyRole(ctx.user.roleKeys)
+  const ownSectionIds = isPortalScoped ? await accessibleSectionIds(ctx) : null
   const teachingSubjects = await teachingClassSubjectIds(ctx)
   const today = attendanceDate(new Date())
 
@@ -100,6 +106,10 @@ export async function listHomework(
               some: { studentId: { in: ownStudentIds }, isCurrent: true },
             },
           },
+          OR: [
+            { sectionId: null },
+            { sectionId: { in: ownSectionIds ?? [] } },
+          ],
         }
       : {}),
     ...(teachingSubjects !== null
@@ -214,6 +224,18 @@ export async function getHomework(ctx: AppContext, id: string) {
   if (!homework) throw notFound('Homework')
 
   const ownStudentIds = await accessibleStudentIds(ctx)
+  if (isPortalOnlyRole(ctx.user.roleKeys)) {
+    const enrolled = await ctx.db.enrollment.findFirst({
+      where: {
+        studentId: { in: ownStudentIds ?? [] },
+        classLevelId: homework.classLevelId,
+        ...(homework.section?.id ? { sectionId: homework.section.id } : {}),
+        isCurrent: true,
+      },
+      select: { id: true },
+    })
+    if (!homework.isPublished || !enrolled) throw notFound('Homework')
+  }
 
   // A reviewer sees the whole class; a student or parent sees only their own.
   const submissions = await ctx.db.homeworkSubmission.findMany({
@@ -481,12 +503,17 @@ export async function submitHomework(
 
   const homework = await ctx.db.homework.findFirst({
     where: { id: input.homeworkId, deletedAt: null, isPublished: true },
-    select: { id: true, dueOn: true, title: true, classLevelId: true },
+    select: { id: true, dueOn: true, title: true, classLevelId: true, sectionId: true },
   })
   if (!homework) throw notFound('Homework')
 
   const enrolled = await ctx.db.enrollment.findFirst({
-    where: { studentId: input.studentId, classLevelId: homework.classLevelId, isCurrent: true },
+    where: {
+      studentId: input.studentId,
+      classLevelId: homework.classLevelId,
+      ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
+      isCurrent: true,
+    },
     select: { id: true },
   })
   if (!enrolled) throw conflict('This student is not in the class this homework was set for')

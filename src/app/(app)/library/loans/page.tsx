@@ -1,12 +1,10 @@
 import Link from 'next/link'
-import { format } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { libraryIssueSetup, listLoans } from '@/server/modules/library/service'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { EmptyState } from '@/components/ui/states'
-import { IssueForm, ReturnButton } from '../forms'
+import { IssueForm } from '../forms'
+import { LoanList } from './loan-list'
 
 export const metadata = { title: 'Library loans' }
 
@@ -41,31 +39,19 @@ export default async function LibraryLoansPage() {
           <CardHeader>
             <CardTitle>Open loans · {open.length}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {open.length === 0 ? (
-              <EmptyState title="No open loans" description="Issue a book from the side form." />
-            ) : (
-              open.map((loan) => {
-                const isOverdue = overdue.some((o) => o.id === loan.id)
-                return (
-                  <div key={loan.id} className="rounded-[var(--radius-sm)] border border-line p-3 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-ink">{loan.book.title}</p>
-                      <Badge tone={isOverdue ? 'danger' : 'neutral'}>
-                        {isOverdue ? 'Overdue' : 'Issued'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-ink-subtle">
-                      Due {format(loan.dueOn, 'd MMM yyyy')}
-                      {loan.student
-                        ? ` · ${loan.student.firstName} ${loan.student.lastName}`
-                        : ''}
-                    </p>
-                    {ctx.can('library.issue') ? <ReturnButton id={loan.id} /> : null}
-                  </div>
-                )
-              })
-            )}
+          <CardContent className="p-0">
+            <LoanList
+              canReturn={ctx.can('library.issue')}
+              rows={open.map((loan) => ({
+                id: loan.id,
+                title: loan.book.title,
+                dueOn: loan.dueOn.toISOString(),
+                studentName: loan.student
+                  ? `${loan.student.firstName} ${loan.student.lastName}`
+                  : null,
+                isOverdue: overdue.some((candidate) => candidate.id === loan.id),
+              }))}
+            />
           </CardContent>
         </Card>
 

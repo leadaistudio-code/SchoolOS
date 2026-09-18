@@ -69,7 +69,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('staff_attendance'),
       ...all('biometric'),
       ...all('leave'),
-      'fees.view', 'fees.export', 'fees.concession',
+      'fees.view', 'fees.accounts', 'fees.export', 'fees.concession', 'fees.report', 'fees.reminder', 'fees.owner_analytics',
       'expenses.view',
       ...all('exams'),
       ...all('results'),
@@ -94,6 +94,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'audit.view',
       'assistant.use',
       'settings.view',
+      'settings.export',
       'users.view',
       'roles.view',
     ],
@@ -141,11 +142,15 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'leave.view',
       'leave.apply',
       'exams.view',
+      'exams.attendance',
       'exams.marks',
       'results.view',
       'notices.view',
       'messages.view',
       'messages.send',
+      'feedback.view',
+      'feedback.teacher_view_own',
+      'feedback.teacher_give_student',
       'teacher_refresh.view_self',
       'teacher_refresh.take',
     ],
@@ -156,16 +161,10 @@ export const SYSTEM_ROLES: RoleDef[] = [
     description: 'Owns fee structures, invoicing, collection and refunds.',
     permissions: [
       'dashboard.view',
-      'students.view', 'parents.view',
-      'academics.view',
       ...all('fees'),
       ...all('expenses'),
-      'reports.view', 'reports.export',
       'notices.view',
       'messages.view', 'messages.send',
-      'feedback.view', 'feedback.student_submit', 'feedback.submit',
-      'documents.view',
-      'audit.view',
       'assistant.use',
       'staff_attendance.mark',
       'leave.view', 'leave.apply',
@@ -177,10 +176,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
     description: 'Manages the library catalogue and circulation.',
     permissions: [
       'dashboard.view',
-      'students.view', 'staff.view',
       ...all('library'),
       'inventory.view',
-      'reports.view',
       'notices.view',
       'staff_attendance.mark',
       'leave.view', 'leave.apply',
@@ -192,9 +189,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
     description: 'Manages buses, routes, drivers and student assignments.',
     permissions: [
       'dashboard.view',
-      'students.view',
       ...all('transport'),
-      'reports.view',
       'notices.view',
       'staff_attendance.mark',
       'leave.view', 'leave.apply',
@@ -218,7 +213,6 @@ export const SYSTEM_ROLES: RoleDef[] = [
     description: 'Reception, visitors, enquiries and admission leads.',
     permissions: [
       'dashboard.view',
-      'students.view', 'parents.view',
       ...all('frontoffice'),
       ...all('admissions'),
       'expenses.view',
@@ -228,8 +222,6 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'feedback.view', 'feedback.parent_submit', 'feedback.submit',
       'calendar.view',
       'events.view',
-      'documents.view',
-      'reports.view',
       'staff_attendance.mark',
       'leave.view', 'leave.apply',
     ],
@@ -243,10 +235,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('staff'),
       ...all('staff_attendance'),
       ...all('leave'),
-      'documents.view', 'documents.manage',
-      'reports.view', 'reports.export',
       'notices.view',
-      'users.view', 'users.create', 'users.edit', 'users.roles',
+      'users.view', 'users.create', 'users.edit',
       'roles.view',
     ],
   },
@@ -272,8 +262,11 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'notices.view',
       'messages.view', 'messages.send',
       'library.view',
+      'feedback.view',
+      'feedback.submit',
+      'feedback.student_submit',
       'events.view',
-      'transport.view',
+      'transport.track',
       'documents.view',
     ],
   },
@@ -305,7 +298,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'feedback.submit',
       'feedback.parent_submit',
       'events.view',
-      'transport.view', 'transport.track',
+      'transport.track',
       'documents.view',
     ],
   },
@@ -319,14 +312,32 @@ export const ROLE_BY_KEY = new Map(SYSTEM_ROLES.map((r) => [r.key, r]))
  */
 export const SELF_SCOPED_ROLES: RoleKey[] = [ROLE.STUDENT, ROLE.PARENT]
 
+export function hasSchoolWideScope(roleKeys: string[]): boolean {
+  const schoolWideRoleKeys: string[] = [ROLE.SUPER_ADMIN, ROLE.SCHOOL_ADMIN, ROLE.PRINCIPAL]
+  return roleKeys.some((key) => schoolWideRoleKeys.includes(key))
+}
+
 export function isSelfScoped(roleKeys: string[]): boolean {
-  const elevated = roleKeys.some(
-    (k) => !SELF_SCOPED_ROLES.includes(k as RoleKey),
-  )
-  return !elevated && roleKeys.length > 0
+  const isPortal = roleKeys.some((key) => SELF_SCOPED_ROLES.includes(key as RoleKey))
+  return isPortal && !hasSchoolWideScope(roleKeys)
 }
 
 /** Teacher-only accounts get a scoped dashboard and row-level filters in scope.ts. */
 export function isTeacherScoped(roleKeys: string[]): boolean {
-  return roleKeys.length > 0 && roleKeys.every((k) => k === ROLE.TEACHER)
+  const schoolWide: string[] = [
+    ROLE.SUPER_ADMIN,
+    ROLE.SCHOOL_ADMIN,
+    ROLE.PRINCIPAL,
+    ROLE.ACCOUNTANT,
+    ROLE.LIBRARIAN,
+    ROLE.TRANSPORT_MANAGER,
+    ROLE.FRONT_DESK,
+    ROLE.HR,
+  ]
+  return (
+    roleKeys.includes(ROLE.TEACHER) &&
+    !roleKeys.includes(ROLE.PARENT) &&
+    !roleKeys.includes(ROLE.STUDENT) &&
+    !roleKeys.some((key) => schoolWide.includes(key))
+  )
 }

@@ -5,16 +5,14 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
-  // An empty allowlist is a refusal, not a default: `microphone=()` disables
-  // the microphone for every origin including this one, and Chrome gates
-  // SpeechRecognition behind it — the assistant's voice button failed with
-  // "not-allowed" and the browser never showed a permission prompt, because
-  // the page had already answered for it. `self` restores the prompt while
-  // still refusing the microphone to anything embedded. The camera stays off
-  // because nothing asks for it.
+  // An empty allowlist is a refusal, not a default: `camera=()` / `microphone=()`
+  // disable the device for every origin including this one, and Chrome never
+  // shows a permission prompt — getUserMedia fails with NotAllowedError. `self`
+  // restores the prompt for admit-card scanning and the assistant voice button,
+  // while still refusing the devices to anything embedded.
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(self), geolocation=(self)',
+    value: 'camera=(self), microphone=(self), geolocation=(self)',
   },
   {
     key: 'Strict-Transport-Security',
@@ -40,7 +38,12 @@ const nextConfig: NextConfig = {
   // otherwise be inferred as the workspace root.
   outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
-  experimental: { optimizePackageImports: ['lucide-react', 'recharts'] },
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts'],
+    // File uploads use authenticated Server Actions. Keep enough multipart
+    // overhead above the application-level 15 MB validation in uploadFile().
+    serverActions: { bodySizeLimit: '16mb' },
+  },
   serverExternalPackages: ['bcryptjs'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]

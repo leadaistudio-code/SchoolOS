@@ -75,6 +75,33 @@ export async function returnLoanAction(id: string): Promise<ActionResult> {
   }
 }
 
+export async function bulkReturnLoansAction(ids: string[]): Promise<ActionResult> {
+  const ctx = await requireContext('library.issue')
+  const loanIds = [...new Set(ids)].slice(0, 100)
+  if (loanIds.length === 0) return { ok: false, message: 'Select at least one loan.' }
+
+  let returned = 0
+  let failed = 0
+  for (let offset = 0; offset < loanIds.length; offset += 10) {
+    const results = await Promise.allSettled(
+      loanIds.slice(offset, offset + 10).map((id) => returnLoan(ctx, id)),
+    )
+    for (const result of results) {
+      if (result.status === 'fulfilled') returned += 1
+      else failed += 1
+    }
+  }
+
+  revalidatePath('/library')
+  revalidatePath('/library/loans')
+  return {
+    ok: failed === 0,
+    message: failed
+      ? `${returned} returned; ${failed} could not be returned.`
+      : `${returned} loan${returned === 1 ? '' : 's'} returned.`,
+  }
+}
+
 export async function markLostAction(id: string): Promise<ActionResult> {
   const ctx = await requireContext('library.issue')
   try {

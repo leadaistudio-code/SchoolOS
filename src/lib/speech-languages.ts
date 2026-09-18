@@ -27,7 +27,7 @@ export type SpeechLanguage = {
 }
 
 export const SPEECH_LANGUAGES: SpeechLanguage[] = [
-  { tag: 'en-IN', label: 'English', english: 'English' },
+  { tag: 'en-IN', label: 'Indian English', english: 'Indian English' },
   { tag: 'hi-IN', label: 'हिन्दी', english: 'Hindi' },
   { tag: 'mr-IN', label: 'मराठी', english: 'Marathi' },
   { tag: 'bn-IN', label: 'বাংলা', english: 'Bengali' },

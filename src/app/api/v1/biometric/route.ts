@@ -8,6 +8,11 @@ import { listMappings, upsertMapping, suggestMatches } from '@/server/modules/de
 import { listRawEvents, adminReprocessEvent } from '@/server/modules/device-gateway/logs'
 import { getBiometricSettings, saveBiometricSettings } from '@/server/modules/device-gateway/settings'
 import { mappingSchema, biometricSettingsSchema } from '@/server/modules/device-gateway/schema'
+import {
+  createCloudBiometricDevice,
+  listCloudBiometricDevices,
+  rotateCloudBiometricEndpoint,
+} from '@/server/modules/device-gateway/cloud-direct'
 import type { NextRequest } from 'next/server'
 import type { DeviceCommandType, DeviceRawEventStatus } from '@prisma/client'
 
@@ -16,6 +21,7 @@ export const GET = route(
     const tab = req.nextUrl.searchParams.get('tab') ?? 'overview'
     if (tab === 'connectors') return ok(await listConnectors(ctx))
     if (tab === 'devices') return ok(await listDevices(ctx))
+    if (tab === 'cloud_devices') return ok(await listCloudBiometricDevices(ctx))
     if (tab === 'pairing') return ok(await listPairingCodes(ctx))
     if (tab === 'settings') return ok(await getBiometricSettings(ctx))
     if (tab === 'mappings') {
@@ -64,6 +70,12 @@ export const POST = route(
     }
     if (action === 'set_device_active') {
       return ok(await setDeviceActive(ctx, String(body.deviceId), Boolean(body.active)))
+    }
+    if (action === 'create_cloud_device') {
+      return ok(await createCloudBiometricDevice(ctx, body))
+    }
+    if (action === 'rotate_cloud_device_url') {
+      return ok(await rotateCloudBiometricEndpoint(ctx, String(body.endpointId)))
     }
     if (action === 'enqueue_command') {
       return ok(

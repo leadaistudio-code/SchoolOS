@@ -1,7 +1,7 @@
 import { requireContext } from '@/server/context'
 import { env } from '@/lib/env'
 import { resolveBrandingAssetUrl } from '@/server/branding-assets'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { BrandingForm } from './branding-form'
 
 export const metadata = { title: 'Branding' }
@@ -16,9 +16,10 @@ export default async function BrandingPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="Branding"
         description="Applied across the portal, receipts, report cards and the installed app"
+        icon="Palette"
       />
       <BrandingForm
         logoUrl={resolveBrandingAssetUrl(b?.logoUrl, 'logo')}

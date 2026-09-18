@@ -6,6 +6,8 @@ import { saveAttendanceAction } from './actions'
 import type { Register } from '@/server/modules/attendance/service'
 import { MARKABLE_STATUSES, STATUS_LABEL, type AttendanceStatusValue } from '@/server/modules/attendance/schema'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/input'
+import { BulkSelectionBar, useBulkSelection } from '@/components/bulk-selection'
 import { EmptyState } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
@@ -31,6 +33,7 @@ const TONE: Record<string, string> = {
 export function AttendanceRegister({ register }: { register: Register }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
+  const selection = useBulkSelection(register.rows.map((row) => row.studentId))
 
   const initial = React.useMemo<Draft>(() => {
     const d: Draft = {}
@@ -60,6 +63,17 @@ export function AttendanceRegister({ register }: { register: Register }) {
     setDraft((d) => {
       const next: Draft = {}
       for (const key of Object.keys(d)) next[key] = { ...d[key]!, status }
+      return next
+    })
+    setDirty(true)
+  }
+
+  const setSelected = (status: AttendanceStatusValue) => {
+    setDraft((current) => {
+      const next = { ...current }
+      for (const studentId of selection.selectedIds) {
+        next[studentId] = { ...next[studentId], status }
+      }
       return next
     })
     setDirty(true)
@@ -118,6 +132,13 @@ export function AttendanceRegister({ register }: { register: Register }) {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-line">
+        {register.editable ? (
+          <Checkbox
+            aria-label="Select all students"
+            checked={selection.allSelected}
+            onChange={selection.toggleAll}
+          />
+        ) : null}
         <div className="flex items-center gap-1.5 text-xs text-ink-muted mr-auto">
           {MARKABLE_STATUSES.map((s) => (
             <span key={s} className="inline-flex items-center gap-1">
@@ -141,6 +162,25 @@ export function AttendanceRegister({ register }: { register: Register }) {
         ) : null}
       </div>
 
+      {register.editable ? (
+        <BulkSelectionBar
+          count={selection.selected.size}
+          noun="student"
+          onClear={selection.clear}
+        >
+          {MARKABLE_STATUSES.filter((status) => status !== 'HOLIDAY').map((status) => (
+            <Button
+              key={status}
+              size="sm"
+              variant="secondary"
+              onClick={() => setSelected(status)}
+            >
+              Mark {STATUS_LABEL[status].toLowerCase()}
+            </Button>
+          ))}
+        </BulkSelectionBar>
+      ) : null}
+
       <ul className="divide-y divide-[var(--border)]">
         {register.rows.map((row) => {
           const current = draft[row.studentId]?.status ?? 'PRESENT'
@@ -149,6 +189,13 @@ export function AttendanceRegister({ register }: { register: Register }) {
               key={row.studentId}
               className="flex flex-wrap items-center gap-3 px-3 py-1.5 hover:bg-surface-2"
             >
+              {register.editable ? (
+                <Checkbox
+                  aria-label={`Select ${row.firstName} ${row.lastName}`}
+                  checked={selection.selected.has(row.studentId)}
+                  onChange={() => selection.toggle(row.studentId)}
+                />
+              ) : null}
               <span className="w-9 text-xs text-ink-subtle tnum shrink-0">
                 {row.rollNumber ?? '—'}
               </span>

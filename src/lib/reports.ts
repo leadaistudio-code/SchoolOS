@@ -37,7 +37,7 @@ export const REPORTS: ReportDefinition[] = [
     summary: 'What was billed, what came in, what is still owed and how late it is.',
     icon: 'Wallet',
     href: '/reports/collection',
-    permission: 'reports.view',
+    permission: 'fees.report',
     defaultDays: 89,
     exports: [
       { key: 'class', label: 'Collection by class' },

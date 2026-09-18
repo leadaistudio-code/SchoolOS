@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { AlertCircle, BadgeIndianRupee, TrendingUp, Wallet } from 'lucide-react'
-import { startOfMonth } from 'date-fns'
+import { addDays, startOfMonth } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { outstandingByClass } from '@/server/modules/finance/service'
 import { attendanceDate, formatDay } from '@/lib/dates'
@@ -93,6 +93,51 @@ export default async function FinancePage() {
   const outstandingMinor = outstanding._sum.balanceMinor ?? 0
   const collectionRate =
     billedMinor > 0 ? Math.round(((billedMinor - outstandingMinor) / billedMinor) * 100) : 0
+  const [studentBalances, dueSoon, reconciliation, pendingCheques, pendingRefunds] =
+    await Promise.all([
+      ctx.db.feeInvoice.groupBy({
+        by: ['studentId'],
+        where: invoiceWhere,
+        _sum: { totalMinor: true, paidMinor: true, balanceMinor: true },
+      }),
+      ctx.db.feeInvoice.aggregate({
+        where: {
+          ...openInvoiceWhere,
+          dueOn: { gte: today, lte: addDays(today, 7) },
+        },
+        _sum: { balanceMinor: true },
+      }),
+      ctx.db.feePayment.count({
+        where: {
+          status: { in: ['INITIATED', 'PENDING'] },
+          ...(invoiceScope.studentId ? { studentId: invoiceScope.studentId } : {}),
+        },
+      }),
+      ctx.db.feePayment.count({
+        where: {
+          mode: 'CHEQUE',
+          status: 'PENDING',
+          ...(invoiceScope.studentId ? { studentId: invoiceScope.studentId } : {}),
+        },
+      }),
+      ctx.db.feeRefund.count({ where: { status: 'PENDING' } }),
+    ])
+  const paymentStatus = studentBalances.reduce(
+    (counts, row) => {
+      const total = row._sum.totalMinor ?? 0
+      const paid = row._sum.paidMinor ?? 0
+      const balance = row._sum.balanceMinor ?? 0
+      if (balance <= 0) counts.paid++
+      else if (paid > 0) counts.partial++
+      else counts.due++
+      return counts
+    },
+    { paid: 0, partial: 0, due: 0 },
+  )
+  const overdueStudents = await ctx.db.feeInvoice.groupBy({
+    by: ['studentId'],
+    where: { ...openInvoiceWhere, dueOn: { lt: today } },
+  })
 
   return (
     <div className="space-y-4">
@@ -121,7 +166,7 @@ export default async function FinancePage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <ColorTile
           label="Collected today"
           value={formatMoney(collectedToday._sum.amountMinor ?? 0, currency)}
@@ -158,9 +203,41 @@ export default async function FinancePage() {
           icon={<AlertCircle className="size-5" aria-hidden />}
           delayMs={160}
         />
+        <ColorTile
+          label="Collection rate"
+          value={`${collectionRate}%`}
+          sub={`${formatMoney(billedMinor - outstandingMinor, currency)} collected`}
+          tone="fees"
+          href="/finance/reports"
+          icon={<TrendingUp className="size-5" aria-hidden />}
+          delayMs={200}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Student payment status</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-2 gap-x-5 gap-y-3">
+            <div><p className="text-xs text-ink-muted">Paid</p><p className="text-xl font-semibold tnum text-success">{paymentStatus.paid}</p></div>
+            <div><p className="text-xs text-ink-muted">Partially paid</p><p className="text-xl font-semibold tnum text-warning">{paymentStatus.partial}</p></div>
+            <div><p className="text-xs text-ink-muted">Due</p><p className="text-xl font-semibold tnum text-ink">{paymentStatus.due}</p></div>
+            <div><p className="text-xs text-ink-muted">Overdue</p><p className="text-xl font-semibold tnum text-[var(--danger)]">{overdueStudents.length}</p></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Needs attention</CardTitle></CardHeader>
+          <CardContent className="py-1">
+            <ul className="divide-y divide-[var(--border)]">
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{overdueStudents.length} students have overdue fees</span><Link href="/finance/dues" className="text-xs text-[var(--brand-600)] hover:underline">View dues</Link></li>
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{formatMoney(dueSoon._sum.balanceMinor ?? 0, currency)} due within 7 days</span><Link href="/finance/dues" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{reconciliation} payments require reconciliation</span><Link href="/finance/payments?status=PENDING" className="text-xs text-[var(--brand-600)] hover:underline">Open payments</Link></li>
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{pendingCheques} cheque payments are pending</span><Link href="/finance/payments?mode=CHEQUE" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{pendingRefunds} refunds await approval</span><Link href="/finance/payments" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
+            </ul>
+          </CardContent>
+        </Card>
+
         <Card variant="elevated" className="overflow-hidden">
           <CardHeader>
             <CardTitle>Outstanding by class</CardTitle>

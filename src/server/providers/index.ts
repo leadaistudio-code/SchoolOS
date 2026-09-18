@@ -534,9 +534,9 @@ const mockPayment: PaymentProvider = {
       raw: { providerPaymentId, source: 'mock.fetch' },
     }
   },
-  async refund(providerPaymentId, amountMinor) {
-    console.info('[payment:mock] refund', { providerPaymentId, amountMinor })
-    return { ok: true, providerMessageId: `mock_refund_${randomToken(8)}` }
+  async refund(providerPaymentId, amountMinor, idempotencyKey) {
+    console.info('[payment:mock] refund', { providerPaymentId, amountMinor, idempotencyKey })
+    return { ok: true, providerMessageId: `mock_refund_${idempotencyKey}` }
   },
 }
 

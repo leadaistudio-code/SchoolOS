@@ -26,8 +26,9 @@ public sealed class StoredCredentials
 }
 
 /// <summary>
-/// Persists the connector secret using Windows DPAPI (CurrentUser scope by default).
-/// Falls back to LocalMachine when running as a Windows Service without an interactive user profile.
+/// Persists the connector secret using Windows DPAPI.
+/// Credentials live under ProgramData and must be readable by the Windows Service
+/// (LocalSystem), so LocalMachine scope is the default.
 /// </summary>
 public sealed class SecureCredentialStore
 {
@@ -44,29 +45,10 @@ public sealed class SecureCredentialStore
     {
         ConnectorConfig.EnsureDirectories();
         _path = path ?? ConnectorConfig.CredentialsPath;
-        _scope = scope ?? DetectScope();
+        _scope = scope ?? DataProtectionScope.LocalMachine;
     }
 
-    public static DataProtectionScope DetectScope()
-    {
-        // Prefer CurrentUser when a real user profile is loaded; LocalMachine for SYSTEM service accounts.
-        try
-        {
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrWhiteSpace(userProfile) &&
-                !userProfile.Contains("systemprofile", StringComparison.OrdinalIgnoreCase) &&
-                Directory.Exists(userProfile))
-            {
-                return DataProtectionScope.CurrentUser;
-            }
-        }
-        catch
-        {
-            // ignore and fall through
-        }
-
-        return DataProtectionScope.LocalMachine;
-    }
+    public static DataProtectionScope DetectScope() => DataProtectionScope.LocalMachine;
 
     public bool Exists() => File.Exists(_path);
 
@@ -79,6 +61,17 @@ public sealed class SecureCredentialStore
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
+        }
+
+        if (File.Exists(_path))
+        {
+            // File.WriteAllBytes cannot replace a Hidden/ReadOnly file on
+            // Windows. Setup marks credentials hidden after the first pairing,
+            // so clear those attributes before a tenant re-pair or rotation.
+            var attributes = File.GetAttributes(_path);
+            File.SetAttributes(
+                _path,
+                attributes & ~FileAttributes.Hidden & ~FileAttributes.ReadOnly);
         }
 
         File.WriteAllBytes(_path, protectedBytes);
@@ -96,15 +89,22 @@ public sealed class SecureCredentialStore
         byte[] plain;
         try
         {
-            plain = ProtectedData.Unprotect(protectedBytes, optionalEntropy: null, scope: _scope);
+            plain = ProtectedData.Unprotect(protectedBytes, optionalEntropy: null, scope: DataProtectionScope.LocalMachine);
         }
         catch (CryptographicException)
         {
-            // Retry alternate scope (service vs interactive pairing mismatch).
-            var alternate = _scope == DataProtectionScope.CurrentUser
-                ? DataProtectionScope.LocalMachine
-                : DataProtectionScope.CurrentUser;
-            plain = ProtectedData.Unprotect(protectedBytes, optionalEntropy: null, scope: alternate);
+            try
+            {
+                // Older Setup builds may have saved with CurrentUser.
+                plain = ProtectedData.Unprotect(
+                    protectedBytes,
+                    optionalEntropy: null,
+                    scope: DataProtectionScope.CurrentUser);
+            }
+            catch (CryptographicException)
+            {
+                return null;
+            }
         }
 
         var json = Encoding.UTF8.GetString(plain);

@@ -1,11 +1,16 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { requireContext } from '@/server/context'
-import { getAdmitCardSummary, listAdmitCards } from '@/server/modules/exams/admit-cards'
+import {
+  getAdmitCardSummary,
+  listAdmitCardSections,
+  listAdmitCards,
+} from '@/server/modules/exams/admit-cards'
 import { getExamDetail } from '@/server/modules/exams/service'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ColorTile } from '@/components/dashboard/color-tiles'
+import { Notice } from '@/components/ui/states'
 import { AdmitCardPanel } from './admit-card-panel'
 
 export const metadata = { title: 'Admit cards' }
@@ -30,10 +35,11 @@ export default async function ExamAdmitCardsPage({
   const { status: rawStatus } = await searchParams
   const statusFilter = parseStatus(rawStatus)
 
-  const [exam, summary, { rows }] = await Promise.all([
+  const [exam, summary, { rows }, sections] = await Promise.all([
     getExamDetail(ctx, id),
     getAdmitCardSummary(ctx, id),
     listAdmitCards(ctx, id),
+    listAdmitCardSections(ctx, id),
   ])
 
   const canGenerate = ctx.can('exams.admit_cards')
@@ -52,8 +58,14 @@ export default async function ExamAdmitCardsPage({
 
       <PageHeader
         title="Admit cards"
-        description="Generate cards with the exam date sheet. The principal approves each card after fees are cleared."
+        description="Generate cards by class section. Each card shows only the papers assigned to that student’s section."
       />
+
+      <Notice tone="info" title="Section-wise date sheet">
+        Subject lists on admit cards follow Academics → Subjects section mapping. Core papers mapped
+        to every section (or left unmapped) appear for the whole class; electives appear only for the
+        sections they are assigned to.
+      </Notice>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <ColorTile
@@ -93,6 +105,10 @@ export default async function ExamAdmitCardsPage({
           <AdmitCardPanel
             examId={exam.id}
             rows={rows}
+            sections={sections.map((section) => ({
+              id: section.id,
+              label: `${section.classLevel.name} · ${section.name}`,
+            }))}
             statusFilter={statusFilter}
             canGenerate={canGenerate}
             canApprove={canApprove}

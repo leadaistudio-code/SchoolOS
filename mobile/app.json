@@ -2,7 +2,7 @@
   "expo": {
     "name": "MyCampusView",
     "slug": "mycampusview",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "mycampusview",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.mycampusview.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0A1A3F",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -67,6 +67,12 @@
         {
           "photosPermission": "MyCampusView uses your photos to attach documents to student and staff records.",
           "cameraPermission": "MyCampusView uses the camera to capture documents and photographs for school records."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MyCampusView uses the camera to scan admit-card barcodes at the exam desk."
         }
       ],
       [

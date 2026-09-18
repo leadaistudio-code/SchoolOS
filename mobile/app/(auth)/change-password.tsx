@@ -26,7 +26,7 @@ export default function ChangePasswordScreen() {
 
   async function submit() {
     if (next !== confirm) { setError('The two new passwords do not match.'); return }
-    if (next.length < 10) { setError('Use at least 10 characters.'); return }
+    if (next.length < 6) { setError('Use at least 6 characters.'); return }
 
     setBusy(true); setError(null)
     try {
@@ -59,7 +59,7 @@ export default function ChangePasswordScreen() {
             <Field label="Current password">
               <Input value={current} onChangeText={setCurrent} secureTextEntry autoCapitalize="none" editable={!busy} />
             </Field>
-            <Field label="New password" hint="At least 10 characters.">
+            <Field label="New password" hint="At least 6 characters (digits are fine).">
               <Input value={next} onChangeText={setNext} secureTextEntry autoCapitalize="none" editable={!busy} />
             </Field>
             <Field label="Confirm new password">

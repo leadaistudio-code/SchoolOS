@@ -13,14 +13,34 @@ export type ScopedStudent = {
   rollNumber: number | null
 }
 
+const UNRESTRICTED_ROLE_KEYS = new Set<string>([
+  ROLE.SUPER_ADMIN,
+  ROLE.SCHOOL_ADMIN,
+  ROLE.PRINCIPAL,
+])
+
+const SCHOOL_WIDE_OPERATIONAL_ROLE_KEYS = new Set<string>([
+  ROLE.ACCOUNTANT,
+  ROLE.LIBRARIAN,
+  ROLE.TRANSPORT_MANAGER,
+  ROLE.FRONT_DESK,
+  ROLE.HR,
+])
+
 export function isTeacherOnlyRole(roleKeys: string[]): boolean {
-  return roleKeys.length > 0 && roleKeys.every((r) => r === ROLE.TEACHER)
+  return (
+    roleKeys.includes(ROLE.TEACHER) &&
+    !roleKeys.includes(ROLE.PARENT) &&
+    !roleKeys.includes(ROLE.STUDENT) &&
+    !roleKeys.some((role) =>
+      UNRESTRICTED_ROLE_KEYS.has(role) || SCHOOL_WIDE_OPERATIONAL_ROLE_KEYS.has(role))
+  )
 }
 
 export function isPortalOnlyRole(roleKeys: string[]): boolean {
   return (
-    roleKeys.length > 0 &&
-    roleKeys.every((r) => r === ROLE.PARENT || r === ROLE.STUDENT)
+    (roleKeys.includes(ROLE.PARENT) || roleKeys.includes(ROLE.STUDENT)) &&
+    !roleKeys.some((role) => UNRESTRICTED_ROLE_KEYS.has(role))
   )
 }
 
@@ -135,12 +155,7 @@ export const accessibleStudentIds = cache(
   async (ctx: AppContext): Promise<string[] | null> => {
     const roles = ctx.user.roleKeys
 
-    if (isTeacherOnlyRole(roles)) {
-      return teachingStudentIds(ctx)
-    }
-
-    const selfOnly = isPortalOnlyRole(roles)
-    if (!selfOnly) return null
+    if (roles.some((role) => UNRESTRICTED_ROLE_KEYS.has(role))) return null
 
     if (roles.includes(ROLE.PARENT)) {
       const parent = await ctx.db.parent.findFirst({
@@ -150,11 +165,23 @@ export const accessibleStudentIds = cache(
       return parent?.children.map((c) => c.studentId) ?? []
     }
 
-    const student = await ctx.db.student.findFirst({
-      where: { userId: ctx.user.userId },
-      select: { id: true },
-    })
-    return student ? [student.id] : []
+    if (roles.includes(ROLE.STUDENT)) {
+      const student = await ctx.db.student.findFirst({
+        where: { userId: ctx.user.userId },
+        select: { id: true },
+      })
+      return student ? [student.id] : []
+    }
+
+    if (isTeacherOnlyRole(roles)) {
+      return teachingStudentIds(ctx)
+    }
+
+    if (roles.some((role) => SCHOOL_WIDE_OPERATIONAL_ROLE_KEYS.has(role))) return null
+
+    // A custom role may grant a module permission, but it never silently grants
+    // school-wide row access. Assign an explicit operational/admin role for that.
+    return []
   },
 )
 
@@ -173,7 +200,9 @@ export const accessibleStudentIds = cache(
 export const teachingClassSubjectIds = cache(
   async (ctx: AppContext): Promise<string[] | null> => {
     const roles = ctx.user.roleKeys
-    if (!roles.every((r) => r === ROLE.TEACHER)) return null
+    if (roles.some((role) => UNRESTRICTED_ROLE_KEYS.has(role))) return null
+    if (roles.includes(ROLE.PARENT) || roles.includes(ROLE.STUDENT)) return []
+    if (!isTeacherOnlyRole(roles)) return null
 
     const staff = await ctx.db.staff.findFirst({
       where: { userId: ctx.user.userId },

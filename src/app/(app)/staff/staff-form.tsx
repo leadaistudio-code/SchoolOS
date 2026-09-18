@@ -29,6 +29,10 @@ export type StaffFormValues = {
   city?: string
   state?: string
   postalCode?: string
+  customAttendanceHours?: boolean
+  attendanceStart?: string
+  attendanceEnd?: string
+  attendanceLateAfter?: string
 }
 
 const STAFF_TYPES = [
@@ -82,6 +86,7 @@ export function StaffForm({
 }) {
   const [state, formAction, pending] = React.useActionState(action, emptyFormState)
   const [createLogin, setCreateLogin] = React.useState(false)
+  const [customHours, setCustomHours] = React.useState(Boolean(values?.customAttendanceHours))
   const err = (name: string) => state.fieldErrors?.[name]
 
   return (
@@ -200,6 +205,71 @@ export function StaffForm({
                   />
                 </Field>
               ) : null}
+          </FormSection>
+
+          <FormSection
+            title="Attendance hours"
+            description="Full-time staff follow school open and close times. Guest or part-time teachers can use their own check-in and check-out window."
+          >
+            <label className="flex items-start gap-2 sm:col-span-2">
+              <Checkbox
+                name="customAttendanceHours"
+                checked={customHours}
+                onChange={(e) => setCustomHours(e.target.checked)}
+              />
+              <span className="text-sm text-ink">
+                Use custom check-in / check-out hours
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  For guest teachers who only work 2–3 hours. Late and half-day are judged against
+                  these hours, not the full school day.
+                </span>
+              </span>
+            </label>
+            {customHours ? (
+              <>
+                <Field
+                  label="Check-in from"
+                  htmlFor="attendanceStart"
+                  required
+                  error={err('attendanceStartMinutes')}
+                >
+                  <Input
+                    id="attendanceStart"
+                    name="attendanceStart"
+                    type="time"
+                    required
+                    defaultValue={values?.attendanceStart ?? '10:00'}
+                  />
+                </Field>
+                <Field
+                  label="Check-out by"
+                  htmlFor="attendanceEnd"
+                  required
+                  error={err('attendanceEndMinutes')}
+                >
+                  <Input
+                    id="attendanceEnd"
+                    name="attendanceEnd"
+                    type="time"
+                    required
+                    defaultValue={values?.attendanceEnd ?? '12:00'}
+                  />
+                </Field>
+                <Field
+                  label="Late after"
+                  htmlFor="attendanceLateAfter"
+                  hint="Defaults to check-in time if left blank"
+                  error={err('attendanceLateAfterMinutes')}
+                >
+                  <Input
+                    id="attendanceLateAfter"
+                    name="attendanceLateAfter"
+                    type="time"
+                    defaultValue={values?.attendanceLateAfter ?? values?.attendanceStart ?? '10:00'}
+                  />
+                </Field>
+              </>
+            ) : null}
           </FormSection>
 
           <FormSection title="Contact" description="Used for notifications and emergencies.">

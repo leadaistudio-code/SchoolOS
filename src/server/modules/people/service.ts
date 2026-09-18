@@ -5,10 +5,14 @@ import { audit } from '@/server/audit'
 import { conflict, notFound, ApiException } from '@/server/api/response'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { assertWithinLimit, FEATURE } from '@/server/entitlements'
-import { hashPassword } from '@/server/auth/password'
+import { generateTemporaryPassword, hashPassword } from '@/server/auth/password'
 import { parentInitialPassword, staffInitialPassword } from '@/server/auth/initial-password'
 import { phoneLookupCandidates, storePhone } from '@/server/auth/phone'
 import { ROLE } from '@/lib/rbac/roles'
+import {
+  setTemporaryPassword,
+  TEMP_PASSWORD_TTL_HOURS,
+} from '@/server/modules/settings/users'
 
 const optional = (max: number) =>
   z.string().trim().max(max).optional().transform((v) => (v === '' ? undefined : v))
@@ -57,6 +61,7 @@ export const PARENT_SORT_FIELDS = ['firstName', 'lastName', 'createdAt'] as cons
 
 export type ParentRow = {
   id: string
+  userId: string | null
   firstName: string
   lastName: string
   phone: string | null
@@ -129,6 +134,7 @@ export async function listParents(
     total,
     rows: rows.map((p) => ({
       id: p.id,
+      userId: p.userId,
       firstName: p.firstName,
       lastName: p.lastName,
       phone: p.phone,
@@ -405,17 +411,79 @@ async function assertPhoneAvailable(ctx: AppContext, phone: string, exceptUserId
   if (clash) throw conflict('Another account already uses this phone number')
 }
 
-export async function updateParent(
-  ctx: AppContext,
-  id: string,
-  input: z.infer<typeof parentUpdateSchema>,
-) {
+export type ParentProfileUpdate = {
+  firstName?: string
+  lastName?: string
+  phone?: string | null
+  email?: string | null
+  occupation?: string | null
+  annualIncome?: string | null
+  addressLine1?: string | null
+  city?: string | null
+  state?: string | null
+  postalCode?: string | null
+}
+
+export async function updateParent(ctx: AppContext, id: string, input: ParentProfileUpdate) {
   ctx.require('parents.edit')
 
   const before = await ctx.db.parent.findFirst({ where: { id, deletedAt: null } })
   if (!before) throw notFound('Parent')
 
-  const updated = await ctx.db.parent.update({ where: { id }, data: input })
+  const phone =
+    input.phone !== undefined ? storePhone(input.phone ?? undefined) ?? null : undefined
+  const email =
+    input.email !== undefined
+      ? input.email?.trim().toLowerCase() || null
+      : undefined
+
+  if (email) {
+    const clash = await ctx.db.parent.findFirst({
+      where: { email, deletedAt: null, id: { not: id } },
+      select: { id: true },
+    })
+    if (clash) throw conflict(`A parent with the email ${email} already exists`)
+  }
+
+  if (phone) {
+    const clash = await ctx.db.parent.findFirst({
+      where: {
+        phone: { in: phoneLookupCandidates(phone) },
+        deletedAt: null,
+        id: { not: id },
+      },
+      select: { id: true },
+    })
+    if (clash) throw conflict('A parent with this phone number already exists')
+    if (before.userId) await assertPhoneAvailable(ctx, phone, before.userId)
+  }
+
+  const data: Prisma.ParentUpdateInput = {
+    ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+    ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
+    ...(phone !== undefined ? { phone } : {}),
+    ...(email !== undefined ? { email } : {}),
+    ...(input.occupation !== undefined ? { occupation: input.occupation || null } : {}),
+    ...(input.annualIncome !== undefined ? { annualIncome: input.annualIncome || null } : {}),
+    ...(input.addressLine1 !== undefined ? { addressLine1: input.addressLine1 || null } : {}),
+    ...(input.city !== undefined ? { city: input.city || null } : {}),
+    ...(input.state !== undefined ? { state: input.state || null } : {}),
+    ...(input.postalCode !== undefined ? { postalCode: input.postalCode || null } : {}),
+  }
+
+  const updated = await ctx.db.parent.update({ where: { id }, data })
+
+  if (before.userId) {
+    await ctx.db.user.update({
+      where: { id: before.userId },
+      data: {
+        ...(input.firstName !== undefined ? { firstName: updated.firstName } : {}),
+        ...(input.lastName !== undefined ? { lastName: updated.lastName } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(email !== undefined ? { email } : {}),
+      },
+    })
+  }
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -518,7 +586,7 @@ export async function unlinkChild(ctx: AppContext, parentId: string, studentId: 
 
 /* -------------------------------------------------------------------- staff */
 
-export const staffCreateSchema = z.object({
+export const staffBaseSchema = z.object({
   employeeCode: z
     .string()
     .trim()
@@ -544,18 +612,62 @@ export const staffCreateSchema = z.object({
   city: optional(80),
   state: optional(80),
   postalCode: optional(12),
-  createLogin: z.coerce.boolean().default(false),
-  roleKey: z.string().optional(),
+  /** Guest / part-time: use personal check-in and check-out hours instead of school day. */
+  customAttendanceHours: z.coerce.boolean().default(false),
+  attendanceStartMinutes: z.coerce.number().int().min(0).max(24 * 60 - 1).nullable().optional(),
+  attendanceEndMinutes: z.coerce.number().int().min(0).max(24 * 60 - 1).nullable().optional(),
+  attendanceLateAfterMinutes: z.coerce.number().int().min(0).max(24 * 60 - 1).nullable().optional(),
 })
 
-export const staffUpdateSchema = staffCreateSchema
-  .partial()
-  .omit({ createLogin: true, roleKey: true })
+function refineCustomAttendanceHours<
+  T extends {
+    customAttendanceHours?: boolean
+    attendanceStartMinutes?: number | null
+    attendanceEndMinutes?: number | null
+  },
+>(value: T, context: z.RefinementCtx) {
+  if (!value.customAttendanceHours) return
+  if (value.attendanceStartMinutes == null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['attendanceStartMinutes'],
+      message: 'Set a check-in time for custom hours',
+    })
+  }
+  if (value.attendanceEndMinutes == null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['attendanceEndMinutes'],
+      message: 'Set a check-out time for custom hours',
+    })
+  }
+  if (
+    value.attendanceStartMinutes != null &&
+    value.attendanceEndMinutes != null &&
+    value.attendanceEndMinutes <= value.attendanceStartMinutes
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['attendanceEndMinutes'],
+      message: 'Check-out must be after check-in',
+    })
+  }
+}
+
+export const staffCreateSchema = staffBaseSchema
+  .extend({
+    createLogin: z.coerce.boolean().default(false),
+    roleKey: z.string().optional(),
+  })
+  .superRefine(refineCustomAttendanceHours)
+
+export const staffUpdateSchema = staffBaseSchema.partial().superRefine(refineCustomAttendanceHours)
 
 export const STAFF_SORT_FIELDS = ['firstName', 'lastName', 'employeeCode', 'joinedOn'] as const
 
 export type StaffRow = {
   id: string
+  userId: string | null
   employeeCode: string
   firstName: string
   lastName: string
@@ -624,6 +736,7 @@ export async function listStaff(
     total,
     rows: rows.map((s) => ({
       id: s.id,
+      userId: s.userId,
       employeeCode: s.employeeCode,
       firstName: s.firstName,
       lastName: s.lastName,
@@ -836,6 +949,196 @@ export async function issueStaffPortalLogin(
   })
 
   return { temporaryPassword, userId }
+}
+
+export type StaffTempPasswordIssued = {
+  staffId: string
+  name: string
+  employeeCode: string
+  phone: string
+  password: string
+  expiresAt: string
+  createdLogin: boolean
+}
+
+export type StaffTempPasswordSkipped = {
+  staffId: string
+  name: string
+  employeeCode: string
+  reason: string
+}
+
+const BULK_TEMP_PASSWORD_MAX = 150
+
+/**
+ * Issues one-time temporary passwords for many staff at once.
+ *
+ * Creates a portal login when none exists; resets an existing account otherwise.
+ * Plaintexts are returned once for a CSV handover — same rules as Settings → Users
+ * Temp password (24h expiry, must change at first sign-in, sessions revoked).
+ */
+export async function bulkIssueStaffTempPasswords(
+  ctx: AppContext,
+  input: { staffIds?: string[]; all?: boolean; staffType?: string },
+): Promise<{ issued: StaffTempPasswordIssued[]; skipped: StaffTempPasswordSkipped[] }> {
+  ctx.require('users.edit')
+
+  let ids: string[]
+  if (input.all) {
+    const rows = await ctx.db.staff.findMany({
+      where: {
+        deletedAt: null,
+        ...(input.staffType ? { staffType: input.staffType as never } : {}),
+      },
+      select: { id: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      take: BULK_TEMP_PASSWORD_MAX,
+    })
+    ids = rows.map((row) => row.id)
+  } else {
+    ids = [...new Set(input.staffIds ?? [])].slice(0, BULK_TEMP_PASSWORD_MAX)
+  }
+
+  if (ids.length === 0) {
+    return { issued: [], skipped: [] }
+  }
+
+  const staffRows = await ctx.db.staff.findMany({
+    where: { id: { in: ids }, deletedAt: null },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      employeeCode: true,
+      phone: true,
+      email: true,
+      userId: true,
+      staffType: true,
+      user: { select: { id: true, status: true } },
+    },
+  })
+
+  const issued: StaffTempPasswordIssued[] = []
+  const skipped: StaffTempPasswordSkipped[] = []
+
+  for (const staff of staffRows) {
+    const name = `${staff.firstName} ${staff.lastName}`.trim()
+    const base = {
+      staffId: staff.id,
+      name,
+      employeeCode: staff.employeeCode,
+    }
+
+    try {
+      if (staff.userId && staff.userId === ctx.user.userId) {
+        skipped.push({ ...base, reason: 'Use Account → Password for your own account' })
+        continue
+      }
+
+      const phone = storePhone(staff.phone)
+      if (!phone) {
+        skipped.push({ ...base, reason: 'No phone number on file' })
+        continue
+      }
+
+      if (staff.user?.status === 'DISABLED') {
+        skipped.push({ ...base, reason: 'Account is disabled — re-enable it first' })
+        continue
+      }
+
+      if (staff.userId) {
+        const result = await setTemporaryPassword(ctx, staff.userId)
+        issued.push({
+          ...base,
+          phone,
+          password: result.password,
+          expiresAt: result.expiresAt.toISOString(),
+          createdLogin: false,
+        })
+        continue
+      }
+
+      await assertPhoneAvailable(ctx, phone)
+      const plain = generateTemporaryPassword()
+      const expiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_HOURS * 3600_000)
+      const roleKey = defaultRoleForStaffType(staff.staffType)
+      const role = await ctx.db.role.findFirst({
+        where: { key: roleKey, OR: [{ tenantId: null }, { tenantId: ctx.tenant.id }] },
+      })
+
+      const user = await ctx.db.user.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          email: staff.email,
+          phone,
+          passwordHash: await hashPassword(plain),
+          firstName: staff.firstName,
+          lastName: staff.lastName,
+          mustChangePassword: true,
+          tempPasswordExpiresAt: expiresAt,
+          passwordChangedAt: new Date(),
+          ...(role ? { roles: { create: { roleId: role.id } } } : {}),
+        },
+      })
+
+      await ctx.db.staff.update({
+        where: { id: staff.id },
+        data: { userId: user.id, phone },
+      })
+
+      await audit({
+        tenantId: ctx.tenant.id,
+        actorId: ctx.user.userId,
+        actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+        action: 'staff.issue_login',
+        module: 'staff',
+        entityType: 'Staff',
+        entityId: staff.id,
+        summary: `Issued temporary portal login for ${name} (${staff.employeeCode})`,
+      })
+
+      issued.push({
+        ...base,
+        phone,
+        password: plain,
+        expiresAt: expiresAt.toISOString(),
+        createdLogin: true,
+      })
+    } catch (err) {
+      skipped.push({
+        ...base,
+        reason: err instanceof Error ? err.message : 'Could not issue a password',
+      })
+    }
+  }
+
+  return { issued, skipped }
+}
+
+/**
+ * Issues a Settings-style temporary password for one staff member.
+ * Creates a portal login when needed; resets when one already exists.
+ */
+export async function issueStaffTempPassword(
+  ctx: AppContext,
+  staffId: string,
+): Promise<{ password: string; expiresAt: Date; name: string; createdLogin: boolean }> {
+  const result = await bulkIssueStaffTempPasswords(ctx, { staffIds: [staffId] })
+  const row = result.issued[0]
+  if (row) {
+    return {
+      password: row.password,
+      expiresAt: new Date(row.expiresAt),
+      name: row.name,
+      createdLogin: row.createdLogin,
+    }
+  }
+  const skip = result.skipped[0]
+  throw new ApiException(
+    400,
+    'BAD_REQUEST',
+    skip?.reason ?? 'Could not issue a temporary password',
+  )
 }
 
 function defaultRoleForStaffType(type: string): string {

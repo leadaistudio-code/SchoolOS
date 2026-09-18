@@ -103,6 +103,18 @@ export default function AppLayout() {
       <Tabs.Screen name="search" options={{ href: null }} />
       <Tabs.Screen name="student" options={{ href: null }} />
       <Tabs.Screen name="register" options={{ href: null }} />
+      <Tabs.Screen name="timetable" options={{ href: null }} />
+      <Tabs.Screen name="exams" options={{ href: null }} />
+      <Tabs.Screen name="exam" options={{ href: null }} />
+      <Tabs.Screen name="exam-attendance" options={{ href: null }} />
+      <Tabs.Screen name="exam-marks" options={{ href: null }} />
+      <Tabs.Screen name="fee-collect" options={{ href: null }} />
+      <Tabs.Screen name="receipt" options={{ href: null }} />
+      <Tabs.Screen name="leave-apply" options={{ href: null }} />
+      <Tabs.Screen name="homework-new" options={{ href: null }} />
+      <Tabs.Screen name="homework-detail" options={{ href: null }} />
+      <Tabs.Screen name="evaluation" options={{ href: null }} />
+      <Tabs.Screen name="evaluation-review" options={{ href: null }} />
     </Tabs>
   )
 }

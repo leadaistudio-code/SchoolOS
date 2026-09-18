@@ -1,19 +1,27 @@
 import { route } from '@/server/api/handler'
 import { ok } from '@/server/api/response'
-import { getAdminDashboard } from '@/server/modules/dashboard/service'
+import { getAdminDashboard, getTeacherDashboard } from '@/server/modules/dashboard/service'
+import { hasSchoolWideScope, isSelfScoped, isTeacherScoped } from '@/lib/rbac/roles'
+import { scopedStudents } from '@/server/scope'
 
 /**
- * GET /api/v1/dashboard — the figures the administrator home screen reads.
+ * GET /api/v1/dashboard — returns a payload selected by identity scope.
  *
- * The web renders this in a server component, so until now there was no way to
- * ask for it over HTTP and the Android app had nothing to open on. It calls
- * the same `getAdminDashboard` the page does rather than recomputing anything:
- * one definition of "attendance today", one of "outstanding", and no chance of
- * the two clients quoting different numbers to the same principal.
- *
- * `dashboard.view` is required here exactly as the page requires it, so this
- * exposes no data to anyone who could not already load the web dashboard.
+ * A shared `dashboard.view` capability only permits opening a dashboard; it
+ * never implies school-wide data. Parent/student, teacher, operational, and
+ * leadership accounts therefore receive different response shapes.
  */
-export const GET = route(async (_req, ctx) => ok(await getAdminDashboard(ctx)), {
+export const GET = route(async (_req, ctx) => {
+  if (isSelfScoped(ctx.user.roleKeys)) {
+    return ok({ scope: 'SELF', students: await scopedStudents(ctx) })
+  }
+  if (isTeacherScoped(ctx.user.roleKeys)) {
+    return ok({ scope: 'TEACHER', ...(await getTeacherDashboard(ctx)) })
+  }
+  if (hasSchoolWideScope(ctx.user.roleKeys)) {
+    return ok({ scope: 'SCHOOL', ...(await getAdminDashboard(ctx)) })
+  }
+  return ok({ scope: 'ROLE', roles: ctx.user.roleKeys })
+}, {
   permission: 'dashboard.view',
 })

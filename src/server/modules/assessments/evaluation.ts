@@ -369,7 +369,11 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
                   topics: {
                     select: {
                       topic: {
-                        select: { id: true, name: true, chapter: { select: { name: true } } },
+                        select: {
+                          id: true,
+                          name: true,
+                          chapter: { select: { id: true, name: true } },
+                        },
                       },
                     },
                   },
@@ -468,7 +472,14 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
   // rather than which child did badly.
   const topicTotals = new Map<
     string,
-    { name: string; chapter: string; earned: number; available: number; questions: number }
+    {
+      name: string
+      chapterId: string
+      chapter: string
+      earned: number
+      available: number
+      questions: number
+    }
   >()
 
   for (const question of perQuestion) {
@@ -476,6 +487,7 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
     for (const topic of question.topics) {
       const entry = topicTotals.get(topic.id) ?? {
         name: topic.name,
+        chapterId: topic.chapter.id,
         chapter: topic.chapter.name,
         earned: 0,
         available: 0,
@@ -492,17 +504,32 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
     .map(([id, entry]) => ({
       id,
       name: entry.name,
+      chapterId: entry.chapterId,
       chapter: entry.chapter,
       questions: entry.questions,
       successRate: entry.available > 0 ? Math.round((entry.earned / entry.available) * 100) : null,
     }))
     .sort((a, b) => (a.successRate ?? 100) - (b.successRate ?? 100))
 
+  const gaps = byTopic.filter((topic) => topic.successRate !== null && topic.successRate < 60)
+
+  const { remedialGenerateHref } = await import('@/server/modules/ai-assessment/insights')
+  const remedialHref =
+    gaps.length > 0
+      ? remedialGenerateHref({
+          classSubjectId: assignment.assessment.classSubjectId,
+          chapterIds: [...new Set(gaps.map((g) => g.chapterId).filter(Boolean))],
+          title: `Remedial · ${assignment.assessment.title}`.slice(0, 160),
+          count: Math.min(12, Math.max(6, gaps.length * 2)),
+        })
+      : null
+
   return {
     assessment: {
       id: assignment.assessment.id,
       title: assignment.assessment.title,
       totalMarks: total,
+      classSubjectId: assignment.assessment.classSubjectId,
     },
     assignmentId: assignment.id,
     summary,
@@ -513,7 +540,8 @@ export async function assignmentAnalytics(ctx: AppContext, assignmentId: string)
     // Stated as an observation, not a conclusion. The number is real; what to
     // do about it is the teacher's call, and a system that says "reteach this"
     // on one test of 20 students is overreaching.
-    gaps: byTopic.filter((topic) => topic.successRate !== null && topic.successRate < 60),
+    gaps,
+    remedialHref,
   }
 }
 

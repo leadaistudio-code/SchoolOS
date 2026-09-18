@@ -6,6 +6,7 @@ import { parseAgentEvent } from '../src/lib/assistant-events'
 import type { AppContext } from '../src/server/context'
 import { toOpenAiMessages, toOpenAiTools, toStrictSchema } from '../src/server/assistant/providers/openai'
 import { toAnthropicMessages } from '../src/server/assistant/providers/anthropic'
+import { toGeminiContents } from '../src/server/assistant/providers/gemini'
 import type { ModelTurn } from '../src/server/assistant/providers/types'
 
 /**
@@ -88,9 +89,26 @@ describe('assistant tool exposure', () => {
     expect(everyPermission).toHaveLength(TOOL_NAMES.length)
   })
 
-  it('exposes exactly one action tool, and it is the notice draft', () => {
+  it('exposes draft action tools only for notice-family drafts', () => {
     const actions = TOOL_NAMES.map((name) => findTool(name)!).filter((tool) => tool.action)
-    expect(actions.map((tool) => tool.name)).toEqual(['draft_notice'])
+    expect(actions.map((tool) => tool.name).sort()).toEqual(
+      [
+        'draft_attendance_nudge',
+        'draft_fee_reminder',
+        'draft_leave_approvals',
+        'draft_notice',
+      ].sort(),
+    )
+  })
+
+  it('offers learning insight tools only with assessments.view', () => {
+    const withAssessments = toolsFor(contextWith('assessments.view')).map((t) => t.name)
+    const without = toolsFor(contextWith('fees.view')).map((t) => t.name)
+
+    expect(withAssessments).toContain('learning_topic_gaps')
+    expect(withAssessments).toContain('assignment_topic_gaps')
+    expect(without).not.toContain('learning_topic_gaps')
+    expect(without).not.toContain('assignment_topic_gaps')
   })
 
   it('accepts no tenant, school or user argument on any tool', () => {
@@ -258,6 +276,97 @@ describe('provider message conversion', () => {
       { name: 'fees_outstanding', description: 'x', parameters: { type: 'object', properties: {} } },
     ])
     expect(spec).toMatchObject({ type: 'function', function: { strict: true } })
+  })
+
+  it('maps multimodal user parts to OpenAI image_url content', () => {
+    const messages = toOpenAiMessages([
+      {
+        role: 'user',
+        text: 'grade this',
+        parts: [
+          { type: 'text', text: 'grade this' },
+          { type: 'image', mimeType: 'image/png', base64: 'abc123' },
+        ],
+      },
+    ])
+    expect(messages[0]).toMatchObject({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'grade this' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,abc123' } },
+      ],
+    })
+  })
+
+  it('maps multimodal user parts to Anthropic image blocks', () => {
+    const messages = toAnthropicMessages([
+      {
+        role: 'user',
+        text: 'grade this',
+        parts: [
+          { type: 'text', text: 'grade this' },
+          { type: 'image', mimeType: 'image/jpeg', base64: 'xyz' },
+        ],
+      },
+    ])
+    expect(messages[0]!.content).toEqual([
+      { type: 'text', text: 'grade this' },
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: 'xyz' },
+      },
+    ])
+  })
+
+  it('maps multimodal user parts to Gemini inlineData', () => {
+    const contents = toGeminiContents([
+      {
+        role: 'user',
+        text: 'grade this',
+        parts: [
+          { type: 'text', text: 'grade this' },
+          { type: 'image', mimeType: 'image/png', base64: 'abc123' },
+        ],
+      },
+    ])
+    expect(contents[0]).toMatchObject({
+      role: 'user',
+      parts: [
+        { text: 'grade this' },
+        { inlineData: { mimeType: 'image/png', data: 'abc123' } },
+      ],
+    })
+  })
+
+  it('merges Gemini tool results into one user content', () => {
+    const contents = toGeminiContents([
+      { role: 'user', text: 'what fees are pending?' },
+      {
+        role: 'assistant',
+        text: '',
+        toolCalls: [
+          { id: 'call_1', name: 'list_classes', argumentsJson: '{}' },
+          { id: 'call_2', name: 'fees_outstanding', argumentsJson: '{}' },
+        ],
+      },
+      { role: 'tool', callId: 'call_1', name: 'list_classes', content: '{"classes":[]}' },
+      {
+        role: 'tool',
+        callId: 'call_2',
+        name: 'fees_outstanding',
+        content: 'permission denied',
+        isError: true,
+      },
+    ])
+    expect(contents.map((c) => c.role)).toEqual(['user', 'model', 'user'])
+    const results = contents[2]!.parts!
+    expect(results).toHaveLength(2)
+    expect(results[0]).toMatchObject({
+      functionResponse: { id: 'call_1', name: 'list_classes' },
+    })
+    expect(results[1]).toMatchObject({
+      functionResponse: { id: 'call_2', name: 'fees_outstanding', response: { error: 'permission denied' } },
+    })
   })
 })
 

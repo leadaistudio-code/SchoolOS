@@ -2,24 +2,15 @@ import { requireContext } from '@/server/context'
 import { listUsers, userCounts } from '@/server/modules/settings/users'
 import { listRoles } from '@/server/modules/settings/roles'
 import { parseListQuery } from '@/lib/query'
-import { formatDay } from '@/lib/dates'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Card } from '@/components/ui/card'
-import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Metric, MetricRow } from '@/components/ui/metric'
-import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { SearchBar } from '@/components/search-bar'
-import { Pagination } from '@/components/pagination'
-import { UserFilters, UserRow } from './controls'
+import { UserFilters } from './controls'
+import { UserTable } from './user-table'
 
 export const metadata = { title: 'Users' }
-
-const STATUS_TONE: Record<string, BadgeTone> = {
-  ACTIVE: 'success',
-  INVITED: 'info',
-  DISABLED: 'neutral',
-}
 
 /**
  * Portal accounts.
@@ -50,10 +41,11 @@ export default async function UsersPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <SettingsPageHeader
         title="Users"
         description={`${total} accounts · staff, parents and students who can sign in`}
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Users' }]}
+        icon="UserCog"
+        tone="info"
       />
 
       <MetricRow>
@@ -77,6 +69,12 @@ export default async function UsersPage({
       </MetricRow>
 
       <Card className="overflow-hidden">
+        <SettingsPanelHeader
+          title="Portal access"
+          description="Search accounts, review roles and manage sign-in access."
+          icon="UserCog"
+          tone="info"
+        />
         <SearchBar placeholder="Search name, email or phone" />
         <UserFilters roles={roleOptions} roleId={params.roleId ?? ''} status={params.status ?? ''} />
 
@@ -86,89 +84,33 @@ export default async function UsersPage({
             description="Accounts are created when staff, students and parents are added to the school."
           />
         ) : (
-          <>
-            <TableWrap>
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Person</TH>
-                    <TH>Roles</TH>
-                    <TH>Status</TH>
-                    <TH align="right">Last signed in</TH>
-                    {canEdit || canAssign ? <TH align="right">&nbsp;</TH> : null}
-                  </tr>
-                </THead>
-                <TBody>
-                  {rows.map((user) => (
-                    <TR key={user.id}>
-                      <TD>
-                        <span className="block text-sm text-ink">
-                          {user.firstName} {user.lastName}
-                          {user.mfaEnabled ? (
-                            <span className="ml-1.5 text-xs text-success">2FA</span>
-                          ) : null}
-                        </span>
-                        <span className="block text-xs text-ink-subtle">
-                          {user.email ?? user.phone ?? 'No contact on file'}
-                          {user.staff ? ` · staff ${user.staff.employeeCode}` : ''}
-                          {user.student ? ` · student ${user.student.admissionNo}` : ''}
-                          {user.parent ? ' · parent' : ''}
-                        </span>
-                      </TD>
-                      <TD>
-                        {user.roles.length === 0 ? (
-                          <span className="text-sm text-warning">No role</span>
-                        ) : (
-                          <span className="flex flex-wrap gap-1">
-                            {user.roles.map((r) => (
-                              <Badge key={r.role.id} tone="neutral">
-                                {r.role.name}
-                              </Badge>
-                            ))}
-                          </span>
-                        )}
-                      </TD>
-                      <TD>
-                        <Badge tone={STATUS_TONE[user.status] ?? 'neutral'}>
-                          {user.status.toLowerCase()}
-                        </Badge>
-                        {user.lockedUntil && user.lockedUntil > new Date() ? (
-                          <span className="ml-1.5 text-xs text-[var(--danger)]">locked out</span>
-                        ) : null}
-                      </TD>
-                      <TD align="right" className="text-sm tnum text-ink-muted">
-                        {user.lastLoginAt ? (
-                          formatDay(user.lastLoginAt)
-                        ) : (
-                          <span className="text-ink-subtle">Never</span>
-                        )}
-                      </TD>
-                      {canEdit || canAssign ? (
-                        <TD align="right">
-                          <UserRow
-                            id={user.id}
-                            name={`${user.firstName} ${user.lastName}`}
-                            status={user.status}
-                            roleIds={user.roles.map((r) => r.role.id)}
-                            roles={roleOptions}
-                            canEdit={canEdit}
-                            canAssign={canAssign}
-                            isSelf={user.id === ctx.user.userId}
-                          />
-                        </TD>
-                      ) : null}
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </TableWrap>
-            <Pagination
-              total={total}
-              page={query.page}
-              pageSize={query.pageSize}
-              label="accounts"
-            />
-          </>
+          <UserTable
+            rows={rows.map((user) => ({
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              phone: user.phone,
+              status: user.status,
+              lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+              mfaEnabled: user.mfaEnabled,
+              lockedUntil: user.lockedUntil?.toISOString() ?? null,
+              roles: user.roles.map(({ role }) => ({
+                id: role.id,
+                name: role.name,
+              })),
+              staffCode: user.staff?.employeeCode ?? null,
+              admissionNo: user.student?.admissionNo ?? null,
+              isParent: !!user.parent,
+            }))}
+            total={total}
+            page={query.page}
+            pageSize={query.pageSize}
+            roles={roleOptions}
+            canEdit={canEdit}
+            canAssign={canAssign}
+            currentUserId={ctx.user.userId}
+          />
         )}
       </Card>
     </div>

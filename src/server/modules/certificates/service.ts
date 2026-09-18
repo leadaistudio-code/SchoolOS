@@ -6,6 +6,7 @@ import { prisma } from '@/server/db/prisma'
 import { randomToken } from '@/server/crypto'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
 import { env } from '@/lib/env'
+import { assertStudentAccess, studentIdScopeWhere } from '@/server/scope'
 import {
   certificateIssueSchema,
   certificateTemplateSchema,
@@ -92,9 +93,12 @@ export async function createCertificateTemplate(
 
 export async function listCertificates(ctx: AppContext, studentId?: string) {
   ctx.require('certificates.view')
+  if (studentId) await assertStudentAccess(ctx, studentId)
+  const scope = await studentIdScopeWhere(ctx)
   return ctx.db.certificate.findMany({
     where: {
       tenantId: ctx.tenant.id,
+      ...scope,
       ...(studentId ? { studentId } : {}),
     },
     orderBy: { issuedOn: 'desc' },
@@ -222,6 +226,7 @@ export async function getCertificate(ctx: AppContext, id: string) {
     },
   })
   if (!certificate) throw notFound('Certificate')
+  await assertStudentAccess(ctx, certificate.studentId)
   return certificate
 }
 

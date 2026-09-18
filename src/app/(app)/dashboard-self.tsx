@@ -12,6 +12,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney } from '@/lib/utils'
 import { PersonCell } from '@/components/ui/identity'
 import { ChildSwitcher } from '@/components/dashboard/child-switcher'
+import { listNotices } from '@/server/modules/notices/service'
 
 /**
  * Student and parent home.
@@ -26,10 +27,15 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
 
   if (children.length === 0) {
     return (
-      <EmptyState
-        title="No student linked to this account"
-        description="Your account is not linked to a student record yet. Please contact the school office."
-      />
+      <div className="space-y-4">
+        <PageHeader title="Overview" description={format(new Date(), 'EEEE d MMMM yyyy')} />
+        <Card variant="elevated">
+          <EmptyState
+            title="No student linked to this account"
+            description="Your account is not linked to a student record yet. Please contact the school office."
+          />
+        </Card>
+      </div>
     )
   }
 
@@ -61,6 +67,10 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
         deletedAt: null,
         dueOn: { gte: subDays(today, 3) },
         classLevel: { enrollments: { some: { studentId: active.id, isCurrent: true } } },
+        OR: [
+          { sectionId: null },
+          { section: { enrollments: { some: { studentId: active.id, isCurrent: true } } } },
+        ],
       },
       orderBy: { dueOn: 'asc' },
       take: 5,
@@ -72,12 +82,8 @@ export async function SelfDashboard({ childId }: { childId?: string } = {}) {
         submissions: { where: { studentId: active.id }, select: { status: true }, take: 1 },
       },
     }),
-    ctx.db.notice.findMany({
-      where: { isPublished: true, deletedAt: null, publishOn: { lte: today } },
-      orderBy: [{ pinned: 'desc' }, { publishOn: 'desc' }],
-      take: 5,
-      select: { id: true, title: true, publishOn: true },
-    }),
+    listNotices(ctx, { page: 1, pageSize: 5, sort: 'publishOn', dir: 'desc' })
+      .then(({ rows }) => rows),
     ctx.db.result.findMany({
       where: { studentId: active.id, publishedAt: { not: null } },
       orderBy: { publishedAt: 'desc' },

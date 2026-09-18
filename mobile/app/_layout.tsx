@@ -8,23 +8,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
 import { NetworkBanner } from '@/components/network-banner'
+import { attachPushListeners } from '@/notifications/push'
 import { colors } from '@/theme'
 
-// Held until the session has been restored, so the app never flashes a
-// sign-in screen at somebody who is already signed in.
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Screens are revisited constantly on a phone. A short window means
-      // coming back to a list is instant while still being current.
       staleTime: 30_000,
       gcTime: 5 * 60_000,
       refetchOnWindowFocus: false,
       retry: (failureCount, error) => {
-        // Retrying a 401 or a 403 just burns battery on a request that will
-        // fail identically. A dropped connection is worth two more goes.
         if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false
         return failureCount < 2
       },
@@ -44,6 +39,11 @@ export default function RootLayout() {
 
   React.useEffect(() => {
     if (status !== 'starting') SplashScreen.hide()
+  }, [status])
+
+  React.useEffect(() => {
+    if (status !== 'signedIn') return
+    return attachPushListeners()
   }, [status])
 
   if (status === 'starting') return null

@@ -10,6 +10,8 @@ const METER_KEYS = {
   storage: 'storage.bytes',
   sms: 'sms.sent',
   whatsapp: 'whatsapp.sent',
+  aiEvalPages: 'ai.eval_pages',
+  aiGenerate: 'ai.generate',
 } as const
 
 function todayPeriod() {
@@ -32,7 +34,7 @@ export async function snapshotUsage(_ctx: PlatformContext, tenantId: string) {
   ])
 
   const monthStart = new Date(Date.UTC(periodOn.getUTCFullYear(), periodOn.getUTCMonth(), 1))
-  const [sms, whatsapp] = await Promise.all([
+  const [sms, whatsapp, aiEval, aiGenerate] = await Promise.all([
     prisma.notificationDelivery.count({
       where: {
         tenantId,
@@ -49,6 +51,14 @@ export async function snapshotUsage(_ctx: PlatformContext, tenantId: string) {
         sentAt: { gte: monthStart },
       },
     }),
+    prisma.aiUsageEvent.aggregate({
+      where: { tenantId, kind: 'evaluation.pages', createdAt: { gte: monthStart } },
+      _sum: { units: true },
+    }),
+    prisma.aiUsageEvent.aggregate({
+      where: { tenantId, kind: 'question.generate', createdAt: { gte: monthStart } },
+      _sum: { units: true },
+    }),
   ])
 
   const rows: { key: string; value: bigint }[] = [
@@ -58,6 +68,8 @@ export async function snapshotUsage(_ctx: PlatformContext, tenantId: string) {
     { key: METER_KEYS.storage, value: BigInt(attachments._sum.sizeBytes ?? 0) },
     { key: METER_KEYS.sms, value: BigInt(sms) },
     { key: METER_KEYS.whatsapp, value: BigInt(whatsapp) },
+    { key: METER_KEYS.aiEvalPages, value: BigInt(aiEval._sum.units ?? 0) },
+    { key: METER_KEYS.aiGenerate, value: BigInt(aiGenerate._sum.units ?? 0) },
   ]
 
   await prisma.$transaction(
@@ -121,6 +133,16 @@ export async function usageVsLimits(tenantId: string) {
       label: 'WhatsApp this month',
       current: byKey.get(METER_KEYS.whatsapp) ?? 0,
       limit: entitlements[FEATURE.LIMIT_WHATSAPP_PER_MONTH]?.limit ?? null,
+    },
+    aiEvalPages: {
+      label: 'AI eval pages this month',
+      current: byKey.get(METER_KEYS.aiEvalPages) ?? 0,
+      limit: entitlements[FEATURE.LIMIT_AI_EVAL_PAGES_PER_MONTH]?.limit ?? null,
+    },
+    aiGenerate: {
+      label: 'AI questions generated this month',
+      current: byKey.get(METER_KEYS.aiGenerate) ?? 0,
+      limit: entitlements[FEATURE.LIMIT_AI_GENERATE_PER_MONTH]?.limit ?? null,
     },
   }
 

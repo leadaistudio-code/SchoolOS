@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { completeMfaChallenge } from '@/server/modules/mfa/service'
 import { resolveTenant, isPlatformHost } from '@/server/tenant'
+import { sanitizeLoginNext } from '@/server/auth/login-redirect'
 import { headers } from 'next/headers'
 import type { FormState } from '@/lib/form-state'
 
@@ -36,9 +37,10 @@ export async function mfaChallengeAction(
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host')
   const tenant = isPlatformHost(host) ? null : await resolveTenant()
-  const next = parsed.data.next
-  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+  const safeNext = sanitizeLoginNext(parsed.data.next)
 
   if (result.mustChangePassword) redirect('/account/password')
+  if (safeNext?.startsWith('/platform') && tenant) redirect('/')
+  if (safeNext && !safeNext.startsWith('/platform') && !tenant) redirect('/platform')
   redirect(safeNext ?? (tenant ? '/' : '/platform'))
 }

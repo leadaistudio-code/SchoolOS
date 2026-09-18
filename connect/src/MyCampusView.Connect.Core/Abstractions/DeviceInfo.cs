@@ -34,7 +34,7 @@ public sealed class DeviceInfo
 
     public DevicePurpose Purpose { get; init; } = DevicePurpose.Both;
 
-    public string? SerialNumber { get; init; }
+    public string? SerialNumber { get; set; }
 
     public string? MachineNumber { get; init; }
 
@@ -44,9 +44,9 @@ public sealed class DeviceInfo
 
     public string? ConnectionPassword { get; init; }
 
-    public string? Firmware { get; init; }
+    public string? Firmware { get; set; }
 
-    public int? UserCount { get; init; }
+    public int? UserCount { get; set; }
 
     public DeviceOnlineStatus Status { get; set; } = DeviceOnlineStatus.Offline;
 

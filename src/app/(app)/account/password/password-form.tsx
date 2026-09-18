@@ -8,7 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input } from '@/components/ui/input'
 
-export function PasswordForm({ minLength, forced }: { minLength: number; forced: boolean }) {
+export function PasswordForm({
+  minLength,
+  hint,
+  forced,
+}: {
+  minLength: number
+  hint: string
+  forced: boolean
+}) {
   const [state, formAction, pending] = useActionState(changePasswordAction, emptyFormState)
 
   return (
@@ -45,13 +53,14 @@ export function PasswordForm({ minLength, forced }: { minLength: number; forced:
             htmlFor="newPassword"
             required
             error={state.fieldErrors.newPassword}
-            hint={`At least ${minLength} characters, with upper case, lower case and a number.`}
+            hint={hint}
           >
             <Input
               id="newPassword"
               name="newPassword"
               type="password"
               autoComplete="new-password"
+              minLength={minLength}
               required
             />
           </Field>

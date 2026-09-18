@@ -49,13 +49,20 @@ export default async function ParentDetailPage({
             : `${parent.children.length} children at this school`
         }
         actions={
-          canIssueLogin ? (
-            <form action={issueParentPortalLoginAction.bind(null, id)}>
-              <Button type="submit" size="sm" variant="secondary">
-                Issue portal login
-              </Button>
-            </form>
-          ) : null
+          <div className="flex items-center gap-2">
+            {ctx.can('parents.edit') ? (
+              <Link href={`/parents/${id}/edit`} className={buttonVariants({ size: 'sm' })}>
+                Edit profile
+              </Link>
+            ) : null}
+            {canIssueLogin ? (
+              <form action={issueParentPortalLoginAction.bind(null, id)}>
+                <Button type="submit" size="sm" variant="secondary">
+                  Issue portal login
+                </Button>
+              </form>
+            ) : null}
+          </div>
         }
       />
 
@@ -100,6 +107,7 @@ export default async function ParentDetailPage({
               <DescriptionItem label="Phone">{parent.phone ?? '—'}</DescriptionItem>
               <DescriptionItem label="Email">{parent.email ?? '—'}</DescriptionItem>
               <DescriptionItem label="Occupation">{parent.occupation ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Annual income">{parent.annualIncome ?? '—'}</DescriptionItem>
               <DescriptionItem label="Address">
                 {[parent.addressLine1, parent.city, parent.state, parent.postalCode]
                   .filter(Boolean)

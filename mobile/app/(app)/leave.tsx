@@ -1,5 +1,6 @@
 import React from 'react'
 import { Alert, FlatList, View } from 'react-native'
+import { router } from 'expo-router'
 import { useDecideLeave, useLeave } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
@@ -29,6 +30,7 @@ const TABS: { key: LeaveStatus | 'ALL'; label: string }[] = [
 
 export default function LeaveScreen() {
   const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
+  const canApply = useAuth((s) => s.can('leave.apply'))
   const [tab, setTab] = React.useState<LeaveStatus | 'ALL'>('PENDING')
   const { data, isLoading, isRefetching, refetch, error } = useLeave(tab === 'ALL' ? undefined : tab)
   const decide = useDecideLeave()
@@ -68,6 +70,9 @@ export default function LeaveScreen() {
           title="Leave"
           subtitle={tab === 'PENDING' && pending > 0 ? `${pending} awaiting a decision` : 'Requests and decisions'}
           tint={brand}
+          onAction={canApply ? () => router.push('/(app)/leave-apply') : undefined}
+          actionIcon={canApply ? 'add' : undefined}
+          actionLabel="Apply for leave"
         />
       }
     >

@@ -179,8 +179,13 @@ public sealed class SimulatedBiometricAdapter : IBiometricDeviceAdapter
 
     private static List<string> BuildDemoUsers(string deviceId)
     {
-        // Stable-looking external IDs similar to device enroll numbers.
-        var hash = Math.Abs(deviceId.GetHashCode(StringComparison.Ordinal));
+        // Deterministic IDs so mapping stays stable across restarts (unlike string.GetHashCode).
+        var hash = 0;
+        foreach (var ch in deviceId)
+        {
+            hash = (hash * 31 + ch) & 0x7fffffff;
+        }
+
         var users = new List<string>();
         for (var i = 1; i <= 12; i++)
         {

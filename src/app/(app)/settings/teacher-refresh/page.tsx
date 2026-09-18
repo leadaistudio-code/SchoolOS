@@ -1,6 +1,6 @@
 import { requireContext } from '@/server/context'
 import { getTeacherRefreshConfig } from '@/server/modules/teacher-refresh/config.service'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { TeacherRefreshSettingsForm } from './settings-form'
 
 export const metadata = { title: 'Teacher knowledge refresh' }
@@ -20,10 +20,11 @@ export default async function TeacherRefreshSettingsPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="Teacher knowledge refresh"
         description="Continuous professional development for teaching staff — private to each teacher and their school"
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Teacher knowledge refresh' }]}
+        icon="RefreshCw"
+        tone="success"
       />
 
       <TeacherRefreshSettingsForm

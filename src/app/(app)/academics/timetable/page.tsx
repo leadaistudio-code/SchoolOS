@@ -25,7 +25,7 @@ export default async function TimetablePage({
   const canManage = ctx.can('timetable.manage')
   const [classes, teachers, periods] = await Promise.all([
     getClassTree(ctx),
-    teacherOptions(ctx),
+    canManage ? teacherOptions(ctx) : Promise.resolve([]),
     listPeriods(ctx),
   ])
   const sections = classes.flatMap((c) =>

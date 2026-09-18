@@ -26,6 +26,7 @@ type Placement = {
   typeSnapshot: string
   difficultySnapshot: string
   questionId: string | null
+  question: { status: string; origin: string } | null
 }
 
 type Section = {
@@ -91,17 +92,20 @@ export function PaperBuilder({
   canEdit,
   canApprove,
   canCreate,
+  canDelete,
 }: {
   assessment: Assessment
   blueprint: Blueprint
   canEdit: boolean
   canApprove: boolean
   canCreate: boolean
+  canDelete: boolean
 }) {
   const router = useRouter()
   const { push } = useToast()
   const [busy, setBusy] = React.useState(false)
   const [picking, setPicking] = React.useState<string | null>(null)
+  const [replacePlacementId, setReplacePlacementId] = React.useState<string | null>(null)
 
   const run = React.useCallback(
     async (work: () => Promise<unknown>, success?: string) => {
@@ -219,6 +223,39 @@ export function PaperBuilder({
                 Generate alternate set
               </Button>
             )}
+            {canDelete ? (
+              <Button
+                variant="danger"
+                disabled={busy}
+                onClick={async () => {
+                  if (
+                    !window.confirm(
+                      `Delete question paper “${assessment.title}”?\n\nQuestions in the bank are kept. This only removes the paper.`,
+                    )
+                  ) {
+                    return
+                  }
+                  setBusy(true)
+                  try {
+                    await send(`/api/v1/assessments/${assessment.id}`, 'DELETE')
+                    push({ tone: 'success', title: 'Paper deleted' })
+                    router.push('/assessments')
+                    router.refresh()
+                  } catch (err) {
+                    push({
+                      tone: 'error',
+                      title: 'Could not delete paper',
+                      description: err instanceof Error ? err.message : 'Please try again.',
+                    })
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                <Trash2 className="size-4" aria-hidden />
+                Delete paper
+              </Button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -302,7 +339,83 @@ export function PaperBuilder({
                         {!placement.questionId && (
                           <Badge tone="warning">no longer in the bank</Badge>
                         )}
+                        {placement.questionId && placement.question?.status === 'DRAFT' ? (
+                          <a
+                            href={`/assessments/bank/${placement.questionId}`}
+                            className="text-xs font-medium text-[var(--brand-600)] hover:underline"
+                          >
+                            Review generated question
+                          </a>
+                        ) : null}
+                        {placement.question?.origin === 'AI' ? (
+                          <Badge tone="info">AI suggested</Badge>
+                        ) : null}
                       </div>
+                      {canEdit && placement.question?.origin === 'AI' ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              run(
+                                () =>
+                                  send(`/api/v1/assessments/placements/${placement.id}/ai`, 'POST', {
+                                    action: 'keep',
+                                  }),
+                                'Kept — bank draft approved',
+                              )
+                            }
+                          >
+                            Keep
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              run(
+                                () =>
+                                  send(`/api/v1/assessments/placements/${placement.id}/ai`, 'POST', {
+                                    action: 'regenerate',
+                                  }),
+                                'Regenerated with AI',
+                              )
+                            }
+                          >
+                            Regenerate
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              setPicking(section.id)
+                              setReplacePlacementId(placement.id)
+                            }}
+                          >
+                            Replace
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              const next = window.prompt('Edit question text', placement.textSnapshot)
+                              if (next == null || next.trim() === placement.textSnapshot) return
+                              void run(
+                                () =>
+                                  send(`/api/v1/assessments/placements/${placement.id}`, 'PATCH', {
+                                    textSnapshot: next.trim(),
+                                  }),
+                                'Question updated',
+                              )
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-1">
@@ -374,8 +487,28 @@ export function PaperBuilder({
                 alreadyPlaced={assessment.sections.flatMap((s) =>
                   s.questions.map((q) => q.questionId).filter(Boolean),
                 )}
-                onClose={() => setPicking(null)}
+                onClose={() => {
+                  setPicking(null)
+                  setReplacePlacementId(null)
+                }}
                 onPlace={async (questionIds) => {
+                  if (replacePlacementId) {
+                    const questionId = questionIds[0]
+                    if (!questionId) return
+                    const done = await run(
+                      () =>
+                        send(`/api/v1/assessments/placements/${replacePlacementId}/ai`, 'POST', {
+                          action: 'replace',
+                          questionId,
+                        }),
+                      'Replaced from question bank',
+                    )
+                    if (done) {
+                      setPicking(null)
+                      setReplacePlacementId(null)
+                    }
+                    return
+                  }
                   const done = await run(
                     () =>
                       send(`/api/v1/assessments/sections/${section.id}/questions`, 'POST', {

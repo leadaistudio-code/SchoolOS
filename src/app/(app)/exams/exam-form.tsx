@@ -13,7 +13,11 @@ import { Notice } from '@/components/ui/states'
 type ClassOption = {
   id: string
   name: string
-  subjects: { id: string; subject: { name: string; code: string } }[]
+  subjects: {
+    id: string
+    subject: { name: string; code: string }
+    sections: { section: { id: string; name: string } }[]
+  }[]
 }
 type ScaleOption = { id: string; name: string; isDefault: boolean }
 
@@ -91,7 +95,7 @@ export function ExamForm({ classes, scales }: { classes: ClassOption[]; scales: 
 
       <FormSection
         title="Papers"
-        description="Subjects to include. Each must belong to a selected class."
+        description="Subjects to include. Section-mapped subjects appear only on admit cards for those sections."
       >
         <fieldset className="sm:col-span-2 space-y-3">
           <legend className="sr-only">Subjects included in this examination</legend>
@@ -99,16 +103,27 @@ export function ExamForm({ classes, scales }: { classes: ClassOption[]; scales: 
             <div key={item.id}>
               <p className="caption mb-1">{item.name}</p>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {item.subjects.map((itemSubject) => (
-                  <label
-                    key={itemSubject.id}
-                    className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-line px-2.5 py-2 text-sm text-ink hover:bg-surface-2"
-                  >
-                    <Checkbox name="classSubjectIds" value={itemSubject.id} />
-                    {itemSubject.subject.name}
-                    <span className="text-ink-subtle">{itemSubject.subject.code}</span>
-                  </label>
-                ))}
+                {item.subjects.map((itemSubject) => {
+                  const sectionLabel =
+                    itemSubject.sections.length === 0
+                      ? 'All sections'
+                      : itemSubject.sections.map((row) => row.section.name).join(', ')
+                  return (
+                    <label
+                      key={itemSubject.id}
+                      className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-line px-2.5 py-2 text-sm text-ink hover:bg-surface-2"
+                    >
+                      <Checkbox name="classSubjectIds" value={itemSubject.id} className="mt-0.5" />
+                      <span>
+                        <span className="block">
+                          {itemSubject.subject.name}{' '}
+                          <span className="text-ink-subtle">{itemSubject.subject.code}</span>
+                        </span>
+                        <span className="text-xs text-ink-muted">{sectionLabel}</span>
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
             </div>
           ))}

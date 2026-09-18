@@ -1,4 +1,4 @@
-import type { AppContext } from '@/server/context'
+import { ForbiddenError, type AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { conflict, notFound } from '@/server/api/response'
 import { attendanceDate } from '@/lib/dates'
@@ -36,6 +36,15 @@ function today() {
 
 function minutesSince(date: Date) {
   return (Date.now() - date.getTime()) / 60_000
+}
+
+async function requireDriverStaff(ctx: AppContext) {
+  const staff = await ctx.db.staff.findFirst({
+    where: { userId: ctx.user.userId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!staff) throw new ForbiddenError('This account is not linked to a driver record')
+  return staff
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +208,7 @@ export async function trackingSnapshot(
         orderBy: { startedAt: 'desc' },
         take: 1,
         include: {
-          boardings: { select: { stopId: true, event: true } },
+          boardings: { select: { stopId: true, studentId: true, event: true } },
           _count: { select: { boardings: true } },
         },
       },
@@ -235,7 +244,9 @@ export async function trackingSnapshot(
       longitude: stop.longitude,
       pickupTime: stop.pickupTime,
       dropTime: stop.dropTime,
-      riders: stop._count.assignments,
+      riders: scoped
+        ? ownAssignments.filter((assignment) => assignment.stopId === stop.id).length
+        : stop._count.assignments,
       served: servedStopIds.has(stop.id),
       isOwnStop: ownStopIds.has(stop.id),
     }))
@@ -265,9 +276,9 @@ export async function trackingSnapshot(
         ? {
             id: bus.driver.id,
             name: `${bus.driver.firstName} ${bus.driver.lastName}`,
-            phone: bus.driver.phone,
+            phone: scoped ? null : bus.driver.phone,
             photoUrl: bus.driver.photoUrl,
-            employeeCode: bus.driver.employeeCode,
+            employeeCode: scoped ? '' : bus.driver.employeeCode,
             designation: bus.driver.designation,
           }
         : null,
@@ -281,7 +292,11 @@ export async function trackingSnapshot(
             direction: trip.direction,
             status: trip.status,
             startedAt: trip.startedAt?.toISOString() ?? null,
-            onBoard: trip.boardings.filter((b) => b.event === 'BOARDED').length,
+            onBoard: trip.boardings.filter(
+              (boarding) =>
+                boarding.event === 'BOARDED' &&
+                (!scoped || scopedStudentIds.includes(boarding.studentId)),
+            ).length,
           }
         : null,
       position,
@@ -290,7 +305,7 @@ export async function trackingSnapshot(
         .slice()
         .reverse()
         .map((l) => ({ latitude: l.latitude, longitude: l.longitude })),
-      riders: bus._count.assignments,
+      riders: scoped ? (childrenByBus.get(bus.id)?.length ?? 0) : bus._count.assignments,
       signalAgeMin: signalAgeMin === null ? null : Math.round(signalAgeMin),
       stale: signalAgeMin === null || signalAgeMin > SIGNAL_STALE_MINUTES,
       nextStop: next,
@@ -376,6 +391,7 @@ export function nextStopFor(
 
 export async function startTrip(ctx: AppContext, input: TripInput) {
   ctx.require('transport.drive')
+  const driver = await requireDriverStaff(ctx)
 
   const running = await ctx.db.busTrip.findFirst({
     where: { busId: input.busId, status: 'RUNNING' },
@@ -384,22 +400,28 @@ export async function startTrip(ctx: AppContext, input: TripInput) {
   if (running) throw conflict('This bus already has a trip running. End it before starting another.')
 
   const bus = await ctx.db.bus.findFirst({
-    where: { id: input.busId, deletedAt: null, isActive: true },
+    where: { id: input.busId, driverId: driver.id, deletedAt: null, isActive: true },
     select: { id: true, code: true, driverId: true },
   })
   if (!bus) throw notFound('Bus')
 
-  const driver = await ctx.db.staff.findFirst({
-    where: { userId: ctx.user.userId },
+  const route = await ctx.db.route.findFirst({
+    where: {
+      id: input.routeId,
+      busId: bus.id,
+      deletedAt: null,
+      isActive: true,
+    },
     select: { id: true },
   })
+  if (!route) throw new ForbiddenError('This route is not assigned to your bus')
 
   const trip = await ctx.db.busTrip.create({
     data: {
       tenantId: ctx.tenant.id,
       busId: input.busId,
       routeId: input.routeId,
-      driverId: driver?.id ?? bus.driverId ?? null,
+      driverId: driver.id,
       direction: input.direction,
       onDate: today(),
       status: 'RUNNING',
@@ -420,9 +442,20 @@ export async function startTrip(ctx: AppContext, input: TripInput) {
 
 export async function endTrip(ctx: AppContext, tripId: string) {
   ctx.require('transport.drive')
+  const driver = await requireDriverStaff(ctx)
+
+  const allowed = await ctx.db.busTrip.findFirst({
+    where: {
+      id: tripId,
+      status: 'RUNNING',
+      OR: [{ driverId: driver.id }, { bus: { driverId: driver.id } }],
+    },
+    select: { id: true },
+  })
+  if (!allowed) throw new ForbiddenError('You cannot end this trip')
 
   const trip = await ctx.db.busTrip.update({
-    where: { id: tripId },
+    where: { id: allowed.id },
     data: { status: 'COMPLETED', endedAt: new Date() },
     include: { bus: { select: { code: true } } },
   })
@@ -447,23 +480,28 @@ export async function endTrip(ctx: AppContext, tripId: string) {
  */
 export async function recordPing(ctx: AppContext, input: PingInput) {
   ctx.require('transport.drive')
+  const driver = await requireDriverStaff(ctx)
 
   const bus = await ctx.db.bus.findFirst({
-    where: { id: input.busId, deletedAt: null },
+    where: { id: input.busId, driverId: driver.id, deletedAt: null, isActive: true },
     select: { id: true },
   })
   if (!bus) throw notFound('Bus')
 
-  const trip =
-    input.tripId ??
-    (
-      await ctx.db.busTrip.findFirst({
-        where: { busId: input.busId, status: 'RUNNING' },
-        orderBy: { startedAt: 'desc' },
-        select: { id: true },
-      })
-    )?.id ??
-    null
+  const runningTrip = await ctx.db.busTrip.findFirst({
+    where: {
+      ...(input.tripId ? { id: input.tripId } : {}),
+      busId: input.busId,
+      status: 'RUNNING',
+      OR: [{ driverId: driver.id }, { bus: { driverId: driver.id } }],
+    },
+    orderBy: { startedAt: 'desc' },
+    select: { id: true },
+  })
+  if (input.tripId && !runningTrip) {
+    throw new ForbiddenError('You cannot report a location for this trip')
+  }
+  const trip = runningTrip?.id ?? null
 
   const location = await ctx.db.busLocation.create({
     data: {
@@ -560,6 +598,29 @@ async function alertApproachingGuardians(
 
 export async function recordBoarding(ctx: AppContext, input: BoardingInput) {
   ctx.require('transport.drive')
+  const driver = await requireDriverStaff(ctx)
+
+  const trip = await ctx.db.busTrip.findFirst({
+    where: {
+      id: input.tripId,
+      status: 'RUNNING',
+      OR: [{ driverId: driver.id }, { bus: { driverId: driver.id } }],
+    },
+    select: { id: true, routeId: true, busId: true },
+  })
+  if (!trip) throw new ForbiddenError('You cannot record boarding for this trip')
+
+  const assignment = await ctx.db.transportAssignment.findFirst({
+    where: {
+      studentId: input.studentId,
+      routeId: trip.routeId,
+      isActive: true,
+      OR: [{ busId: trip.busId }, { busId: null }],
+      ...(input.stopId ? { stopId: input.stopId } : {}),
+    },
+    select: { id: true, stopId: true },
+  })
+  if (!assignment) throw new ForbiddenError('This student is not on your trip roster')
 
   const log = await ctx.db.transportBoardingLog.upsert({
     where: {
@@ -574,11 +635,11 @@ export async function recordBoarding(ctx: AppContext, input: BoardingInput) {
       tenantId: ctx.tenant.id,
       tripId: input.tripId,
       studentId: input.studentId,
-      stopId: input.stopId ?? null,
+      stopId: input.stopId ?? assignment.stopId,
       event: input.event,
       recordedById: ctx.user.userId,
     },
-    update: { occurredAt: new Date(), stopId: input.stopId ?? null },
+    update: { occurredAt: new Date(), stopId: input.stopId ?? assignment.stopId },
   })
 
   const student = await ctx.db.student.findFirst({
@@ -615,15 +676,16 @@ export async function driverToday(ctx: AppContext) {
   ctx.require('transport.drive')
 
   const staff = await ctx.db.staff.findFirst({
-    where: { userId: ctx.user.userId },
+    where: { userId: ctx.user.userId, deletedAt: null },
     select: { id: true },
   })
+  if (!staff) return { trip: null, buses: [], roster: [] }
 
   const trip = await ctx.db.busTrip.findFirst({
     where: {
       onDate: today(),
       status: 'RUNNING',
-      ...(staff ? { OR: [{ driverId: staff.id }, { bus: { driverId: staff.id } }] } : {}),
+      OR: [{ driverId: staff.id }, { bus: { driverId: staff.id } }],
     },
     orderBy: { startedAt: 'desc' },
     include: {
@@ -639,17 +701,15 @@ export async function driverToday(ctx: AppContext) {
     },
   })
 
-  const buses = staff
-    ? await ctx.db.bus.findMany({
-        where: { deletedAt: null, isActive: true, driverId: staff.id },
-        select: {
-          id: true,
-          code: true,
-          registrationNo: true,
-          routes: { where: { deletedAt: null }, select: { id: true, name: true } },
-        },
-      })
-    : []
+  const buses = await ctx.db.bus.findMany({
+    where: { deletedAt: null, isActive: true, driverId: staff.id },
+    select: {
+      id: true,
+      code: true,
+      registrationNo: true,
+      routes: { where: { deletedAt: null }, select: { id: true, name: true } },
+    },
+  })
 
   const roster = trip
     ? await ctx.db.transportAssignment.findMany({

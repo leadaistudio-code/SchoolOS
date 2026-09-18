@@ -1,6 +1,6 @@
 import { requireContext } from '@/server/context'
 import { getSmtpSettings } from '@/server/mail/smtp'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { MailForm } from './mail-form'
 
 export const metadata = { title: 'Email' }
@@ -11,10 +11,11 @@ export default async function EmailSettingsPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="Email"
         description="Connect the school's own mailbox so outgoing mail comes from your address"
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Email' }]}
+        icon="AtSign"
+        tone="info"
       />
       <MailForm settings={settings} testRecipient={ctx.user.email ?? ''} />
     </div>

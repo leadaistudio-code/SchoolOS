@@ -1,8 +1,14 @@
 import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { env } from '@/lib/env'
+import { ROLE } from '@/lib/rbac/roles'
 
 const ROUNDS = 12
+
+/** Minimum length for teacher and parent passwords (numeric PINs allowed). */
+export const PORTAL_PASSWORD_MIN_LENGTH = 6
+
+const SIMPLE_PASSWORD_ROLES = new Set<string>([ROLE.TEACHER, ROLE.PARENT])
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, ROUNDS)
@@ -43,17 +49,64 @@ export function generateTemporaryPassword(): string {
 
 export type PasswordPolicyIssue = string
 
+export type PasswordPolicyOptions = {
+  /** Role keys on the account choosing the password. */
+  roleKeys?: string[]
+}
+
 /**
- * Password policy. Deliberately length-first: a long passphrase beats a short
- * password full of symbols, and schools type these on phones.
+ * Teachers and parents may use a short numeric password (min 6). Everyone else
+ * keeps the full length + mixed-case + digit rules from PASSWORD_MIN_LENGTH.
+ *
+ * A user who also holds an admin-style role is held to the full policy.
  */
-export function checkPasswordPolicy(plain: string): PasswordPolicyIssue[] {
+export function usesSimplePasswordPolicy(roleKeys: string[] | undefined): boolean {
+  if (!roleKeys?.length) return false
+  const hasSimple = roleKeys.some((key) => SIMPLE_PASSWORD_ROLES.has(key))
+  if (!hasSimple) return false
+  // Prefer the stricter rule when the same account is also an administrator.
+  const elevated = roleKeys.some(
+    (key) =>
+      key === ROLE.SUPER_ADMIN ||
+      key === ROLE.SCHOOL_ADMIN ||
+      key === ROLE.PRINCIPAL ||
+      key === ROLE.HR,
+  )
+  return !elevated
+}
+
+export function passwordPolicyHint(roleKeys?: string[]): string {
+  if (usesSimplePasswordPolicy(roleKeys)) {
+    return `At least ${PORTAL_PASSWORD_MIN_LENGTH} characters (digits are fine).`
+  }
   const min = env().PASSWORD_MIN_LENGTH
+  return `At least ${min} characters, with upper case, lower case and a number.`
+}
+
+export function passwordMinLength(roleKeys?: string[]): number {
+  return usesSimplePasswordPolicy(roleKeys)
+    ? PORTAL_PASSWORD_MIN_LENGTH
+    : env().PASSWORD_MIN_LENGTH
+}
+
+/**
+ * Password policy. Deliberately length-first for staff accounts: a long
+ * passphrase beats a short password full of symbols. Teachers and parents get
+ * a shorter bar so office-issued PINs and phone-friendly passwords work.
+ */
+export function checkPasswordPolicy(
+  plain: string,
+  opts?: PasswordPolicyOptions,
+): PasswordPolicyIssue[] {
+  const simple = usesSimplePasswordPolicy(opts?.roleKeys)
+  const min = simple ? PORTAL_PASSWORD_MIN_LENGTH : env().PASSWORD_MIN_LENGTH
   const issues: string[] = []
   if (plain.length < min) issues.push(`Must be at least ${min} characters`)
-  if (!/[a-z]/.test(plain)) issues.push('Must contain a lowercase letter')
-  if (!/[A-Z]/.test(plain)) issues.push('Must contain an uppercase letter')
-  if (!/[0-9]/.test(plain)) issues.push('Must contain a number')
   if (/^(.)\1+$/.test(plain)) issues.push('Must not be a single repeated character')
+  if (!simple) {
+    if (!/[a-z]/.test(plain)) issues.push('Must contain a lowercase letter')
+    if (!/[A-Z]/.test(plain)) issues.push('Must contain an uppercase letter')
+    if (!/[0-9]/.test(plain)) issues.push('Must contain a number')
+  }
   return issues
 }

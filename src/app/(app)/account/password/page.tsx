@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/components/page-header'
 import { getContext } from '@/server/context'
+import { passwordMinLength, passwordPolicyHint } from '@/server/auth/password'
 import { PasswordForm } from './password-form'
-import { env } from '@/lib/env'
 
 export const metadata = { title: 'Change password' }
 
@@ -22,7 +22,11 @@ export default async function ChangePasswordPage() {
             : 'Choose a new password for your account.'
         }
       />
-      <PasswordForm minLength={env().PASSWORD_MIN_LENGTH} forced={ctx.user.mustChangePassword} />
+      <PasswordForm
+        minLength={passwordMinLength(ctx.user.roleKeys)}
+        hint={passwordPolicyHint(ctx.user.roleKeys)}
+        forced={ctx.user.mustChangePassword}
+      />
     </div>
   )
 }

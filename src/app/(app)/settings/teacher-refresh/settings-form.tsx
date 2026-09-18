@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { TeacherRefreshFrequency } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Field, Input, Select, Checkbox, FormSection, FormActions } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
@@ -78,8 +79,9 @@ export function TeacherRefreshSettingsForm({ initial }: { initial: Config }) {
 
   return (
     <form onSubmit={onSubmit}>
-      <Card>
-        <CardContent className="space-y-8">
+      <Card variant="elevated" className="overflow-hidden">
+        <SettingsPanelHeader title="Refresh programme" description="Set frequency, question mix and completion expectations." icon="RefreshCw" tone="success" />
+        <CardContent className="space-y-8 p-5">
           {!config.enabled ? (
             <Notice tone="info" title="The programme is off">
               While this is off, no refreshers are scheduled and teachers see an empty dashboard.

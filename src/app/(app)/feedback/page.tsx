@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { ClipboardCheck, MessageSquare, ShieldAlert, Target } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import { isPortalOnlyRole } from '@/server/scope'
 import { pendingForCurrentUser } from '@/server/modules/feedback/service'
+import { listReceivedTeacherFeedback } from '@/server/modules/students/performance'
 import {
   ColorBanner,
   ColorTile,
@@ -16,7 +18,11 @@ export const metadata = { title: 'Feedback' }
 
 export default async function FeedbackPage() {
   const ctx = await requireContext('feedback.view')
-  if (ctx.can('feedback.analytics_view')) {
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
+
+  // Portal accounts must never see the staff analytics hub — even if their
+  // role set accidentally includes analytics_view (e.g. mixed roles).
+  if (!portal && ctx.can('feedback.analytics_view')) {
     const [campaigns, assignments, responses, concerns, actions] = await Promise.all([
       ctx.db.feedbackCampaign.count({ where: { status: 'ACTIVE' } }),
       ctx.db.feedbackAssignment.count(),
@@ -87,7 +93,8 @@ export default async function FeedbackPage() {
             <h2 className="text-base font-semibold text-ink">Start the feedback cycle</h2>
             <p className="mt-1 max-w-2xl text-sm text-ink-muted">
               Create a reusable template, save a campaign, then activate it to safely assign
-              feedback only to students taught by each teacher.
+              feedback only to students taught by each teacher. Parents and students then see
+              those forms under Give feedback.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
@@ -109,7 +116,73 @@ export default async function FeedbackPage() {
     )
   }
 
-  const pending = await pendingForCurrentUser(ctx)
+  const [pending, received] = await Promise.all([
+    ctx.can('feedback.submit') ? pendingForCurrentUser(ctx) : Promise.resolve([]),
+    portal ? listReceivedTeacherFeedback(ctx) : Promise.resolve([]),
+  ])
+
+  if (portal) {
+    return (
+      <div className="space-y-4">
+        <ColorBanner
+          tone="parents"
+          eyebrow="Feedback"
+          title="Give feedback"
+          description="Forms about your teachers appear here when the school assigns them."
+          actions={
+            <Link href="/feedback/received" className={colorBannerPrimaryBtn()}>
+              From teachers{received.length ? ` (${received.length})` : ''}
+            </Link>
+          }
+        />
+
+        {pending.length === 0 ? (
+          <Card variant="elevated">
+            <EmptyState
+              title="No forms to fill right now"
+              description="When the school assigns a feedback form about a teacher, it will show up here."
+              action={
+                <Link
+                  href="/feedback/received"
+                  className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+                >
+                  View teacher feedback
+                </Link>
+              }
+            />
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {pending.map((assignment) => (
+              <Link
+                key={assignment.id}
+                href={`/feedback/respond/${assignment.id}`}
+                className="rounded-[var(--radius)] border border-line bg-surface p-4 transition-colors hover:border-brand"
+              >
+                <p className="text-sm font-medium text-ink">
+                  {assignment.targetStaff
+                    ? `${assignment.targetStaff.firstName} ${assignment.targetStaff.lastName}`
+                    : 'Feedback request'}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {[
+                    assignment.student
+                      ? `${assignment.student.firstName} ${assignment.student.lastName}`
+                      : null,
+                    assignment.subject?.name ?? assignment.template.name,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <p className="mt-4 text-sm font-medium text-brand">Give feedback →</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <ColorBanner

@@ -1,8 +1,8 @@
 import { requireContext } from '@/server/context'
 import { listNotificationTemplates } from '@/server/modules/notification-templates/service'
 import { TEMPLATE_EVENTS } from '@/lib/notification-templates'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { DeleteTemplateButton, SeedTemplatesButton, TemplateForm } from './forms'
@@ -16,18 +16,23 @@ export default async function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <SettingsPageHeader
         title="Message templates"
         description="Email, SMS and push copy for school notifications. Variables are replaced at send time."
         actions={<SeedTemplatesButton />}
+        icon="Mail"
+        tone="warning"
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Templates · {templates.length}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader
+            title={`Templates · ${templates.length}`}
+            description="Reusable messages grouped by event and channel."
+            icon="Mail"
+            tone="warning"
+          />
+          <CardContent className="space-y-3 p-5">
             {templates.length === 0 ? (
               <EmptyState
                 title="No templates yet"
@@ -35,7 +40,7 @@ export default async function TemplatesPage() {
               />
             ) : (
               templates.map((t) => (
-                <div key={t.id} className="rounded-[var(--radius-sm)] border border-line p-3 space-y-2">
+                <div key={t.id} className="space-y-2 rounded-[var(--radius-sm)] bg-surface-2 p-3.5 transition-colors hover:bg-surface-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-ink">
                       {labels.get(t.eventKey) ?? t.eventKey}
@@ -55,11 +60,14 @@ export default async function TemplatesPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Create / update</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card variant="elevated" className="h-fit overflow-hidden">
+          <SettingsPanelHeader
+            title="Create or update"
+            description="Configure content for one event channel."
+            icon="Mail"
+            tone="brand"
+          />
+          <CardContent className="p-5">
             <TemplateForm />
           </CardContent>
         </Card>

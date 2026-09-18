@@ -1,16 +1,18 @@
 'use client'
 
 import * as React from 'react'
-import { Plus } from 'lucide-react'
+import { MinusCircle, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import {
   createAppraisalAction,
+  deletePayslipAction,
   generatePayslipAction,
   setPayslipStatusAction,
   setSalaryAction,
+  updatePayslipDeductionAction,
 } from '../actions'
 
 const MONTHS = [
@@ -201,6 +203,8 @@ export function GeneratePayslipButton({
   const [periodMonth, setPeriodMonth] = React.useState(String(now.getMonth() + 1))
   const [periodYear, setPeriodYear] = React.useState(String(now.getFullYear()))
   const [bonus, setBonus] = React.useState('')
+  const [manualDeduction, setManualDeduction] = React.useState('')
+  const [manualDeductionReason, setManualDeductionReason] = React.useState('')
   const [notes, setNotes] = React.useState('')
 
   const submit = () =>
@@ -210,6 +214,8 @@ export function GeneratePayslipButton({
         periodYear,
         periodMonth,
         bonus: bonus ? Number(bonus) : 0,
+        manualDeduction: manualDeduction ? Number(manualDeduction) : 0,
+        manualDeductionReason: manualDeductionReason.trim() || undefined,
         notes: notes.trim() || undefined,
       })
       if (!result.ok) {
@@ -219,6 +225,8 @@ export function GeneratePayslipButton({
       toast.push({ tone: 'success', title: 'Payslip generated', description: result.message })
       setOpen(false)
       setBonus('')
+      setManualDeduction('')
+      setManualDeductionReason('')
       setNotes('')
     })
 
@@ -238,10 +246,14 @@ export function GeneratePayslipButton({
         open={open}
         onClose={() => setOpen(false)}
         title="Generate a payslip"
-        description="Loss of pay comes from the staff register: approved leave is paid, a half day is half, and only an unexplained absence costs money."
+        description="Attendance is calculated automatically: absence costs one day, half-day costs half, and every 3 late arrivals cost one day. Approved leave stays paid."
         footer={
           <>
-            <Button onClick={submit} loading={pending}>
+            <Button
+              onClick={submit}
+              loading={pending}
+              disabled={Number(manualDeduction) > 0 && manualDeductionReason.trim().length < 3}
+            >
               Generate draft
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
@@ -283,7 +295,34 @@ export function GeneratePayslipButton({
               onChange={(e) => setBonus(e.target.value)}
             />
           </Field>
-          <Field label="Note" htmlFor="ps-note" hint="Optional, appears on the payslip">
+          <Field
+            label="Manual deduction"
+            htmlFor="ps-manual-deduction"
+            hint="Optional one-off deduction for this month"
+          >
+            <Input
+              id="ps-manual-deduction"
+              type="number"
+              min="0"
+              value={manualDeduction}
+              onChange={(e) => setManualDeduction(e.target.value)}
+            />
+          </Field>
+          <Field
+            label="Deduction reason"
+            htmlFor="ps-deduction-reason"
+            required={Number(manualDeduction) > 0}
+            hint={Number(manualDeduction) > 0 ? 'Required for the audit record' : 'Required when deducting'}
+            className="sm:col-span-2"
+          >
+            <Input
+              id="ps-deduction-reason"
+              value={manualDeductionReason}
+              onChange={(e) => setManualDeductionReason(e.target.value)}
+              placeholder="Loan recovery, salary advance, damage recovery"
+            />
+          </Field>
+          <Field label="Note" htmlFor="ps-note" hint="Optional, appears on the payslip" className="sm:col-span-2">
             <Input id="ps-note" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </Field>
         </div>
@@ -292,7 +331,91 @@ export function GeneratePayslipButton({
   )
 }
 
-/** Draft → published → paid, and back to draft while nothing has gone out. */
+/** Adds or revises a reasoned one-off deduction while the payslip is a draft. */
+export function PayslipDeductionButton({
+  id,
+  amountMinor,
+  reason,
+}: {
+  id: string
+  amountMinor: number
+  reason?: string | null
+}) {
+  const toast = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
+  const [amount, setAmount] = React.useState(amountMinor ? String(amountMinor / 100) : '')
+  const [deductionReason, setDeductionReason] = React.useState(reason ?? '')
+
+  const submit = () =>
+    startTransition(async () => {
+      const result = await updatePayslipDeductionAction({
+        id,
+        manualDeduction: amount ? Number(amount) : 0,
+        manualDeductionReason: deductionReason.trim() || undefined,
+      })
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Deduction updated' : 'Could not update deduction',
+        description: result.message,
+      })
+      if (result.ok) setOpen(false)
+    })
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        <MinusCircle aria-hidden />
+        Deduction
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Manual salary deduction"
+        description="This changes only this draft payslip. The reason is stored in the audit log."
+        footer={
+          <>
+            <Button
+              onClick={submit}
+              loading={pending}
+              disabled={Number(amount) > 0 && deductionReason.trim().length < 3}
+            >
+              Save deduction
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Deduction amount" htmlFor={`manual-deduction-${id}`} required>
+            <Input
+              id={`manual-deduction-${id}`}
+              type="number"
+              min="0"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+            />
+          </Field>
+          <Field
+            label="Reason"
+            htmlFor={`manual-deduction-reason-${id}`}
+            required={Number(amount) > 0}
+            hint="Set the amount to zero to remove this manual deduction"
+          >
+            <Textarea
+              id={`manual-deduction-reason-${id}`}
+              value={deductionReason}
+              onChange={(event) => setDeductionReason(event.target.value)}
+              placeholder="Explain why this deduction is being applied"
+            />
+          </Field>
+        </div>
+      </Dialog>
+    </>
+  )
+}
+
+/** Draft → published → paid. Published (unpaid) can roll back to draft. */
 export function PayslipStatusControl({ id, status }: { id: string; status: string }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
@@ -307,25 +430,64 @@ export function PayslipStatusControl({ id, status }: { id: string; status: strin
       })
     })
 
+  const remove = () => {
+    if (
+      !window.confirm(
+        'Delete this draft payslip? You can generate it again for the same month afterwards.',
+      )
+    ) {
+      return
+    }
+    startTransition(async () => {
+      const result = await deletePayslipAction(id)
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Payslip deleted' : 'Could not delete',
+        description: result.message,
+      })
+    })
+  }
+
   if (status === 'PAID') {
+    return null
+  }
+
+  if (status === 'DRAFT') {
     return (
-      <Button size="sm" variant="ghost" loading={pending} onClick={() => move('PUBLISHED')}>
-        Mark unpaid
-      </Button>
+      <>
+        <Button size="sm" variant="ghost" loading={pending} onClick={remove}>
+          Delete
+        </Button>
+        <Button size="sm" variant="secondary" loading={pending} onClick={() => move('PUBLISHED')}>
+          Publish
+        </Button>
+      </>
     )
   }
 
   return (
-    <div className="flex items-center justify-end gap-1.5">
-      {status === 'DRAFT' ? (
-        <Button size="sm" variant="secondary" loading={pending} onClick={() => move('PUBLISHED')}>
-          Publish
-        </Button>
-      ) : null}
+    <>
+      <Button
+        size="sm"
+        variant="secondary"
+        loading={pending}
+        onClick={() => {
+          if (
+            !window.confirm(
+              'Unpublish this payslip and return it to draft? You can then edit deductions, delete it, or publish again.',
+            )
+          ) {
+            return
+          }
+          move('DRAFT')
+        }}
+      >
+        Unpublish
+      </Button>
       <Button size="sm" loading={pending} onClick={() => move('PAID')}>
         Mark paid
       </Button>
-    </div>
+    </>
   )
 }
 

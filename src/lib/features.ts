@@ -34,6 +34,10 @@ export const FEATURE = {
   LIMIT_SMS_PER_MONTH: 'limit.sms_per_month',
   LIMIT_WHATSAPP_PER_MONTH: 'limit.whatsapp_per_month',
   LIMIT_DOMAINS: 'limit.domains',
+  /** Answer-sheet pages processed by AI evaluation per calendar month. */
+  LIMIT_AI_EVAL_PAGES_PER_MONTH: 'limit.ai_eval_pages_month',
+  /** Draft questions kept from AI generate per calendar month. */
+  LIMIT_AI_GENERATE_PER_MONTH: 'limit.ai_generate_month',
 } as const
 
 export type FeatureKey = (typeof FEATURE)[keyof typeof FEATURE]

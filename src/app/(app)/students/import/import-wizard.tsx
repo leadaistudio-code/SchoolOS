@@ -26,7 +26,7 @@ import { IMPORT_FIELDS, type ImportFieldKey } from '@/server/modules/imports/fie
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, Input, Select } from '@/components/ui/input'
+import { Field, Input, Select, Checkbox } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
@@ -47,6 +47,7 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
   const [mapping, setMapping] = React.useState<Record<ImportFieldKey, string | null> | null>(null)
   const [saveTemplate, setSaveTemplate] = React.useState(true)
   const [smartImport, setSmartImport] = React.useState(smartImportAvailable)
+  const [pruneMissing, setPruneMissing] = React.useState(false)
   const [answers, setAnswers] = React.useState<Record<string, string>>({})
   const [pending, startTransition] = React.useTransition()
   const [dragOver, setDragOver] = React.useState(false)
@@ -55,6 +56,7 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
     if (!batch) return
     setMapping(batch.mapping)
     setAnswers({})
+    setPruneMissing(false)
   }, [batch])
 
   const needsReview = batch?.status === 'NEEDS_REVIEW'
@@ -129,8 +131,16 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
 
   const commit = () => {
     if (!batch) return
+    if (batch.isPack && pruneMissing) {
+      const ok = window.confirm(
+        'Override mode will archive every active student and staff member whose admission number / employee code is NOT in this file. Continue?',
+      )
+      if (!ok) return
+    }
     startTransition(async () => {
-      const result = await commitStudentImportAction(batch.id)
+      const result = await commitStudentImportAction(batch.id, {
+        pruneMissing: Boolean(batch.isPack && pruneMissing),
+      })
       if (!result.ok || !result.data) {
         toast.push({ tone: 'error', title: 'Commit failed', description: result.message })
         return
@@ -367,9 +377,26 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
               <CardContent className="space-y-4">
                 <p className="text-sm text-ink-muted">
                   This workbook imports together: classes and sections, staff (by employee code),
-                  students, and parents linked by admission number. Class teachers and subject
-                  teachers tie to staff codes on the Sections and Class subjects sheets.
+                  students, and parents linked by admission number. Matching codes are updated;
+                  people missing from the file stay on the rolls unless you turn on override below.
                 </p>
+                {batch.status === 'READY' ? (
+                  <label className="flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+                    <Checkbox
+                      checked={pruneMissing}
+                      onChange={(e) => setPruneMissing(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm text-ink">
+                      <span className="font-medium">Override — archive people missing from this pack</span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">
+                        Soft-archives active students and staff whose admission number or employee
+                        code is not in the file. Use this when replacing a previous import so stale
+                        names disappear from Students and Staff lists.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
                 {batch.packSheetStats && batch.packSheetStats.length > 0 ? (
                   <TableWrap>
                     <Table>
@@ -423,8 +450,18 @@ export function ImportWizard({ initialBatches, smartImportAvailable }: Props) {
                       batch.packCommitStats.sections > 0 && `${batch.packCommitStats.sections} sections`,
                       batch.packCommitStats.staff > 0 && `${batch.packCommitStats.staff} staff`,
                       batch.packCommitStats.subjects > 0 && `${batch.packCommitStats.subjects} subjects`,
+                      batch.packCommitStats.feeHeads > 0 &&
+                        `${batch.packCommitStats.feeHeads} fee heads`,
+                      batch.packCommitStats.feeStructures > 0 &&
+                        `${batch.packCommitStats.feeStructures} fee structures`,
+                      batch.packCommitStats.feeItems > 0 &&
+                        `${batch.packCommitStats.feeItems} fee items`,
                       batch.packCommitStats.parentLinks > 0 &&
                         `${batch.packCommitStats.parentLinks} parent links`,
+                      (batch.packCommitStats.studentsArchived ?? 0) > 0 &&
+                        `${batch.packCommitStats.studentsArchived} students archived`,
+                      (batch.packCommitStats.staffArchived ?? 0) > 0 &&
+                        `${batch.packCommitStats.staffArchived} staff archived`,
                     ]
                       .filter(Boolean)
                       .join(', ')}

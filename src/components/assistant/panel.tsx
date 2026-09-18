@@ -12,11 +12,22 @@ import {
   Sparkle,
   Square,
   Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button, IconButton } from '@/components/ui/button'
-import { listen, speak, speechSupported, stopSpeaking, primeMicrophone } from './speech'
+import {
+  getSpeechCapabilities,
+  listen,
+  listenToInterruptSpeech,
+  loadSpeechCapabilities,
+  preloadVoices,
+  primeMicrophone,
+  speak,
+  speechSupported,
+  stopSpeaking,
+} from './speech'
 import { parseAgentEvent } from '@/lib/assistant-events'
 import {
   DEFAULT_SPEECH_LANGUAGE,
@@ -25,7 +36,6 @@ import {
 } from '@/lib/speech-languages'
 import { activityForLabel } from './activity-messages'
 import { AssistantWelcome } from './welcome'
-import { MorningBriefingPrompt } from './morning-briefing'
 import { AssistantFloatingMic } from './floating-mic'
 import {
   readHandsfreePreference,
@@ -63,29 +73,47 @@ export function AssistantPanel({
   const [language, setLanguage] = React.useState(DEFAULT_SPEECH_LANGUAGE)
   const [briefing, setBriefing] = React.useState<AssistantBriefing | null>(null)
   const [briefingLoading, setBriefingLoading] = React.useState(false)
-  const [handsfree, setHandsfree] = React.useState(true)
+  const [handsfree, setHandsfree] = React.useState(false)
   const [voiceGreeting, setVoiceGreeting] = React.useState(true)
   const [greetingDone, setGreetingDone] = React.useState(false)
   const [sessionKey, setSessionKey] = React.useState(0)
   const [offline, setOffline] = React.useState(false)
+  const [speakingTurnIndex, setSpeakingTurnIndex] = React.useState<number | null>(null)
+  const [listenStatus, setListenStatus] = React.useState<string | null>(null)
 
   const stopManualListen = React.useRef<(() => void) | null>(null)
+  const stopReadAloudBargeIn = React.useRef<(() => void) | null>(null)
   const scroller = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
-  const canSpeak = React.useMemo(() => speechSupported(), [])
+  const [voiceReady, setVoiceReady] = React.useState(0)
+  const canSpeak = React.useMemo(() => speechSupported(), [voiceReady])
+  const speechCaps = React.useMemo(() => getSpeechCapabilities(), [voiceReady])
   const speakAnswerRef = React.useRef<(text: string) => void>(() => {})
   const askRef = React.useRef<(text: string) => Promise<string | null>>(async () => null)
 
   React.useEffect(() => {
     setHandsfree(readHandsfreePreference())
+    preloadVoices()
+    void loadSpeechCapabilities().then(() => setVoiceReady((n) => n + 1))
   }, [])
+
+  const clearReadAloudBargeIn = React.useCallback(() => {
+    stopReadAloudBargeIn.current?.()
+    stopReadAloudBargeIn.current = null
+  }, [])
+
+  const stopReadAloud = React.useCallback(() => {
+    clearReadAloudBargeIn()
+    stopSpeaking()
+    setSpeakingTurnIndex(null)
+  }, [clearReadAloudBargeIn])
 
   React.useEffect(() => {
     try {
       const stored = window.localStorage.getItem('mycampusview.assistant.lang')
       if (stored) setLanguage(normaliseLanguageTag(stored))
     } catch {
-      // Blocked storage: English is a reasonable place to start.
+      // Blocked storage: Indian English is a reasonable place to start.
     }
   }, [])
 
@@ -116,6 +144,48 @@ export function AssistantPanel({
     onError: (message) => setNotice(message),
   })
 
+  const startReadAloud = React.useCallback(
+    (turnIndex: number, text: string) => {
+      clearReadAloudBargeIn()
+      voice.interrupt()
+      setSpeakingTurnIndex(turnIndex)
+
+      // While reading aloud, any spoken sound cuts the voice immediately.
+      stopReadAloudBargeIn.current = listenToInterruptSpeech({
+        lang: language,
+        onInterrupt: () => {
+          stopSpeaking()
+          setSpeakingTurnIndex(null)
+          clearReadAloudBargeIn()
+        },
+      })
+
+      speak(text, {
+        lang: language,
+        onEnd: () => {
+          clearReadAloudBargeIn()
+          setSpeakingTurnIndex((current) => (current === turnIndex ? null : current))
+        },
+      })
+    },
+    [clearReadAloudBargeIn, language, voice],
+  )
+
+  const toggleReadAloud = React.useCallback(
+    (turnIndex: number, text: string) => {
+      if (speakingTurnIndex === turnIndex) {
+        stopReadAloud()
+        return
+      }
+      if (speakingTurnIndex !== null || voice.phase === 'speaking') {
+        stopReadAloud()
+        voice.interrupt()
+      }
+      startReadAloud(turnIndex, text)
+    },
+    [speakingTurnIndex, startReadAloud, stopReadAloud, voice],
+  )
+
   speakAnswerRef.current = voice.speakAnswer
 
   React.useEffect(() => {
@@ -133,12 +203,16 @@ export function AssistantPanel({
     } else {
       voice.endSession()
       stopManualListen.current?.()
+      clearReadAloudBargeIn()
       stopSpeaking()
+      setSpeakingTurnIndex(null)
       setManualListening(false)
     }
     return () => {
       stopManualListen.current?.()
+      clearReadAloudBargeIn()
       stopSpeaking()
+      setSpeakingTurnIndex(null)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -298,21 +372,50 @@ export function AssistantPanel({
 
   function toggleManualMic() {
     if (manualListening) {
+      // Second click finishes the recording and sends it to Whisper.
       stopManualListen.current?.()
-      setManualListening(false)
+      stopManualListen.current = null
+      setListenStatus('Transcribing…')
       return
     }
+    stopReadAloud()
     voice.interrupt()
     setNotice(null)
+    setListenStatus('Listening…')
     setManualListening(true)
+    setQuestion('')
     stopManualListen.current = listen({
       lang: language,
+      continuous: false,
       onResult: ({ transcript, final }) => {
+        if (speakingTurnIndex !== null) stopReadAloud()
+        if (
+          transcript === 'Listening…' ||
+          transcript === 'Transcribing…' ||
+          transcript === '…'
+        ) {
+          setListenStatus(transcript === '…' ? 'Listening…' : transcript)
+          return
+        }
+        setListenStatus(null)
         setQuestion(transcript)
-        if (final) void askRef.current(transcript)
+        if (final) {
+          setManualListening(false)
+          stopManualListen.current = null
+          void askRef.current(transcript)
+        }
       },
-      onError: (message) => setNotice(message),
-      onEnd: () => setManualListening(false),
+      onError: (message) => {
+        setNotice(message)
+        setListenStatus(null)
+        setManualListening(false)
+        stopManualListen.current = null
+      },
+      onEnd: () => {
+        setManualListening(false)
+        setListenStatus(null)
+        stopManualListen.current = null
+      },
     })
   }
 
@@ -506,14 +609,31 @@ export function AssistantPanel({
                     </div>
                   ) : null}
 
-                  {turn.text && !busy && !handsfree ? (
+                  {turn.text && !busy ? (
                     <button
                       type="button"
-                      onClick={() => speak(turn.text, { lang: language })}
+                      onClick={() => {
+                        if (voice.phase === 'speaking' && speakingTurnIndex === null) {
+                          voice.interrupt()
+                          return
+                        }
+                        toggleReadAloud(index, turn.text)
+                      }}
                       className="inline-flex items-center gap-1 text-xs text-ink-subtle transition-colors hover:text-ink"
+                      aria-pressed={speakingTurnIndex === index || voice.phase === 'speaking'}
                     >
-                      <Volume2 className="size-3.5" aria-hidden />
-                      Read aloud
+                      {speakingTurnIndex === index ||
+                      (voice.phase === 'speaking' && speakingTurnIndex === null) ? (
+                        <>
+                          <VolumeX className="size-3.5" aria-hidden />
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="size-3.5" aria-hidden />
+                          Read aloud
+                        </>
+                      )}
                     </button>
                   ) : null}
                 </div>
@@ -566,7 +686,13 @@ export function AssistantPanel({
               ref={inputRef}
               rows={1}
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              onChange={(event) => {
+                if (speakingTurnIndex !== null || voice.phase === 'speaking') {
+                  stopReadAloud()
+                  voice.interrupt()
+                }
+                setQuestion(event.target.value)
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
@@ -574,7 +700,13 @@ export function AssistantPanel({
                 }
               }}
               placeholder={
-                listening ? 'Listening…' : 'Ask about fees, attendance, students…'
+                manualListening || listenStatus
+                  ? listenStatus === 'Transcribing…'
+                    ? 'Transcribing…'
+                    : 'Listening — speak now, click Stop when done…'
+                  : listening
+                    ? 'Listening…'
+                    : 'Ask about fees, attendance, students…'
               }
               className="max-h-28 min-h-8 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-ink outline-none placeholder:text-ink-subtle"
             />
@@ -595,26 +727,50 @@ export function AssistantPanel({
               </select>
             ) : null}
 
-            {canSpeak && !handsfree ? (
-              <IconButton
-                label={manualListening ? 'Stop listening' : 'Ask by voice'}
-                onClick={toggleManualMic}
-                variant={manualListening ? 'danger' : 'ghost'}
+            {canSpeak ? (
+              <button
                 type="button"
+                onClick={() => {
+                  if (handsfree) {
+                    // Handsfree owns the mic — switch to manual Listen instead.
+                    setHandsfree(false)
+                    writeHandsfreePreference(false)
+                    voice.endSession()
+                  }
+                  toggleManualMic()
+                }}
+                className={cn(
+                  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[10px] border px-2.5 text-xs font-medium transition-colors',
+                  manualListening
+                    ? 'border-[var(--danger)] bg-[var(--danger-bg)] text-[var(--danger)]'
+                    : 'border-line-strong text-ink-muted hover:border-[var(--product-400)] hover:text-ink',
+                )}
+                aria-pressed={manualListening}
+                title={
+                  manualListening
+                    ? 'Click to stop and send what you said'
+                    : 'Click to listen — speak your question'
+                }
               >
                 {manualListening ? (
-                  <Square className="size-4" aria-hidden />
+                  <>
+                    <Square className="size-3.5" aria-hidden />
+                    Stop
+                  </>
                 ) : (
-                  <Mic className="size-4" aria-hidden />
+                  <>
+                    <Mic className="size-3.5" aria-hidden />
+                    Listen
+                  </>
                 )}
-              </IconButton>
+              </button>
             ) : null}
 
             <IconButton
               label="Send question"
               type="submit"
               variant="primary"
-              disabled={!question.trim() || busy}
+              disabled={!question.trim() || busy || manualListening}
             >
               {busy ? (
                 <ArrowUp className="size-4 animate-pulse" aria-hidden />
@@ -626,10 +782,20 @@ export function AssistantPanel({
 
           <p className="mt-2 px-1 text-[11px] leading-snug text-ink-subtle">
             {canSpeak
-              ? handsfree
-                ? 'Handsfree mode: speak your question, hear the answer, then speak again — you can interrupt while it is speaking. Say "stop" or "thank you" to end. Voice is transcribed by your browser. '
-                : 'Voice uses your browser\'s speech recognition. '
-              : 'Voice input needs Chrome or Edge. '}
+              ? `Click Listen, speak your question, then pause or click Stop. ${
+                  speechCaps.tts === 'azure'
+                    ? 'Answers are spoken in Azure Neural Indian English. '
+                    : ''
+                }${
+                  speechCaps.stt === 'whisper'
+                    ? 'Listening uses Whisper. '
+                    : "Listening uses your browser's speech recognition. "
+                }${
+                  handsfree
+                    ? 'Handsfree is on for continuous conversation after each answer. '
+                    : ''
+                }`
+              : 'Voice input needs a microphone and Chrome or Edge. '}
             Answers link to the record they came from — always worth checking.
           </p>
         </form>
@@ -708,12 +874,6 @@ export function AssistantLauncher({ schoolName }: { schoolName: string }) {
         </kbd>
       </button>
       <AssistantPanel open={open} onClose={() => setOpen(false)} schoolName={schoolName} />
-      <MorningBriefingPrompt
-        onOpenAssistant={() => {
-          void primeMicrophone()
-          setOpen(true)
-        }}
-      />
       <AssistantFloatingMic
         open={open}
         handsfree={handsfree}

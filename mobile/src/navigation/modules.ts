@@ -53,12 +53,12 @@ export const MODULES: Module[] = [
   /* ---------------------------------------------------------- academics */
   { key: 'attendance', title: 'Attendance', blurb: 'Mark a register in a few taps', href: '/(app)/attendance', icon: 'checkbox-outline', permissions: ['attendance.view', 'attendance.mark'], group: 'Academics', tint: '#10B981', ready: true },
   { key: 'homework', title: 'Homework', blurb: 'Set work and review submissions', href: '/(app)/homework', icon: 'book-outline', permissions: ['homework.view'], group: 'Academics', tint: '#0EA5E9', ready: true },
-  { key: 'timetable', title: 'Timetable', blurb: 'Today’s periods by class', href: '/(app)/timetable', icon: 'calendar-outline', permissions: ['timetable.view'], group: 'Academics', tint: '#8B5CF6', ready: false },
-  { key: 'exams', title: 'Exams & results', blurb: 'Schedules, marks and report cards', href: '/(app)/exams', icon: 'school-outline', permissions: ['exams.view', 'results.view'], group: 'Academics', tint: '#F43F5E', ready: false },
-  { key: 'assessments', title: 'Assessments', blurb: 'Question bank and papers', href: '/(app)/assessments', icon: 'document-text-outline', permissions: ['assessments.view', 'questionbank.view'], group: 'Academics', tint: '#C026D3', ready: false },
+  { key: 'timetable', title: 'Timetable', blurb: 'Today’s periods for you', href: '/(app)/timetable', icon: 'calendar-outline', permissions: ['timetable.view'], group: 'Academics', tint: '#8B5CF6', ready: true },
+  { key: 'exams', title: 'Exams & results', blurb: 'Attendance desk and marks entry', href: '/(app)/exams', icon: 'school-outline', permissions: ['exams.view', 'results.view', 'exams.attendance', 'exams.marks'], group: 'Academics', tint: '#F43F5E', ready: true },
+  { key: 'assessments', title: 'AI Evaluation', blurb: 'Review AI marks on answer sheets', href: '/(app)/evaluation', icon: 'scan-outline', permissions: ['assessments.evaluate'], group: 'Academics', tint: '#C026D3', ready: true },
 
   /* -------------------------------------------------------------- money */
-  { key: 'fees', title: 'Fees', blurb: 'Outstanding, collection and receipts', href: '/(app)/fees', icon: 'card-outline', permissions: ['fees.view'], group: 'Money', tint: '#2563EB', ready: true },
+  { key: 'fees', title: 'Fees', blurb: 'Outstanding, collection and receipts', href: '/(app)/fees', icon: 'card-outline', permissions: ['fees.view', 'fees.collect'], group: 'Money', tint: '#2563EB', ready: true },
 
   /* --------------------------------------------------------- operations */
   { key: 'notices', title: 'Notices', blurb: 'What the school has announced', href: '/(app)/notices', icon: 'megaphone-outline', permissions: ['notices.view'], group: 'Operations', tint: '#F97316', ready: true },
@@ -85,7 +85,7 @@ export function visibleModules(held: string[]): Module[] {
  * More are always present; the two slots between them go to the highest
  * priority modules the person can actually open.
  */
-const TAB_PRIORITY = ['attendance', 'students', 'fees', 'admissions', 'homework', 'notices']
+const TAB_PRIORITY = ['attendance', 'students', 'fees', 'timetable', 'exams', 'admissions', 'homework', 'notices']
 
 export function tabModules(held: string[]): Module[] {
   const allowed = visibleModules(held).filter((m) => m.ready)

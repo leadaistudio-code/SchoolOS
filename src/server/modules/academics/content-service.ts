@@ -5,7 +5,13 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, notFound } from '@/server/api/response'
 import { attendanceDate } from '@/lib/dates'
-import { accessibleStudentIds, isPortalOnlyRole, teachingClassSubjectIds } from '@/server/scope'
+import {
+  accessibleSectionIds,
+  accessibleStudentIds,
+  classLevelScopeWhere,
+  isPortalOnlyRole,
+  teachingClassSubjectIds,
+} from '@/server/scope'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
@@ -47,6 +53,7 @@ export async function listClasswork(
 
   const ownStudentIds = await accessibleStudentIds(ctx)
   const isPortalScoped = isPortalOnlyRole(ctx.user.roleKeys)
+  const ownSectionIds = isPortalScoped ? await accessibleSectionIds(ctx) : null
   const teachingSubjects = await teachingClassSubjectIds(ctx)
 
   const where: Prisma.ClassworkWhereInput = {
@@ -59,6 +66,16 @@ export async function listClasswork(
         }
       : {}),
     ...(teachingSubjects !== null ? { classSubjectId: { in: teachingSubjects } } : {}),
+    ...(isPortalScoped
+      ? {
+          AND: [{
+            OR: [
+              { sectionId: null },
+              { sectionId: { in: ownSectionIds ?? [] } },
+            ],
+          }],
+        }
+      : {}),
     ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
     ...(filter.sectionId ? { sectionId: filter.sectionId } : {}),
     ...(filter.subjectId ? { classSubject: { subjectId: filter.subjectId } } : {}),
@@ -243,10 +260,16 @@ function parseExamTime(examDate: Date, time: string | null): Date {
 }
 
 async function examPapersInRange(ctx: AppContext, from: Date, to: Date) {
+  const classScope = await classLevelScopeWhere(ctx)
+  const scoped = Object.keys(classScope).length > 0
   return ctx.db.examSubject.findMany({
     where: {
       examDate: { not: null, gte: from, lte: to },
-      exam: { status: { not: 'ARCHIVED' } },
+      // Students/parents see assigned exams once scheduled — same rule as listExams.
+      exam: isPortalOnlyRole(ctx.user.roleKeys)
+        ? { status: { in: ['SCHEDULED', 'ONGOING', 'MARKS_ENTRY', 'PUBLISHED'] } }
+        : { status: { not: 'ARCHIVED' } },
+      ...(scoped ? { classSubject: { classLevel: classScope } } : {}),
     },
     orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
     select: {

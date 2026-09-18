@@ -4,6 +4,7 @@ import { splitPersonName } from '@/lib/person-name'
 import { gridToTable } from '@/lib/spreadsheet'
 import { attendanceDate } from '@/lib/dates'
 import type { AppContext } from '@/server/context'
+import { audit } from '@/server/audit'
 import { ApiException } from '@/server/api/response'
 import { findOrRestore } from '@/server/db/soft-delete'
 import { assignSubjectToClass } from '@/server/modules/academics/service'
@@ -56,8 +57,13 @@ export type PackCommitStats = {
   staff: number
   subjects: number
   classSubjects: number
+  feeHeads: number
+  feeStructures: number
+  feeItems: number
   parents: number
   parentLinks: number
+  studentsArchived?: number
+  staffArchived?: number
 }
 
 function formatCell(value: string | number | boolean | Date | null | undefined): string {
@@ -119,17 +125,27 @@ function normalizeHeaderKey(key: string): string {
 
 /** Case-insensitive column lookup — Excel often capitalises headers differently from the template. */
 function cell(row: Record<string, string>, header: string, ...aliases: string[]): string {
-  const wanted = new Set([header, ...aliases].map(normalizeHeaderKey))
+  const wanted = [header, ...aliases].map(normalizeHeaderKey)
+  const wantedSet = new Set(wanted)
   for (const [key, value] of Object.entries(row)) {
-    if (wanted.has(normalizeHeaderKey(key))) return value.trim()
+    if (wantedSet.has(normalizeHeaderKey(key))) return value.trim()
   }
+  // Fuzzy only for multi-word labels when the sheet header *contains* the full
+  // requested label (e.g. "staff type (optional)" → "staff type").
+  // Never fuzzy single tokens — "name" must not match "session name", and
+  // "type" must not match a campus "Type" column that stole Staff type (NAINI).
   for (const want of wanted) {
+    if (!want.includes(' ')) continue
     for (const [key, value] of Object.entries(row)) {
       const nk = normalizeHeaderKey(key)
-      if (nk.includes(want) || want.includes(nk)) return value.trim()
+      if (nk !== want && nk.includes(want)) return value.trim()
     }
   }
   return ''
+}
+
+function normalizeStructureKey(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 function normalizeEmpCode(code: string): string {
@@ -182,6 +198,29 @@ function parseYesNo(value: string): boolean {
   return v === 'yes' || v === 'y' || v === 'true' || v === '1'
 }
 
+const FEE_FREQUENCIES = new Set([
+  'ONE_TIME',
+  'MONTHLY',
+  'QUARTERLY',
+  'HALF_YEARLY',
+  'ANNUAL',
+  'TERM_WISE',
+  'CUSTOM',
+])
+
+function parseFeeFrequency(value: string): Prisma.FeeHeadUncheckedCreateInput['frequency'] | undefined {
+  const frequency = value.trim().toUpperCase()
+  return FEE_FREQUENCIES.has(frequency)
+    ? (frequency as Prisma.FeeHeadUncheckedCreateInput['frequency'])
+    : undefined
+}
+
+function parseRupeesMinor(value: string): number | undefined {
+  const amount = Number(value.replace(/[₹,\s]/g, ''))
+  if (!Number.isFinite(amount) || amount <= 0) return undefined
+  return Math.round(amount * 100)
+}
+
 function parseGender(value: string): 'MALE' | 'FEMALE' | 'OTHER' | undefined {
   if (!value) return undefined
   const v = value.trim().toLowerCase()
@@ -189,6 +228,31 @@ function parseGender(value: string): 'MALE' | 'FEMALE' | 'OTHER' | undefined {
   if (['f', 'female', 'girl', 'g'].includes(v)) return 'FEMALE'
   if (['o', 'other', 'others'].includes(v)) return 'OTHER'
   return undefined
+}
+
+type PackStaffType = 'TEACHING' | 'ADMIN' | 'SUPPORT' | 'DRIVER' | 'LIBRARIAN' | 'ACCOUNTANT' | 'OTHER'
+
+const STAFF_TYPES = new Set<string>([
+  'TEACHING',
+  'ADMIN',
+  'SUPPORT',
+  'DRIVER',
+  'LIBRARIAN',
+  'ACCOUNTANT',
+  'OTHER',
+])
+
+/** Maps common labels; unknown values (e.g. campus names) fall back to TEACHING. */
+function parseStaffType(value: string): PackStaffType {
+  const raw = value.trim().toUpperCase().replace(/[\s-]+/g, '_')
+  if (!raw) return 'TEACHING'
+  if (STAFF_TYPES.has(raw)) return raw as PackStaffType
+  if (['TEACHER', 'FACULTY', 'TGT', 'PGT', 'PRT', 'NTT'].includes(raw)) return 'TEACHING'
+  if (['ADMINISTRATION', 'OFFICE', 'PRINCIPAL', 'COORDINATOR'].includes(raw)) return 'ADMIN'
+  if (['HELPER', 'AYAH', 'PEON', 'SECURITY', 'NON_TEACHING'].includes(raw)) return 'SUPPORT'
+  if (['ACCOUNTS', 'ACCOUNT', 'FINANCE', 'CASHIER'].includes(raw)) return 'ACCOUNTANT'
+  if (['LIBRARY'].includes(raw)) return 'LIBRARIAN'
+  return 'TEACHING'
 }
 
 function parseRelation(value: string): 'FATHER' | 'MOTHER' | 'GUARDIAN' | 'OTHER' | undefined {
@@ -431,6 +495,97 @@ export function validatePack(workbook: PackWorkbook): PackValidation {
     }
   }
 
+  const feeHeadCodes = new Set<string>()
+  const feeHeadsSheet = findSheet(workbook, 'Fee heads')
+  if (feeHeadsSheet) {
+    for (let i = 0; i < feeHeadsSheet.rows.length; i++) {
+      const row = feeHeadsSheet.rows[i]!
+      const code = cell(row, 'Code', 'Fee head code').toUpperCase()
+      const name = cell(row, 'Name', 'Fee head name')
+      const frequency = parseFeeFrequency(cell(row, 'Frequency'))
+      if (!code || !name) {
+        errors.push({ sheet: 'Fee heads', row: i + 2, message: 'Code and Name are required' })
+        continue
+      }
+      if (!frequency) {
+        errors.push({ sheet: 'Fee heads', row: i + 2, message: 'Frequency is invalid' })
+      }
+      if (feeHeadCodes.has(code)) {
+        errors.push({ sheet: 'Fee heads', row: i + 2, message: `Fee head code ${code} is duplicated` })
+      }
+      feeHeadCodes.add(code)
+    }
+  }
+
+  const feeStructureNames = new Set<string>()
+  const feeStructuresSheet = findSheet(workbook, 'Fee structures', 'Fee structure')
+  if (feeStructuresSheet) {
+    for (let i = 0; i < feeStructuresSheet.rows.length; i++) {
+      const row = feeStructuresSheet.rows[i]!
+      const name = cell(row, 'Structure name', 'Fee structure name', 'Plan name', 'Name')
+      const className = cell(row, 'Class')
+      if (!name) {
+        errors.push({ sheet: 'Fee structures', row: i + 2, message: 'Structure name is required' })
+        continue
+      }
+      const key = normalizeStructureKey(name)
+      if (feeStructureNames.has(key)) {
+        errors.push({ sheet: 'Fee structures', row: i + 2, message: `Structure ${name} is duplicated` })
+      }
+      feeStructureNames.add(key)
+      if (className && !classMap.has(className.toLowerCase())) {
+        errors.push({ sheet: 'Fee structures', row: i + 2, message: `Unknown class ${className}` })
+      }
+    }
+  }
+
+  const feeItemsSheet = findSheet(workbook, 'Fee items')
+  if (feeItemsSheet) {
+    const itemKeys = new Set<string>()
+    for (let i = 0; i < feeItemsSheet.rows.length; i++) {
+      const row = feeItemsSheet.rows[i]!
+      const structureName = cell(row, 'Structure name', 'Fee structure name', 'Plan name', 'Name')
+      const headCode = cell(row, 'Fee head code', 'Code').toUpperCase()
+      const amountMinor = parseRupeesMinor(cell(row, 'Amount INR', 'Amount'))
+      const dueOn = cell(row, 'Due on')
+      if (!structureName || !headCode) {
+        errors.push({
+          sheet: 'Fee items',
+          row: i + 2,
+          message: 'Structure name and Fee head code are required',
+        })
+        continue
+      }
+      // Only flag when Fee structures lists plans but omits this one. An empty /
+      // missing Fee structures sheet is fine — commit will create the plan.
+      if (feeStructureNames.size > 0 && !feeStructureNames.has(normalizeStructureKey(structureName))) {
+        errors.push({
+          sheet: 'Fee items',
+          row: i + 2,
+          message: `Unknown structure ${structureName} — add it on the Fee structures sheet`,
+        })
+      }
+      if (feeHeadsSheet && !feeHeadCodes.has(headCode)) {
+        errors.push({ sheet: 'Fee items', row: i + 2, message: `Unknown fee head code ${headCode}` })
+      }
+      if (!amountMinor) {
+        errors.push({ sheet: 'Fee items', row: i + 2, message: 'Amount INR must be greater than zero' })
+      }
+      if (dueOn && !parseIsoDate(dueOn)) {
+        errors.push({ sheet: 'Fee items', row: i + 2, message: 'Due on must be a valid date' })
+      }
+      const itemKey = `${structureName.toLowerCase()}::${headCode}`
+      if (itemKeys.has(itemKey)) {
+        errors.push({
+          sheet: 'Fee items',
+          row: i + 2,
+          message: `${headCode} is duplicated in ${structureName}`,
+        })
+      }
+      itemKeys.add(itemKey)
+    }
+  }
+
   const studentsSheet = findSheet(workbook, 'Students')
   if (studentsSheet) {
     for (let i = 0; i < studentsSheet.rows.length; i++) {
@@ -597,6 +752,9 @@ export async function commitPackStructure(
     staff: 0,
     subjects: 0,
     classSubjects: 0,
+    feeHeads: 0,
+    feeStructures: 0,
+    feeItems: 0,
     parents: 0,
     parentLinks: 0,
   }
@@ -637,7 +795,7 @@ export async function commitPackStructure(
         employeeCode: code,
         firstName,
         lastName,
-        staffType: (cell(row, 'Staff type').toUpperCase() || 'TEACHING') as Prisma.StaffCreateInput['staffType'],
+        staffType: parseStaffType(cell(row, 'Staff type', 'Staff category', 'Employee type')),
         designation: cell(row, 'Designation') || null,
         department: cell(row, 'Department') || null,
         qualification: cell(row, 'Qualification') || null,
@@ -844,6 +1002,272 @@ export async function commitPackStructure(
     }
   }
 
+  const feeHeadsSheet = findSheet(workbook, 'Fee heads')
+  const feeStructuresSheet = findSheet(workbook, 'Fee structures', 'Fee structure')
+  const feeItemsSheet = findSheet(workbook, 'Fee items')
+  const hasFeeRows = [feeHeadsSheet, feeStructuresSheet, feeItemsSheet].some(
+    (sheet) => sheet && sheet.rows.length > 0,
+  )
+
+  if (hasFeeRows) {
+    ctx.require('fees.structure')
+  }
+
+  const feeHeadByCode = new Map<string, string>()
+  if (feeHeadsSheet) {
+    for (let i = 0; i < feeHeadsSheet.rows.length; i++) {
+      const row = feeHeadsSheet.rows[i]!
+      const code = cell(row, 'Code', 'Fee head code').toUpperCase()
+      const name = cell(row, 'Name', 'Fee head name')
+      const frequency = parseFeeFrequency(cell(row, 'Frequency'))
+      if (!code || !name || !frequency) {
+        throw new ApiException(
+          400,
+          'BAD_REQUEST',
+          `Fee heads row ${i + 2}: Code, Name and a valid Frequency are required`,
+        )
+      }
+
+      const existing = await ctx.db.feeHead.findFirst({ where: { code } })
+      const data = {
+        name,
+        frequency,
+        isRefundable: parseYesNo(cell(row, 'Is refundable')),
+        isDeposit: parseYesNo(cell(row, 'Is deposit')),
+        deletedAt: null,
+      }
+      const saved = existing
+        ? await ctx.db.feeHead.update({ where: { id: existing.id }, data })
+        : await ctx.db.feeHead.create({
+            data: { tenantId: ctx.tenant.id, code, ...data },
+          })
+      feeHeadByCode.set(code, saved.id)
+      stats.feeHeads++
+    }
+  }
+
+  const structureByName = new Map<
+    string,
+    { id: string; sessionId: string; invoiceCount: number }
+  >()
+
+  // Seed from DB so Fee items still resolve when the Fee structures sheet was left blank.
+  const existingStructures = await ctx.db.feeStructure.findMany({
+    where: { deletedAt: null },
+    include: { _count: { select: { invoices: true } } },
+  })
+  for (const existing of existingStructures) {
+    const key = normalizeStructureKey(existing.name)
+    if (structureByName.has(key)) continue
+    structureByName.set(key, {
+      id: existing.id,
+      sessionId: existing.sessionId,
+      invoiceCount: existing._count.invoices,
+    })
+  }
+
+  function inferClassLevelId(structureName: string): string | null {
+    const key = normalizeStructureKey(structureName)
+    let best: { id: string; len: number } | null = null
+    for (const [className, classId] of classByName) {
+      if (key === className || key.startsWith(`${className} `)) {
+        if (!best || className.length > best.len) best = { id: classId, len: className.length }
+      }
+    }
+    return best?.id ?? null
+  }
+
+  if (feeStructuresSheet) {
+    for (let i = 0; i < feeStructuresSheet.rows.length; i++) {
+      const row = feeStructuresSheet.rows[i]!
+      const name = cell(row, 'Structure name', 'Fee structure name', 'Plan name', 'Name')
+      if (!name) {
+        throw new ApiException(400, 'BAD_REQUEST', `Fee structures row ${i + 2}: Name is required`)
+      }
+
+      const sessionName = cell(row, 'Session name')
+      const rowSession = sessionName
+        ? await ctx.db.academicSession.findFirst({ where: { name: sessionName } })
+        : session
+      if (!rowSession) {
+        throw new ApiException(
+          400,
+          'BAD_REQUEST',
+          `Fee structures row ${i + 2}: Unknown session ${sessionName}`,
+        )
+      }
+
+      const className = cell(row, 'Class')
+      const classLevel = className
+        ? await ctx.db.classLevel.findFirst({
+            where: { sessionId: rowSession.id, name: className, deletedAt: null },
+            select: { id: true },
+          })
+        : null
+      if (className && !classLevel) {
+        throw new ApiException(
+          400,
+          'BAD_REQUEST',
+          `Fee structures row ${i + 2}: Unknown class ${className}`,
+        )
+      }
+
+      const description = cell(row, 'Description') || null
+      const existing = await ctx.db.feeStructure.findFirst({
+        where: { sessionId: rowSession.id, name },
+        include: { _count: { select: { invoices: true } } },
+      })
+
+      let saved
+      if (existing) {
+        const changed =
+          existing.classLevelId !== (classLevel?.id ?? null) ||
+          (existing.description ?? null) !== description ||
+          existing.deletedAt !== null
+        if (changed && existing._count.invoices > 0) {
+          throw new ApiException(
+            409,
+            'CONFLICT',
+            `Fee structure ${name} already has invoices and cannot be changed by bulk import`,
+          )
+        }
+        saved = changed
+          ? await ctx.db.feeStructure.update({
+              where: { id: existing.id },
+              data: { classLevelId: classLevel?.id ?? null, description, deletedAt: null },
+            })
+          : existing
+      } else {
+        saved = await ctx.db.feeStructure.create({
+          data: {
+            tenantId: ctx.tenant.id,
+            sessionId: rowSession.id,
+            classLevelId: classLevel?.id ?? null,
+            name,
+            description,
+          },
+        })
+      }
+
+      structureByName.set(normalizeStructureKey(name), {
+        id: saved.id,
+        sessionId: rowSession.id,
+        invoiceCount: existing?._count.invoices ?? 0,
+      })
+      stats.feeStructures++
+    }
+  }
+
+  if (feeItemsSheet) {
+    for (let i = 0; i < feeItemsSheet.rows.length; i++) {
+      const row = feeItemsSheet.rows[i]!
+      const structureName = cell(row, 'Structure name', 'Fee structure name', 'Plan name', 'Name')
+      const headCode = cell(row, 'Fee head code', 'Code').toUpperCase()
+      const amountMinor = parseRupeesMinor(cell(row, 'Amount INR', 'Amount'))
+      const dueOnInput = cell(row, 'Due on')
+      const dueOnIso = dueOnInput ? parseIsoDate(dueOnInput) : undefined
+      if (!structureName || !headCode || !amountMinor || (dueOnInput && !dueOnIso)) {
+        throw new ApiException(
+          400,
+          'BAD_REQUEST',
+          `Fee items row ${i + 2}: Structure, fee head, positive amount and valid due date are required`,
+        )
+      }
+
+      const structureKey = normalizeStructureKey(structureName)
+      let structure = structureByName.get(structureKey)
+      if (!structure) {
+        const matches = await ctx.db.feeStructure.findMany({
+          where: {
+            deletedAt: null,
+            name: { equals: structureName, mode: 'insensitive' },
+          },
+          include: { _count: { select: { invoices: true } } },
+          take: 10,
+        })
+        const preferred =
+          matches.find((row) => row.sessionId === session.id) ?? matches[0] ?? null
+
+        if (preferred) {
+          structure = {
+            id: preferred.id,
+            sessionId: preferred.sessionId,
+            invoiceCount: preferred._count.invoices,
+          }
+          structureByName.set(structureKey, structure)
+        } else {
+          // Fee structures sheet left blank — create the plan so amounts still import.
+          const classLevelId = inferClassLevelId(structureName)
+          const created = await ctx.db.feeStructure.create({
+            data: {
+              tenantId: ctx.tenant.id,
+              sessionId: session.id,
+              classLevelId,
+              name: structureName,
+              description: 'Created from Fee items import',
+            },
+          })
+          structure = { id: created.id, sessionId: session.id, invoiceCount: 0 }
+          structureByName.set(structureKey, structure)
+          stats.feeStructures++
+        }
+      }
+
+      let feeHeadId = feeHeadByCode.get(headCode)
+      if (!feeHeadId) {
+        const existing = await ctx.db.feeHead.findFirst({
+          where: { code: headCode, deletedAt: null },
+          select: { id: true },
+        })
+        feeHeadId = existing?.id
+        if (feeHeadId) feeHeadByCode.set(headCode, feeHeadId)
+      }
+      if (!feeHeadId) {
+        throw new ApiException(
+          400,
+          'BAD_REQUEST',
+          `Fee items row ${i + 2}: Unknown fee head ${headCode}`,
+        )
+      }
+
+      const dueOn = dueOnIso ? attendanceDate(dueOnIso) : null
+      const existingItem = await ctx.db.feeStructureItem.findFirst({
+        where: { structureId: structure.id, feeHeadId },
+      })
+      const changed =
+        !existingItem ||
+        existingItem.amountMinor !== amountMinor ||
+        (existingItem.dueOn?.getTime() ?? null) !== (dueOn?.getTime() ?? null)
+      if (changed && structure.invoiceCount > 0) {
+        throw new ApiException(
+          409,
+          'CONFLICT',
+          `Fee structure ${structureName} already has invoices and its amounts cannot be changed`,
+        )
+      }
+
+      if (existingItem) {
+        if (changed) {
+          await ctx.db.feeStructureItem.update({
+            where: { id: existingItem.id },
+            data: { amountMinor, dueOn },
+          })
+        }
+      } else {
+        await ctx.db.feeStructureItem.create({
+          data: {
+            tenantId: ctx.tenant.id,
+            structureId: structure.id,
+            feeHeadId,
+            amountMinor,
+            dueOn,
+          },
+        })
+      }
+      stats.feeItems++
+    }
+  }
+
   return { stats, staffByCode, classByName, sectionByKey }
 }
 
@@ -977,4 +1401,125 @@ export async function commitPackParents(
   }
 
   return { parents, parentLinks }
+}
+
+/**
+ * Soft-archives active students and staff whose admission / employee codes are
+ * not in this pack. Used for an explicit “override” re-import so leftover
+ * people from earlier packs do not stay on the rolls.
+ */
+export async function pruneMissingFromPack(
+  ctx: AppContext,
+  workbook: PackWorkbook,
+): Promise<{ studentsArchived: number; staffArchived: number }> {
+  ctx.require('students.delete')
+  ctx.require('staff.delete')
+
+  const studentsSheet = findSheet(workbook, 'Students')
+  const staffSheet = findSheet(workbook, 'Staff', 'Teachers', 'Employees')
+
+  const keepAdmissions = new Set<string>()
+  if (studentsSheet) {
+    for (const row of studentsSheet.rows) {
+      const admission =
+        cell(row, 'Admission number') || cell(row, 'Admission No') || cell(row, 'Admission no')
+      if (admission) keepAdmissions.add(admission.toLowerCase())
+    }
+  }
+
+  const keepStaffCodes = new Set<string>()
+  if (staffSheet) {
+    for (const row of staffSheet.rows) {
+      const code = readEmployeeCode(row)
+      if (code) keepStaffCodes.add(normalizeEmpCode(code))
+    }
+  }
+
+  let studentsArchived = 0
+  let staffArchived = 0
+  const reason = 'Not present in school pack override import'
+
+  const activeStudents = await ctx.db.student.findMany({
+    where: { deletedAt: null },
+    select: { id: true, admissionNo: true, firstName: true, lastName: true, userId: true },
+  })
+  const toArchiveStudents = activeStudents.filter(
+    (student) => !keepAdmissions.has(student.admissionNo.toLowerCase()),
+  )
+
+  for (const student of toArchiveStudents) {
+    await ctx.db.$transaction(async (tx) => {
+      await tx.enrollment.updateMany({
+        where: { studentId: student.id, isCurrent: true },
+        data: { isCurrent: false, leftOn: new Date() },
+      })
+      if (student.userId) {
+        await tx.user.update({
+          where: { id: student.userId },
+          data: { status: 'DISABLED' },
+        })
+        await tx.session.updateMany({
+          where: { userId: student.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        })
+      }
+      await tx.student.update({
+        where: { id: student.id },
+        data: { deletedAt: new Date(), status: 'WITHDRAWN' },
+      })
+    })
+    studentsArchived++
+  }
+
+  const activeStaff = await ctx.db.staff.findMany({
+    where: { deletedAt: null },
+    select: { id: true, employeeCode: true, userId: true },
+  })
+  const toArchiveStaff = activeStaff.filter(
+    (member) => !keepStaffCodes.has(normalizeEmpCode(member.employeeCode)),
+  )
+
+  for (const member of toArchiveStaff) {
+    await ctx.db.$transaction(async (tx) => {
+      await tx.section.updateMany({
+        where: { classTeacherId: member.id },
+        data: { classTeacherId: null },
+      })
+      await tx.classSubject.updateMany({
+        where: { teacherId: member.id },
+        data: { teacherId: null },
+      })
+      if (member.userId) {
+        await tx.user.update({
+          where: { id: member.userId },
+          data: { status: 'DISABLED' },
+        })
+        await tx.session.updateMany({
+          where: { userId: member.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        })
+      }
+      await tx.staff.update({
+        where: { id: member.id },
+        data: { deletedAt: new Date(), leftOn: new Date() },
+      })
+    })
+    staffArchived++
+  }
+
+  if (studentsArchived > 0 || staffArchived > 0) {
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'students.import.prune_missing',
+      module: 'students',
+      entityType: 'ImportBatch',
+      entityId: ctx.tenant.id,
+      summary: `Pack override archived ${studentsArchived} student(s) and ${staffArchived} staff not in the uploaded file`,
+      after: { studentsArchived, staffArchived, reason },
+    })
+  }
+
+  return { studentsArchived, staffArchived }
 }

@@ -69,6 +69,55 @@ export async function updateActionItemAction(payload: unknown): Promise<Result> 
   }
 }
 
+export async function bulkUpdateActionItemsAction(payload: {
+  ids: string[]
+  status?: 'IN_PROGRESS' | 'WAITING'
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+}): Promise<Result> {
+  try {
+    const ctx = await requireContext('feedback.action_manage')
+    const ids = [...new Set(payload.ids)].slice(0, 100)
+    if (ids.length === 0) return { ok: false, message: 'Select at least one action item.' }
+    if (!payload.status && !payload.priority) {
+      return { ok: false, message: 'Choose a status or priority to apply.' }
+    }
+
+    const items = await ctx.db.feedbackActionItem.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, status: true },
+    })
+    let updated = 0
+    let failed = ids.length - items.length
+
+    for (let offset = 0; offset < items.length; offset += 10) {
+      const results = await Promise.allSettled(
+        items.slice(offset, offset + 10).map((item) =>
+          updateActionItem(ctx, actionUpdateSchema.parse({
+            id: item.id,
+            status: payload.status ?? item.status,
+            priority: payload.priority,
+          })),
+        ),
+      )
+      for (const result of results) {
+        if (result.status === 'fulfilled') updated += 1
+        else failed += 1
+      }
+    }
+
+    revalidatePath('/feedback/actions')
+    revalidatePath('/feedback')
+    return {
+      ok: failed === 0,
+      message: failed
+        ? `${updated} updated; ${failed} could not be updated.`
+        : `${updated} action item${updated === 1 ? '' : 's'} updated.`,
+    }
+  } catch (error) {
+    return failure(error, 'The action items could not be updated')
+  }
+}
+
 export async function createFeedbackActionAction(payload: unknown): Promise<Result> {
   try {
     const ctx = await requireContext('feedback.action_manage')

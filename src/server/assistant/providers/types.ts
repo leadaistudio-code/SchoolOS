@@ -21,6 +21,14 @@ export type ModelToolCall = {
 }
 
 /**
+ * Multimodal user content. Existing callers keep using `text` alone.
+ * Vision evaluation sets `parts` (text + images).
+ */
+export type ModelContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mimeType: string; base64: string }
+
+/**
  * One entry of conversation, in a shape neither provider owns.
  *
  * `raw` carries the provider's own representation of an assistant turn so it can
@@ -30,7 +38,7 @@ export type ModelToolCall = {
  * The loop never inspects `raw`; only the adapter that produced it does.
  */
 export type ModelTurn =
-  | { role: 'user'; text: string }
+  | { role: 'user'; text: string; parts?: ModelContentPart[] }
   | { role: 'assistant'; text: string; toolCalls: ModelToolCall[]; raw?: unknown }
   | { role: 'tool'; callId: string; name: string; content: string; isError?: boolean }
 
@@ -52,6 +60,21 @@ export type ModelTurnResult = {
   refused: boolean
 }
 
+export type ModelTurnParams = {
+  system: string
+  turns: ModelTurn[]
+  tools: ModelToolSpec[]
+  onText: (delta: string) => void
+  /**
+   * Prefer complete JSON for one-shot tool results (question generation).
+   * Streaming remains the default for the interactive assistant.
+   */
+  stream?: boolean
+  /** Force a single tool call by name. */
+  toolChoice?: string
+  maxOutputTokens?: number
+}
+
 export type ModelAdapter = {
   /** For logs and errors. */
   readonly name: string
@@ -61,10 +84,5 @@ export type ModelAdapter = {
    * Streams one turn. Text arrives through `onText` as it is generated; the
    * resolved value is the complete turn including any tool calls.
    */
-  turn: (params: {
-    system: string
-    turns: ModelTurn[]
-    tools: ModelToolSpec[]
-    onText: (delta: string) => void
-  }) => Promise<ModelTurnResult>
+  turn: (params: ModelTurnParams) => Promise<ModelTurnResult>
 }

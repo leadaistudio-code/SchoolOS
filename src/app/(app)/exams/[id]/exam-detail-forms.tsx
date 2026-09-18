@@ -2,8 +2,8 @@
 
 import { useActionState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Trash2 } from 'lucide-react'
-import { updateExamMetaAction, updateExamPapersAction, deleteExamAction } from '../actions'
+import { Plus, Save, Trash2 } from 'lucide-react'
+import { addExamPaperAction, updateExamMetaAction, updateExamPapersAction, deleteExamAction } from '../actions'
 import { emptyFormState } from '@/lib/form-state'
 import { Button } from '@/components/ui/button'
 import { Field, FormSection, Input, Select } from '@/components/ui/input'
@@ -191,6 +191,85 @@ export function ExamPapersForm({ examId, papers, locked }: { examId: string; pap
       ) : (
         <p className="text-sm text-ink-muted">Published exams cannot change paper settings.</p>
       )}
+    </form>
+  )
+}
+
+export function AddExamPaperForm({
+  examId,
+  options,
+  locked,
+}: {
+  examId: string
+  options: { id: string; label: string }[]
+  locked: boolean
+}) {
+  const [state, action, pending] = useActionState(addExamPaperAction, emptyFormState)
+
+  if (locked) return null
+
+  if (options.length === 0) {
+    return (
+      <p className="mb-4 text-sm text-ink-muted">
+        Every subject for this exam&apos;s classes is already added. Map more subjects under Academics
+        to add further papers.
+      </p>
+    )
+  }
+
+  return (
+    <form action={action} className="mb-6 space-y-3 rounded-[var(--radius)] border border-line bg-surface-2 p-3">
+      <input type="hidden" name="examId" value={examId} />
+      <div>
+        <p className="text-sm font-medium text-ink">Add a paper manually</p>
+        <p className="mt-0.5 text-xs text-ink-muted">
+          Pick a class subject that is not already on this exam, then set marks and schedule.
+        </p>
+      </div>
+      {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
+      {state.ok ? <Notice tone="success">Paper added.</Notice> : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Field
+          label="Class · subject"
+          htmlFor="classSubjectId"
+          required
+          error={state.fieldErrors.classSubjectId}
+          className="sm:col-span-2 lg:col-span-3"
+        >
+          <Select id="classSubjectId" name="classSubjectId" required defaultValue="">
+            <option value="" disabled>
+              Select paper
+            </option>
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Max marks" htmlFor="maxMarks" required error={state.fieldErrors.maxMarks}>
+          <Input id="maxMarks" name="maxMarks" type="number" step="0.5" min={1} max={1000} defaultValue={100} required />
+        </Field>
+        <Field label="Pass marks" htmlFor="passMarks" required error={state.fieldErrors.passMarks}>
+          <Input id="passMarks" name="passMarks" type="number" step="0.5" min={0} max={1000} defaultValue={33} required />
+        </Field>
+        <Field label="Room" htmlFor="roomName">
+          <Input id="roomName" name="roomName" maxLength={80} />
+        </Field>
+        <Field label="Exam date" htmlFor="examDate">
+          <Input id="examDate" name="examDate" type="date" />
+        </Field>
+        <Field label="Starts" htmlFor="startTime">
+          <Input id="startTime" name="startTime" type="time" />
+        </Field>
+        <Field label="Ends" htmlFor="endTime">
+          <Input id="endTime" name="endTime" type="time" />
+        </Field>
+      </div>
+      <Button type="submit" size="sm" disabled={pending}>
+        <Plus aria-hidden />
+        {pending ? 'Adding…' : 'Add paper'}
+      </Button>
     </form>
   )
 }

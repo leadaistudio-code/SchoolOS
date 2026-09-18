@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useStudent } from '@/api/hooks'
 import { ApiError } from '@/api/client'
+import { useAuth } from '@/auth/store'
 import { Avatar, Badge, Button, Card, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
 import { longDate, money } from '@/lib/format'
 import { colors, spacing } from '@/theme'
@@ -18,6 +19,7 @@ import { colors, spacing } from '@/theme'
  */
 export default function StudentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const canCollect = useAuth((s) => s.can('fees.collect'))
   const { data, isLoading, error, refetch } = useStudent(id ?? '')
 
   if (isLoading) return <Screen><SkeletonList rows={6} /></Screen>
@@ -97,6 +99,15 @@ export default function StudentScreen() {
 
           <Section title="Fees">
             <Row label="Outstanding" value={money(data.dueMinor)} />
+            {canCollect && data.dueMinor > 0 ? (
+              <Button
+                label="Collect payment"
+                onPress={() =>
+                  router.push({ pathname: '/(app)/fee-collect', params: { studentId: data.id } })
+                }
+                style={{ marginTop: spacing.md }}
+              />
+            ) : null}
           </Section>
         </View>
       </ScrollView>

@@ -75,7 +75,8 @@ export interface PaymentProvider {
   verifyWebhook(rawBody: string, signature: string | null): Promise<PaymentVerification>
   /** Server-to-server confirmation, used as the source of truth on return. */
   fetchPayment(providerPaymentId: string): Promise<PaymentVerification>
-  refund(providerPaymentId: string, amountMinor: number): Promise<SendResult>
+  /** Provider must treat idempotencyKey as stable across retries. */
+  refund(providerPaymentId: string, amountMinor: number, idempotencyKey: string): Promise<SendResult>
 }
 
 export type StoredObject = {

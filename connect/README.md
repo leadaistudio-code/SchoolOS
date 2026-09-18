@@ -2,9 +2,11 @@
 
 Windows biometric device gateway for [MyCampusView](https://mycampusview.com) school ERP.
 
-This is a **.NET 8 Worker Service** that pairs to a school tenant, polls local biometric terminals, queues punches in SQLite under ProgramData, and uploads batches to the cloud device-gateway API.
+This is a **.NET 8 Worker Service** that pairs to a school tenant, receives or polls local biometric terminals, queues punches in SQLite under ProgramData, and uploads batches to the cloud device-gateway API.
 
-> **Important:** The Realtime RS9W vendor SDK/DLL is **not** included. The `RealtimeRS9WAdapter` is an intentional stub that throws `NotSupportedException` until you install the manufacturer SDK and wire a real implementation. Connect never fakes hardware calls.
+> **Realtime RS9W:** SDK-free attendance is supported through the terminal's
+> `FkWeb` push mode. SDK polling remains a separate optional mode and still
+> requires the manufacturer DLL.
 
 ## Solution layout
 
@@ -83,8 +85,9 @@ Edit `%ProgramData%\MyCampusView\Connect\config.json`:
       "Name": "Main Gate",
       "Brand": "Realtime",
       "Model": "RS9W",
-      "NetworkAddress": "192.168.1.50",
-      "Port": 4370,
+      "ConnectionMode": "FKWEB_PUSH",
+      "PushDeviceId": "CLOUD_ID_FROM_THE_TERMINAL",
+      "NetworkAddress": "192.168.1.224",
       "Purpose": "BOTH",
       "SyncEnabled": true
     }
@@ -97,14 +100,15 @@ Supported `Brand` values in this build:
 | Brand | Behavior |
 |-------|----------|
 | `Simulator` | Lab punches only when `AllowSimulator` is `true` |
-| `Realtime` / `RealtimeRS9W` / `RS9W` | Stub — requires vendor SDK (throws clear errors) |
+| `Realtime` / `RealtimeRS9W` / `RS9W` + `FKWEB_PUSH` | SDK-free local HTTP push receiver |
+| `Realtime` / `RealtimeRS9W` / `RS9W` + `SDK` | Stub until the vendor SDK is installed |
 
 ## Install as a Windows Service
 
 ```powershell
 # From an elevated PowerShell
 .\scripts\publish.ps1
-.\scripts\install-service.ps1
+.\scripts\install-service.ps1 -EnableFkWeb -FkWebPort 8080
 ```
 
 Uninstall:
@@ -147,6 +151,7 @@ All durable state lives under:
   config.json       Ops overlay (URL, devices, intervals)
   logs\connect-YYYYMMDD.log
   checkpoints\      Human-readable checkpoint mirrors
+  fkweb-diagnostics\ Unknown FKWeb packets retained for safe diagnosis
 ```
 
 ## Cloud API surface used
@@ -164,7 +169,25 @@ Authenticated with `Authorization: Bearer <connectorSecret>` (except pair):
 
 Sync loop features: per-device checkpoints, batch upload, exponential backoff with jitter, dead-letter after max attempts, command handling (`TEST_CONNECTION`, `SYNC_DEVICE`, `READ_USERS`, `REFRESH_INFO`, `SYNC_DEVICE_TIME`).
 
-## Realtime SDK note
+## Realtime RS9W FKWeb push
+
+For an RS9W configured with `ConnectionMode: FKWEB_PUSH`, set the terminal's
+**Web Server URL** to:
+
+```text
+http://CONNECT_PC_LAN_IP:8080/hdata.aspx
+```
+
+Keep **Server-Client Mode** set to `FkWeb`. The connector accepts both common
+FKData HS102 and EBKN FKWeb packet/acknowledgement variants. It validates the
+`dev_id` against `PushDeviceId` and, when `NetworkAddress` is configured,
+rejects packets from any other source IP. Attendance is acknowledged only
+after SQLite has durably accepted it, so retries are safe.
+
+Reserve fixed DHCP addresses for the terminal and Connect PC. The firewall rule
+created by `-EnableFkWeb` permits only the private local subnet.
+
+## Realtime SDK polling note
 
 `RealtimeRS9WAdapter` implements `IBiometricDeviceAdapter` fully but every hardware method throws:
 

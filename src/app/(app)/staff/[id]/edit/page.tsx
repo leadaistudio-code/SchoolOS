@@ -1,6 +1,7 @@
 import { requireContext } from '@/server/context'
 import { getStaff } from '@/server/modules/people/service'
 import { toDateInput } from '@/lib/dates'
+import { minutesToTime } from '@/lib/attendance-hours'
 import { PageHeader } from '@/components/page-header'
 import { StaffForm } from '../../staff-form'
 import { updateStaffAction } from '../../actions'
@@ -50,6 +51,19 @@ export default async function EditStaffPage({ params }: { params: Promise<{ id: 
           city: staff.city ?? undefined,
           state: staff.state ?? undefined,
           postalCode: staff.postalCode ?? undefined,
+          customAttendanceHours: staff.customAttendanceHours,
+          attendanceStart:
+            staff.attendanceStartMinutes != null
+              ? minutesToTime(staff.attendanceStartMinutes)
+              : undefined,
+          attendanceEnd:
+            staff.attendanceEndMinutes != null
+              ? minutesToTime(staff.attendanceEndMinutes)
+              : undefined,
+          attendanceLateAfter:
+            staff.attendanceLateAfterMinutes != null
+              ? minutesToTime(staff.attendanceLateAfterMinutes)
+              : undefined,
         }}
       />
     </div>

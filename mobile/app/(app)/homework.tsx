@@ -1,9 +1,10 @@
 import React from 'react'
 import { FlatList, View } from 'react-native'
+import { router } from 'expo-router'
 import { useHomework } from '@/api/hooks'
 import { ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
-import { Badge, Card, EmptyState, ErrorState, Screen, SkeletonList, Springy, Txt } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, ErrorState, Screen, SkeletonList, Springy, Txt } from '@/components/ui'
 import { ScreenHeader } from '@/components/header'
 import { friendlyDate, longDate } from '@/lib/format'
 import { colors, radius, spacing } from '@/theme'
@@ -19,6 +20,7 @@ import type { Homework } from '@/api/types'
  */
 export default function HomeworkScreen() {
   const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
+  const canCreate = useAuth((s) => s.can('homework.create'))
   const { data, isLoading, isRefetching, refetch, error } = useHomework()
   const [open, setOpen] = React.useState<string | null>(null)
 
@@ -58,9 +60,23 @@ export default function HomeworkScreen() {
           contentContainerStyle={
             rows.length === 0 ? { flexGrow: 1 } : { paddingHorizontal: spacing.base, paddingBottom: spacing.xxl }
           }
-          ListEmptyComponent={<EmptyState title="No homework set" body="Work set on the web appears here." />}
+          ListEmptyComponent={<EmptyState title="No homework set" body="Set work from this phone or on the web." />}
+          ListHeaderComponent={
+            canCreate ? (
+              <Button
+                label="Set homework"
+                onPress={() => router.push('/(app)/homework-new')}
+                style={{ marginBottom: spacing.md }}
+              />
+            ) : null
+          }
           renderItem={({ item }) => (
-            <HomeworkCard item={item} expanded={open === item.id} onToggle={() => setOpen(open === item.id ? null : item.id)} />
+            <HomeworkCard
+              item={item}
+              expanded={open === item.id}
+              onToggle={() => setOpen(open === item.id ? null : item.id)}
+              onOpen={() => router.push({ pathname: '/(app)/homework-detail', params: { id: item.id } })}
+            />
           )}
         />
       )}
@@ -68,7 +84,17 @@ export default function HomeworkScreen() {
   )
 }
 
-function HomeworkCard({ item, expanded, onToggle }: { item: Homework; expanded: boolean; onToggle: () => void }) {
+function HomeworkCard({
+  item,
+  expanded,
+  onToggle,
+  onOpen,
+}: {
+  item: Homework
+  expanded: boolean
+  onToggle: () => void
+  onOpen: () => void
+}) {
   const klass = [item.className, item.sectionName].filter(Boolean).join(' ')
   const done = item.expected > 0 ? item.submitted / item.expected : 0
   const marked = item.submitted > 0 ? item.reviewed / item.submitted : 0
@@ -128,9 +154,7 @@ function HomeworkCard({ item, expanded, onToggle }: { item: Homework; expanded: 
             <Row label="Due" value={item.dueOn ? longDate(item.dueOn) : 'No due date'} />
             {item.maxScore != null ? <Row label="Out of" value={`${item.maxScore}`} /> : null}
             {item.attachmentCount > 0 ? <Row label="Attachments" value={`${item.attachmentCount}`} /> : null}
-            <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.sm }}>
-              Marking a submission is on the web for now.
-            </Txt>
+            <Button label="Open & review" onPress={onOpen} variant="secondary" style={{ marginTop: spacing.md }} />
           </View>
         ) : null}
       </Card>

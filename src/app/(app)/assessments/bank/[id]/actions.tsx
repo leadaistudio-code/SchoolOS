@@ -147,10 +147,10 @@ export function QuestionActions({
       {canDelete && (
         <Button
           size="sm"
-          variant="ghost"
+          variant="danger"
           disabled={busy}
           onClick={async () => {
-            if (!window.confirm('Delete this question? Papers already built keep their copy.')) return
+            if (!window.confirm('Delete this question from the bank?\n\nPapers already built keep their copy.')) return
             if (await call(`/api/v1/questions/${id}`, 'DELETE', undefined, 'Question deleted')) {
               router.push('/assessments/bank')
               router.refresh()

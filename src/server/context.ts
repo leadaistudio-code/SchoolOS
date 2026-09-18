@@ -183,9 +183,8 @@ export async function requirePlatformContext(
 ): Promise<PlatformContext> {
   const ctx = await getPlatformContext()
   if (!ctx) {
-    const h = await headers()
-    const path = h.get('x-pathname') ?? '/platform'
-    redirect(`/login?next=${encodeURIComponent(path)}`)
+    // Avoid /login?next=/platform — tenant cookies on the platform host looped.
+    redirect('/login')
   }
   if (permission && !ctx.user.permissions.has(permission)) redirect('/403')
   return ctx

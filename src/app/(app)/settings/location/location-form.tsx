@@ -4,7 +4,8 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Crosshair, ExternalLink, Link2, MapPin, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Field, Input } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
@@ -133,10 +134,8 @@ export function LocationForm({
           </Notice>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Paste a map link</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Paste a map link" description="The quickest way to find accurate coordinates." icon="MapPin" tone="info" />
           <CardContent className="space-y-3">
             <p className="text-sm text-ink-muted">
               Open Google Maps, press and hold on the school, tap Share, and paste what you get.
@@ -170,10 +169,8 @@ export function LocationForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Coordinates</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Coordinates and geofence" description="Fine-tune the school point and check-in boundary." icon="MapPin" tone="success" />
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
@@ -251,10 +248,8 @@ export function LocationForm({
         </Card>
       </div>
 
-      <Card className="lg:sticky lg:top-20">
-        <CardHeader>
-          <CardTitle>Check before saving</CardTitle>
-        </CardHeader>
+      <Card variant="elevated" className="overflow-hidden lg:sticky lg:top-20">
+        <SettingsPanelHeader title="Check before saving" description="Preview the point staff and transport will use." icon="MapPin" tone="brand" />
         <CardContent className="space-y-3">
           <div className="flex items-start gap-2">
             <MapPin className="mt-0.5 size-4 shrink-0 text-ink-subtle" aria-hidden />

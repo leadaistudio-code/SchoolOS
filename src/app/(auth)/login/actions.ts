@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { login } from '@/server/auth/login'
 import { resolveTenant, isPlatformHost } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
+import { sanitizeLoginNext } from '@/server/auth/login-redirect'
 import type { FormState as LoginState } from '@/lib/form-state'
 
 const schema = z.object({
@@ -48,8 +49,7 @@ export async function loginAction(
 
   if (!result.ok) {
     if (result.reason === 'mfa') {
-      const next = parsed.data.next
-      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : ''
+      const safeNext = sanitizeLoginNext(parsed.data.next)
       const qs = new URLSearchParams({ token: result.challengeToken })
       if (safeNext) qs.set('next', safeNext)
       redirect(`/login/mfa?${qs.toString()}`)
@@ -57,10 +57,11 @@ export async function loginAction(
     return { error: result.message, fieldErrors: {} }
   }
 
-  const next = parsed.data.next
-  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null
+  const safeNext = sanitizeLoginNext(parsed.data.next)
 
   if (result.mustChangePassword) redirect('/account/password')
+  if (safeNext?.startsWith('/platform') && tenant) redirect('/')
+  if (safeNext && !safeNext.startsWith('/platform') && !tenant) redirect('/platform')
   redirect(safeNext ?? (tenant ? '/' : '/platform'))
 }
 

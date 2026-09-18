@@ -134,7 +134,7 @@ export async function readFileForCaller(
     throw new ApiException(404, 'NOT_FOUND', 'File not found')
   }
 
-  const [attachment, document] = await Promise.all([
+  const [attachment, document, textbook, answerSheet] = await Promise.all([
     ctx.db.attachment.findFirst({
       where: { storageKey },
       select: {
@@ -152,9 +152,38 @@ export async function readFileForCaller(
       where: { storageKey, deletedAt: null },
       select: { title: true, mimeType: true, category: true, studentId: true, staffId: true, parentId: true },
     }),
+    ctx.db.textbook.findFirst({
+      where: { storageKey, deletedAt: null },
+      select: { title: true, fileName: true, mimeType: true, classSubjectId: true },
+    }),
+    ctx.db.answerSheet.findFirst({
+      where: { storageKey },
+      select: {
+        fileName: true,
+        mimeType: true,
+        studentId: true,
+        assignment: { select: { assessment: { select: { classSubjectId: true } } } },
+      },
+    }),
   ])
 
-  if (!attachment && !document) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+  if (!attachment && !document && !textbook && !answerSheet) {
+    throw new ApiException(404, 'NOT_FOUND', 'File not found')
+  }
+
+  if (answerSheet) {
+    if (!ctx.can('assessments.evaluate')) {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this answer sheet')
+    }
+    const { assertClassSubjectAccess, assertStudentAccess } = await import('@/server/scope')
+    await assertClassSubjectAccess(ctx, answerSheet.assignment.assessment.classSubjectId)
+    await assertStudentAccess(ctx, answerSheet.studentId)
+    return {
+      body: await storageProvider().get(storageKey),
+      mimeType: answerSheet.mimeType,
+      fileName: answerSheet.fileName,
+    }
+  }
 
   if (attachment) {
     await assertAttachmentAccess(ctx, attachment)
@@ -162,6 +191,19 @@ export async function readFileForCaller(
       body: await storageProvider().get(storageKey),
       mimeType: attachment.mimeType,
       fileName: attachment.fileName,
+    }
+  }
+
+  if (textbook) {
+    if (!ctx.can('questionbank.generate')) {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this textbook')
+    }
+    const { assertClassSubjectAccess } = await import('@/server/scope')
+    await assertClassSubjectAccess(ctx, textbook.classSubjectId)
+    return {
+      body: await storageProvider().get(storageKey),
+      mimeType: textbook.mimeType,
+      fileName: textbook.fileName || textbook.title,
     }
   }
 
@@ -187,6 +229,20 @@ export async function readFileForCaller(
     if (document!.studentId) {
       const { assertStudentAccess } = await import('@/server/scope')
       await assertStudentAccess(ctx, document!.studentId)
+    } else if (document!.parentId) {
+      const parent = await ctx.db.parent.findFirst({
+        where: { id: document!.parentId, userId: ctx.user.userId },
+        select: { id: true },
+      })
+      if (!parent && !ctx.can('documents.manage')) {
+        throw new ApiException(403, 'FORBIDDEN', 'You cannot view this document')
+      }
+    } else if (document!.staffId) {
+      if (!ctx.can('staff.view')) {
+        throw new ApiException(403, 'FORBIDDEN', 'You cannot view this document')
+      }
+    } else if (!ctx.can('documents.manage')) {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this document')
     }
   }
 
@@ -212,10 +268,32 @@ async function assertAttachmentAccess(
     throw new ApiException(403, 'FORBIDDEN', 'You cannot view this file')
   }
 
-  if (attachment.noticeId && !ctx.can('notices.view')) deny()
-  if (attachment.homeworkId && !ctx.can('homework.view')) deny()
-  if (attachment.classworkId && !ctx.can('classwork.view')) deny()
-  if (attachment.messageId && !ctx.can('messages.view')) deny()
+  if (attachment.noticeId) {
+    if (!ctx.can('notices.view')) deny()
+    const { getNotice } = await import('@/server/modules/notices/service')
+    await getNotice(ctx, attachment.noticeId)
+  }
+  if (attachment.homeworkId) {
+    if (!ctx.can('homework.view')) deny()
+    const { getHomework } = await import('@/server/modules/homework/service')
+    await getHomework(ctx, attachment.homeworkId)
+  }
+  if (attachment.classworkId) {
+    if (!ctx.can('classwork.view')) deny()
+    const allowed = await classworkVisibleToCaller(ctx, attachment.classworkId)
+    if (!allowed) deny()
+  }
+  if (attachment.messageId) {
+    if (!ctx.can('messages.view')) deny()
+    const message = await ctx.db.message.findFirst({
+      where: {
+        id: attachment.messageId,
+        conversation: { participants: { some: { userId: ctx.user.userId } } },
+      },
+      select: { id: true },
+    })
+    if (!message) deny()
+  }
 
   // A submission attachment belongs to one student: only that student (or
   // their guardians) and a reviewer may read it.
@@ -229,9 +307,49 @@ async function assertAttachmentAccess(
   }
 }
 
+async function classworkVisibleToCaller(ctx: AppContext, classworkId: string) {
+  const classwork = await ctx.db.classwork.findFirst({
+    where: { id: classworkId, deletedAt: null },
+    select: { classLevelId: true, sectionId: true },
+  })
+  if (!classwork) return false
+
+  const { accessibleStudentIds } = await import('@/server/scope')
+  const studentIds = await accessibleStudentIds(ctx)
+  if (studentIds === null) return true
+
+  return !!(await ctx.db.enrollment.findFirst({
+    where: {
+      studentId: { in: studentIds },
+      classLevelId: classwork.classLevelId,
+      ...(classwork.sectionId ? { sectionId: classwork.sectionId } : {}),
+      isCurrent: true,
+    },
+    select: { id: true },
+  }))
+}
+
 export async function deleteAttachment(ctx: AppContext, id: string) {
-  const attachment = await ctx.db.attachment.findFirst({ where: { id } })
+  const attachment = await ctx.db.attachment.findFirst({
+    where: { id },
+    select: {
+      id: true,
+      storageKey: true,
+      fileName: true,
+      uploadedById: true,
+      noticeId: true,
+      homeworkId: true,
+      submissionId: true,
+      classworkId: true,
+      messageId: true,
+      submission: { select: { studentId: true } },
+    },
+  })
   if (!attachment) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+  await assertAttachmentAccess(ctx, attachment)
+  if (attachment.uploadedById !== ctx.user.userId && !ctx.can('documents.manage')) {
+    throw new ApiException(403, 'FORBIDDEN', 'You cannot delete this file')
+  }
 
   await storageProvider().delete(attachment.storageKey).catch(() => undefined)
   await ctx.db.attachment.delete({ where: { id } })

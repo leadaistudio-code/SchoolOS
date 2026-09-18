@@ -225,6 +225,7 @@ const FULL_SELECT = {
           typeSnapshot: true,
           difficultySnapshot: true,
           questionId: true,
+          question: { select: { status: true, origin: true } },
         },
       },
     },
@@ -628,6 +629,7 @@ export async function approveAssessment(ctx: AppContext, id: string) {
               typeSnapshot: true,
               difficultySnapshot: true,
               questionId: true,
+              question: { select: { status: true } },
             },
           },
         },
@@ -646,6 +648,14 @@ export async function approveAssessment(ctx: AppContext, id: string) {
       409,
       'UNBALANCED',
       `The questions add up to ${blueprint.placed} marks but the paper is set to ${blueprint.declared}. Fix one of the two before approving.`,
+    )
+  }
+  const unreviewed = assessment.sections
+    .flatMap((section) => section.questions)
+    .filter((question) => question.question && question.question.status !== 'APPROVED')
+  if (unreviewed.length > 0) {
+    throw conflict(
+      `Review and approve ${unreviewed.length} generated question${unreviewed.length === 1 ? '' : 's'} before approving this paper`,
     )
   }
 

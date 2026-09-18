@@ -53,6 +53,13 @@ public sealed class CloudApiClient : ICloudApiClient
         }
 
         var uri = _config.GetApiBaseUri();
+
+        // HttpClient forbids changing BaseAddress after the first request.
+        if (_http.BaseAddress is not null)
+        {
+            return;
+        }
+
         _http.BaseAddress = uri;
         if (!_http.DefaultRequestHeaders.UserAgent.Any())
         {
@@ -229,7 +236,7 @@ public sealed class CloudApiClient : ICloudApiClient
             Accepted = envelope.Data.Accepted,
             Duplicate = envelope.Data.Duplicate,
             Rejected = envelope.Data.Rejected,
-            Results = (envelope.Data.Results ?? Array.Empty<EventBatchItemResultDto>())
+            Results = (envelope.Data.Results ?? new List<EventBatchItemResultDto>())
                 .Select(r => new EventBatchItemResult
                 {
                     DedupeKey = r.DedupeKey ?? "",

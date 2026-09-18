@@ -40,6 +40,14 @@ const TILES: Tile[] = [
     tone: 'attendance',
   },
   {
+    href: '/settings/teacher-refresh',
+    title: 'Teacher knowledge refresh',
+    description: 'Professional development frequency, questions and completion rules.',
+    permission: 'teacher_refresh.configure',
+    icon: 'BrainCircuit',
+    tone: 'staff',
+  },
+  {
     href: '/settings/branding',
     title: 'Branding',
     description: 'School colours, sign-in page and document footers.',
@@ -118,6 +126,14 @@ const TILES: Tile[] = [
     permission: 'audit.view',
     icon: 'ScrollText',
     tone: 'overdue',
+  },
+  {
+    href: '/settings/data-export',
+    title: 'Data export',
+    description: 'Download students, staff, fees and all school records as CSV files.',
+    permission: 'settings.export',
+    icon: 'Download',
+    tone: 'fees',
   },
 ]
 

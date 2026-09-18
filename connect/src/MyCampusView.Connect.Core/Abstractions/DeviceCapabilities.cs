@@ -32,4 +32,13 @@ public sealed class DeviceCapabilities
         CanSyncDeviceTime = false,
         IsSimulated = false,
     };
+
+    public static DeviceCapabilities PushOnly { get; } = new()
+    {
+        CanReadAttendanceLogs = false,
+        CanTestConnection = false,
+        CanReadUsers = false,
+        CanSyncDeviceTime = false,
+        IsSimulated = false,
+    };
 }

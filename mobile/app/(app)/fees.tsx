@@ -1,8 +1,9 @@
 import React from 'react'
 import { FlatList, View } from 'react-native'
+import { router } from 'expo-router'
 import { useOutstanding } from '@/api/hooks'
 import { ApiError } from '@/api/client'
-import { Card, EmptyState, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
+import { Button, Card, EmptyState, ErrorState, Screen, SkeletonList, Txt } from '@/components/ui'
 import { ScreenHeader } from '@/components/header'
 import { useAuth } from '@/auth/store'
 import { count, money, moneyShort } from '@/lib/format'
@@ -18,6 +19,7 @@ import { colors, radius, spacing } from '@/theme'
  */
 export default function FeesScreen() {
   const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
+  const canCollect = useAuth((s) => s.can('fees.collect'))
   const { data, isLoading, isRefetching, refetch, error } = useOutstanding()
 
   const totals = React.useMemo(() => {
@@ -50,26 +52,35 @@ export default function FeesScreen() {
           contentContainerStyle={{ paddingHorizontal: spacing.base, paddingBottom: spacing.xxl }}
           ListEmptyComponent={<EmptyState title="Nothing outstanding" body="Every invoice raised has been paid." />}
           ListHeaderComponent={
-            (data?.length ?? 0) > 0 ? (
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <Card style={{ flex: 1 }}>
-                  <Txt variant="caption" color={colors.textSubtle}>Total outstanding</Txt>
-                  <Txt variant="metric" style={{ marginTop: spacing.xs }}>{moneyShort(totals.outstanding)}</Txt>
-                  <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: 2 }}>
-                    across {count(totals.students)} students
-                  </Txt>
-                </Card>
-                <Card style={{ flex: 1 }}>
-                  <Txt variant="caption" color={colors.textSubtle}>Overdue</Txt>
-                  <Txt variant="metric" color={colors.overdue} style={{ marginTop: spacing.xs }}>
-                    {moneyShort(totals.overdue)}
-                  </Txt>
-                  <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: 2 }}>
-                    past its due date
-                  </Txt>
-                </Card>
-              </View>
-            ) : null
+            <>
+              {canCollect ? (
+                <Button
+                  label="Collect payment"
+                  onPress={() => router.push('/(app)/fee-collect')}
+                  style={{ marginBottom: spacing.md }}
+                />
+              ) : null}
+              {(data?.length ?? 0) > 0 ? (
+                <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                  <Card style={{ flex: 1 }}>
+                    <Txt variant="caption" color={colors.textSubtle}>Total outstanding</Txt>
+                    <Txt variant="metric" style={{ marginTop: spacing.xs }}>{moneyShort(totals.outstanding)}</Txt>
+                    <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: 2 }}>
+                      across {count(totals.students)} students
+                    </Txt>
+                  </Card>
+                  <Card style={{ flex: 1 }}>
+                    <Txt variant="caption" color={colors.textSubtle}>Overdue</Txt>
+                    <Txt variant="metric" color={colors.overdue} style={{ marginTop: spacing.xs }}>
+                      {moneyShort(totals.overdue)}
+                    </Txt>
+                    <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: 2 }}>
+                      past its due date
+                    </Txt>
+                  </Card>
+                </View>
+              ) : null}
+            </>
           }
           renderItem={({ item }) => {
             const share = item.outstandingMinor / worst

@@ -1,6 +1,6 @@
 import { requireContext } from '@/server/context'
 import { getSchoolLocation } from '@/server/modules/settings/school-location'
-import { PageHeader } from '@/components/page-header'
+import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { LocationForm } from './location-form'
 
 export const metadata = { title: 'School location' }
@@ -19,10 +19,11 @@ export default async function SchoolLocationPage() {
 
   return (
     <div>
-      <PageHeader
+      <SettingsPageHeader
         title="School location"
         description="Used by staff check-in to decide who is on the premises, and by the transport map as the point every route runs to"
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'School location' }]}
+        icon="MapPin"
+        tone="info"
       />
 
       <LocationForm

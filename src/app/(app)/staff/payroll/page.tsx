@@ -1,25 +1,15 @@
-import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { listPayslips, monthName, payrollSummary } from '@/server/modules/staff/payroll'
 import { formatMoney, formatNumber } from '@/lib/utils'
-import { formatDay } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { EmptyState, Notice } from '@/components/ui/states'
 import { Metric, MetricRow } from '@/components/ui/metric'
-import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { StaffTabs } from '../tabs'
-import { PayslipStatusControl } from '../[id]/panels'
 import { PeriodPicker } from './period-picker'
+import { PayrollTable } from './payroll-table'
 
 export const metadata = { title: 'Payroll' }
-
-const TONE: Record<string, BadgeTone> = {
-  DRAFT: 'neutral',
-  PUBLISHED: 'info',
-  PAID: 'success',
-}
 
 /**
  * The payroll month.
@@ -61,6 +51,12 @@ export default async function PayrollPage({
       <StaffTabs active="payroll" ctxCan={{ payroll: true, appraise: ctx.can('staff.appraise'), leave: ctx.can('leave.view') }} />
 
       <PeriodPicker year={year} month={month} />
+
+      <Notice tone="info" title="Automatic salary deduction rule">
+        One absence deducts one daily wage, a half-day deducts half, and every 3 late arrivals
+        deduct one daily wage. Approved leave is paid. Admins and principals can add a reasoned
+        manual deduction while a payslip is still a draft.
+      </Notice>
 
       <MetricRow>
         <Metric
@@ -111,65 +107,17 @@ export default async function PayrollPage({
             description="Open a staff profile, go to Salary, and generate the month. Figures come from the salary in force and the staff register."
           />
         ) : (
-          <TableWrap>
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Staff member</TH>
-                  <TH>Department</TH>
-                  <TH align="right">Days paid</TH>
-                  <TH align="right">Gross</TH>
-                  <TH align="right">Deductions</TH>
-                  <TH align="right">Net</TH>
-                  <TH>Status</TH>
-                  {canManage ? <TH align="right">&nbsp;</TH> : null}
-                </tr>
-              </THead>
-              <TBody>
-                {payslips.map((p) => (
-                  <TR key={p.id}>
-                    <TD>
-                      <Link
-                        href={`/staff/${p.staff.id}?tab=salary`}
-                        className="block text-sm text-ink hover:underline"
-                      >
-                        {p.staff.firstName} {p.staff.lastName}
-                      </Link>
-                      <span className="block text-xs tnum text-ink-subtle">
-                        {p.staff.employeeCode}
-                      </span>
-                    </TD>
-                    <TD className="text-sm text-ink-muted">{p.staff.department ?? '—'}</TD>
-                    <TD align="right" className="text-sm">
-                      {p.paidDays}/{p.workingDays}
-                    </TD>
-                    <TD align="right" className="text-sm">
-                      {money(p.grossMinor)}
-                    </TD>
-                    <TD align="right" className="text-sm">
-                      {money(p.deductionsMinor + p.lopMinor)}
-                    </TD>
-                    <TD align="right" className="text-sm font-medium text-ink">
-                      {money(p.netMinor)}
-                    </TD>
-                    <TD>
-                      <Badge tone={TONE[p.status] ?? 'neutral'}>{p.status.toLowerCase()}</Badge>
-                      {p.paidAt ? (
-                        <span className="ml-1.5 text-xs tnum text-ink-subtle">
-                          {formatDay(p.paidAt)}
-                        </span>
-                      ) : null}
-                    </TD>
-                    {canManage ? (
-                      <TD align="right">
-                        <PayslipStatusControl id={p.id} status={p.status} />
-                      </TD>
-                    ) : null}
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </TableWrap>
+          <PayrollTable
+            rows={payslips.map((payslip) => ({
+              ...payslip,
+              paidAt: payslip.paidAt?.toISOString() ?? null,
+            }))}
+            canManage={canManage}
+            currency={currency}
+            year={year}
+            month={month}
+            monthLabel={monthName(month)}
+          />
         )}
       </Card>
 

@@ -5,7 +5,7 @@ import {
 } from '@/lib/speech-languages'
 import { zodToJsonSchema } from './json-schema'
 import { findTool, toolsFor, type AssistantTool, type ToolOutput } from './tools'
-import { assistantModel, type ModelTurn } from './providers'
+import { assistantModel, type ModelAdapter, type ModelTurn, type ModelTurnResult } from './providers'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import type { AgentEvent } from '@/lib/assistant-events'
@@ -16,8 +16,8 @@ export type { AgentEvent }
 /**
  * The assistant loop.
  *
- * Provider-agnostic: `AI_DRIVER` decides whether each turn goes to Anthropic or
- * OpenAI, and nothing below cares. What lives here is everything that actually
+ * Provider-agnostic: `AI_DRIVER` decides whether each turn goes to Anthropic,
+ * OpenAI, or Gemini, and nothing below cares. What lives here is everything that actually
  * determines behaviour — which tools exist for this user, how a tool failure is
  * reported, when a draft is created, what gets audited, and the ceiling on turns.
  *
@@ -161,20 +161,11 @@ export async function* runAssistant(options: {
     while (round < MAX_TURNS) {
       round += 1
 
-      // Text is buffered rather than yielded from the callback: a generator
-      // cannot yield from inside one, so deltas are collected and flushed
-      // immediately after the turn resolves.
-      const pending: string[] = []
-      const result = await model.turn({
+      const result = yield* streamModelTurn(model, {
         system,
         turns,
         tools: specs,
-        onText: (delta) => pending.push(delta),
       })
-
-      for (const delta of pending) {
-        yield { type: 'text', text: delta }
-      }
 
       // The provider declined on policy grounds. Say so rather than showing an
       // empty bubble, and do not retry the same text.
@@ -201,60 +192,89 @@ export async function* runAssistant(options: {
         raw: result.raw,
       })
 
-      for (const call of result.toolCalls) {
+      // Announce every lookup up front, then run them together — most questions
+      // ask for two or three figures and waiting one-by-one feels broken.
+      const runnable = result.toolCalls.map((call) => {
         const tool = findTool(call.name)
+        const allowed = Boolean(tool && ctx.can(tool.permission))
+        return { call, tool: allowed ? tool! : null }
+      })
 
-        // The model asked for a tool this user does not have, or one that does
-        // not exist. Both are answered the same way: tell it, and let it adapt.
-        if (!tool || !ctx.can(tool.permission)) {
-          turns.push({
-            role: 'tool',
-            callId: call.id,
-            name: call.name,
-            content: `No tool named ${call.name} is available to this user.`,
-            isError: true,
-          })
-          continue
+      for (const item of runnable) {
+        if (item.tool) {
+          yield { type: 'tool', name: item.tool.name, label: describeCall(item.tool.name) }
         }
+      }
 
-        yield { type: 'tool', name: tool.name, label: describeCall(tool.name) }
-
-        try {
-          // Nulls become absent fields before validation. OpenAI's strict mode
-          // has no concept of an omitted argument, so it sends `{"date": null}`
-          // where the tool declared `date?: string` — a null would fail the Zod
-          // schema that the model was, correctly, told to satisfy.
-          const parsed = tool.input.parse(dropNulls(JSON.parse(call.argumentsJson || '{}')))
-          const output = await tool.run(ctx, parsed as Record<string, never>)
-          usedTools.push(tool.name)
-
-          if (output.href && !seenSources.has(output.href)) {
-            seenSources.add(output.href)
-            yield { type: 'source', label: describeCall(tool.name), href: output.href }
+      const toolResults = await Promise.all(
+        runnable.map(async ({ call, tool }) => {
+          if (!tool) {
+            return {
+              call,
+              turn: {
+                role: 'tool' as const,
+                callId: call.id,
+                name: call.name,
+                content: `No tool named ${call.name} is available to this user.`,
+                isError: true,
+              },
+              href: null as string | null,
+              draft: null as ToolOutput['draft'] | null,
+              used: null as string | null,
+            }
           }
 
-          if (output.draft) {
-            const id = await onDraft(output.draft)
-            yield { type: 'draft', id, kind: output.draft.kind, summary: output.draft.summary }
+          try {
+            // Nulls become absent fields before validation. OpenAI's strict mode
+            // has no concept of an omitted argument, so it sends `{"date": null}`
+            // where the tool declared `date?: string` — a null would fail the Zod
+            // schema that the model was, correctly, told to satisfy.
+            const parsed = tool.input.parse(dropNulls(JSON.parse(call.argumentsJson || '{}')))
+            const output = await tool.run(ctx, parsed as Record<string, never>)
+            return {
+              call,
+              turn: {
+                role: 'tool' as const,
+                callId: call.id,
+                name: tool.name,
+                content: JSON.stringify(output.data),
+              },
+              href: output.href ?? null,
+              draft: output.draft ?? null,
+              used: tool.name,
+            }
+          } catch (error) {
+            return {
+              call,
+              turn: {
+                role: 'tool' as const,
+                callId: call.id,
+                name: tool.name,
+                content: error instanceof Error ? error.message : 'That lookup failed.',
+                isError: true,
+              },
+              href: null as string | null,
+              draft: null as ToolOutput['draft'] | null,
+              used: null as string | null,
+            }
           }
+        }),
+      )
 
-          turns.push({
-            role: 'tool',
-            callId: call.id,
-            name: tool.name,
-            content: JSON.stringify(output.data),
-          })
-        } catch (error) {
-          // A failed tool is a fact the model should relay, not a crash. These
-          // messages are validation and permission text written for users.
-          turns.push({
-            role: 'tool',
-            callId: call.id,
-            name: tool.name,
-            content: error instanceof Error ? error.message : 'That lookup failed.',
-            isError: true,
-          })
+      for (const item of toolResults) {
+        if (item.used) usedTools.push(item.used)
+
+        if (item.href && !seenSources.has(item.href)) {
+          seenSources.add(item.href)
+          yield { type: 'source', label: describeCall(item.call.name), href: item.href }
         }
+
+        if (item.draft) {
+          const id = await onDraft(item.draft)
+          yield { type: 'draft', id, kind: item.draft.kind, summary: item.draft.summary }
+        }
+
+        turns.push(item.turn)
       }
     }
 
@@ -271,6 +291,60 @@ export async function* runAssistant(options: {
     yield { type: 'error', message: explain(error) }
     yield { type: 'done', turns: round }
   }
+}
+
+/**
+ * Streams one model turn into the agent event loop as text arrives.
+ *
+ * Generators cannot `yield` from an `onText` callback, so deltas are pushed onto
+ * a small queue that this async generator drains while the provider call is in
+ * flight. That is what makes answers appear word-by-word instead of all at once
+ * after the whole turn finishes.
+ */
+async function* streamModelTurn(
+  model: ModelAdapter,
+  params: {
+    system: string
+    turns: ModelTurn[]
+    tools: { name: string; description: string; parameters: Record<string, unknown> }[]
+  },
+): AsyncGenerator<AgentEvent, ModelTurnResult> {
+  const textQueue: string[] = []
+  let wake: (() => void) | null = null
+  const signal = () => {
+    wake?.()
+    wake = null
+  }
+
+  const turnPromise = model.turn({
+    system: params.system,
+    turns: params.turns,
+    tools: params.tools,
+    onText: (delta) => {
+      if (!delta) return
+      textQueue.push(delta)
+      signal()
+    },
+  })
+
+  // Race text against completion without blocking the whole turn first.
+  let done = false
+  void turnPromise.finally(() => {
+    done = true
+    signal()
+  })
+
+  while (!done || textQueue.length > 0) {
+    while (textQueue.length > 0) {
+      yield { type: 'text', text: textQueue.shift()! }
+    }
+    if (done) break
+    await new Promise<void>((resolve) => {
+      wake = resolve
+    })
+  }
+
+  return await turnPromise
 }
 
 /**

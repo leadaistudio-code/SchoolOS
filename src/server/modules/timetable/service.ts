@@ -1,7 +1,13 @@
 import { z } from 'zod'
-import type { AppContext } from '@/server/context'
+import { ForbiddenError, type AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
+import {
+  accessibleSectionIds,
+  isPortalOnlyRole,
+  isTeacherOnlyRole,
+  teachingStaffId,
+} from '@/server/scope'
 
 export const DAYS = [
   { value: 1, label: 'Monday', short: 'Mon' },
@@ -68,6 +74,28 @@ export async function sectionTimetable(
   sectionId: string,
 ): Promise<TimetableGrid & { section: { id: string; name: string; className: string } }> {
   ctx.require('timetable.view')
+  if (isPortalOnlyRole(ctx.user.roleKeys)) {
+    const allowed = await accessibleSectionIds(ctx)
+    if (!allowed?.includes(sectionId)) {
+      throw new ForbiddenError('You cannot view this section timetable')
+    }
+  } else if (isTeacherOnlyRole(ctx.user.roleKeys)) {
+    const staffId = await teachingStaffId(ctx)
+    const assigned = staffId
+      ? await ctx.db.section.findFirst({
+          where: {
+            id: sectionId,
+            deletedAt: null,
+            OR: [
+              { classTeacherId: staffId },
+              { timetableSlots: { some: { teacherId: staffId } } },
+            ],
+          },
+          select: { id: true },
+        })
+      : null
+    if (!assigned) throw new ForbiddenError('You cannot view this section timetable')
+  }
 
   const section = await ctx.db.section.findFirst({
     where: { id: sectionId, deletedAt: null },
@@ -142,6 +170,15 @@ function emptyCell(): TimetableCell {
 /** The same grid from a teacher's point of view: which class they are with. */
 export async function teacherTimetable(ctx: AppContext, staffId: string) {
   ctx.require('timetable.view')
+  if (isPortalOnlyRole(ctx.user.roleKeys)) {
+    throw new ForbiddenError('Portal accounts cannot view staff timetables')
+  }
+  if (isTeacherOnlyRole(ctx.user.roleKeys)) {
+    const ownStaffId = await teachingStaffId(ctx)
+    if (!ownStaffId || ownStaffId !== staffId) {
+      throw new ForbiddenError('You can only view your own timetable')
+    }
+  }
 
   const [staff, periods, slots] = await Promise.all([
     ctx.db.staff.findFirst({

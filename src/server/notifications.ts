@@ -3,6 +3,7 @@ import { prisma } from '@/server/db/prisma'
 import { emailProvider, smsProvider } from '@/server/providers'
 import { sendParentMessage } from '@/server/messaging/send'
 import { tenantEmailProvider } from '@/server/mail/smtp'
+import { isExpoPushEndpoint, sendExpoPush } from '@/server/modules/push/service'
 
 export type NotificationChannelValue = 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
 
@@ -17,6 +18,13 @@ export type NotifyInput = {
   channels?: NotificationChannelValue[]
 }
 
+export type NotificationDeliveryResult = {
+  attempted: number
+  sent: number
+  failed: number
+  skipped: number
+}
+
 /**
  * Notification engine.
  *
@@ -25,23 +33,28 @@ export type NotifyInput = {
  * SMS, WhatsApp, push) is queued as a durable Job instead, because a fee
  * collection must not fail or hang because an SMS vendor is slow.
  *
- * Delivery rows are created up front in QUEUED state, so an undelivered
- * notification is visible rather than silently lost.
+ * If the recipient has a registered push device, PUSH is queued automatically
+ * even when the caller only asked for IN_APP — that is what makes the phone
+ * feel live without every call site listing the channel.
  */
 export async function notify(ctx: AppContext, input: NotifyInput): Promise<void> {
+  return notifyTenant(ctx.tenant.id, input)
+}
+
+/** Server-job variant for trusted background work that already resolved tenant ownership. */
+export async function notifyTenant(tenantId: string, input: NotifyInput): Promise<void> {
   const recipients = [...new Set(input.userIds)].filter(Boolean)
   if (recipients.length === 0) return
 
   const channels = input.channels ?? ['IN_APP']
-  const external = channels.filter((c) => c !== 'IN_APP')
-  const queued: string[] = []
+  const baseExternal = channels.filter((c) => c !== 'IN_APP')
 
   try {
     await prisma.$transaction(async (tx) => {
       for (const userId of recipients) {
         const notification = await tx.notification.create({
           data: {
-            tenantId: ctx.tenant.id,
+            tenantId,
             userId,
             eventKey: input.eventKey,
             title: input.title,
@@ -51,12 +64,17 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
           },
         })
 
+        const hasPush = await tx.pushSubscription.count({
+          where: { tenantId, userId },
+        })
+        const external = [...baseExternal]
+        if (hasPush > 0 && !external.includes('PUSH')) external.push('PUSH')
+
         if (external.length === 0) continue
-        queued.push(notification.id)
 
         await tx.notificationDelivery.createMany({
           data: external.map((channel) => ({
-            tenantId: ctx.tenant.id,
+            tenantId,
             notificationId: notification.id,
             channel,
           })),
@@ -64,7 +82,7 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
 
         await tx.job.create({
           data: {
-            tenantId: ctx.tenant.id,
+            tenantId,
             queue: 'notifications',
             name: 'notification.send',
             payload: { notificationId: notification.id, channels: external } as never,
@@ -73,50 +91,45 @@ export async function notify(ctx: AppContext, input: NotifyInput): Promise<void>
       }
     })
   } catch (err) {
-    // A failed notification must never roll back the action that caused it.
     console.error('[notifications] failed to enqueue', { eventKey: input.eventKey, err })
     return
   }
-
-  // Deliver small batches now rather than leaving them for a worker.
-  //
-  // The Job rows above are the durable record and the retry path, but nothing
-  // drains that queue yet. A leave approval or a message to one colleague
-  // should not wait for a worker that does not exist, so a handful of
-  // recipients are attempted inline; anything larger stays queued rather than
-  // holding a request open while a mail server works through a class list.
-  if (queued.length > 0 && queued.length <= INLINE_DELIVERY_LIMIT) {
-    await Promise.allSettled(queued.map((id) => deliverNotification(id)))
-  }
 }
-
-/** Above this many recipients, delivery is left to the queue. */
-const INLINE_DELIVERY_LIMIT = 25
 
 /**
  * Processes one queued notification job. Called by the worker; exported here so
  * the dispatch logic lives with the rest of the engine rather than in the
  * worker script.
  */
-export async function deliverNotification(notificationId: string): Promise<void> {
+export async function deliverNotification(
+  notificationId: string,
+): Promise<NotificationDeliveryResult> {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
     include: {
       user: { select: { email: true, phone: true, firstName: true } },
-      deliveries: { where: { status: 'QUEUED' } },
+      deliveries: { where: { status: { in: ['QUEUED', 'FAILED'] } } },
     },
   })
-  if (!notification) return
+  if (!notification) return { attempted: 0, sent: 0, failed: 0, skipped: 0 }
 
+  const summary: NotificationDeliveryResult = {
+    attempted: notification.deliveries.length,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  }
   for (const delivery of notification.deliveries) {
-    let result = { ok: false, providerMessageId: undefined as string | undefined, error: 'Unsupported channel' as string | undefined }
+    let result = {
+      ok: false,
+      providerMessageId: undefined as string | undefined,
+      error: 'Unsupported channel' as string | undefined,
+    }
     let deliveredVia: string | null = null
+    let shouldRetry = true
 
     try {
       if (delivery.channel === 'EMAIL' && notification.user.email) {
-        // The school's own mail server when it has connected one, the
-        // platform sender otherwise. Resolved per notification because the
-        // answer belongs to the tenant, not to the process.
         const provider = notification.tenantId
           ? await tenantEmailProvider(notification.tenantId)
           : emailProvider()
@@ -150,17 +163,54 @@ export async function deliverNotification(notificationId: string): Promise<void>
           body: `${notification.title}: ${notification.body}`,
         })
         result = { ok: r.ok, providerMessageId: r.providerMessageId, error: r.error }
+      } else if (delivery.channel === 'PUSH') {
+        const subs = await prisma.pushSubscription.findMany({
+          where: { tenantId: notification.tenantId, userId: notification.userId },
+          select: { endpoint: true },
+        })
+        const expoTokens = subs.map((s) => s.endpoint).filter(isExpoPushEndpoint)
+        if (expoTokens.length === 0) {
+          result = {
+            ok: false,
+            error: 'No Expo push token for this user',
+            providerMessageId: undefined,
+          }
+          shouldRetry = false
+        } else {
+          const deepLink = mobileDeepLink(notification.linkUrl, notification.eventKey)
+          const r = await sendExpoPush(
+            expoTokens.map((to) => ({
+              to,
+              title: notification.title,
+              body: notification.body,
+              data: {
+                eventKey: notification.eventKey,
+                linkUrl: notification.linkUrl,
+                href: deepLink,
+                notificationId: notification.id,
+              },
+            })),
+          )
+          result = {
+            ok: r.ok,
+            providerMessageId: r.providerMessageId,
+            error: r.error,
+          }
+          deliveredVia = 'expo'
+        }
       } else {
         result = { ok: false, providerMessageId: undefined, error: 'No address for this channel' }
+        shouldRetry = false
       }
     } catch (err) {
       result = { ok: false, providerMessageId: undefined, error: String(err) }
     }
 
+    const status = result.ok ? 'SENT' : shouldRetry ? 'FAILED' : 'SKIPPED'
     await prisma.notificationDelivery.update({
       where: { id: delivery.id },
       data: {
-        status: result.ok ? 'SENT' : 'FAILED',
+        status,
         provider: result.ok ? (deliveredVia ?? delivery.channel.toLowerCase()) : null,
         providerMessageId: result.providerMessageId ?? null,
         attempts: { increment: 1 },
@@ -168,7 +218,37 @@ export async function deliverNotification(notificationId: string): Promise<void>
         sentAt: result.ok ? new Date() : null,
       },
     })
+
+    if (status === 'SENT') summary.sent += 1
+    else if (status === 'FAILED') summary.failed += 1
+    else summary.skipped += 1
   }
+
+  return summary
+}
+
+/**
+ * Maps web-relative notification links to expo-router paths the phone opens.
+ * Leave pending, fees/dues, exams, and notices are the daily-ops targets.
+ */
+export function mobileDeepLink(linkUrl: string | null | undefined, eventKey?: string): string {
+  const path = (linkUrl ?? '').split('?')[0] || ''
+
+  if (path.startsWith('/leave') || eventKey?.startsWith('leave.')) return '/(app)/leave'
+  if (path.startsWith('/finance') || eventKey?.startsWith('fee.')) return '/(app)/fees'
+  if (path.includes('/notices') || eventKey === 'notice.published') return '/(app)/notices'
+  if (
+    path.includes('/exams') ||
+    path.includes('/exam') ||
+    eventKey?.startsWith('result.') ||
+    eventKey?.startsWith('exam.')
+  ) {
+    return '/(app)/exams'
+  }
+  if (path.includes('/homework')) return '/(app)/homework'
+  if (path.includes('/attendance')) return '/(app)/attendance'
+  if (path.includes('/admissions')) return '/(app)/admissions'
+  return '/(app)'
 }
 
 function escapeHtml(value: string): string {

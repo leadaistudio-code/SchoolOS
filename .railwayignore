@@ -1,0 +1,22 @@
+.git/
+.idea/
+.cursor/
+node_modules/
+.next/
+out/
+coverage/
+.env
+.env.*
+*.tsbuildinfo
+uploads/
+backups/
+mobile/
+mobile/backup key/
+connect/
+cloud/
+scroll-site-generator/
+Payment-Collection-Data-*
+docs/Payment-Collection-Data-*
+prisma/Payment-Collection-Data-*
+prisma/_apni_fees_*
+prisma/_uolo_*

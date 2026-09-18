@@ -55,9 +55,11 @@ student is unmarked"*. Consequences worth knowing:
 - To make the assistant aggregate-only instead, change the tools that map rows to
   return counts and class names without `name`/`guardian` fields. The change is
   confined to `tools.ts`; nothing else needs to know.
-- Voice input is separate and worse in one respect: browser speech recognition in
-  Chrome **streams the audio to Google**. The panel says so under the input, and
-  the microphone is hidden entirely where the API is unavailable.
+- Voice input is separate: when Azure Speech + OpenAI Whisper are configured
+  (see below), audio goes to **Microsoft** (TTS) and **OpenAI** (STT) — not to
+  Google. Without those keys the panel falls back to browser speech recognition,
+  which in Chrome **streams the audio to Google**. The footer states which path
+  is active, and the microphone is hidden where neither path can run.
 
 ## Switching it on
 
@@ -67,18 +69,77 @@ differs, and that lives entirely in
 [`providers/`](../src/server/assistant/providers/).
 
 ```bash
-# OpenAI
+# OpenAI (recommended for speed)
 AI_DRIVER=openai
 AI_API_KEY=sk-...
-AI_MODEL=gpt-4.1            # optional; must be a model your key can reach
+AI_MODEL=gpt-4.1-mini       # fast default — upgrade to gpt-4.1 only if answers need more depth
 
 # or Anthropic
 AI_DRIVER=anthropic
 AI_API_KEY=sk-ant-...
-AI_MODEL=claude-opus-5
-AI_EFFORT=medium            # low | medium | high — Anthropic only
+AI_MODEL=claude-sonnet-4-5  # fast default — claude-opus-5 for harder reasoning
+AI_EFFORT=low               # low | medium | high — Anthropic only; keep low for speed
+
+# or Google Gemini (strong for vision / answer-sheet OCR)
+AI_DRIVER=gemini
+AI_API_KEY=...              # Google AI Studio key
+AI_MODEL=gemini-2.5-flash   # default — gemini-2.5-pro for harder reasoning
 ```
 
+### Pointing at a faster model (production)
+
+On Railway → **MyCampusView WebApp** → Variables (or CLI):
+
+```bash
+# Fastest practical OpenAI option for this assistant
+railway variables --service "MyCampusView WebApp" --environment production \
+  --set AI_MODEL=gpt-4.1-mini
+
+# Slightly smarter, still quick
+# --set AI_MODEL=gpt-4.1
+
+# Anthropic path
+# --set AI_DRIVER=anthropic --set AI_MODEL=claude-sonnet-4-5 --set AI_EFFORT=low
+
+# Gemini path (vision evaluation + assistant)
+# --set AI_DRIVER=gemini --set AI_API_KEY=... --set AI_MODEL=gemini-2.5-flash
+```
+
+Redeploy (or restart) after changing variables so the running process picks them up.
+Optional OpenAI-compatible gateways (OpenRouter, Azure, etc.): set `AI_BASE_URL` to the
+gateway base and keep `AI_DRIVER=openai`. For Gemini gateways, set `AI_BASE_URL` with
+`AI_DRIVER=gemini`.
+
+### Cloud voice — best Indian accent (Azure Neural + Whisper)
+
+Browser voices are inconsistent and rarely true Indian English. For Wispr-like
+quality, configure Azure Neural TTS for speaking and Whisper (same OpenAI key)
+for listening:
+
+```bash
+# Required for cloud speak (Indian English Neerja by default)
+AZURE_SPEECH_KEY=...
+AZURE_SPEECH_REGION=centralindia   # or eastus / southindia
+# Optional: AZURE_SPEECH_VOICE=en-IN-PrabhatNeural
+
+# Cloud listen uses AI_DRIVER=openai + AI_API_KEY (Whisper)
+```
+
+On Railway → **MyCampusView WebApp** → Variables:
+
+```bash
+railway variables --service "MyCampusView WebApp" --environment production \
+  --set AZURE_SPEECH_KEY=... \
+  --set AZURE_SPEECH_REGION=centralindia \
+  --set AZURE_SPEECH_VOICE=en-IN-NeerjaNeural
+```
+
+Cost (order of magnitude): Azure Neural ~$16 per 1M characters after 500K free/month;
+Whisper is billed on OpenAI audio minutes. One busy school is usually a few dollars
+a month. Without these vars the assistant keeps using the browser for voice.
+
+Speed also comes from the agent loop: answers stream token-by-token, and multiple
+lookups in one question run in parallel.
 `AI_BASE_URL` points the OpenAI driver at Azure OpenAI or any OpenAI-compatible
 gateway. `AI_MODEL` is optional and defaults per driver, but **set it explicitly**:
 which models a key can reach depends on the account, and the default may not be

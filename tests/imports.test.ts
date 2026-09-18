@@ -130,6 +130,88 @@ describe('school pack validation', () => {
     const result = validatePack(parsePackWorkbook(buffer))
     expect(result.packErrors.filter((e) => e.sheet === 'Sections')).toHaveLength(0)
   })
+
+  it('allows Fee items when Fee structures sheet is blank', async () => {
+    const XLSX = await import('xlsx')
+    const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
+      'School',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
+      'Students',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Code', 'Name', 'Frequency', 'Is refundable', 'Is deposit'],
+        ['TUI', 'Tuition', 'ANNUAL', 'No', 'No'],
+      ]),
+      'Fee heads',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
+        ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
+      ]),
+      'Fee items',
+    )
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    const result = validatePack(parsePackWorkbook(buffer))
+    expect(result.packErrors.filter((e) => e.sheet === 'Fee items')).toHaveLength(0)
+  })
+
+  it('does not treat Session name as the fee structure name', async () => {
+    const XLSX = await import('xlsx')
+    const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
+      'School',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Session name', 'Class', 'Numeric'],
+        ['2026-27', 'Class 1', '1'],
+      ]),
+      'Classes',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
+      'Students',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Session name', 'Structure name', 'Class', 'Description'],
+        ['2026-27', 'Class 1 annual', 'Class 1', 'Day scholar'],
+      ]),
+      'Fee structures',
+    )
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
+        ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
+      ]),
+      'Fee items',
+    )
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    const result = validatePack(parsePackWorkbook(buffer))
+    expect(result.packErrors.filter((e) => e.message.includes('Unknown structure'))).toHaveLength(0)
+  })
 })
 
 describe('spreadsheet grid', () => {

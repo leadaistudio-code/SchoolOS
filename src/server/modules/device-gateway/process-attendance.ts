@@ -2,7 +2,14 @@ import type { AttendanceStatus, BiometricEventDirection } from '@prisma/client'
 import { prisma } from '@/server/db/prisma'
 import { tenantDb } from '@/server/db/tenant-client'
 import { attendanceDate, toDateInput } from '@/lib/dates'
+import {
+  expectedWorkMinutes,
+  formatMinutesLabel,
+  isWithinAttendanceWindow,
+  type AttendanceWindow,
+} from '@/lib/attendance-hours'
 import { loadBiometricSettings } from './settings'
+import type { BiometricSettings } from './schema'
 
 function minutesFromMidnight(d: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -23,6 +30,18 @@ function formatTime(d: Date, timeZone: string): string {
     minute: '2-digit',
     hour12: true,
   }).format(d)
+}
+
+export function attendanceDateInTimeZone(d: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value
+  return attendanceDate(`${value('year')}-${value('month')}-${value('day')}`)
 }
 
 async function notifyParents(
@@ -194,6 +213,7 @@ export async function processRawEvent(tenantId: string, eventId: string): Promis
         mappingId: mapping.id,
         deviceLocalAt: event.deviceLocalAt,
         direction: event.direction,
+        settings,
         timeZone,
       })
       return
@@ -233,7 +253,7 @@ async function applyStudentPunch(input: {
   deviceName: string
 }) {
   const db = tenantDb(input.tenantId)
-  const onDate = attendanceDate(input.deviceLocalAt)
+  const onDate = attendanceDateInTimeZone(input.deviceLocalAt, input.timeZone)
 
   const enrollment = await db.enrollment.findFirst({
     where: { studentId: input.studentId, isCurrent: true },
@@ -291,7 +311,29 @@ async function applyStudentPunch(input: {
   }
 
   const mins = minutesFromMidnight(input.deviceLocalAt, input.timeZone)
-  const lateThreshold = input.settings.studentLateAfterMinutes
+  const window: AttendanceWindow = {
+    openMinutes: input.settings.schoolOpenMinutes,
+    closeMinutes: input.settings.schoolCloseMinutes,
+    lateAfterMinutes: input.settings.studentLateAfterMinutes,
+    graceMinutes: input.settings.attendanceWindowGraceMinutes,
+    custom: false,
+  }
+
+  if (input.settings.enforceAttendanceWindow && !isWithinAttendanceWindow(mins, window)) {
+    await db.deviceRawEvent.update({
+      where: { id: input.eventId },
+      data: {
+        status: 'SKIPPED',
+        mappingId: input.mappingId,
+        studentId: input.studentId,
+        processError: `Outside school hours (${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)})`,
+        processedAt: new Date(),
+      },
+    })
+    return
+  }
+
+  const lateThreshold = window.lateAfterMinutes
   const isLate = mins > lateThreshold
   const status: AttendanceStatus = isLate ? 'LATE' : 'PRESENT'
   const minutesLate = isLate ? mins - lateThreshold : null
@@ -402,18 +444,67 @@ async function applyStaffPunch(input: {
   mappingId: string
   deviceLocalAt: Date
   direction: BiometricEventDirection
+  settings: BiometricSettings
   timeZone: string
 }) {
   const db = tenantDb(input.tenantId)
-  const onDate = attendanceDate(input.deviceLocalAt)
+  const onDate = attendanceDateInTimeZone(input.deviceLocalAt, input.timeZone)
   const existing = await db.staffAttendance.findFirst({
     where: { staffId: input.staffId, onDate },
   })
 
+  const staff = await db.staff.findFirst({
+    where: { id: input.staffId },
+    select: {
+      customAttendanceHours: true,
+      attendanceStartMinutes: true,
+      attendanceEndMinutes: true,
+      attendanceLateAfterMinutes: true,
+      firstName: true,
+    },
+  })
+
   const mins = minutesFromMidnight(input.deviceLocalAt, input.timeZone)
-  const lateAfter = 9 * 60
-  const isLate = mins >= lateAfter
+  const window: AttendanceWindow = staff?.customAttendanceHours
+    ? {
+        openMinutes: staff.attendanceStartMinutes ?? input.settings.schoolOpenMinutes,
+        closeMinutes: staff.attendanceEndMinutes ?? input.settings.schoolCloseMinutes,
+        lateAfterMinutes:
+          staff.attendanceLateAfterMinutes ??
+          staff.attendanceStartMinutes ??
+          input.settings.staffLateAfterMinutes,
+        graceMinutes: input.settings.attendanceWindowGraceMinutes,
+        custom: true,
+      }
+    : {
+        openMinutes: input.settings.schoolOpenMinutes,
+        closeMinutes: input.settings.schoolCloseMinutes,
+        lateAfterMinutes: input.settings.staffLateAfterMinutes,
+        graceMinutes: input.settings.attendanceWindowGraceMinutes,
+        custom: false,
+      }
+
+  if (input.settings.enforceAttendanceWindow && !isWithinAttendanceWindow(mins, window)) {
+    await db.deviceRawEvent.update({
+      where: { id: input.eventId },
+      data: {
+        status: 'SKIPPED',
+        mappingId: input.mappingId,
+        staffId: input.staffId,
+        processError: window.custom
+          ? `Outside this staff member’s hours (${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)})`
+          : `Outside school hours (${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)})`,
+        processedAt: new Date(),
+      },
+    })
+    return
+  }
+
+  const isLate = mins > window.lateAfterMinutes
   const status: AttendanceStatus = isLate ? 'LATE' : 'PRESENT'
+  const shiftLabel = window.custom
+    ? `Custom hours ${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}`
+    : `School hours ${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}`
 
   const isCheckOut =
     input.direction === 'OUT' ||
@@ -430,14 +521,34 @@ async function applyStaffPunch(input: {
         checkInAt: input.deviceLocalAt,
         source: 'BIOMETRIC',
         deviceInfo: 'MyCampusView Connect',
+        remarks: shiftLabel,
       },
     })
   } else if (isCheckOut) {
+    const checkOutAt = existing.checkOutAt ?? input.deviceLocalAt
+    const checkInAt = existing.checkInAt ?? input.deviceLocalAt
+    const workedMinutes = Math.max(
+      0,
+      Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60_000),
+    )
+    const expected = expectedWorkMinutes(window)
+    // Short day vs this person's own window — never the full school day for guest staff.
+    const nextStatus: AttendanceStatus =
+      existing.status === 'LEAVE' || existing.status === 'HOLIDAY' || existing.status === 'ABSENT'
+        ? existing.status
+        : expected > 0 && workedMinutes < expected * 0.5
+          ? 'HALF_DAY'
+          : existing.status === 'LATE' || existing.status === 'PRESENT'
+            ? existing.status
+            : status
+
     row = await db.staffAttendance.update({
       where: { id: existing.id },
       data: {
-        checkOutAt: existing.checkOutAt ?? input.deviceLocalAt,
+        checkOutAt,
+        status: nextStatus,
         source: existing.source === 'MANUAL' ? existing.source : 'BIOMETRIC',
+        remarks: existing.remarks?.includes('hours') ? existing.remarks : shiftLabel,
       },
     })
   } else {
@@ -457,6 +568,7 @@ async function applyStaffPunch(input: {
               ? existing.status
               : status,
         source: existing.source === 'GEOFENCE' ? existing.source : 'BIOMETRIC',
+        remarks: existing.remarks?.includes('hours') ? existing.remarks : shiftLabel,
       },
     })
   }

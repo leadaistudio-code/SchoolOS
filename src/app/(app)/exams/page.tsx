@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Calendar, FileCheck, Plus, ScrollText } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import { isPortalOnlyRole } from '@/server/scope'
 import { listExams } from '@/server/modules/exams/service'
 import { parseListQuery } from '@/lib/query'
 import { formatDay } from '@/lib/dates'
@@ -26,6 +27,7 @@ export default async function ExamsPage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const ctx = await requireContext('exams.view')
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
   const params = await searchParams
   const query = parseListQuery(params)
   const { rows, total } = await listExams(ctx, query)
@@ -40,15 +42,27 @@ export default async function ExamsPage({
         eyebrow="Exams"
         title={
           total > 0
-            ? `${formatNumber(total)} exams in the catalogue`
-            : 'No examinations yet'
+            ? portal
+              ? `${formatNumber(total)} exam${total === 1 ? '' : 's'} for you`
+              : `${formatNumber(total)} exams in the catalogue`
+            : portal
+              ? 'No exams assigned yet'
+              : 'No examinations yet'
         }
-        description="Schedule papers, enter marks and generate report cards."
+        description={
+          portal
+            ? 'See your timetable and download admit cards when they are approved.'
+            : 'Schedule papers, enter marks and generate report cards.'
+        }
         actions={
           ctx.can('exams.manage') ? (
             <Link href="/exams/new" className={colorBannerPrimaryBtn()}>
               <Plus aria-hidden />
               New exam
+            </Link>
+          ) : portal ? (
+            <Link href="/exams/my-admit-cards" className={colorBannerPrimaryBtn()}>
+              My admit cards
             </Link>
           ) : null
         }
@@ -56,9 +70,9 @@ export default async function ExamsPage({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <ColorTile
-          label="Total exams"
+          label={portal ? 'Your exams' : 'Total exams'}
           value={formatNumber(total)}
-          sub="All examination records"
+          sub={portal ? 'Assigned to your class' : 'All examination records'}
           tone="late"
           href="#exams-list"
           icon={<FileCheck className="size-5" aria-hidden />}
@@ -74,11 +88,11 @@ export default async function ExamsPage({
           delayMs={80}
         />
         <ColorTile
-          label="Report cards"
+          label={portal ? 'Admit cards' : 'Report cards'}
           value="Open"
-          sub="Generate and print cards"
+          sub={portal ? 'Download approved cards' : 'Generate and print cards'}
           tone="students"
-          href="/exams/report-cards"
+          href={portal ? '/exams/my-admit-cards' : '/exams/report-cards'}
           icon={<ScrollText className="size-5" aria-hidden />}
           delayMs={120}
         />
@@ -89,8 +103,18 @@ export default async function ExamsPage({
 
         {rows.length === 0 ? (
           <EmptyState
-            title={params.q ? 'No exams match that search' : 'No examinations yet'}
-            description="Set up an examination to schedule papers and enter marks."
+            title={
+              params.q
+                ? 'No exams match that search'
+                : portal
+                  ? 'No exams assigned yet'
+                  : 'No examinations yet'
+            }
+            description={
+              portal
+                ? 'When your school schedules an exam for your class, it will show here.'
+                : 'Set up an examination to schedule papers and enter marks.'
+            }
             action={
               ctx.can('exams.manage') ? (
                 <Link href="/exams/new" className={buttonVariants({ size: 'sm' })}>
@@ -137,12 +161,28 @@ export default async function ExamsPage({
                         <StatusBadge status={exam.status} />
                       </TD>
                       <TD align="right">
-                        <Link
-                          href={`/exams/${exam.id}/marks`}
-                          className="text-sm text-[var(--brand-600)] hover:underline"
-                        >
-                          Enter marks
-                        </Link>
+                        {portal ? (
+                          <Link
+                            href={`/exams/${exam.id}`}
+                            className="text-sm text-[var(--brand-600)] hover:underline"
+                          >
+                            View
+                          </Link>
+                        ) : ctx.can('exams.marks') ? (
+                          <Link
+                            href={`/exams/${exam.id}/marks`}
+                            className="text-sm text-[var(--brand-600)] hover:underline"
+                          >
+                            Enter marks
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/exams/${exam.id}`}
+                            className="text-sm text-[var(--brand-600)] hover:underline"
+                          >
+                            Open
+                          </Link>
+                        )}
                       </TD>
                     </TR>
                   ))}

@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { MfaChallengeForm } from './mfa-form'
 import { resolveTenant } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
+import { destinationForExistingSession } from '@/server/auth/login-redirect'
 import { env } from '@/lib/env'
 
 export const metadata = { title: 'Authenticator code' }
@@ -19,7 +20,16 @@ export default async function MfaLoginPage({
   ])
 
   if (user) {
-    redirect(tenant ? '/' : '/platform')
+    const destination = destinationForExistingSession({
+      user,
+      tenant,
+      next: params.next,
+    })
+    if (destination.kind === 'redirect') {
+      redirect(destination.href)
+    }
+    // Mismatched session — send them to login which explains and offers sign-out.
+    redirect('/login')
   }
 
   if (!params.token) {

@@ -6,13 +6,18 @@ import { requireContext } from '@/server/context'
 import {
   collectPayment,
   collectSchema,
+  editPayment,
+  editPaymentSchema,
   refundPayment,
   refundSchema,
+  reversePayment,
+  reversePaymentSchema,
   startOnlinePayment,
   startPaymentSchema,
 } from '@/server/modules/finance/payments'
 import {
   concessionSchema,
+  concessionUpdateSchema,
   createFeeHead,
   createStructure,
   deleteFeeHead,
@@ -27,9 +32,27 @@ import {
   structureSchema,
   structureUpdateSchema,
   updateFeeHead,
+  updateConcession,
   updateStructure,
   type GenerationResult,
 } from '@/server/modules/finance/service'
+import {
+  previewFeePlan,
+  copyFeePlan,
+  customInvoiceGenerationSchema,
+  generateCustomInvoices,
+  type CustomInvoiceGenerationResult,
+  previewFeePlanAssignment,
+  publishAndAssignFeePlan,
+  saveFeePlanDraft,
+  sendFeeReminders,
+  saveFeeReminderRule,
+  saveLateFeeRule,
+  saveTransportFeeRate,
+  setInvoiceChargeAmount,
+  setInvoiceChargeAmountSchema,
+  simulateFeeIncrease,
+} from '@/server/modules/finance/simplicity'
 
 export type ActionResult<T = unknown> =
   | { ok: true; message: string; data?: T }
@@ -45,11 +68,36 @@ function fail(err: unknown, fallback: string): ActionResult<never> {
 export async function grantConcessionAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('fees.concession')
   try {
-    await grantConcession(ctx, concessionSchema.parse(payload))
+    const result = await grantConcession(ctx, concessionSchema.parse(payload))
     revalidatePath('/finance/concessions')
-    return { ok: true, message: 'Concession granted. It will apply the next time an invoice is generated.' }
+    revalidatePath('/finance/students')
+    revalidatePath('/finance/dues')
+    return {
+      ok: true,
+      message: result.recalculation.affectedInvoices
+        ? 'Discount granted and the student’s current outstanding was recalculated.'
+        : 'Discount granted. It will apply when an eligible invoice is generated.',
+    }
   } catch (err) {
     return fail(err, 'The concession could not be granted')
+  }
+}
+
+export async function updateConcessionAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.concession')
+  try {
+    const result = await updateConcession(ctx, concessionUpdateSchema.parse(payload))
+    revalidatePath('/finance/concessions')
+    revalidatePath('/finance/students')
+    revalidatePath('/finance/dues')
+    return {
+      ok: true,
+      message: result.recalculation.affectedInvoices
+        ? 'Discount updated and the student’s current outstanding was recalculated.'
+        : 'Discount updated.',
+    }
+  } catch (err) {
+    return fail(err, 'The discount could not be updated')
   }
 }
 
@@ -149,9 +197,11 @@ export async function setStudentFeeOptionsAction(payload: unknown): Promise<Acti
 
 /** Records a counter payment and returns the receipt number to show at once. */
 export async function collectPaymentAction(payload: unknown): Promise<ActionResult<{
+  paymentId: string
   receiptNumber: string
   allocatedMinor: number
   unallocatedMinor: number
+  discountedMinor: number
 }>> {
   const ctx = await requireContext('fees.collect')
   try {
@@ -161,8 +211,13 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
     revalidatePath('/finance')
     revalidatePath('/finance/payments')
     revalidatePath('/finance/invoices')
+    revalidatePath('/finance/dues')
+    revalidatePath('/finance/students')
 
     const parts = [`Receipt ${result.receiptNumber}`]
+    if (result.discountedMinor > 0) {
+      parts.push(`₹${result.discountedMinor / 100} discounted`)
+    }
     if (result.unallocatedMinor > 0) {
       parts.push(`₹${result.unallocatedMinor / 100} held as advance`)
     }
@@ -170,9 +225,11 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
       ok: true,
       message: parts.join(' · '),
       data: {
+        paymentId: result.paymentId,
         receiptNumber: result.receiptNumber,
         allocatedMinor: result.allocatedMinor,
         unallocatedMinor: result.unallocatedMinor,
+        discountedMinor: result.discountedMinor,
       },
     }
   } catch (err) {
@@ -205,6 +262,31 @@ export async function generateInvoicesAction(
   }
 }
 
+export async function generateCustomInvoicesAction(
+  payload: unknown,
+): Promise<ActionResult<CustomInvoiceGenerationResult>> {
+  const ctx = await requireContext('fees.invoice')
+  try {
+    const input = customInvoiceGenerationSchema.parse(payload)
+    const result = await generateCustomInvoices(ctx, input)
+    if (!input.dryRun) {
+      revalidatePath('/finance')
+      revalidatePath('/finance/invoices')
+      revalidatePath('/finance/dues')
+      revalidatePath('/finance/students')
+    }
+    return {
+      ok: true,
+      message: input.dryRun
+        ? `${result.preview.filter((item) => !item.skipReason).length} fee invoices ready`
+        : `${result.created} invoices generated${result.scheduled ? ` · ${result.scheduled} students scheduled` : ''}`,
+      data: result,
+    }
+  } catch (err) {
+    return fail(err, 'Custom invoices could not be generated')
+  }
+}
+
 export async function refundPaymentAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('fees.refund')
   try {
@@ -214,6 +296,38 @@ export async function refundPaymentAction(payload: unknown): Promise<ActionResul
     return { ok: true, message: 'Refunded. The invoice balance has been restored.' }
   } catch (err) {
     return fail(err, 'The refund could not be processed')
+  }
+}
+
+export async function reversePaymentAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.reverse')
+  try {
+    const result = await reversePayment(ctx, reversePaymentSchema.parse(payload))
+    revalidatePath('/finance')
+    revalidatePath('/finance/payments')
+    revalidatePath(`/finance/payments/${result.paymentId}`)
+    revalidatePath('/finance/students')
+    revalidatePath(`/finance/students/${result.studentId}`)
+    revalidatePath('/finance/dues')
+    revalidatePath('/finance/collect')
+    return { ok: true, message: 'Receipt cancelled. Original receipt retained and balances restored.' }
+  } catch (err) {
+    return fail(err, 'The receipt could not be cancelled')
+  }
+}
+
+export async function editPaymentAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.collect')
+  try {
+    const result = await editPayment(ctx, editPaymentSchema.parse(payload))
+    revalidatePath('/finance/payments')
+    revalidatePath(`/finance/payments/${result.paymentId}`)
+    revalidatePath('/finance/students')
+    revalidatePath(`/finance/students/${result.studentId}`)
+    revalidatePath('/finance/collect')
+    return { ok: true, message: 'Receipt details updated.' }
+  } catch (err) {
+    return fail(err, 'The receipt could not be updated')
   }
 }
 
@@ -230,5 +344,145 @@ export async function startPaymentAction(
     }
   } catch (err) {
     return fail(err, 'The payment could not be started')
+  }
+}
+
+export async function previewFeePlanAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    return { ok: true, message: 'Installments calculated', data: await previewFeePlan(ctx, payload) }
+  } catch (err) {
+    return fail(err, 'Could not calculate the fee plan')
+  }
+}
+
+export async function saveFeePlanDraftAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const result = await saveFeePlanDraft(ctx, payload)
+    revalidatePath('/finance/structures')
+    return { ok: true, message: `${result.structure.name} saved as draft.`, data: result }
+  } catch (err) {
+    return fail(err, 'Could not save the fee plan')
+  }
+}
+
+export async function copyFeePlanAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const structure = await copyFeePlan(ctx, payload)
+    revalidatePath('/finance/structures')
+    return { ok: true, message: `${structure.name} copied as a draft.`, data: structure }
+  } catch (err) {
+    return fail(err, 'Could not copy the fee structure')
+  }
+}
+
+export async function previewFeeAssignmentAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure_publish')
+  try {
+    return { ok: true, message: 'Assignment preview ready', data: await previewFeePlanAssignment(ctx, payload) }
+  } catch (err) {
+    return fail(err, 'Could not preview this assignment')
+  }
+}
+
+export async function publishFeePlanAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure_publish')
+  try {
+    const result = await publishAndAssignFeePlan(ctx, payload)
+    revalidatePath('/finance')
+    revalidatePath('/finance/structures')
+    revalidatePath('/finance/students')
+    revalidatePath('/finance/dues')
+    return {
+      ok: true,
+      message: `Published and assigned ${result.assigned} students. ${result.invoices} installments created.`,
+      data: result,
+    }
+  } catch (err) {
+    return fail(err, 'Could not publish the fee plan')
+  }
+}
+
+export async function sendFeeRemindersAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.reminder')
+  try {
+    const result = await sendFeeReminders(ctx, payload)
+    revalidatePath('/finance/dues')
+    return { ok: true, message: `${result.sent} reminder${result.sent === 1 ? '' : 's'} sent.`, data: result }
+  } catch (err) {
+    return fail(err, 'Could not send reminders')
+  }
+}
+
+export async function simulateFeeIncreaseAction(payload: {
+  structureId: string
+  kind: 'PERCENT' | 'FIXED'
+  value: number
+}): Promise<ActionResult> {
+  const ctx = await requireContext('fees.owner_analytics')
+  try {
+    return {
+      ok: true,
+      message: 'Estimated billing impact calculated',
+      data: await simulateFeeIncrease(ctx, payload.structureId, payload.kind, payload.value),
+    }
+  } catch (err) {
+    return fail(err, 'Could not calculate the estimate')
+  }
+}
+
+export async function saveFeeReminderRuleAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.settings')
+  try {
+    const rule = await saveFeeReminderRule(ctx, payload)
+    revalidatePath('/finance/settings')
+    return { ok: true, message: `${rule.name} saved.` }
+  } catch (err) {
+    return fail(err, 'Could not save the reminder rule')
+  }
+}
+
+export async function saveLateFeeRuleAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.settings')
+  try {
+    const rule = await saveLateFeeRule(ctx, payload)
+    revalidatePath('/finance/settings')
+    return { ok: true, message: `${rule.name} saved.` }
+  } catch (err) {
+    return fail(err, 'Could not save the late fee rule')
+  }
+}
+
+export async function saveTransportFeeRateAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.settings')
+  try {
+    await saveTransportFeeRate(ctx, payload)
+    revalidatePath('/finance/settings')
+    return { ok: true, message: 'Transport fee rate saved.' }
+  } catch (err) {
+    return fail(err, 'Could not save the transport fee rate')
+  }
+}
+
+export async function setInvoiceChargeAmountAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext()
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice')) {
+    ctx.require('fees.concession')
+  }
+  try {
+    const updated = await setInvoiceChargeAmount(ctx, setInvoiceChargeAmountSchema.parse(payload))
+    revalidatePath('/finance/students')
+    revalidatePath(`/finance/students/${updated.studentId}`)
+    revalidatePath('/finance/collect')
+    revalidatePath('/finance/dues')
+    revalidatePath('/finance/invoices')
+    return {
+      ok: true,
+      message: `Invoice charge updated to ₹${(updated.totalMinor / 100).toLocaleString('en-IN')}.`,
+    }
+  } catch (err) {
+    return fail(err, 'The invoice amount could not be updated')
   }
 }

@@ -29,13 +29,15 @@ const HANDSFREE_KEY = 'mycampusview.assistant.handsfree'
 const RESTART_DELAY_MS = 350
 
 export function readHandsfreePreference(): boolean {
-  if (typeof window === 'undefined') return true
+  if (typeof window === 'undefined') return false
   try {
     const stored = window.localStorage.getItem(HANDSFREE_KEY)
+    if (stored === 'true') return true
     if (stored === 'false') return false
-    return true
+    // Default off: click Listen is clearer and more reliable with Whisper.
+    return false
   } catch {
-    return true
+    return false
   }
 }
 
@@ -163,13 +165,31 @@ export function useVoiceSession(options: VoiceSessionOptions) {
 
           setSpeechActive(true)
 
-          // Barge-in: user started talking over the assistant.
+          // Barge-in: cut TTS as soon as any speech is detected.
           if (bargeInModeRef.current && phaseRef.current === 'speaking') {
             speakGenerationRef.current += 1
             stopSpeakRef.current?.()
             stopSpeaking()
             bargeInModeRef.current = false
             setPhaseSafe('listening')
+          }
+
+          // Also interrupt if the user speaks while we thought we were idle-but-speaking
+          // (some browsers keep synthesis.speaking without a clean phase flip).
+          if (phaseRef.current === 'speaking' && preview.trim().length > 0) {
+            speakGenerationRef.current += 1
+            stopSpeakRef.current?.()
+            stopSpeaking()
+            setPhaseSafe('listening')
+          }
+
+          // Whisper markers — interrupt TTS, but don't treat as words yet.
+          if (
+            preview === '…' ||
+            preview === 'Listening…' ||
+            preview === 'Transcribing…'
+          ) {
+            return
           }
 
           setLiveTranscript(preview)

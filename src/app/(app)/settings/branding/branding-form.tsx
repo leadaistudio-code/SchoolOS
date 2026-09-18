@@ -6,6 +6,7 @@ import { Palette, RotateCcw, Save } from 'lucide-react'
 import { saveBrandingAction, uploadBrandingAssetAction, deleteBrandingAssetAction } from './actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsPanelHeader } from '@/components/settings/settings-page-header'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
@@ -148,10 +149,8 @@ export function BrandingForm({
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px] items-start">
       <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Logo &amp; banner</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Logo & banner" description="Core identity assets used across the portal." icon="Palette" tone="brand" />
           <CardContent className="grid gap-6 sm:grid-cols-2">
             <p className="sm:col-span-2 text-xs text-ink-muted">
               JPEG, PNG or WebP, up to {maxUploadMb}MB. Images are stored exactly as uploaded and
@@ -213,10 +212,8 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Letterhead for printed documents</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Printed letterhead" description="Shared artwork for receipts, certificates and reports." icon="Palette" tone="info" />
           <CardContent className="grid gap-6 sm:grid-cols-2">
             <p className="sm:col-span-2 text-xs text-ink-muted">
               Upload your school letterhead as images. Fee receipts, certificates, admit cards and
@@ -246,8 +243,8 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <CardHeader className="min-h-16 bg-warning-bg">
             <CardTitle>Colours</CardTitle>
             <Button
               variant="ghost"
@@ -328,10 +325,8 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sign-in page</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Sign-in page" description="Welcome families and staff in the school’s voice." icon="Palette" tone="success" />
           <CardContent className="space-y-4">
             <Field label="Headline" htmlFor="loginHeadline">
               <Input
@@ -364,10 +359,8 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>PDF letterhead</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="PDF letterhead" description="Advanced HTML content for generated documents." icon="Palette" tone="info" />
           <CardContent className="space-y-4">
             <Field
               label="PDF header HTML"
@@ -393,10 +386,8 @@ export function BrandingForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Installed app (PWA)</CardTitle>
-          </CardHeader>
+        <Card variant="elevated" className="overflow-hidden">
+          <SettingsPanelHeader title="Installed app (PWA)" description="Name and theme shown when the portal is installed." icon="Palette" tone="brand" />
           <CardContent className="space-y-4">
             <Field label="App name" htmlFor="pwaName">
               <Input
@@ -437,7 +428,8 @@ export function BrandingForm({
       {/* Live preview. Scoped custom properties, so it reflects the unsaved
           palette without touching the rest of the page. */}
       <Card
-        className="sticky top-20"
+        variant="elevated"
+        className="sticky top-20 overflow-hidden"
         style={
           {
             '--brand-500': values.primaryHex,
@@ -449,7 +441,7 @@ export function BrandingForm({
           } as React.CSSProperties
         }
       >
-        <CardHeader>
+        <CardHeader className="min-h-16 bg-[var(--product-50)]">
           <CardTitle>Live preview</CardTitle>
           <Palette className="size-4 text-ink-subtle" aria-hidden />
         </CardHeader>

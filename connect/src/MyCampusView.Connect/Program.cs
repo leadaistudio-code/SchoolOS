@@ -87,6 +87,7 @@ public static class Program
         });
         builder.Services.AddSingleton<SyncService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SyncService>());
+        builder.Services.AddHostedService<FkWebReceiverService>();
         builder.Services.AddHostedService<Worker>();
 
         var host = builder.Build();

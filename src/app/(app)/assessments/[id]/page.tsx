@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { PaperBuilder } from './builder'
+import { QualityCheckPanel } from './quality-panel'
 
 export const metadata = { title: 'Paper' }
 
@@ -18,7 +19,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
   const locked = assessment.status === 'ASSIGNED' || assessment.status === 'CLOSED'
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title={assessment.title}
         description={`${assessment.classSubject.classLevel.name} · ${assessment.classSubject.subject.name} · ${assessment.type.name} · ${assessment.durationMinutes} minutes`}
@@ -49,12 +50,15 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
         }
       />
 
+      <QualityCheckPanel assessmentId={assessment.id} />
+
       <PaperBuilder
         assessment={assessment}
         blueprint={blueprint}
         canEdit={ctx.can('assessments.edit') && !locked}
         canApprove={ctx.can('assessments.approve') && !locked}
         canCreate={ctx.can('assessments.create')}
+        canDelete={ctx.can('assessments.delete') && !locked}
       />
     </div>
   )

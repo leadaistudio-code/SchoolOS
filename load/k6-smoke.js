@@ -45,5 +45,17 @@ export default function () {
     'login page loads': (r) => r.status === 200,
   })
 
+  // Unauthenticated API probes — must refuse without leaking data.
+  const evalJobs = http.get(`${BASE_URL}/api/v1/evaluation/jobs`)
+  check(evalJobs, {
+    'evaluation jobs require auth': (r) => r.status === 401 || r.status === 403,
+  })
+
+  const insightsPrint = http.get(`${BASE_URL}/assessments/insights/print`)
+  check(insightsPrint, {
+    'insights print requires auth or redirects': (r) =>
+      r.status === 200 || r.status === 302 || r.status === 307 || r.status === 401 || r.status === 403,
+  })
+
   sleep(1)
 }

@@ -6,6 +6,10 @@ import { outstandingByClass, listInvoices } from '@/server/modules/finance/servi
 import { listPayments } from '@/server/modules/finance/payments'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
 import { facultyReadinessOverview } from '@/server/modules/teacher-refresh/analytics'
+import {
+  learningInsightsOverview,
+} from '@/server/modules/ai-assessment/insights'
+import { assignmentAnalytics } from '@/server/modules/assessments/evaluation'
 import { formatMoney } from '@/lib/utils'
 import { formatDay } from '@/lib/dates'
 
@@ -431,6 +435,88 @@ const facultyReadiness: AssistantTool = {
   },
 }
 
+const learningTopicGaps: AssistantTool = {
+  name: 'learning_topic_gaps',
+  description:
+    'School or class learning insights from recent published assessment papers: weakest syllabus topics, chapter averages, papers that show topic gaps, and a short supportive list of students who scored under 40% on a recent paper. Use for "where are we weak academically", "which topics need reteaching", "who may need academic attention". Frame as observations from marked papers, never as medical or diagnostic conclusions. Do not invent scores.',
+  permission: 'assessments.view',
+  input: z.object({}),
+  async run(ctx) {
+    const overview = await learningInsightsOverview(ctx)
+    return {
+      href: '/assessments/insights',
+      data: {
+        windowDays: overview.windowDays,
+        weakestTopics: overview.schoolGaps.slice(0, 10).map((t) => ({
+          topic: t.name,
+          chapter: t.chapter,
+          marksEarnedPercent: t.successRate == null ? 'n/a' : `${t.successRate}%`,
+          questions: t.questions,
+        })),
+        strongestTopics: overview.schoolStrengths.slice(0, 5).map((t) => ({
+          topic: t.name,
+          chapter: t.chapter,
+          marksEarnedPercent: t.successRate == null ? 'n/a' : `${t.successRate}%`,
+        })),
+        papersWithGaps: overview.papersWithGaps.slice(0, 8).map((p) => ({
+          title: p.title,
+          class: p.className,
+          subject: p.subject,
+          gapTopics: p.gaps.slice(0, 4).map((g) => g.name),
+          analyticsPath: `/assessments/${p.assessmentId}/evaluate/${p.assignmentId}/analytics`,
+        })),
+        mayNeedCheckIn: overview.needsAttention.slice(0, 10).map((s) => ({
+          student: s.name,
+          admissionNo: s.admissionNo,
+          lowPapers: s.lowPapers,
+          papersSeen: s.papers,
+          latestPercent: `${s.lastPercent}%`,
+          latestPaper: s.lastTitle,
+        })),
+        note: overview.note,
+      },
+    }
+  },
+}
+
+const assignmentTopicGaps: AssistantTool = {
+  name: 'assignment_topic_gaps',
+  description:
+    'Topic gap report for one assessment assignment (one sitting of a paper): class average, pass rate, weakest topics, and a link to the analytics screen. Use when the user names a specific assignment id or asks about gaps on a particular paper. Arguments: assignmentId (required). Frame as observations, not diagnoses.',
+  permission: 'assessments.view',
+  input: z.object({
+    assignmentId: z
+      .string()
+      .min(1)
+      .describe('The assessment assignment id (the sitting), not the paper id alone.'),
+  }),
+  async run(ctx, args) {
+    const assignmentId = String(
+      (args as unknown as { assignmentId?: string }).assignmentId ?? '',
+    )
+    const data = await assignmentAnalytics(ctx, assignmentId)
+    return {
+      href: `/assessments/${data.assessment.id}/evaluate/${data.assignmentId}/analytics`,
+      data: {
+        paper: data.assessment.title,
+        marked: data.summary.marked,
+        submitted: data.summary.submitted,
+        average: data.summary.average,
+        passRate:
+          data.summary.passRate == null ? 'n/a' : `${data.summary.passRate}%`,
+        weakestTopics: data.gaps.slice(0, 10).map((t) => ({
+          topic: t.name,
+          chapter: t.chapter,
+          marksEarnedPercent: t.successRate == null ? 'n/a' : `${t.successRate}%`,
+          questions: t.questions,
+        })),
+        remedialGeneratePath: data.remedialHref,
+        note: 'Observations from one paper. A low topic score can reflect a hard question, not only weak understanding.',
+      },
+    }
+  },
+}
+
 const attendanceCompare: AssistantTool = {
   name: 'attendance_compare',
   description:
@@ -773,6 +859,8 @@ const ALL_TOOLS: AssistantTool[] = [
   students,
   classes,
   facultyReadiness,
+  learningTopicGaps,
+  assignmentTopicGaps,
   pendingLeave,
   draftNotice,
   draftFeeReminder,

@@ -5,6 +5,12 @@ import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, attendancePercent, toDateInput } from '@/lib/dates'
 import { evaluateGeofence, formatDistance } from '@/lib/geo'
+import {
+  formatMinutesLabel,
+  isWithinAttendanceWindow,
+  type AttendanceWindow,
+} from '@/lib/attendance-hours'
+import { loadBiometricSettings } from '@/server/modules/device-gateway/settings'
 
 export const checkInSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90),
@@ -75,7 +81,15 @@ export async function geofenceStatus(ctx: AppContext): Promise<GeofenceStatus> {
 async function requireStaffRecord(ctx: AppContext) {
   const staff = await ctx.db.staff.findFirst({
     where: { userId: ctx.user.userId, deletedAt: null },
-    select: { id: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      customAttendanceHours: true,
+      attendanceStartMinutes: true,
+      attendanceEndMinutes: true,
+      attendanceLateAfterMinutes: true,
+    },
   })
   if (!staff) {
     throw new ApiException(
@@ -87,8 +101,43 @@ async function requireStaffRecord(ctx: AppContext) {
   return staff
 }
 
-/** Late after this hour, school local time. */
-const LATE_AFTER_HOUR = 9
+function minutesFromMidnightInZone(d: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0')
+  return hour * 60 + minute
+}
+
+async function resolveStaffAttendanceWindow(
+  ctx: AppContext,
+  staff: Awaited<ReturnType<typeof requireStaffRecord>>,
+): Promise<AttendanceWindow> {
+  const settings = await loadBiometricSettings(ctx.tenant.id)
+  if (staff.customAttendanceHours) {
+    return {
+      openMinutes: staff.attendanceStartMinutes ?? settings.schoolOpenMinutes,
+      closeMinutes: staff.attendanceEndMinutes ?? settings.schoolCloseMinutes,
+      lateAfterMinutes:
+        staff.attendanceLateAfterMinutes ??
+        staff.attendanceStartMinutes ??
+        settings.staffLateAfterMinutes,
+      graceMinutes: settings.attendanceWindowGraceMinutes,
+      custom: true,
+    }
+  }
+  return {
+    openMinutes: settings.schoolOpenMinutes,
+    closeMinutes: settings.schoolCloseMinutes,
+    lateAfterMinutes: settings.staffLateAfterMinutes,
+    graceMinutes: settings.attendanceWindowGraceMinutes,
+    custom: false,
+  }
+}
 
 export type CheckInResult = {
   ok: boolean
@@ -170,7 +219,25 @@ export async function checkIn(
   }
 
   const now = new Date()
-  const status = now.getHours() >= LATE_AFTER_HOUR ? 'LATE' : 'PRESENT'
+  const timeZone = ctx.tenant.timezone || 'Asia/Kolkata'
+  const settings = await loadBiometricSettings(ctx.tenant.id)
+  const window = await resolveStaffAttendanceWindow(ctx, staff)
+  const mins = minutesFromMidnightInZone(now, timeZone)
+
+  if (settings.enforceAttendanceWindow && !isWithinAttendanceWindow(mins, window)) {
+    return {
+      ok: false,
+      distanceM: verdict.distanceM,
+      message: window.custom
+        ? `Check-in is only allowed during your hours (${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}).`
+        : `Check-in is only allowed during school hours (${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}).`,
+    }
+  }
+
+  const status = mins > window.lateAfterMinutes ? 'LATE' : 'PRESENT'
+  const shiftLabel = window.custom
+    ? `Custom hours ${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}`
+    : `School hours ${formatMinutesLabel(window.openMinutes)}–${formatMinutesLabel(window.closeMinutes)}`
 
   await ctx.db.staffAttendance.upsert({
     where: {
@@ -190,6 +257,7 @@ export async function checkIn(
       insideGeofence: true,
       deviceInfo: input.deviceInfo ?? null,
       mockLocationFlag: false,
+      remarks: shiftLabel,
     },
     update: {
       status,
@@ -201,6 +269,7 @@ export async function checkIn(
       distanceM: verdict.distanceM,
       insideGeofence: true,
       deviceInfo: input.deviceInfo ?? null,
+      remarks: shiftLabel,
     },
   })
 

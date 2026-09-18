@@ -22,5 +22,7 @@ if ($existing.Status -ne "Stopped") {
 }
 
 sc.exe delete $ServiceName | Out-Null
+Get-NetFirewallRule -DisplayName "MyCampusView Connect FKWeb" -ErrorAction SilentlyContinue |
+  Remove-NetFirewallRule -ErrorAction SilentlyContinue
 Write-Host "Removed service '$ServiceName'."
 Write-Host "Note: %ProgramData%\MyCampusView\Connect data (queue, credentials, logs) was left in place."

@@ -82,6 +82,14 @@ public sealed class SqliteEventQueue : IEventQueue
                       checkpoint TEXT NOT NULL,
                       updated_at TEXT NOT NULL
                     );
+
+                    -- No uploader survives a process restart. Return abandoned
+                    -- claims to pending so the cloud's dedupe key can safely
+                    -- handle a retry after a crash or power loss.
+                    UPDATE event_queue
+                    SET status = 'pending',
+                        next_attempt_at = NULL
+                    WHERE status = 'uploading';
                     """;
                 await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }

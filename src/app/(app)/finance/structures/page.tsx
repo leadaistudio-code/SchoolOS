@@ -9,13 +9,14 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney } from '@/lib/utils'
-import { EditFeeHeadButton, EditStructureButton, NewFeeHeadButton, NewStructureButton } from './structure-forms'
+import { EditFeeHeadButton, EditStructureButton, NewFeeHeadButton } from './structure-forms'
 
 export const metadata = { title: 'Fee structure' }
 
 export default async function StructuresPage() {
-  const ctx = await requireContext('fees.view')
+  const ctx = await requireContext('fees.structure')
   const canStructure = ctx.can('fees.structure')
+  const canPublish = ctx.can('fees.structure_publish')
 
   const [structures, heads, classes] = await Promise.all([
     listStructures(ctx),
@@ -51,7 +52,9 @@ export default async function StructuresPage() {
             {canStructure ? (
               <>
                 <NewFeeHeadButton />
-                <NewStructureButton feeHeads={feeHeadOptions} classes={classOptions} />
+                <Link href="/finance/structures/new" className={buttonVariants({ size: 'sm' })}>
+                  Create fee structure
+                </Link>
                 <Link
                   href="/finance/optional-fees"
                   className={buttonVariants({ variant: 'secondary', size: 'sm' })}
@@ -66,6 +69,11 @@ export default async function StructuresPage() {
                 className={buttonVariants({ variant: 'secondary', size: 'sm' })}
               >
                 Generate invoices
+              </Link>
+            ) : null}
+            {ctx.can('fees.settings') ? (
+              <Link href="/finance/settings" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                Advanced settings
               </Link>
             ) : null}
           </>
@@ -83,11 +91,9 @@ export default async function StructuresPage() {
                   canStructure ? (
                     <div className="flex flex-wrap justify-center gap-2">
                       <NewFeeHeadButton label="Add fee head" />
-                      <NewStructureButton
-                        feeHeads={feeHeadOptions}
-                        classes={classOptions}
-                        label="Add structure"
-                      />
+                      <Link href="/finance/structures/new" className={buttonVariants({ size: 'sm' })}>
+                        Create fee structure
+                      </Link>
                     </div>
                   ) : undefined
                 }
@@ -104,6 +110,19 @@ export default async function StructuresPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {s.status === 'DRAFT' && canPublish ? (
+                      <Link
+                        href={`/finance/structures/${s.id}/publish`}
+                        className={buttonVariants({ size: 'sm' })}
+                      >
+                        Publish & assign
+                      </Link>
+                    ) : null}
+                    {canStructure ? (
+                      <Link href={`/finance/structures/${s.id}/copy`} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                        Copy
+                      </Link>
+                    ) : null}
                     {canStructure ? (
                       <EditStructureButton
                         structure={{
@@ -123,7 +142,9 @@ export default async function StructuresPage() {
                         classes={classOptions}
                       />
                     ) : null}
-                    {s.isActive ? <Badge tone="success">active</Badge> : <Badge>inactive</Badge>}
+                    <Badge tone={s.status === 'PUBLISHED' ? 'success' : s.status === 'DRAFT' ? 'warning' : 'neutral'}>
+                      {s.status.toLowerCase()}
+                    </Badge>
                     <span className="text-lg font-semibold text-ink tnum">
                       {formatMoney(s.totalMinor, currency)}
                     </span>

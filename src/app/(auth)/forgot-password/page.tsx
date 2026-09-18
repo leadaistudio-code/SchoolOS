@@ -5,6 +5,7 @@ import { AuthShell } from '../_components/auth-shell'
 import { canDeliverEmail } from '@/server/auth/reset'
 import { resolveTenant } from '@/server/tenant'
 import { getSessionUser } from '@/server/auth/session'
+import { destinationForExistingSession } from '@/server/auth/login-redirect'
 
 export const metadata = { title: 'Forgot password' }
 
@@ -12,7 +13,11 @@ export default async function ForgotPasswordPage() {
   const [tenant, user] = await Promise.all([resolveTenant(), getSessionUser()])
 
   if (!tenant) redirect('/login')
-  if (user) redirect('/')
+  if (user) {
+    const destination = destinationForExistingSession({ user, tenant })
+    if (destination.kind === 'redirect') redirect(destination.href)
+    redirect('/login')
+  }
 
   // Offering an email tab that cannot send anything would be worse than not
   // offering one, so the choice depends on what this school has configured.

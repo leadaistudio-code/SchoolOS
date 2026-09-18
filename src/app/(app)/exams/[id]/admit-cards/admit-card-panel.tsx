@@ -2,14 +2,19 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Check, RefreshCw, Undo2, UserPlus, X } from 'lucide-react'
+import { Check, Download, RefreshCw, Undo2, UserPlus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox, SearchInput } from '@/components/ui/input'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { useToast } from '@/components/ui/toast'
+import { BulkSelectionBar, useBulkSelection } from '@/components/bulk-selection'
 import { formatMoney } from '@/lib/utils'
 import {
   approveAdmitCardAction,
+  bulkApproveAdmitCardsAction,
+  bulkRejectAdmitCardsAction,
   generateAdmitCardsAction,
   refreshAdmitCardFeesAction,
   rejectAdmitCardAction,
@@ -36,29 +41,69 @@ type Row = {
   }
 }
 
+type SectionOption = { id: string; label: string }
+
+function matchesStudentSearch(row: Row, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const enrollment = row.student.enrollments[0]
+  const haystack = [
+    row.student.firstName,
+    row.student.lastName,
+    `${row.student.firstName} ${row.student.lastName}`,
+    row.student.admissionNo,
+    row.number,
+    enrollment?.classLevel.name,
+    enrollment?.section?.name,
+    enrollment?.rollNumber != null ? String(enrollment.rollNumber) : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(q)
+}
+
 export function AdmitCardPanel({
   examId,
   rows,
+  sections,
   statusFilter,
   canGenerate,
   canApprove,
 }: {
   examId: string
   rows: Row[]
+  sections: SectionOption[]
   statusFilter?: 'PENDING' | 'APPROVED' | 'REJECTED'
   canGenerate: boolean
   canApprove: boolean
 }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
+  const [selectedSectionIds, setSelectedSectionIds] = React.useState<string[]>([])
+  const [studentQuery, setStudentQuery] = React.useState('')
 
-  const filtered = statusFilter ? rows.filter((row) => row.status === statusFilter) : rows
+  const statusRows = statusFilter ? rows.filter((row) => row.status === statusFilter) : rows
+  const filtered = statusRows.filter((row) => matchesStudentSearch(row, studentQuery))
+  const selectableIds = filtered.filter((row) => row.status === 'PENDING').map((row) => row.id)
+  const selection = useBulkSelection(selectableIds)
+  const selectedRows = filtered.filter((row) => selection.selected.has(row.id))
+  const feeClearSelectedIds = selectedRows
+    .filter((row) => row.feeDueMinor === 0)
+    .map((row) => row.id)
+  const approvedCount = rows.filter((row) => row.status === 'APPROVED').length
 
   React.useEffect(() => {
     if (statusFilter && typeof window !== 'undefined') {
       document.getElementById('students')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [statusFilter])
+
+  const toggleSection = (id: string, checked: boolean) => {
+    setSelectedSectionIds((current) =>
+      checked ? [...current, id] : current.filter((sectionId) => sectionId !== id),
+    )
+  }
 
   const run = (fn: () => Promise<{ ok: boolean; message: string }>, title: string) =>
     startTransition(async () => {
@@ -69,6 +114,19 @@ export function AdmitCardPanel({
         description: result.message,
       })
     })
+
+  const runBulk = (
+    fn: () => Promise<{ ok: boolean; message: string }>,
+    title: string,
+  ) => startTransition(async () => {
+    const result = await fn()
+    toast.push({
+      tone: result.ok ? 'success' : 'error',
+      title,
+      description: result.message,
+    })
+    if (result.ok) selection.clear()
+  })
 
   return (
     <div className="space-y-4">
@@ -82,11 +140,52 @@ export function AdmitCardPanel({
         </p>
       ) : null}
 
+      {canGenerate && sections.length > 0 ? (
+        <div className="rounded-[var(--radius)] border border-line bg-surface-2 p-3">
+          <p className="text-sm font-medium text-ink">Generate by section</p>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            Leave unchecked to include every eligible section. Each admit card still shows only that
+            student&apos;s section papers.
+          </p>
+          <div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            {sections.map((section) => (
+              <label
+                key={section.id}
+                className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-white px-2.5 py-2 text-sm text-ink"
+              >
+                <Checkbox
+                  checked={selectedSectionIds.includes(section.id)}
+                  onChange={(event) => toggleSection(section.id, event.target.checked)}
+                  disabled={pending}
+                />
+                {section.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {canGenerate ? (
           <>
-            <Button size="sm" disabled={pending} onClick={() => run(() => generateAdmitCardsAction(examId), 'Generate')}>
-              <UserPlus aria-hidden /> Generate for all students
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                run(
+                  () =>
+                    generateAdmitCardsAction(
+                      examId,
+                      selectedSectionIds.length > 0 ? selectedSectionIds : undefined,
+                    ),
+                  'Generate',
+                )
+              }
+            >
+              <UserPlus aria-hidden />
+              {selectedSectionIds.length > 0
+                ? `Generate for ${selectedSectionIds.length} section${selectedSectionIds.length === 1 ? '' : 's'}`
+                : 'Generate for eligible students'}
             </Button>
             <Button
               size="sm"
@@ -98,26 +197,124 @@ export function AdmitCardPanel({
             </Button>
           </>
         ) : null}
+        {approvedCount > 0 ? (
+          <Link
+            href={
+              selectedSectionIds.length > 0
+                ? `/exams/${examId}/admit-cards/print?sections=${encodeURIComponent(selectedSectionIds.join(','))}`
+                : `/exams/${examId}/admit-cards/print`
+            }
+            className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+          >
+            <Download aria-hidden />
+            {selectedSectionIds.length > 0
+              ? `Print approved (${selectedSectionIds.length} section${selectedSectionIds.length === 1 ? '' : 's'})`
+              : 'Print all approved'}
+          </Link>
+        ) : null}
       </div>
+
+      {canApprove ? (
+        <BulkSelectionBar
+          count={selection.selected.size}
+          noun="admit card"
+          onClear={selection.clear}
+        >
+          <Button
+            size="sm"
+            disabled={pending || feeClearSelectedIds.length === 0}
+            title={
+              feeClearSelectedIds.length === 0
+                ? 'Bulk approval is available only for fee-clear students'
+                : 'Approve selected fee-clear admit cards'
+            }
+            onClick={() => {
+              runBulk(
+                () => bulkApproveAdmitCardsAction(feeClearSelectedIds, examId),
+                'Bulk approval',
+              )
+            }}
+          >
+            <Check aria-hidden />
+            Approve fee-clear ({feeClearSelectedIds.length})
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => {
+              const reason = window.prompt('Reason for rejecting the selected admit cards?')
+              if (!reason?.trim()) return
+              runBulk(
+                () => bulkRejectAdmitCardsAction(selection.selectedIds, examId, reason.trim()),
+                'Bulk rejection',
+              )
+            }}
+          >
+            <X aria-hidden />
+            Reject selected
+          </Button>
+        </BulkSelectionBar>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="text-sm text-ink-muted">
-          No admit cards yet. Generate cards for every student enrolled in this exam&apos;s classes. The
+          No admit cards yet. Generate cards for students whose section has papers in this exam. The
           principal approves each card after confirming fees are paid.
         </p>
-      ) : filtered.length === 0 ? (
-        <p className="text-sm text-ink-muted">
-          No {statusFilter?.toLowerCase()} admit cards. Pick another status above, or{' '}
-          <Link href={`/exams/${examId}/admit-cards#students`} className="text-brand-600 hover:underline">
-            show all students
-          </Link>
-          .
-        </p>
       ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={studentQuery}
+              onChange={(event) => setStudentQuery(event.target.value)}
+              placeholder="Search name, admission no, class or card no"
+              aria-label="Search students"
+            />
+            {studentQuery ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setStudentQuery('')}>
+                Clear
+              </Button>
+            ) : null}
+            {studentQuery.trim() ? (
+              <p className="text-sm text-ink-muted">
+                {filtered.length} of {statusRows.length} shown
+              </p>
+            ) : null}
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              {studentQuery.trim() ? (
+                'No students match that search.'
+              ) : (
+                <>
+                  No {statusFilter?.toLowerCase()} admit cards. Pick another status above, or{' '}
+                  <Link
+                    href={`/exams/${examId}/admit-cards#students`}
+                    className="text-brand-600 hover:underline"
+                  >
+                    show all students
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
+          ) : (
         <TableWrap>
           <Table>
             <THead>
               <tr>
+                {canApprove ? (
+                  <TH>
+                    <Checkbox
+                      checked={selection.allSelected}
+                      onChange={selection.toggleAll}
+                      aria-label="Select all pending admit cards on this page"
+                      disabled={selectableIds.length === 0}
+                    />
+                  </TH>
+                ) : null}
                 <TH>Student</TH>
                 <TH>Class</TH>
                 <TH>Fee due</TH>
@@ -133,6 +330,17 @@ export function AdmitCardPanel({
                   : '—'
                 return (
                   <TR key={row.id}>
+                    {canApprove ? (
+                      <TD>
+                        {row.status === 'PENDING' ? (
+                          <Checkbox
+                            checked={selection.selected.has(row.id)}
+                            onChange={() => selection.toggle(row.id)}
+                            aria-label={`Select admit card for ${row.student.firstName} ${row.student.lastName}`}
+                          />
+                        ) : null}
+                      </TD>
+                    ) : null}
                     <TD>
                       <div className="flex items-center gap-2">
                         {row.student.photoUrl ? (
@@ -218,17 +426,37 @@ export function AdmitCardPanel({
                             <Button
                               size="sm"
                               variant="secondary"
-                              disabled={pending || row.feeDueMinor > 0}
+                              disabled={pending}
                               title={
                                 row.feeDueMinor > 0
-                                  ? 'Fees must be cleared before approval'
+                                  ? 'Approve by recording a fee exception reason'
                                   : 'Approve admit card'
                               }
-                              onClick={() =>
-                                run(() => approveAdmitCardAction(row.id, examId), 'Approve')
-                              }
+                              onClick={() => {
+                                let feeOverrideReason: string | undefined
+                                if (row.feeDueMinor > 0) {
+                                  const reason = window.prompt(
+                                    `This student has ${formatMoney(row.feeDueMinor)} outstanding. Enter the reason for allowing the student to sit the exam:`,
+                                  )
+                                  if (!reason?.trim()) return
+                                  if (reason.trim().length < 3) {
+                                    toast.push({
+                                      tone: 'error',
+                                      title: 'Reason required',
+                                      description: 'Enter at least 3 characters for the audit record.',
+                                    })
+                                    return
+                                  }
+                                  feeOverrideReason = reason.trim()
+                                }
+                                run(
+                                  () => approveAdmitCardAction(row.id, examId, feeOverrideReason),
+                                  'Approve',
+                                )
+                              }}
                             >
-                              <Check aria-hidden /> Approve
+                              <Check aria-hidden />
+                              {row.feeDueMinor > 0 ? 'Approve exception' : 'Approve'}
                             </Button>
                             <Button
                               size="sm"
@@ -255,6 +483,8 @@ export function AdmitCardPanel({
             </TBody>
           </Table>
         </TableWrap>
+          )}
+        </>
       )}
     </div>
   )

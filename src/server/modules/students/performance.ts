@@ -1,6 +1,12 @@
 import type { AppContext } from '@/server/context'
-import { assertStudentAccess } from '@/server/scope'
+import { ApiException } from '@/server/api/response'
+import {
+  accessibleStudentIds,
+  assertStudentAccess,
+  isPortalOnlyRole,
+} from '@/server/scope'
 import { resultsToTrend, type ResultTrendPoint } from '@/lib/three-sixty'
+import { ROLE } from '@/lib/rbac/roles'
 
 /**
  * Per-student readers behind the 360° dashboard.
@@ -62,6 +68,23 @@ export type StudentFeedbackItem = {
   behaviour: string | null
 }
 
+function portalFeedbackVisibility(roleKeys: string[]): Array<'STUDENT' | 'PARENT' | 'STUDENT_AND_PARENT'> {
+  const audiences = new Set<'STUDENT' | 'PARENT' | 'STUDENT_AND_PARENT'>()
+  if (roleKeys.includes(ROLE.STUDENT)) {
+    audiences.add('STUDENT')
+    audiences.add('STUDENT_AND_PARENT')
+  }
+  if (roleKeys.includes(ROLE.PARENT)) {
+    audiences.add('PARENT')
+    audiences.add('STUDENT_AND_PARENT')
+  }
+  if (audiences.size === 0) {
+    audiences.add('STUDENT')
+    audiences.add('STUDENT_AND_PARENT')
+  }
+  return [...audiences]
+}
+
 /**
  * Teacher-authored feedback that may surface on the child's profile.
  *
@@ -76,9 +99,16 @@ export async function listStudentFeedback(
 ): Promise<StudentFeedbackItem[]> {
   ctx.require('feedback.view')
   await assertStudentAccess(ctx, studentId)
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
+  const visibleToPortal = portalFeedbackVisibility(ctx.user.roleKeys)
 
   const rows = await ctx.db.teacherStudentFeedback.findMany({
-    where: { studentId, visibility: { not: 'TEACHER_ONLY' } },
+    where: {
+      studentId,
+      visibility: portal
+        ? { in: visibleToPortal }
+        : { not: 'TEACHER_ONLY' },
+    },
     orderBy: { createdAt: 'desc' },
     take: 20,
     select: {
@@ -108,6 +138,85 @@ export async function listStudentFeedback(
   return rows.map((row) => ({
     id: row.id,
     createdAt: row.createdAt,
+    teacherName: `${row.teacher.firstName} ${row.teacher.lastName}`.trim(),
+    subjectName: row.subjectId ? (subjectName.get(row.subjectId) ?? null) : null,
+    comment: row.comment,
+    strengths: row.strengths,
+    improvement: row.improvement,
+    performance: row.performance,
+    participation: row.participation,
+    homework: row.homework,
+    behaviour: row.behaviour,
+  }))
+}
+
+export type ReceivedTeacherFeedbackItem = StudentFeedbackItem & {
+  studentId: string
+  studentName: string
+  admissionNo: string | null
+}
+
+/**
+ * Inbox of teacher→student notes for the student/parent portal.
+ * Scoped to the signed-in student (or a parent's linked children) and only
+ * rows whose visibility includes that audience.
+ */
+export async function listReceivedTeacherFeedback(
+  ctx: AppContext,
+): Promise<ReceivedTeacherFeedbackItem[]> {
+  ctx.require('feedback.view')
+  if (!isPortalOnlyRole(ctx.user.roleKeys)) {
+    throw new ApiException(
+      403,
+      'FORBIDDEN',
+      'Teacher feedback is available on the student and parent portal only',
+    )
+  }
+
+  const studentIds = await accessibleStudentIds(ctx)
+  if (!studentIds || studentIds.length === 0) return []
+
+  const visibleToPortal = portalFeedbackVisibility(ctx.user.roleKeys)
+  const rows = await ctx.db.teacherStudentFeedback.findMany({
+    where: {
+      studentId: { in: studentIds },
+      visibility: { in: visibleToPortal },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    select: {
+      id: true,
+      createdAt: true,
+      subjectId: true,
+      comment: true,
+      strengths: true,
+      improvement: true,
+      performance: true,
+      participation: true,
+      homework: true,
+      behaviour: true,
+      teacher: { select: { firstName: true, lastName: true } },
+      student: {
+        select: { id: true, firstName: true, lastName: true, admissionNo: true },
+      },
+    },
+  })
+
+  const subjectIds = [...new Set(rows.map((r) => r.subjectId).filter((id): id is string => !!id))]
+  const subjects = subjectIds.length
+    ? await ctx.db.subject.findMany({
+        where: { id: { in: subjectIds } },
+        select: { id: true, name: true },
+      })
+    : []
+  const subjectName = new Map(subjects.map((s) => [s.id, s.name]))
+
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt,
+    studentId: row.student.id,
+    studentName: `${row.student.firstName} ${row.student.lastName}`.trim(),
+    admissionNo: row.student.admissionNo,
     teacherName: `${row.teacher.firstName} ${row.teacher.lastName}`.trim(),
     subjectName: row.subjectId ? (subjectName.get(row.subjectId) ?? null) : null,
     comment: row.comment,

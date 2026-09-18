@@ -33,28 +33,69 @@ export function anthropicAdapter(options: {
     name: 'anthropic',
     model: options.model,
 
-    async turn({ system, turns, tools, onText }): Promise<ModelTurnResult> {
-      const stream = client.messages.stream({
-        model: options.model,
-        max_tokens: 4096,
-        thinking: { type: 'adaptive' },
-        output_config: { effort: options.effort },
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        tools: tools.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          input_schema: tool.parameters as Anthropic.Tool.InputSchema,
-        })),
-        messages: toAnthropicMessages(turns),
-      })
+    async turn({
+      system,
+      turns,
+      tools,
+      onText,
+      stream = true,
+      toolChoice,
+      maxOutputTokens,
+    }): Promise<ModelTurnResult> {
+      const mappedTools = tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+      }))
+      const choice =
+        toolChoice && tools.some((tool) => tool.name === toolChoice)
+          ? { type: 'tool' as const, name: toolChoice }
+          : undefined
 
-      for await (const event of stream) {
+      const base = {
+        model: options.model,
+        max_tokens: maxOutputTokens ?? 4096,
+        thinking: { type: 'adaptive' as const },
+        output_config: { effort: options.effort },
+        system: [{ type: 'text' as const, text: system, cache_control: { type: 'ephemeral' as const } }],
+        tools: mappedTools.length ? mappedTools : undefined,
+        tool_choice: choice,
+        messages: toAnthropicMessages(turns),
+      }
+
+      // One-shot structured outputs (vision eval, question generate) prefer a
+      // complete message over streaming deltas.
+      if (!stream) {
+        const message = await client.messages.create(base)
+        const text = message.content
+          .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+          .map((block) => block.text)
+          .join('')
+        if (text) onText(text)
+        const toolCalls: ModelToolCall[] = message.content
+          .filter((block): block is Anthropic.ToolUseBlock => block.type === 'tool_use')
+          .map((block) => ({
+            id: block.id,
+            name: block.name,
+            argumentsJson: JSON.stringify(block.input ?? {}),
+          }))
+        return {
+          text,
+          toolCalls,
+          raw: message.content,
+          refused: message.stop_reason === 'refusal',
+        }
+      }
+
+      const streamResponse = client.messages.stream(base)
+
+      for await (const event of streamResponse) {
         if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           onText(event.delta.text)
         }
       }
 
-      const message = await stream.finalMessage()
+      const message = await streamResponse.finalMessage()
 
       const text = message.content
         .filter((block): block is Anthropic.TextBlock => block.type === 'text')
@@ -81,13 +122,31 @@ export function anthropicAdapter(options: {
   }
 }
 
+function userContent(turn: Extract<ModelTurn, { role: 'user' }>): string | Anthropic.ContentBlockParam[] {
+  if (turn.parts && turn.parts.length > 0) {
+    return turn.parts.map((part): Anthropic.ContentBlockParam => {
+      if (part.type === 'text') return { type: 'text', text: part.text }
+      const mediaType = part.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+      return {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mediaType,
+          data: part.base64,
+        },
+      }
+    })
+  }
+  return turn.text
+}
+
 /** Neutral turns → Anthropic messages. Exported for tests. */
 export function toAnthropicMessages(turns: ModelTurn[]): Anthropic.MessageParam[] {
   const messages: Anthropic.MessageParam[] = []
 
   for (const turn of turns) {
     if (turn.role === 'user') {
-      messages.push({ role: 'user', content: turn.text })
+      messages.push({ role: 'user', content: userContent(turn) })
       continue
     }
 

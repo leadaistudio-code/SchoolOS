@@ -3,6 +3,7 @@ import { route } from '@/server/api/handler'
 import { ok, ApiException } from '@/server/api/response'
 import { uploadFile } from '@/server/files'
 import { audit } from '@/server/audit'
+import { assertStudentAccess } from '@/server/scope'
 
 const ATTACH_TO = {
   homework: { column: 'homeworkId', permission: 'homework.edit', folder: 'homework' },
@@ -87,8 +88,15 @@ async function ownerExists(
   switch (target) {
     case 'homework':
       return !!(await ctx.db.homework.findFirst({ where: { id }, select: { id: true } }))
-    case 'submission':
-      return !!(await ctx.db.homeworkSubmission.findFirst({ where: { id }, select: { id: true } }))
+    case 'submission': {
+      const submission = await ctx.db.homeworkSubmission.findFirst({
+        where: { id },
+        select: { studentId: true },
+      })
+      if (!submission) return false
+      await assertStudentAccess(ctx, submission.studentId)
+      return true
+    }
     case 'classwork':
       return !!(await ctx.db.classwork.findFirst({ where: { id }, select: { id: true } }))
     case 'notice':

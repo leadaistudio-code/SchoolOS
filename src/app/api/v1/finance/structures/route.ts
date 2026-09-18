@@ -8,7 +8,7 @@ import {
 } from '@/server/modules/finance/service'
 
 export const GET = route(async (_req, ctx) => ok(await listStructures(ctx)), {
-  permission: 'fees.view',
+  permission: 'fees.structure',
 })
 
 export const POST = route(

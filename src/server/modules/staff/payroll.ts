@@ -21,12 +21,32 @@ export const salaryStructureSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 })
 
-export const payslipGenerateSchema = z.object({
+function manualDeductionSchema<T extends z.ZodRawShape>(shape: T) {
+  return z.object({
+    ...shape,
+    manualDeduction: majorToMinor.default(0),
+    manualDeductionReason: z.string().trim().max(300).optional(),
+  }).superRefine((input, ctx) => {
+    if ((input.manualDeduction ?? 0) > 0 && !input.manualDeductionReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['manualDeductionReason'],
+        message: 'Enter a reason for the manual deduction',
+      })
+    }
+  })
+}
+
+export const payslipGenerateSchema = manualDeductionSchema({
   staffId: z.string().min(1),
   periodYear: z.coerce.number().int().min(2000).max(2100),
   periodMonth: z.coerce.number().int().min(1).max(12),
   bonus: majorToMinor.default(0),
   notes: z.string().trim().max(500).optional(),
+})
+
+export const payslipDeductionSchema = manualDeductionSchema({
+  id: z.string().min(1),
 })
 
 export const payslipStatusSchema = z.object({
@@ -41,6 +61,41 @@ const MONTHS = [
 
 export function monthName(month: number): string {
   return MONTHS[month - 1] ?? String(month)
+}
+
+export const LATE_MARKS_PER_UNPAID_DAY = 3
+
+export type PayrollAttendanceCounts = {
+  present: number
+  late: number
+  halfDay: number
+  leave: number
+  absent: number
+}
+
+/**
+ * Frozen attendance deduction for one payroll month.
+ *
+ * Approved leave stays paid. An absence costs one day, a half-day costs half,
+ * and each complete set of three late arrivals costs one day. Unmarked dates
+ * are excluded because the payroll engine must not invent attendance.
+ */
+export function calculateAttendanceDeduction(
+  grossMinor: number,
+  counts: PayrollAttendanceCounts,
+) {
+  const workingDays =
+    counts.present + counts.late + counts.halfDay + counts.leave + counts.absent
+  const latePenaltyDays = Math.floor(counts.late / LATE_MARKS_PER_UNPAID_DAY)
+  const lossOfPayDays = Math.min(
+    workingDays,
+    counts.absent + counts.halfDay * 0.5 + latePenaltyDays,
+  )
+  const paidDays = Math.max(0, workingDays - lossOfPayDays)
+  const perDayMinor = workingDays > 0 ? grossMinor / workingDays : 0
+  const lopMinor = Math.round(perDayMinor * lossOfPayDays)
+
+  return { workingDays, paidDays, latePenaltyDays, lossOfPayDays, lopMinor }
 }
 
 /**
@@ -203,21 +258,29 @@ export async function generatePayslip(
   })
   const count = (status: string) => marks.find((m) => m.status === status)?._count._all ?? 0
 
-  const present = count('PRESENT') + count('LATE')
-  const half = count('HALF_DAY')
+  const present = count('PRESENT')
+  const late = count('LATE')
+  const halfDay = count('HALF_DAY')
   const leave = count('LEAVE')
   const absent = count('ABSENT')
-  const workingDays = present + half + leave + absent
-
-  // Approved leave is paid; a half-day is half. Only an unexplained absence
-  // costs money.
-  const paidDays = present + half * 0.5 + leave
-  const lopDays = workingDays > 0 ? workingDays - paidDays : 0
-  const perDay = workingDays > 0 ? structure.grossMinor / workingDays : 0
-  const lopMinor = Math.round(perDay * lopDays)
+  const attendance = calculateAttendanceDeduction(structure.grossMinor, {
+    present,
+    late,
+    halfDay,
+    leave,
+    absent,
+  })
 
   const grossMinor = structure.grossMinor + input.bonus
-  const netMinor = grossMinor - structure.deductionsMinor - lopMinor
+  const deductionsMinor = structure.deductionsMinor + input.manualDeduction
+  const netMinor = grossMinor - deductionsMinor - attendance.lopMinor
+  if (netMinor < 0) {
+    throw new ApiException(
+      400,
+      'DEDUCTION_EXCEEDS_PAY',
+      'The deductions are greater than this month’s gross salary',
+    )
+  }
 
   const created = await ctx.db.staffPayslip.create({
     data: {
@@ -225,14 +288,20 @@ export async function generatePayslip(
       staffId: input.staffId,
       periodYear: input.periodYear,
       periodMonth: input.periodMonth,
-      workingDays,
-      paidDays: Math.round(paidDays),
+      workingDays: attendance.workingDays,
+      paidDays: attendance.paidDays,
+      lateCount: late,
+      absentCount: absent,
+      halfDayCount: halfDay,
+      latePenaltyDays: attendance.latePenaltyDays,
       basicMinor: structure.basicMinor,
       hraMinor: structure.hraMinor,
       allowancesMinor: structure.allowancesMinor,
       bonusMinor: input.bonus,
-      deductionsMinor: structure.deductionsMinor,
-      lopMinor,
+      deductionsMinor,
+      manualDeductionMinor: input.manualDeduction,
+      manualDeductionReason: input.manualDeductionReason,
+      lopMinor: attendance.lopMinor,
       grossMinor,
       netMinor,
       notes: input.notes,
@@ -254,7 +323,68 @@ export async function generatePayslip(
   return created
 }
 
-/** Draft → published → paid. Paid stamps the date the money went out. */
+/** A reasoned manual adjustment may change a draft, never a published payroll record. */
+export async function updateDraftPayslipDeduction(
+  ctx: AppContext,
+  input: z.infer<typeof payslipDeductionSchema>,
+) {
+  ctx.require('staff.payroll_manage')
+
+  const payslip = await ctx.db.staffPayslip.findFirst({
+    where: { id: input.id },
+    include: { staff: { select: { firstName: true, lastName: true } } },
+  })
+  if (!payslip) throw notFound('Payslip')
+  if (payslip.status !== 'DRAFT') {
+    throw conflict('Only a draft payslip can be adjusted. Move it back to draft first.')
+  }
+
+  const recurringDeductions = payslip.deductionsMinor - payslip.manualDeductionMinor
+  const deductionsMinor = recurringDeductions + input.manualDeduction
+  const netMinor = payslip.grossMinor - deductionsMinor - payslip.lopMinor
+  if (netMinor < 0) {
+    throw new ApiException(
+      400,
+      'DEDUCTION_EXCEEDS_PAY',
+      'The deductions are greater than this month’s gross salary',
+    )
+  }
+
+  const updated = await ctx.db.staffPayslip.update({
+    where: { id: input.id },
+    data: {
+      deductionsMinor,
+      manualDeductionMinor: input.manualDeduction,
+      manualDeductionReason: input.manualDeduction > 0 ? input.manualDeductionReason : null,
+      netMinor,
+    },
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'staff.payslip.deduction',
+    module: 'staff',
+    entityType: 'StaffPayslip',
+    entityId: payslip.id,
+    summary: `Adjusted manual deduction for ${payslip.staff.firstName} ${payslip.staff.lastName}`,
+    before: {
+      manualDeductionMinor: payslip.manualDeductionMinor,
+      manualDeductionReason: payslip.manualDeductionReason,
+      netMinor: payslip.netMinor,
+    },
+    after: {
+      manualDeductionMinor: updated.manualDeductionMinor,
+      manualDeductionReason: updated.manualDeductionReason,
+      netMinor: updated.netMinor,
+    },
+  })
+
+  return updated
+}
+
+/** Draft → published → paid. Published (unpaid) can return to draft for corrections. */
 export async function setPayslipStatus(
   ctx: AppContext,
   input: z.infer<typeof payslipStatusSchema>,
@@ -263,14 +393,37 @@ export async function setPayslipStatus(
 
   const payslip = await ctx.db.staffPayslip.findFirst({ where: { id: input.id } })
   if (!payslip) throw notFound('Payslip')
+  if (payslip.status === input.status) return payslip
 
-  const updated = await ctx.db.staffPayslip.update({
-    where: { id: input.id },
+  const allowed =
+    (payslip.status === 'DRAFT' && input.status === 'PUBLISHED') ||
+    (payslip.status === 'PUBLISHED' && input.status === 'PAID') ||
+    (payslip.status === 'PUBLISHED' && input.status === 'DRAFT')
+  if (!allowed) {
+    throw conflict(
+      payslip.status === 'PAID'
+        ? 'A paid payslip cannot be reopened without a recorded payroll reversal.'
+        : `A ${payslip.status.toLowerCase()} payslip cannot be moved directly to ${input.status.toLowerCase()}.`,
+    )
+  }
+
+  const changed = await ctx.db.staffPayslip.updateMany({
+    where: { id: input.id, status: payslip.status, updatedAt: payslip.updatedAt },
     data: {
       status: input.status,
-      paidAt: input.status === 'PAID' ? (payslip.paidAt ?? new Date()) : null,
+      paidAt: input.status === 'PAID' ? new Date() : null,
     },
   })
+  if (changed.count !== 1) {
+    throw conflict('This payslip changed while you were reviewing it. Refresh and try again.')
+  }
+  const updated = await ctx.db.staffPayslip.findFirst({ where: { id: input.id } })
+  if (!updated) throw notFound('Payslip')
+
+  const summary =
+    payslip.status === 'PUBLISHED' && input.status === 'DRAFT'
+      ? 'Payslip unpublished back to draft'
+      : `Payslip marked ${input.status.toLowerCase()}`
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -280,7 +433,7 @@ export async function setPayslipStatus(
     module: 'staff',
     entityType: 'StaffPayslip',
     entityId: input.id,
-    summary: `Payslip marked ${input.status.toLowerCase()}`,
+    summary,
     before: { status: payslip.status },
     after: { status: updated.status },
   })
@@ -294,7 +447,7 @@ export async function deletePayslip(ctx: AppContext, id: string) {
   const payslip = await ctx.db.staffPayslip.findFirst({ where: { id } })
   if (!payslip) throw notFound('Payslip')
   if (payslip.status !== 'DRAFT') {
-    throw conflict('Only a draft payslip can be deleted. Published ones stay on the record.')
+    throw conflict('Only a draft payslip can be deleted. Unpublish it first if it was published by mistake.')
   }
 
   await ctx.db.staffPayslip.delete({ where: { id } })
@@ -309,6 +462,7 @@ export async function deletePayslip(ctx: AppContext, id: string) {
     summary: `Deleted draft payslip for ${monthName(payslip.periodMonth)} ${payslip.periodYear}`,
     before: payslip,
   })
+  return { staffId: payslip.staffId }
 }
 
 /** The payroll month at a glance: how much is drafted, published and paid. */

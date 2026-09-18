@@ -115,8 +115,9 @@ export function Sidebar({
             {collapsed ? (
               <div className="mx-2 mb-2 h-px bg-[var(--sidebar-border)]" aria-hidden />
             ) : (
-              <p className="caption mb-1.5 px-2 text-[var(--sidebar-caption)]">
-                {SECTION_LABEL[group.section]}
+              <p className="mb-2 flex items-center gap-2 rounded-[8px] bg-[var(--sidebar-bg-deep)] px-2.5 py-1.5 text-xs font-bold text-[var(--sidebar-fg-strong)]">
+                <span className="size-1.5 rounded-full bg-[var(--product-500)]" aria-hidden />
+                <span>{SECTION_LABEL[group.section]}</span>
               </p>
             )}
             <ul className="space-y-0.5">

@@ -43,11 +43,15 @@ public static class BiometricAdapterFactory
 
         if (entry.IsRealtimeBrand())
         {
+            if (entry.IsFkWebPush())
+            {
+                return new RealtimeRS9WFkWebAdapter(info);
+            }
             return new RealtimeRS9WAdapter(info);
         }
 
         throw new NotSupportedException(
             $"Unsupported biometric brand '{entry.Brand}' for device '{entry.LocalDeviceId}'. " +
-            "Supported brands in this build: Simulator (lab only), Realtime / RealtimeRS9W (requires vendor SDK).");
+            "Supported brands in this build: Simulator (lab only), Realtime / RealtimeRS9W (FKWeb push or vendor SDK).");
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MyCampusView.Connect.Core.Abstractions;
 
 namespace MyCampusView.Connect.Core.Config;
 
@@ -28,6 +29,12 @@ public sealed class ConnectorConfig
 
     public int MaxBackoffSeconds { get; set; } = 300;
 
+    /// <summary>Local HTTP prefix used by SDK-free FKWeb push devices.</summary>
+    public string FkWebListenPrefix { get; set; } = "http://+:8080/";
+
+    /// <summary>Hard request limit for legacy device packets.</summary>
+    public int FkWebMaxBodyBytes { get; set; } = 1_048_576;
+
     /// <summary>
     /// When false (default in Production), SimulatedBiometricAdapter will not be used
     /// even if a device Brand is Simulator.
@@ -48,6 +55,8 @@ public sealed class ConnectorConfig
 
     public static string CheckpointsDirectory => Path.Combine(ProgramDataRoot, "checkpoints");
 
+    public static string FkWebDiagnosticsDirectory => Path.Combine(ProgramDataRoot, "fkweb-diagnostics");
+
     public static string LocalConfigPath => Path.Combine(ProgramDataRoot, "config.json");
 
     public static string CredentialsPath => Path.Combine(ProgramDataRoot, "credentials.dpapi");
@@ -57,6 +66,7 @@ public sealed class ConnectorConfig
         Directory.CreateDirectory(ProgramDataRoot);
         Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(CheckpointsDirectory);
+        Directory.CreateDirectory(FkWebDiagnosticsDirectory);
     }
 
     public Uri GetApiBaseUri()
@@ -104,6 +114,12 @@ public sealed class DeviceConfigEntry
 
     public string? ConnectionPassword { get; set; }
 
+    /// <summary>SDK (default) or FKWEB_PUSH for the SDK-free local listener.</summary>
+    public string ConnectionMode { get; set; } = "SDK";
+
+    /// <summary>Value sent in the FKWeb dev_id header. Treat as a device credential.</summary>
+    public string? PushDeviceId { get; set; }
+
     public bool SyncEnabled { get; set; } = true;
 
     public bool IsSimulatorBrand()
@@ -120,6 +136,10 @@ public sealed class DeviceConfigEntry
                || brand.Equals("RealtimeRS9W", StringComparison.OrdinalIgnoreCase)
                || brand.Equals("RS9W", StringComparison.OrdinalIgnoreCase);
     }
+
+    public bool IsFkWebPush() =>
+        ConnectionMode.Trim().Equals("FKWEB_PUSH", StringComparison.OrdinalIgnoreCase) ||
+        ConnectionMode.Trim().Equals("FKWEB", StringComparison.OrdinalIgnoreCase);
 
     public DeviceInfo ToDeviceInfo()
     {
@@ -238,6 +258,16 @@ public static class ConnectorConfigLoader
             target.MaxBackoffSeconds = overlay.MaxBackoffSeconds;
         }
 
+        if (!string.IsNullOrWhiteSpace(overlay.FkWebListenPrefix))
+        {
+            target.FkWebListenPrefix = overlay.FkWebListenPrefix;
+        }
+
+        if (overlay.FkWebMaxBodyBytes > 0)
+        {
+            target.FkWebMaxBodyBytes = overlay.FkWebMaxBodyBytes;
+        }
+
         if (overlay.Devices is { Count: > 0 })
         {
             target.Devices = overlay.Devices;
@@ -277,6 +307,8 @@ public static class ConnectorConfigLoader
         public int? MaxUploadAttempts { get; set; }
         public int? InitialBackoffSeconds { get; set; }
         public int? MaxBackoffSeconds { get; set; }
+        public string? FkWebListenPrefix { get; set; }
+        public int? FkWebMaxBodyBytes { get; set; }
         public bool? AllowSimulator { get; set; }
         public List<DeviceConfigEntry>? Devices { get; set; }
 
@@ -293,6 +325,8 @@ public static class ConnectorConfigLoader
             if (MaxUploadAttempts is > 0) cfg.MaxUploadAttempts = MaxUploadAttempts.Value;
             if (InitialBackoffSeconds is > 0) cfg.InitialBackoffSeconds = InitialBackoffSeconds.Value;
             if (MaxBackoffSeconds is > 0) cfg.MaxBackoffSeconds = MaxBackoffSeconds.Value;
+            if (!string.IsNullOrWhiteSpace(FkWebListenPrefix)) cfg.FkWebListenPrefix = FkWebListenPrefix;
+            if (FkWebMaxBodyBytes is > 0) cfg.FkWebMaxBodyBytes = FkWebMaxBodyBytes.Value;
             if (AllowSimulator.HasValue) cfg.AllowSimulator = AllowSimulator.Value;
             if (Devices is { Count: > 0 }) cfg.Devices = Devices;
             return cfg;
@@ -310,6 +344,8 @@ public static class ConnectorConfigLoader
             MaxUploadAttempts = config.MaxUploadAttempts,
             InitialBackoffSeconds = config.InitialBackoffSeconds,
             MaxBackoffSeconds = config.MaxBackoffSeconds,
+            FkWebListenPrefix = config.FkWebListenPrefix,
+            FkWebMaxBodyBytes = config.FkWebMaxBodyBytes,
             AllowSimulator = config.AllowSimulator,
             Devices = config.Devices,
         };

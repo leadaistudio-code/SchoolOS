@@ -13,6 +13,7 @@ type Props = {
   token: string
   submitLabel: string
   minLength: number
+  hint: string
 }
 
 /**
@@ -20,7 +21,7 @@ type Props = {
  * password, and a parent who follows one should not meet a different form than
  * a parent who follows the other.
  */
-export function SetPasswordForm({ action, token, submitLabel, minLength }: Props) {
+export function SetPasswordForm({ action, token, submitLabel, minLength, hint }: Props) {
   const [state, formAction, pending] = useActionState(action, emptyFormState)
 
   return (
@@ -50,7 +51,7 @@ export function SetPasswordForm({ action, token, submitLabel, minLength }: Props
         htmlFor="password"
         required
         error={state.fieldErrors.password}
-        hint={`At least ${minLength} characters, with a capital, a small letter and a number.`}
+        hint={hint}
       >
         <Input
           id="password"

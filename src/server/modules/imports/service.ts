@@ -25,6 +25,7 @@ import {
   commitPackStructure,
   mergeClassLookups,
   parsePackWorkbook,
+  pruneMissingFromPack,
   validatePack,
   type PackCommitStats,
   type PackSheetStat,
@@ -365,7 +366,11 @@ export async function confirmStudentImportMapping(
  * Commit every valid row. Invalid rows are skipped — the dry-run report already
  * listed them. Returns the updated batch summary.
  */
-export async function commitStudentImport(ctx: AppContext, id: string): Promise<ImportBatchSummary> {
+export async function commitStudentImport(
+  ctx: AppContext,
+  id: string,
+  options?: { pruneMissing?: boolean },
+): Promise<ImportBatchSummary> {
   ctx.require('students.import')
   ctx.require('students.create')
 
@@ -387,11 +392,16 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
   }
 
   const meta = readMeta(batch.errors)
+  const pruneMissing = Boolean(options?.pruneMissing && meta.isPack)
   if (meta.isPack) {
     ctx.require('students.edit')
     ctx.require('academics.manage')
     ctx.require('staff.create')
     ctx.require('parents.create')
+  }
+  if (pruneMissing) {
+    ctx.require('students.delete')
+    ctx.require('staff.delete')
   }
 
   const table = await readTable(batch.storageKey, meta, batch.fileName)
@@ -501,6 +511,13 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
       packCommitStats.parents = parentStats.parents
       packCommitStats.parentLinks = parentStats.parentLinks
     }
+    if (pruneMissing) {
+      const pruned = await pruneMissingFromPack(ctx, workbook)
+      if (packCommitStats) {
+        packCommitStats.studentsArchived = pruned.studentsArchived
+        packCommitStats.staffArchived = pruned.staffArchived
+      }
+    }
   }
 
   const nextMeta: ImportBatchMeta = {
@@ -534,7 +551,11 @@ export async function commitStudentImport(ctx: AppContext, id: string): Promise<
     entityType: 'ImportBatch',
     entityId: id,
     summary: meta.isPack
-      ? `School pack: ${created} students added, ${updatedCount} updated${packCommitStats ? `; ${packCommitStats.staff} staff, ${packCommitStats.parentLinks} parent links` : ''}`
+      ? `School pack: ${created} students added, ${updatedCount} updated${packCommitStats ? `; ${packCommitStats.staff} staff, ${packCommitStats.parentLinks} parent links` : ''}${
+          packCommitStats?.studentsArchived || packCommitStats?.staffArchived
+            ? `; archived ${packCommitStats.studentsArchived ?? 0} students / ${packCommitStats.staffArchived ?? 0} staff missing from pack`
+            : ''
+        }`
       : `Imported ${created} student${created === 1 ? '' : 's'} from ${batch.fileName}`,
     after: { created, updated: updatedCount, skipped: rowErrors.length, packCommitStats },
   })
@@ -560,10 +581,26 @@ export async function rollbackStudentImport(ctx: AppContext, id: string): Promis
   if (ids.length === 0) throw conflict('This import has no students to roll back')
 
   await ctx.db.$transaction(async (tx) => {
+    const linkedUsers = await tx.student.findMany({
+      where: { id: { in: ids }, deletedAt: null, userId: { not: null } },
+      select: { userId: true },
+    })
+    const userIds = linkedUsers.flatMap((student) => student.userId ? [student.userId] : [])
+
     await tx.enrollment.updateMany({
       where: { studentId: { in: ids }, isCurrent: true },
       data: { isCurrent: false, leftOn: new Date() },
     })
+    if (userIds.length > 0) {
+      await tx.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { status: 'DISABLED' },
+      })
+      await tx.session.updateMany({
+        where: { userId: { in: userIds }, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    }
     await tx.student.updateMany({
       where: { id: { in: ids }, deletedAt: null },
       data: {

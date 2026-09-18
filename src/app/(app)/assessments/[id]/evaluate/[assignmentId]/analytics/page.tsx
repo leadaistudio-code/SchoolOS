@@ -7,6 +7,8 @@ import { Metric, MetricRow } from '@/components/ui/metric'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState, Notice } from '@/components/ui/states'
 import { QUESTION_TYPE_LABEL, type QuestionTypeKey } from '@/lib/questions'
+import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button-variants'
 
 export const metadata = { title: 'Analytics' }
 
@@ -114,6 +116,16 @@ export default async function AnalyticsPage({
                 low because it was asked in a hard question rather than because it was not
                 understood.
               </p>
+              {data.remedialHref && ctx.can('questionbank.generate') ? (
+                <p className="mt-3">
+                  <Link
+                    href={data.remedialHref}
+                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                  >
+                    Create remedial paper from weak topics
+                  </Link>
+                </p>
+              ) : null}
             </Notice>
           )}
 

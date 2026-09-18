@@ -140,6 +140,9 @@ async function StudentResults({ params }: { params: Record<string, string | unde
       canEdit={ctx.can('students.edit')}
       canCreate={ctx.can('students.create')}
       canSeeFeeAmounts={ctx.can('fees.view')}
+      canExport={ctx.can('students.export')}
+      canMessage={ctx.can('messages.send')}
+      canBroadcast={ctx.can('messages.broadcast')}
     />
   )
 }

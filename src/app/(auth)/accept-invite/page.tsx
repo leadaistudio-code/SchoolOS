@@ -7,7 +7,8 @@ import { acceptInviteAction } from './actions'
 import { inspectToken } from '@/server/auth/reset'
 import { getSessionUser } from '@/server/auth/session'
 import { resolveTenant } from '@/server/tenant'
-import { env } from '@/lib/env'
+import { destinationForExistingSession } from '@/server/auth/login-redirect'
+import { passwordMinLength, passwordPolicyHint } from '@/server/auth/password'
 
 export const metadata = { title: 'Set up your account' }
 
@@ -23,7 +24,11 @@ export default async function AcceptInvitePage({
   ])
 
   if (!tenant) redirect('/login')
-  if (user) redirect('/')
+  if (user) {
+    const destination = destinationForExistingSession({ user, tenant })
+    if (destination.kind === 'redirect') redirect(destination.href)
+    redirect('/login')
+  }
 
   const token = params.token ?? ''
   const link = token ? await inspectToken(token, 'INVITE', tenant.id) : { valid: false as const }
@@ -60,7 +65,8 @@ export default async function AcceptInvitePage({
         action={acceptInviteAction}
         token={token}
         submitLabel="Create my account"
-        minLength={env().PASSWORD_MIN_LENGTH}
+        minLength={passwordMinLength(link.roleKeys)}
+        hint={passwordPolicyHint(link.roleKeys)}
       />
 
       <p className="mt-8 text-xs text-ink-subtle flex items-center gap-1.5">

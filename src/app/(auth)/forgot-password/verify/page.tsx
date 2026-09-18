@@ -4,6 +4,7 @@ import { VerifyOtpForm } from './verify-form'
 import { AuthShell } from '../../_components/auth-shell'
 import { getSessionUser } from '@/server/auth/session'
 import { resolveTenant } from '@/server/tenant'
+import { destinationForExistingSession } from '@/server/auth/login-redirect'
 
 export const metadata = { title: 'Enter your code' }
 
@@ -19,7 +20,11 @@ export default async function VerifyOtpPage({
   ])
 
   if (!tenant) redirect('/login')
-  if (user) redirect('/')
+  if (user) {
+    const destination = destinationForExistingSession({ user, tenant })
+    if (destination.kind === 'redirect') redirect(destination.href)
+    redirect('/login')
+  }
   // No challenge means somebody arrived here directly.
   if (!params.c) redirect('/forgot-password')
 

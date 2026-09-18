@@ -18,6 +18,23 @@ describe('password policy', () => {
     expect(checkPasswordPolicy('ALLUPPERCASE1')).toContain('Must contain a lowercase letter')
     expect(checkPasswordPolicy('NoDigitsHere')).toContain('Must contain a number')
   })
+
+  it('lets teachers and parents use a 6-character password including digits only', () => {
+    expect(checkPasswordPolicy('123456', { roleKeys: ['TEACHER'] })).toEqual([])
+    expect(checkPasswordPolicy('384921', { roleKeys: ['PARENT'] })).toEqual([])
+    expect(checkPasswordPolicy('12345', { roleKeys: ['TEACHER'] })).toContain(
+      'Must be at least 6 characters',
+    )
+    expect(checkPasswordPolicy('111111', { roleKeys: ['PARENT'] })).toContain(
+      'Must not be a single repeated character',
+    )
+  })
+
+  it('keeps the full policy when a teacher is also an administrator', () => {
+    expect(
+      checkPasswordPolicy('123456', { roleKeys: ['TEACHER', 'SCHOOL_ADMIN'] }),
+    ).toContain('Must be at least 10 characters')
+  })
 })
 
 describe('tenant host resolution', () => {

@@ -24,6 +24,9 @@ dotnet publish (Join-Path $repoRoot "src\MyCampusView.Connect\MyCampusView.Conne
   -r $Runtime `
   --self-contained false `
   -o $workerOut
+if ($LASTEXITCODE -ne 0) {
+  throw "Connect worker publish failed with exit code $LASTEXITCODE."
+}
 
 Write-Host "Publishing setup -> $setupOut"
 dotnet publish (Join-Path $repoRoot "src\MyCampusView.Connect.Setup\MyCampusView.Connect.Setup.csproj") `
@@ -31,6 +34,9 @@ dotnet publish (Join-Path $repoRoot "src\MyCampusView.Connect.Setup\MyCampusView
   -r $Runtime `
   --self-contained false `
   -o $setupOut
+if ($LASTEXITCODE -ne 0) {
+  throw "Connect Setup publish failed with exit code $LASTEXITCODE."
+}
 
 Write-Host "Done."
 Write-Host "  Worker: $workerOut\MyCampusView.Connect.exe"

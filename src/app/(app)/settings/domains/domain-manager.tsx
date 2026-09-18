@@ -122,8 +122,8 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px] items-start">
-      <Card>
-        <CardHeader>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="min-h-16 bg-info-bg">
           <CardTitle>Your Domains</CardTitle>
           <CardDescription>
             Custom domains you have added to your portal. Traffic to these addresses will be routed to your school.
@@ -259,8 +259,8 @@ export function DomainManager({ initialDomains }: { initialDomains: Domain[] }) 
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="min-h-16 bg-[var(--product-50)]">
           <CardTitle>Add Domain</CardTitle>
           <CardDescription>Register a new custom domain.</CardDescription>
         </CardHeader>

@@ -7,7 +7,7 @@ import {
   pathLengthMeters,
 } from '../src/lib/geo'
 import { documentAlerts } from '../src/server/modules/transport/service'
-import { nextStopFor, type TrackedStop } from '../src/server/modules/transport/tracking'
+import { nextStopFor, startTrip, type TrackedStop } from '../src/server/modules/transport/tracking'
 
 /**
  * Transport is the module a parent looks at while their child is standing at a
@@ -218,5 +218,48 @@ describe('vehicle paperwork', () => {
         pollutionExpiresOn: null,
       }),
     ).toEqual([])
+  })
+})
+
+describe('driver assignment authorization', () => {
+  it('looks up a bus through the signed-in driver assignment', async () => {
+    let busWhere: Record<string, unknown> | undefined
+    const ctx = {
+      user: { userId: 'driver-user', firstName: 'D', lastName: 'R' },
+      tenant: { id: 'tenant-1' },
+      require: () => undefined,
+      db: {
+        staff: { findFirst: async () => ({ id: 'staff-1' }) },
+        busTrip: { findFirst: async () => null },
+        bus: {
+          findFirst: async ({ where }: { where: Record<string, unknown> }) => {
+            busWhere = where
+            return null
+          },
+        },
+      },
+    }
+
+    await expect(startTrip(ctx as never, {
+      busId: 'someone-elses-bus',
+      routeId: 'route-1',
+      direction: 'PICKUP',
+    })).rejects.toThrow('Bus')
+    expect(busWhere).toMatchObject({ id: 'someone-elses-bus', driverId: 'staff-1' })
+  })
+
+  it('rejects an account that has no linked staff record', async () => {
+    const ctx = {
+      user: { userId: 'unlinked-user', firstName: 'N', lastName: 'A' },
+      tenant: { id: 'tenant-1' },
+      require: () => undefined,
+      db: { staff: { findFirst: async () => null } },
+    }
+
+    await expect(startTrip(ctx as never, {
+      busId: 'bus-1',
+      routeId: 'route-1',
+      direction: 'PICKUP',
+    })).rejects.toThrow('not linked to a driver')
   })
 })

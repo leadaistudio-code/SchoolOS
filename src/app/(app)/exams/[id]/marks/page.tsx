@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { LinkTabs } from '@/components/ui/tabs'
+import { MarksBulkUpload } from './marks-bulk-upload'
 import { MarksForm } from './marks-form'
 
 export const metadata = { title: 'Marks entry' }
@@ -39,9 +40,19 @@ export default async function MarksPage({
   }
 
   const roster = await marksRoster(ctx, id, selected.id)
+  const paperLabel = `${selected.classSubject.classLevel.name} · ${selected.classSubject.subject.name}`
+  const studentRows = roster.rows.map((row) => ({
+    studentId: row.studentId,
+    rollNumber: row.rollNumber,
+    admissionNo: row.student.admissionNo,
+    name: `${row.student.firstName} ${row.student.lastName}`,
+    marksObtained: row.mark?.marksObtained ?? null,
+    isAbsent: row.mark?.isAbsent ?? false,
+    remarks: row.mark?.remarks ?? '',
+  }))
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title={setup.name}
         breadcrumbs={[{ label: 'Examinations', href: '/exams' }, { label: 'Marks' }]}
@@ -58,19 +69,19 @@ export default async function MarksPage({
         }))}
       />
 
+      <MarksBulkUpload
+        examId={id}
+        examName={setup.name}
+        examSubjectId={selected.id}
+        paperLabel={paperLabel}
+        students={studentRows}
+      />
+
       <MarksForm
         examId={id}
         examSubjectId={selected.id}
         maxMarks={roster.maxMarks}
-        rows={roster.rows.map((row) => ({
-          studentId: row.studentId,
-          rollNumber: row.rollNumber,
-          admissionNo: row.student.admissionNo,
-          name: `${row.student.firstName} ${row.student.lastName}`,
-          marksObtained: row.mark?.marksObtained ?? null,
-          isAbsent: row.mark?.isAbsent ?? false,
-          remarks: row.mark?.remarks ?? '',
-        }))}
+        rows={studentRows}
       />
     </div>
   )

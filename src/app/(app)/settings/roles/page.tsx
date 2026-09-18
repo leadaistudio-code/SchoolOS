@@ -1,11 +1,12 @@
+import Link from 'next/link'
 import { requireContext } from '@/server/context'
 import { listRoles, permissionCatalogue } from '@/server/modules/settings/roles'
-import { PageHeader } from '@/components/page-header'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { SettingsPageHeader, SettingsPanelHeader } from '@/components/settings/settings-page-header'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
-import { NewRoleButton, RoleControls } from './controls'
+import { NewRoleButton, RoleControls, RolePermissionViewer } from './controls'
 
 export const metadata = { title: 'Roles and permissions' }
 
@@ -27,6 +28,7 @@ export default async function RolesPage() {
     Promise.resolve(permissionCatalogue()),
   ])
   const canManage = ctx.can('roles.manage')
+  const canViewUsers = ctx.can('users.view')
 
   const system = roles.filter((r) => r.isSystem)
   const custom = roles.filter((r) => !r.isSystem)
@@ -36,20 +38,21 @@ export default async function RolesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
+      <SettingsPageHeader
         title="Roles and permissions"
         description={`${roles.length} roles · ${totalPermissions} permissions available`}
-        breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Roles' }]}
         actions={canManage ? <NewRoleButton copyFrom={copyOptions} /> : null}
+        icon="KeyRound"
+        tone="warning"
       />
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>Built-in roles</CardTitle>
-          <span className="text-xs text-ink-subtle">
-            Shared across the platform — copy one to change it
-          </span>
-        </CardHeader>
+        <SettingsPanelHeader
+          title="Built-in roles"
+          description="Shared across the platform — copy one to change it."
+          icon="KeyRound"
+          tone="brand"
+        />
         <TableWrap>
           <Table>
             <THead>
@@ -63,8 +66,15 @@ export default async function RolesPage() {
             <TBody>
               {system.map((role) => (
                 <TR key={role.id}>
-                  <TD className="text-sm font-medium text-ink">
-                    {role.name}
+                  <TD>
+                    <RolePermissionViewer
+                      name={role.name}
+                      description={role.description}
+                      members={role._count.users}
+                      isSystem
+                      catalogue={catalogue}
+                      granted={role.permissions.map((permission) => permission.permission.key)}
+                    />
                     <Badge tone="neutral" className="ml-2">
                       built-in
                     </Badge>
@@ -73,8 +83,18 @@ export default async function RolesPage() {
                   <TD align="right" className="text-sm tnum">
                     {role.permissions.length}
                   </TD>
-                  <TD align="right" className="text-sm tnum">
-                    {role._count.users}
+                  <TD align="right">
+                    {canViewUsers ? (
+                      <Link
+                        href={`/settings/users?roleId=${role.id}&status=CURRENT`}
+                        className="inline-flex min-w-8 items-center justify-center rounded-full bg-[var(--product-50)] px-2.5 py-1 text-sm font-semibold text-[var(--product-600)] tnum hover:bg-[var(--product-100)] hover:underline"
+                        aria-label={`View ${role._count.users} people with the ${role.name} role`}
+                      >
+                        {role._count.users}
+                      </Link>
+                    ) : (
+                      <span className="text-sm tnum">{role._count.users}</span>
+                    )}
                   </TD>
                 </TR>
               ))}
@@ -84,10 +104,12 @@ export default async function RolesPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle>Your school&apos;s roles</CardTitle>
-          <span className="text-xs text-ink-subtle">Editable, and only visible to this school</span>
-        </CardHeader>
+        <SettingsPanelHeader
+          title="Your school’s roles"
+          description="Editable roles visible only to this school."
+          icon="KeyRound"
+          tone="warning"
+        />
         {custom.length === 0 ? (
           <EmptyState
             title="No custom roles"
@@ -117,13 +139,32 @@ export default async function RolesPage() {
               <TBody>
                 {custom.map((role) => (
                   <TR key={role.id}>
-                    <TD className="text-sm font-medium text-ink">{role.name}</TD>
+                    <TD>
+                      <RolePermissionViewer
+                        name={role.name}
+                        description={role.description}
+                        members={role._count.users}
+                        isSystem={false}
+                        catalogue={catalogue}
+                        granted={role.permissions.map((permission) => permission.permission.key)}
+                      />
+                    </TD>
                     <TD className="text-sm text-ink-muted">{role.description ?? '—'}</TD>
                     <TD align="right" className="text-sm tnum">
                       {role.permissions.length}
                     </TD>
-                    <TD align="right" className="text-sm tnum">
-                      {role._count.users}
+                    <TD align="right">
+                      {canViewUsers ? (
+                        <Link
+                          href={`/settings/users?roleId=${role.id}&status=CURRENT`}
+                          className="inline-flex min-w-8 items-center justify-center rounded-full bg-[var(--product-50)] px-2.5 py-1 text-sm font-semibold text-[var(--product-600)] tnum hover:bg-[var(--product-100)] hover:underline"
+                          aria-label={`View ${role._count.users} people with the ${role.name} role`}
+                        >
+                          {role._count.users}
+                        </Link>
+                      ) : (
+                        <span className="text-sm tnum">{role._count.users}</span>
+                      )}
                     </TD>
                     {canManage ? (
                       <TD align="right">
