@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
 import { ApiException, notFound } from '@/server/api/response'
 import { audit } from '@/server/audit'
@@ -812,7 +813,7 @@ export async function processEvaluationJob(evaluationJobId: string, tenantId: st
               feedback: row.feedback,
               needsReview: row.needsReview,
               reviewStatus: 'PENDING',
-              rubricNotes: row.rubricNotes,
+              rubricNotes: row.rubricNotes as Prisma.InputJsonValue,
             })),
           })
         } else {
