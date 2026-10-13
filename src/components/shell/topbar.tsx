@@ -13,9 +13,12 @@ import {
   PanelLeftOpen,
   School,
   ShieldAlert,
+  UserRound,
 } from 'lucide-react'
 import { GlobalSearch } from './global-search'
 import { NotificationMenu } from './notification-menu'
+import { QuickActions } from './quick-actions'
+import type { QuickAction } from '@/lib/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar } from '@/components/ui/identity'
 import { cn } from '@/lib/utils'
@@ -23,6 +26,7 @@ import { cn } from '@/lib/utils'
 export type TopbarUser = {
   firstName: string
   lastName: string
+  displayName: string | null
   email: string | null
   roleLabel: string
   avatarUrl: string | null
@@ -52,6 +56,7 @@ export function Topbar({
   onToggleCollapse,
   onOpenMenu,
   assistant,
+  quickActions,
 }: {
   user: TopbarUser
   unreadCount: number
@@ -66,6 +71,7 @@ export function Topbar({
    * need to know about entitlements.
    */
   assistant?: React.ReactNode
+  quickActions?: QuickAction[]
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
@@ -90,7 +96,7 @@ export function Topbar({
       {user.impersonated ? (
         <div className="flex flex-wrap items-center justify-center gap-2 border-b border-[color-mix(in_srgb,var(--warning)_25%,transparent)] bg-warning-bg px-4 py-1.5 text-xs text-warning">
           <ShieldAlert className="size-3.5" aria-hidden />
-          Impersonating this school. Every action is recorded in the audit log.
+          MyCampus Support · full school access. Every action is recorded in the audit log.
           <form action="/api/v1/auth/stop-impersonation" method="post">
             <button className="font-semibold underline">Exit</button>
           </form>
@@ -124,6 +130,8 @@ export function Topbar({
         <GlobalSearch />
 
         {assistant ? <div className="ml-2 hidden sm:block">{assistant}</div> : null}
+
+        <QuickActions actions={quickActions ?? []} />
 
         <div className="ml-auto flex items-center gap-1">
           {sessionName ? (
@@ -170,7 +178,7 @@ export function Topbar({
               />
               <span className="hidden text-left leading-tight md:block">
                 <span className="block text-sm font-semibold text-ink">
-                  {user.firstName} {user.lastName}
+                  {user.displayName?.trim() || `${user.firstName} ${user.lastName}`.trim()}
                 </span>
                 <span className="block text-xs text-ink-subtle">{user.roleLabel}</span>
               </span>
@@ -190,12 +198,15 @@ export function Topbar({
                   />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink">
-                      {user.firstName} {user.lastName}
+                      {user.displayName?.trim() || `${user.firstName} ${user.lastName}`.trim()}
                     </p>
                     <p className="truncate text-xs text-ink-subtle">{user.email}</p>
                   </div>
                 </div>
 
+                <MenuLink href="/account/profile" icon={UserRound} onClick={() => setMenuOpen(false)}>
+                  Edit profile
+                </MenuLink>
                 <MenuLink href="/account/password" icon={KeyRound} onClick={() => setMenuOpen(false)}>
                   Password &amp; security
                 </MenuLink>

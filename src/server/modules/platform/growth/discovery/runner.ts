@@ -4,6 +4,59 @@ import { buildSearchQueries } from '@/lib/lead-discovery'
 import { annotateHit, getLeadDiscoveryProvider } from './provider'
 import { candidateKey, extractSchoolFromHits, scoreDiscovery } from './extract'
 import { shouldAutoCreate, syncCandidateToCrm } from './sync'
+import { findSchoolContacts, mergeFindings } from './contacts'
+import { overallContactConfidence, parseContactFindings, type ContactFindings } from '@/lib/lead-discovery'
+import type { Prisma } from '@prisma/client'
+
+/** Contact details are looked up again at most this often per school. */
+const CONTACT_RECHECK_MS = 14 * 24 * 60 * 60 * 1000
+
+function contactColumns(findings: ContactFindings, checkedAt: Date) {
+  return {
+    email: findings.email?.value ?? null,
+    phone: findings.phone?.value ?? null,
+    alternatePhone: findings.otherPhones[0]?.value ?? null,
+    address: findings.address?.value ?? null,
+    website: findings.website?.value ?? null,
+    contactConfidence: overallContactConfidence(findings),
+    contactFindings: findings as unknown as Prisma.InputJsonValue,
+    contactCheckedAt: checkedAt,
+  }
+}
+
+/** Re-runs the contact lookup for one discovered school. */
+export async function refreshDiscoveryContacts(candidateId: string) {
+  const candidate = await prisma.crmDiscoveryCandidate.findUnique({
+    where: { id: candidateId },
+    include: { evidence: { orderBy: { weight: 'desc' }, take: 6 } },
+  })
+  if (!candidate) throw new Error('Discovery not found')
+  const provider = getLeadDiscoveryProvider()
+  if (provider.name === 'none') {
+    throw new Error('No search provider configured (set LEAD_DISCOVERY_SEARCH_DRIVER and its API key)')
+  }
+  const previous = parseContactFindings(candidate.contactFindings)
+  const { findings } = await findSchoolContacts(provider, {
+    ...candidate,
+    seedEmail: candidate.email,
+    seedPhone: candidate.phone,
+    seedAddress: candidate.address,
+    hits: candidate.evidence.map((e) => ({ title: e.title ?? '', url: e.url, snippet: e.snippet ?? '' })),
+  })
+  const merged = mergeFindings(previous, findings)
+  const cols = contactColumns(merged, new Date())
+  return prisma.crmDiscoveryCandidate.update({
+    where: { id: candidate.id },
+    data: {
+      ...cols,
+      email: cols.email ?? candidate.email,
+      phone: cols.phone ?? candidate.phone,
+      alternatePhone: cols.alternatePhone ?? candidate.alternatePhone,
+      address: cols.address ?? candidate.address,
+      website: cols.website ?? candidate.website,
+    },
+  })
+}
 
 export type DiscoveryRunReport = {
   runId: string
@@ -115,12 +168,44 @@ export async function runSchoolLeadDiscovery(
         }
         seenKeys.add(key)
 
-        const scored = scoreDiscovery(extracted, annotated)
-
         const existing = await prisma.crmDiscoveryCandidate.findFirst({
           where: { normalizedKey: key },
           orderBy: { discoveredAt: 'desc' },
         })
+
+        let contacts: ReturnType<typeof contactColumns> | null = null
+        if (!extracted.reject) {
+          const previous = parseContactFindings(existing?.contactFindings)
+          const fresh =
+            existing?.contactCheckedAt && Date.now() - existing.contactCheckedAt.getTime() < CONTACT_RECHECK_MS
+          let findings = previous
+          if (!fresh) {
+            try {
+              const lookup = await findSchoolContacts(provider, {
+                ...extracted,
+                city: extracted.city ?? location.city,
+                state: extracted.state ?? location.state,
+                website: extracted.website ?? existing?.website,
+                seedEmail: extracted.email,
+                seedPhone: extracted.phone,
+                seedAddress: extracted.address,
+                hits,
+              })
+              report.queries += lookup.queries
+              findings = mergeFindings(previous, lookup.findings)
+            } catch (err) {
+              report.errors.push(`Contacts ${extracted.schoolName}: ${err instanceof Error ? err.message : String(err)}`)
+            }
+          }
+          if (findings) {
+            contacts = contactColumns(findings, fresh ? existing!.contactCheckedAt! : new Date())
+            extracted.email = contacts.email ?? extracted.email
+            extracted.phone = contacts.phone ?? extracted.phone
+            extracted.website = contacts.website ?? extracted.website
+          }
+        }
+
+        const scored = scoreDiscovery(extracted, annotated)
 
         if (scored.verificationStatus === 'REJECTED' || extracted.reject) {
           report.rejected += 1
@@ -184,9 +269,18 @@ export async function runSchoolLeadDiscovery(
               confidenceScore: scored.confidenceScore,
               salesPriority: scored.salesPriority,
               opportunityScore: scored.opportunityScore,
-              phone: existing.phone || extracted.phone || null,
-              email: existing.email || extracted.email || null,
-              website: existing.website || extracted.website || null,
+              phone: contacts?.phone ?? (existing.phone || extracted.phone || null),
+              email: contacts?.email ?? (existing.email || extracted.email || null),
+              website: contacts?.website ?? (existing.website || extracted.website || null),
+              ...(contacts
+                ? {
+                    alternatePhone: contacts.alternatePhone ?? existing.alternatePhone,
+                    address: contacts.address ?? existing.address,
+                    contactConfidence: contacts.contactConfidence,
+                    contactFindings: contacts.contactFindings,
+                    contactCheckedAt: contacts.contactCheckedAt,
+                  }
+                : {}),
               openingEvidence: extracted.openingEvidence ?? existing.openingEvidence,
               discoverySummary: extracted.discoverySummary ?? existing.discoverySummary,
               whyThisLead: extracted.whyThisLead ?? existing.whyThisLead,
@@ -230,9 +324,17 @@ export async function runSchoolLeadDiscovery(
               contactPerson: extracted.contactPerson ?? null,
               designation: extracted.designation ?? null,
               phone: extracted.phone ?? null,
-              alternatePhone: extracted.alternatePhone ?? null,
+              alternatePhone: contacts?.alternatePhone ?? extracted.alternatePhone ?? null,
               email: extracted.email ?? null,
               website: extracted.website ?? null,
+              address: contacts?.address ?? null,
+              ...(contacts
+                ? {
+                    contactConfidence: contacts.contactConfidence,
+                    contactFindings: contacts.contactFindings,
+                    contactCheckedAt: contacts.contactCheckedAt,
+                  }
+                : {}),
               verificationStatus: scored.verificationStatus,
               confidenceScore: scored.confidenceScore,
               salesPriority: scored.salesPriority,

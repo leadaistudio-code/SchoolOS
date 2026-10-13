@@ -18,6 +18,8 @@ const REDACTED = '[redacted]'
 const SENSITIVE_FIELDS = new Set([
   'passwordHash',
   'password',
+  'passwordEncrypted',
+  'resendKeyEncrypted',
   'mfaSecret',
   'tokenHash',
   'providerSignature',

@@ -16,8 +16,8 @@ import { cn } from '@/lib/utils'
  * belongs on the marketing site, the platform console and the signed-out
  * shell — never in place of a customer's identity.
  *
- * The assets are derived from `public/brand/mycampusview.svg` by
- * `scripts/brand-assets.py`, which lifts the artwork off the navy card it
+ * The assets are derived from `docs/brand/mycampusview-logo-master.jpg` by
+ * `scripts/brand-assets.py`, which lifts the artwork off the navy field it
  * ships on and crops it to its own bounds. They are therefore transparent and
  * edge-to-edge: whatever is behind the logo is the logo's background, and the
  * component adds no plate, padding or box of its own.
@@ -30,24 +30,24 @@ import { cn } from '@/lib/utils'
 /**
  * The two cuts, each on the two grounds. Nothing else references these paths.
  *
- * `dark` is the artwork as drawn, with the cream wordmark it carries on the
- * master. `light` is the same lockup with those glyphs in the card's own navy,
- * because cream measures 1.1:1 against white and simply disappears.
+ * `dark` is the artwork as drawn, with the white wordmark it carries on the
+ * master. `light` is the same lockup with those glyphs in the master's navy,
+ * because white on white simply disappears.
  */
 const ASSET = {
   /** Symbol and wordmark, side by side. The default everywhere. */
   lockup: {
     light: '/brand/mycampusview-lockup-dark.png',
     dark: '/brand/mycampusview-lockup.png',
-    w: 2392,
-    h: 422,
+    w: 1198,
+    h: 199,
   },
   /** The symbol alone. Console topbars, avatars, anything narrow. */
   mark: {
     light: '/brand/mycampusview-mark.png',
     dark: '/brand/mycampusview-mark.png',
-    w: 958,
-    h: 1024,
+    w: 410,
+    h: 404,
   },
 } as const
 
@@ -258,20 +258,16 @@ function FallbackWordmark({
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <svg viewBox="0 0 32 32" style={{ width: glyph, height: glyph }} className="shrink-0" aria-hidden>
-        <rect width="32" height="32" rx="8" fill="#0a1a3f" />
-        <g stroke="#f8e8d5" strokeWidth="2" strokeLinecap="round">
-          <path d="M9 12h14M9 17h14M9 22h8" opacity="0.9" />
-        </g>
-        <circle cx="23.5" cy="22" r="2.5" fill="#f46527" />
+        <rect width="32" height="32" rx="8" fill="#002046" />
+        <circle cx="15" cy="14" r="8" fill="none" stroke="#e8b84a" strokeWidth="2.5" />
+        <path d="M9.5 20 5 25" stroke="#e8b84a" strokeWidth="3" strokeLinecap="round" />
       </svg>
       <span
-        className={cn(
-          'font-semibold tracking-[-0.02em]',
-          onDark ? 'text-[#f8e8d5]' : 'text-[#0a1a3f]',
-        )}
+        className="font-extrabold tracking-[-0.02em]"
         style={{ fontSize: Math.round(height * 0.58) }}
       >
-        MyCampusView
+        <span className={onDark ? 'text-white' : 'text-[#002046]'}>MyCampus</span>
+        <span className="text-[#f45a1e]">View</span>
       </span>
     </span>
   )

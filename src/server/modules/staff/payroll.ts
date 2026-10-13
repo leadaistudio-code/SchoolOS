@@ -49,9 +49,13 @@ export const payslipDeductionSchema = manualDeductionSchema({
   id: z.string().min(1),
 })
 
+export const SALARY_PAYMENT_MODES = ['BANK_TRANSFER', 'CASH', 'CHEQUE', 'UPI'] as const
+
 export const payslipStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum(['DRAFT', 'PUBLISHED', 'PAID']),
+  paymentMode: z.enum(SALARY_PAYMENT_MODES).optional(),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date').optional(),
 })
 
 const MONTHS = [
@@ -407,11 +411,22 @@ export async function setPayslipStatus(
     )
   }
 
+  const paying = input.status === 'PAID'
+  let paidAt: Date | null = null
+  if (paying) {
+    paidAt = input.paidOn ? attendanceDate(input.paidOn) : new Date()
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
+    if (input.paidOn && input.paidOn > today) {
+      throw new ApiException(400, 'VALIDATION', 'The payment date cannot be in the future.')
+    }
+  }
+
   const changed = await ctx.db.staffPayslip.updateMany({
     where: { id: input.id, status: payslip.status, updatedAt: payslip.updatedAt },
     data: {
       status: input.status,
-      paidAt: input.status === 'PAID' ? new Date() : null,
+      paidAt,
+      paymentMode: paying ? input.paymentMode ?? 'BANK_TRANSFER' : null,
     },
   })
   if (changed.count !== 1) {
@@ -435,8 +450,14 @@ export async function setPayslipStatus(
     entityId: input.id,
     summary,
     before: { status: payslip.status },
-    after: { status: updated.status },
+    after: paying
+      ? { status: updated.status, paymentMode: updated.paymentMode, paidAt: updated.paidAt }
+      : { status: updated.status },
   })
+  if (paying) {
+    const { syncPayslipLedger } = await import('@/server/modules/accounts/posting')
+    await syncPayslipLedger(ctx.tenant.id, updated.id)
+  }
   return updated
 }
 

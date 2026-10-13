@@ -9,7 +9,9 @@ export type RawCapableClient = {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>
 }
 
-export type DocumentKind = 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD'
+export type DocumentKind =
+  | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
+  | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
 
 const PREFIX: Record<DocumentKind, string> = {
   INVOICE: 'INV',
@@ -18,6 +20,23 @@ const PREFIX: Record<DocumentKind, string> = {
   CERTIFICATE: 'CRT',
   ADMIT_CARD: 'ADM',
   LEAD: 'LEAD',
+  JOURNAL: 'JV',
+  STORE_SALE: 'STR',
+  STORE_PURCHASE: 'GRN',
+  TC: 'TC',
+}
+
+const TABLE: Record<DocumentKind, string> = {
+  INVOICE: 'FeeInvoice',
+  RECEIPT: 'FeeReceipt',
+  REFUND: 'FeeInvoice',
+  CERTIFICATE: 'Certificate',
+  ADMIT_CARD: 'AdmitCard',
+  LEAD: 'AdmissionLead',
+  JOURNAL: 'JournalEntry',
+  STORE_SALE: 'StoreSale',
+  STORE_PURCHASE: 'StorePurchase',
+  TC: 'TransferCertificate',
 }
 
 /**
@@ -43,16 +62,7 @@ export async function nextDocumentNumber(
 ): Promise<string> {
   const prefix = `${PREFIX[params.kind]}-${params.sessionLabel}-`
 
-  const table =
-    params.kind === 'RECEIPT'
-      ? 'FeeReceipt'
-      : params.kind === 'CERTIFICATE'
-        ? 'Certificate'
-        : params.kind === 'ADMIT_CARD'
-          ? 'AdmitCard'
-          : params.kind === 'LEAD'
-            ? 'AdmissionLead'
-            : 'FeeInvoice'
+  const table = TABLE[params.kind]
 
   const column = params.kind === 'LEAD' ? 'reference' : 'number'
 

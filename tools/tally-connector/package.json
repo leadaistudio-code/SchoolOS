@@ -1,0 +1,99 @@
+{
+  "name": "mycampusview-tally-connector",
+  "productName": "MyCampusView Tally Connector",
+  "version": "1.0.2",
+  "description": "Official Windows connector that syncs MyCampusView fee receipts with Tally.ERP 9.",
+  "author": "MyCampusView",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "gui/main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "cli": "node index.mjs",
+    "brand": "node scripts/prepare-brand-assets.cjs",
+    "predist": "node scripts/prepare-brand-assets.cjs",
+    "service:install": "node service/install.cjs",
+    "service:uninstall": "node service/uninstall.cjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.4"
+  },
+  "build": {
+    "appId": "com.mycampusview.tallyconnector",
+    "productName": "MyCampusView Tally Connector",
+    "copyright": "Copyright Â© MyCampusView",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "gui/**/*",
+      "lib/**/*",
+      "service/**/*",
+      "index.mjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "lib",
+        "to": "lib"
+      },
+      {
+        "from": "service",
+        "to": "service"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "build/icon.png"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "build/icon.ico"
+      },
+      {
+        "from": "build/logo-wide.png",
+        "to": "build/logo-wide.png"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "MyCampusView-Tally-Connector-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker",
+      "signtoolOptions": {
+        "publisherName": "MyCampusView"
+      }
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MyCampusView Tally Connector",
+      "uninstallDisplayName": "MyCampusView Tally Connector",
+      "license": "build/license.txt",
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

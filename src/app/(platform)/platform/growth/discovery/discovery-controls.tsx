@@ -4,12 +4,40 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
+import { SearchCheck } from 'lucide-react'
 import {
   createCrmLeadFromDiscoveryAction,
+  findContactsAction,
   markVerifiedAction,
   rejectDiscoveryAction,
   runDiscoveryNowAction,
 } from './actions'
+
+export function FindContactsButton({ id, label = 'Find contact details' }: { id: string; label?: string }) {
+  const router = useRouter()
+  const toast = useToast()
+  const [pending, start] = React.useTransition()
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={pending}
+      onClick={() =>
+        start(async () => {
+          const result = await findContactsAction(id)
+          toast.push({
+            tone: result.ok ? 'success' : 'error',
+            title: result.ok ? 'Contact search finished' : 'Contact search failed',
+            description: result.message,
+          })
+          router.refresh()
+        })
+      }
+    >
+      <SearchCheck aria-hidden /> {pending ? 'Searching Maps, web and school site…' : label}
+    </Button>
+  )
+}
 
 export function RunDiscoveryButton() {
   const router = useRouter()
@@ -41,17 +69,26 @@ export function CandidateActions({
   id,
   crmSchoolId,
   website,
+  compact = false,
 }: {
   id: string
   crmSchoolId: string | null
   website: string | null
+  /** One row for table cells. */
+  compact?: boolean
 }) {
   const router = useRouter()
   const toast = useToast()
   const [pending, start] = React.useTransition()
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div
+      className={
+        compact
+          ? 'flex flex-nowrap items-center justify-end gap-1.5 whitespace-nowrap'
+          : 'flex flex-wrap items-center gap-2'
+      }
+    >
       {website ? (
         <a
           href={website}
@@ -59,7 +96,7 @@ export function CandidateActions({
           rel="noreferrer"
           className="text-sm font-medium text-[var(--brand-600)] hover:underline"
         >
-          Open website
+          {compact ? 'Website' : 'Open website'}
         </a>
       ) : null}
       {crmSchoolId ? (
@@ -67,7 +104,7 @@ export function CandidateActions({
           href={`/platform/growth/schools/${crmSchoolId}`}
           className="text-sm font-medium text-[var(--brand-600)] hover:underline"
         >
-          Open CRM lead
+          {compact ? 'CRM lead' : 'Open CRM lead'}
         </a>
       ) : (
         <Button
@@ -89,7 +126,7 @@ export function CandidateActions({
             })
           }
         >
-          Create CRM lead
+          {compact ? 'Add to CRM' : 'Create CRM lead'}
         </Button>
       )}
       <Button
@@ -107,7 +144,7 @@ export function CandidateActions({
           })
         }
       >
-        Mark verified
+        {compact ? 'Verify' : 'Mark verified'}
       </Button>
       <Button
         size="sm"

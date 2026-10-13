@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>MyCampusView — Quotation MCV/Q/2026-27/105 · Green Valley Public School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0a1024; --ink-soft: #3a4254; --ink-faint: #6b7385;
+    --wash: #f4f5f8; --rule: #d8dce6;
+    --violet: #5b3fd4; --violet-deep: #3d28a8; --violet-soft: #efeaff;
+    --mint: #1f9d5c; --mint-soft: #e8f8ef; --lime: #b8e04a; --red: #b42318;
+    --on-dark: #f6f5f2; --on-dark-soft: #b0b6c6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+  html, body {
+    background: #cfcad8; color: var(--ink);
+    font-family: "Source Sans 3", "Segoe UI", sans-serif; font-size: 10.5pt; line-height: 1.42;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page {
+    width: 210mm; height: 297mm; margin: 12px auto; background: #fff; overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(10,16,36,.18);
+    break-after: page; page-break-after: always;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+  @media print { html, body { background: #fff; } .page { margin: 0; box-shadow: none; } }
+
+  .hdr { background: #000; padding: 11px 12mm; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .hdr img { height: 38px; display: block; }
+  .hdr-meta { text-align: right; color: var(--on-dark-soft); font-size: 9.5pt; line-height: 1.3; }
+  .hdr-meta strong { display: block; color: var(--on-dark); font-size: 12pt; }
+  .pf {
+    margin-top: auto; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12mm; border-top: 1px solid var(--rule); background: var(--wash); font-size: 9pt; color: var(--ink-faint);
+  }
+  .pf strong { color: var(--ink); }
+  .body { padding: 8mm 12mm 6mm; display: flex; flex-direction: column; gap: 5mm; }
+
+  .eyebrow { font-family: Manrope, sans-serif; font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--violet); }
+  h1.t { font-family: Manrope, sans-serif; font-size: 20pt; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px; }
+  .sub { color: var(--ink-faint); font-size: 10.5pt; margin-top: 3px; }
+  h3 { font-family: Manrope, sans-serif; font-weight: 800; }
+
+  .meta { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .meta div { padding: 3mm 4mm; background: var(--wash); }
+  .meta div + div { border-left: 1px solid var(--rule); }
+  .meta small { display: block; font-size: 8pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .meta span { font-weight: 700; font-size: 10.5pt; }
+
+  .pack {
+    border-radius: 14px; color: var(--on-dark); padding: 7mm 8mm;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(91,63,212,.35), transparent 55%),
+      radial-gradient(90% 70% at 0% 100%, rgba(31,157,92,.22), transparent 50%),
+      linear-gradient(160deg, #000 0%, #0d1224 55%, #0a1024 100%);
+  }
+  .pack .tag { font-family: Manrope, sans-serif; font-size: 9pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--lime); }
+  .pack h2 { font-family: Manrope, sans-serif; font-size: 30pt; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; margin: 2mm 0 2mm; }
+  .pack p { color: var(--on-dark-soft); font-size: 11pt; max-width: 150mm; }
+  .prices { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 5mm; }
+  .price { border-radius: 10px; padding: 4.5mm 5mm; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); position: relative; }
+  .price.best { background: rgba(184,224,74,.10); border-color: rgba(184,224,74,.55); }
+  .price .lbl { font-family: Manrope, sans-serif; font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--on-dark-soft); }
+  .price .amt { font-family: Manrope, sans-serif; font-size: 26pt; font-weight: 800; color: #fff; letter-spacing: -.02em; line-height: 1.1; margin-top: 1mm; }
+  .price .amt i { font-style: normal; font-size: 12pt; font-weight: 700; color: var(--on-dark-soft); }
+  .price .note { font-size: 9.5pt; color: var(--on-dark-soft); margin-top: 1.5mm; }
+  .price .flag { position: absolute; top: 4mm; right: 4mm; font-size: 8pt; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; background: var(--lime); color: #0a1024; padding: 2px 8px; border-radius: 999px; font-family: Manrope, sans-serif; }
+
+  .pack .setup { display: flex; justify-content: space-between; align-items: baseline; margin-top: 3.5mm; padding: 3mm 5mm; border-radius: 10px; border: 1px dashed rgba(255,255,255,.25); color: var(--on-dark-soft); font-size: 10.5pt; }
+  .pack .setup b { font-family: Manrope, sans-serif; font-size: 15pt; color: #fff; }
+  table.bill tr.total td small { font-family: "Source Sans 3", sans-serif; font-weight: 400; }
+  .sec { font-family: Manrope, sans-serif; font-size: 10pt; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); border-bottom: 2px solid var(--ink); padding-bottom: 1.5mm; margin-bottom: 3mm; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { font-size: 9.6pt; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .chips.in span { background: var(--mint-soft); color: #136c3f; border: 1px solid #bfe8d1; }
+  .chips.in span::before { content: "✓ "; }
+  .chips.out span { background: #f4f4f6; color: var(--ink-faint); border: 1px dashed #c3c8d4; text-decoration: line-through; text-decoration-color: rgba(107,115,133,.5); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .box { border: 1px solid var(--rule); border-radius: 10px; padding: 4mm 5mm; background: var(--wash); }
+  .box h3 { font-size: 11pt; margin-bottom: 2mm; color: var(--violet-deep); }
+  .box ul { list-style: none; display: grid; gap: 1.4mm; }
+  .box li { font-size: 10pt; color: var(--ink-soft); padding-left: 14px; position: relative; }
+  .box li::before { content: "→"; position: absolute; left: 0; color: var(--violet); font-weight: 800; }
+  .box.dark { background: linear-gradient(145deg, #0a1024, #1a1240); border: 0; }
+  .box.dark h3 { color: var(--lime); }
+  .box.dark li { color: var(--on-dark-soft); }
+  .box.dark li::before { color: var(--lime); }
+
+  .mods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6mm; }
+  .mod { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .mod h3 { font-size: 10.2pt; color: var(--violet-deep); padding: 2mm 3.2mm; background: linear-gradient(90deg, var(--violet-soft), #fff); border-bottom: 1px solid var(--rule); }
+  .mod ul { list-style: none; padding: 2.2mm 3.2mm 2.6mm; display: grid; gap: 1.1mm; }
+  .mod li { font-size: 9pt; line-height: 1.28; color: var(--ink-soft); padding-left: 12px; position: relative; }
+  .mod li::before { content: ""; position: absolute; left: 0; top: 5px; width: 7px; height: 7px; border-radius: 2px; background: var(--mint); }
+  .mod.platform { background: var(--ink); border-color: var(--ink); }
+  .mod.platform h3 { background: transparent; color: var(--lime); border-bottom-color: rgba(255,255,255,.12); }
+  .mod.platform li { color: var(--on-dark-soft); }
+  .mod.platform li::before { background: var(--lime); }
+
+  .body.tight { padding-top: 6mm; gap: 3.5mm; }
+  .body.compact { padding-top: 6.5mm; gap: 4mm; }
+  .body.compact table.bill td { padding: 2.1mm 4mm; }
+  .body.compact .box li { font-size: 9.6pt; }
+  .body.compact .accept p { padding: 2.4mm 0 .8mm; }
+  .body.tight .mods { gap: 2.2mm; }
+  .body.tight .mod h3 { padding: 1.6mm 3mm; font-size: 9.8pt; }
+  .body.tight .mod ul { padding: 1.8mm 3mm 2mm; gap: .7mm; }
+  .body.tight .mod li { font-size: 8.7pt; line-height: 1.24; }
+  .excl { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2.4mm; }
+  .excl div { border: 1px dashed #c3c8d4; border-radius: 8px; padding: 2.4mm 2.8mm; background: var(--wash); display: flex; flex-direction: column; gap: .8mm; }
+  .excl b { font-family: Manrope, sans-serif; font-size: 9.4pt; color: var(--ink); }
+  .excl span { font-size: 8.4pt; line-height: 1.25; color: var(--ink-soft); }
+  .excl em { margin-top: auto; font-style: normal; font-size: 7.6pt; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); }
+
+  table.bill { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  table.bill th { font-family: Manrope, sans-serif; font-size: 9.5pt; text-align: left; padding: 2.8mm 4mm; background: var(--ink); color: #fff; }
+  table.bill th.r, table.bill td.r { text-align: right; white-space: nowrap; }
+  table.bill td { padding: 2.6mm 4mm; font-size: 10pt; border-top: 1px solid var(--rule); color: var(--ink-soft); vertical-align: top; }
+  table.bill td b { color: var(--ink); }
+  table.bill td small { display: block; color: var(--ink-faint); font-size: 8.8pt; }
+  table.bill tr.total td { background: var(--violet-soft); color: var(--ink); font-weight: 800; font-family: Manrope, sans-serif; }
+
+  .terms ol { columns: 2; column-gap: 7mm; padding-left: 4mm; }
+  .terms li { font-size: 8.6pt; color: var(--ink-soft); line-height: 1.32; margin-bottom: 1.4mm; break-inside: avoid; }
+  .accept { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .accept div { border-top: 2px solid var(--ink); padding-top: 2.5mm; }
+  .accept h3 { font-size: 10.5pt; margin-bottom: 1mm; }
+  .accept p { font-size: 9.4pt; color: var(--ink-faint); border-bottom: 1px dotted #aab; padding: 3mm 0 1mm; }
+  .accept .fill { color: var(--ink); font-weight: 700; }
+  .note { font-size: 9pt; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<!-- 1 · summary -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Commercial quotation</strong>Quotation MCV/Q/2026-27/105 · 8 October 2026</div>
+  </header>
+  <div class="body">
+    <div class="meta">
+      <div><small>Prepared for</small><span>Green Valley Public School</span></div>
+      <div><small>Quotation ref</small><span>MCV/Q/2026-27/105</span></div>
+      <div><small>Date</small><span>8 October 2026</span></div>
+      <div><small>Valid until</small><span>7 November 2026</span></div>
+    </div>
+
+    <div class="pack">
+      <div class="tag">Your package</div>
+      <h2>Custom</h2>
+      <p>A package built around what Green Valley asked for: every core MyCampusView module for the office, accounts, teachers and parents, without the operations modules the school has chosen not to use.</p>
+      <div class="prices">
+        <div class="price best">
+          <span class="flag">Save ₹12,000</span>
+          <div class="lbl">Yearly plan</div>
+          <div class="amt">₹2,40,000 <i>/ year</i></div>
+          <div class="note">Billed once a year in advance · GST extra</div>
+        </div>
+        <div class="price">
+          <div class="lbl">Monthly plan</div>
+          <div class="amt">₹21,000 <i>/ month</i></div>
+          <div class="note">₹2,52,000 over 12 months · GST extra</div>
+        </div>
+      </div>
+      <div class="setup"><span>One-time onboarding, data migration &amp; training</span><b>₹20,000</b></div>
+    </div>
+
+    <div>
+      <div class="sec">Included in Custom</div>
+      <div class="chips in"><span>Admissions &amp; front office</span><span>Student information</span><span>Attendance &amp; leave</span><span>Academics &amp; timetable</span><span>Examinations &amp; report cards</span><span>Fees &amp; collections</span><span>Accounts &amp; Tally</span><span>Communication</span><span>Parent self-service</span><span>Staff &amp; HR</span><span>Management &amp; control</span></div>
+    </div>
+    <div>
+      <div class="sec">Not opted by Green Valley</div>
+      <div class="chips out"><span>Transport</span><span>Inventory management</span><span>CCTV live view</span><span>Library</span><span>Events &amp; sports</span></div>
+      <p class="note" style="margin-top:2mm">Any of these can be added later on request with a separate quotation; no re-setup is needed.</p>
+    </div>
+
+    <div class="two">
+      <div class="box"><h3>Included with the subscription</h3><ul>
+        <li>Role-based logins for staff, parents and students</li>
+        <li>School name, logo and colours on app, receipts and report cards</li>
+        <li>All product updates during the subscription</li>
+        <li>Support through the in-app help desk and email</li>
+      </ul></div>
+      <div class="box dark"><h3>Related documents</h3><ul>
+        <li>Proposal MCV/P/2026-27/105 — scope and implementation plan</li>
+        <li>Page 2 — included modules in detail</li>
+        <li>Page 3 — price breakdown, payment and terms</li>
+        <li>Questions: contact@mycampusview.com</li>
+      </ul></div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>Green Valley Public School · Quotation MCV/Q/2026-27/105</span>
+    <span>Confidential</span>
+    <strong>Page 1 / 3</strong>
+  </footer>
+</section>
+
+<!-- 2 · scope -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Scope of the pack</strong>Quotation MCV/Q/2026-27/105 · 8 October 2026</div>
+  </header>
+  <div class="body tight">
+    <div>
+      <div class="eyebrow">Custom · included modules</div>
+      <h1 class="t">Everything Green Valley needs to run the school day</h1>
+      <div class="sub">All included modules work from one student record, on the web portals and the Android app.</div>
+    </div>
+    <div class="mods">
+      <div class="mod"><h3>Admissions &amp; front office</h3><ul><li>Enquiry pipeline with follow-ups and conversion reports</li><li>Online admission form that feeds the pipeline</li><li>Visitor log and appointments</li><li>Gate passes and student pickup with OTP / QR check</li></ul></div><div class="mod"><h3>Student information</h3><ul><li>One record per child: profile, guardians, documents</li><li>Branded student and staff ID cards</li><li>Transfer certificates and year-end promotions</li><li>Bulk import of existing student data</li></ul></div><div class="mod"><h3>Attendance &amp; leave</h3><ul><li>Daily and period-wise registers on phone or desktop</li><li>Instant absence alerts to parents</li><li>Staff attendance with geofence or biometric devices</li><li>Leave apply → approve with balances</li></ul></div><div class="mod"><h3>Academics &amp; timetable</h3><ul><li>Automatic timetable generator with locked periods</li><li>Teacher substitution board with fair allocation</li><li>Homework, classwork log and syllabus tracking</li><li>Academic calendar for staff and parents</li></ul></div><div class="mod"><h3>Examinations &amp; report cards</h3><ul><li>Exam schedules, rooms and admit cards</li><li>Marks entry with review and approval workflow</li><li>Configurable grading and holistic report cards</li><li>Question bank, paper builder and QR certificates</li></ul></div><div class="mod"><h3>Fees &amp; collections</h3><ul><li>Fee structures, instalments and concessions</li><li>Counter, cheque and online collection with receipts</li><li>Live dues, reminders and late-fee rules</li><li>Day-end collection report for the accountant</li></ul></div><div class="mod"><h3>Accounts &amp; Tally</h3><ul><li>Chart of accounts and journal entries</li><li>Trial balance, profit &amp; loss, balance sheet</li><li>Expense heads and expense tracking</li><li>Export of fee and expense vouchers to Tally</li></ul></div><div class="mod"><h3>Communication</h3><ul><li>Notices by class, section or role</li><li>Parent–teacher messaging inside the app</li><li>SMS and WhatsApp notifications</li><li>Daily WhatsApp summary for the principal</li></ul></div><div class="mod"><h3>Parent self-service</h3><ul><li>Parent app: attendance, fees, results, homework</li><li>Online fee payment and receipt download</li><li>Two-way WhatsApp assistant for common queries</li><li>Parent queries routed to the front office</li></ul></div><div class="mod"><h3>Staff &amp; HR</h3><ul><li>Staff records, documents and appraisals</li><li>Leave balances and approvals</li><li>Staff attendance reports</li><li>Role-based logins for every staff member</li></ul></div><div class="mod"><h3>Management &amp; control</h3><ul><li>Live dashboard and school health score</li><li>Standard reports with print / Excel export</li><li>Custom roles and permission-level access</li><li>Audit trail on fees, results and permissions</li></ul></div>
+      <div class="mod platform"><h3>Platform</h3><ul><li>Web portals for every role + Android app</li><li>Your school’s branding throughout</li><li>Two-factor sign-in and role-based access</li><li>Regular backups and data export any time</li></ul></div>
+    </div>
+    <div>
+      <div class="sec">Modules not included in this quotation</div>
+      <div class="excl">
+        <div><b>Transport</b><span>Buses, routes, stops, live GPS tracking and transport fees</span><em>Not opted</em></div><div><b>Inventory management</b><span>School store, stock, purchases and billing (POS)</span><em>Not opted</em></div><div><b>CCTV live view</b><span>Camera viewing for management and parents in the app</span><em>Not opted</em></div><div><b>Library</b><span>Catalogue, issue / return and overdue fines</span><em>Not opted</em></div><div><b>Events &amp; sports</b><span>Event calendar, sports fixtures and results</span><em>Not opted</em></div>
+      </div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>Green Valley Public School · Quotation MCV/Q/2026-27/105</span>
+    <span>Confidential</span>
+    <strong>Page 2 / 3</strong>
+  </footer>
+</section>
+
+<!-- 3 · commercial -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Price &amp; terms</strong>Quotation MCV/Q/2026-27/105 · 8 October 2026</div>
+  </header>
+  <div class="body compact">
+    <div>
+      <div class="eyebrow">Package</div>
+      <h1 class="t">Custom</h1>
+      <div class="sub">Choose either the yearly or the monthly plan. Amounts in Indian Rupees, GST extra.</div>
+    </div>
+    <table class="bill">
+      <tr><th>Package</th><th class="r">Yearly plan</th><th class="r">Monthly plan</th></tr>
+      <tr class="total"><td>Custom<small>All included modules on page 2</small></td><td class="r">₹2,40,000 / year</td><td class="r">₹21,000 / month</td></tr>
+    </table>
+    <p class="note">On the monthly plan the subscription comes to ₹2,52,000 over 12 months, so the yearly plan saves Green Valley ₹12,000 a year.</p>
+
+    <table class="bill">
+      <tr><th>One-time fee</th><th class="r">Amount</th></tr>
+      <tr class="total"><td>Onboarding, data migration &amp; training<small>Remote, by the MyCampusView team · payable once, with the first invoice</small></td><td class="r">₹20,000 one-time</td></tr>
+    </table>
+
+    <div class="two">
+      <div class="box"><h3>Payment terms</h3><ul>
+        <li><b>Yearly:</b> 100% of the annual fee in advance, due within 7 days of invoice</li>
+        <li><b>Monthly:</b> billed each month in advance, minimum 12 months</li>
+        <li>One-time onboarding fee of ₹20,000 with the first invoice</li>
+        <li>Onboarding starts once the first invoice is paid</li>
+        <li>Please quote MCV/Q/2026-27/105 on every payment</li>
+      </ul></div>
+      <div class="box"><h3>Charged separately, if used</h3><ul>
+        <li>SMS and WhatsApp message charges, at actuals</li>
+        <li>Payment-gateway fees on online fee payments</li>
+        <li>Hardware: biometric devices, printers, cards</li>
+        <li>On-site training days and custom development</li>
+        <li>Modules not opted, if added later</li>
+      </ul></div>
+    </div>
+
+    <div class="terms">
+      <div class="sec">Terms &amp; conditions</div>
+      <ol>
+        <li>Prices are in INR and exclude GST, which is charged extra at the applicable rate.</li>
+        <li>This quotation is valid until 7 November 2026. Prices are fixed for the first 12-month term.</li>
+        <li>The subscription covers the modules listed on page 2 only. Modules marked “Not opted” can be added later at a separately quoted price.</li>
+        <li>Green Valley Public School owns its data. A complete export is available at any time and on exit.</li>
+        <li>The school provides student, staff and fee data and is responsible for its accuracy.</li>
+        <li>Support is available Monday to Saturday during business hours (IST), through the in-app help desk and email.</li>
+        <li>Access may be paused after written notice if invoices remain unpaid; it resumes once dues are cleared.</li>
+        <li>Prepaid periods are non-refundable unless agreed in writing. The signed agreement prevails over this quotation.</li>
+      </ol>
+    </div>
+
+    <div>
+      <div class="eyebrow" style="margin-bottom:2mm">Acceptance — please tick one: ☐ Yearly plan &nbsp; ☐ Monthly plan</div>
+      <div class="accept">
+        <div><h3>For Green Valley Public School</h3><p>Name</p><p>Designation</p><p>Signature &amp; school seal</p><p>Date</p></div>
+        <div><h3>For MyCampusView</h3><p>Name: <b class="fill">Manmohan Singh</b></p><p>Designation: <b class="fill">Growth Manager</b></p><p>Signature</p><p>Date</p></div>
+      </div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>Green Valley Public School · Quotation MCV/Q/2026-27/105</span>
+    <span>Confidential</span>
+    <strong>Page 3 / 3</strong>
+  </footer>
+</section>
+
+</body>
+</html>

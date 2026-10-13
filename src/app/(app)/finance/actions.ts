@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
+  bounceCheque,
+  bounceChequeSchema,
+  clearCheque,
+  clearChequeSchema,
   collectPayment,
   collectSchema,
   editPayment,
@@ -51,7 +55,10 @@ import {
   saveTransportFeeRate,
   setInvoiceChargeAmount,
   setInvoiceChargeAmountSchema,
+  setInvoiceDates,
   simulateFeeIncrease,
+  updateInstallmentDates,
+  updateInvoiceGroupDates,
 } from '@/server/modules/finance/simplicity'
 
 export type ActionResult<T = unknown> =
@@ -68,9 +75,12 @@ function fail(err: unknown, fallback: string): ActionResult<never> {
 export async function grantConcessionAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('fees.concession')
   try {
-    const result = await grantConcession(ctx, concessionSchema.parse(payload))
+    const parsed = concessionSchema.parse(payload)
+    const result = await grantConcession(ctx, parsed)
     revalidatePath('/finance/concessions')
     revalidatePath('/finance/students')
+    revalidatePath(`/finance/students/${parsed.studentId}`)
+    revalidatePath(`/finance/students/${parsed.studentId}/edit`)
     revalidatePath('/finance/dues')
     return {
       ok: true,
@@ -215,6 +225,9 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
     revalidatePath('/finance/students')
 
     const parts = [`Receipt ${result.receiptNumber}`]
+    if (result.pendingClearance) {
+      parts.push('cheque pending clearance; dues update once it is marked cleared')
+    }
     if (result.discountedMinor > 0) {
       parts.push(`₹${result.discountedMinor / 100} discounted`)
     }
@@ -328,6 +341,58 @@ export async function editPaymentAction(payload: unknown): Promise<ActionResult>
     return { ok: true, message: 'Receipt details updated.' }
   } catch (err) {
     return fail(err, 'The receipt could not be updated')
+  }
+}
+
+export async function applyLateFinesAction(): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const { applyLateFinesNow } = await import('@/server/modules/finance/dashboard')
+    const r = await applyLateFinesNow(ctx)
+    revalidatePath('/finance')
+    revalidatePath('/finance/dues')
+    if (r.tenants === 0) return { ok: false, message: 'No active late-fee rule. Set one up in Fee Setup first.' }
+    if (r.ambiguousTenants > 0) return { ok: false, message: 'More than one late-fee rule is active. Keep only one active.' }
+    return {
+      ok: true,
+      message: r.updated === 0
+        ? 'Late fines are already up to date.'
+        : `Late fines updated on ${r.updated} invoices (+₹${(r.addedMinor / 100).toLocaleString('en-IN')}).`,
+    }
+  } catch (err) {
+    return fail(err, 'Late fines could not be applied')
+  }
+}
+
+function revalidateChequePaths(paymentId: string, studentId: string) {
+  revalidatePath('/finance')
+  revalidatePath('/finance/payments')
+  revalidatePath(`/finance/payments/${paymentId}`)
+  revalidatePath('/finance/students')
+  revalidatePath(`/finance/students/${studentId}`)
+  revalidatePath('/finance/dues')
+  revalidatePath('/finance/collect')
+}
+
+export async function clearChequeAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.collect')
+  try {
+    const result = await clearCheque(ctx, clearChequeSchema.parse(payload))
+    revalidateChequePaths(result.paymentId, result.studentId)
+    return { ok: true, message: 'Cheque marked cleared. Dues have been settled.' }
+  } catch (err) {
+    return fail(err, 'The cheque could not be marked cleared')
+  }
+}
+
+export async function bounceChequeAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.collect')
+  try {
+    const result = await bounceCheque(ctx, bounceChequeSchema.parse(payload))
+    revalidateChequePaths(result.paymentId, result.studentId)
+    return { ok: true, message: 'Cheque marked bounced. Dues remain open.' }
+  } catch (err) {
+    return fail(err, 'The cheque could not be marked bounced')
   }
 }
 
@@ -468,13 +533,14 @@ export async function saveTransportFeeRateAction(payload: unknown): Promise<Acti
 
 export async function setInvoiceChargeAmountAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext()
-  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice')) {
-    ctx.require('fees.concession')
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice') && !ctx.can('fees.accounts')) {
+    ctx.require('fees.accounts')
   }
   try {
     const updated = await setInvoiceChargeAmount(ctx, setInvoiceChargeAmountSchema.parse(payload))
     revalidatePath('/finance/students')
     revalidatePath(`/finance/students/${updated.studentId}`)
+    revalidatePath(`/finance/students/${updated.studentId}/edit`)
     revalidatePath('/finance/collect')
     revalidatePath('/finance/dues')
     revalidatePath('/finance/invoices')
@@ -484,5 +550,61 @@ export async function setInvoiceChargeAmountAction(payload: unknown): Promise<Ac
     }
   } catch (err) {
     return fail(err, 'The invoice amount could not be updated')
+  }
+}
+
+function revalidateInvoiceViews(studentId?: string) {
+  revalidatePath('/finance', 'layout')
+  if (studentId) {
+    revalidatePath(`/finance/students/${studentId}`)
+    revalidatePath(`/finance/students/${studentId}/edit`)
+  }
+}
+
+export async function setInvoiceDatesAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext()
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice') && !ctx.can('fees.accounts')) {
+    ctx.require('fees.accounts')
+  }
+  try {
+    const updated = await setInvoiceDates(ctx, payload)
+    revalidateInvoiceViews(updated.studentId)
+    revalidatePath(`/finance/invoices/${updated.invoiceId}`)
+    return { ok: true, message: 'Invoice date and due date updated.' }
+  } catch (err) {
+    return fail(err, 'The invoice dates could not be updated')
+  }
+}
+
+export async function updateInstallmentDatesAction(
+  payload: unknown,
+): Promise<ActionResult<{ installmentsChanged: number; invoicesMoved: number }>> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const result = await updateInstallmentDates(ctx, payload)
+    revalidateInvoiceViews()
+    const parts = [
+      `${result.installmentsChanged} installment${result.installmentsChanged === 1 ? '' : 's'} rescheduled`,
+      ...(result.invoicesMoved > 0
+        ? [`${result.invoicesMoved} existing invoice${result.invoicesMoved === 1 ? '' : 's'} moved`]
+        : []),
+    ]
+    return { ok: true, message: `${parts.join(' · ')}.`, data: result }
+  } catch (err) {
+    return fail(err, 'The billing dates could not be saved')
+  }
+}
+
+export async function updateInvoiceGroupDatesAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.structure')
+  try {
+    const result = await updateInvoiceGroupDates(ctx, payload)
+    revalidateInvoiceViews()
+    return {
+      ok: true,
+      message: `${result.invoicesMoved} invoice${result.invoicesMoved === 1 ? '' : 's'} moved to the new dates.`,
+    }
+  } catch (err) {
+    return fail(err, 'The invoice dates could not be saved')
   }
 }

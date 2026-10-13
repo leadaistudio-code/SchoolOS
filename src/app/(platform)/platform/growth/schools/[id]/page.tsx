@@ -43,6 +43,7 @@ import {
   TaskForm,
   VisitForm,
 } from './panels'
+import { SchoolPhotos } from './school-photos'
 
 export const metadata = { title: 'School · Growth CRM' }
 
@@ -131,6 +132,24 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
           { label: 'Schools', href: '/platform/growth/schools' },
           { label: school.name },
         ]}
+        actions={
+          canComms ? (
+            <div className="flex gap-2">
+              <Link
+                href={`/platform/mail/compose?school=${school.id}&template=proposal`}
+                className="rounded-[var(--radius-sm)] bg-[var(--brand-500)] px-3 py-1.5 text-sm font-medium text-[var(--brand-contrast)] hover:bg-[var(--brand-600)]"
+              >
+                Send proposal
+              </Link>
+              <Link
+                href={`/platform/mail/compose?school=${school.id}`}
+                className="rounded-[var(--radius-sm)] border border-line-strong px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-2"
+              >
+                Email
+              </Link>
+            </div>
+          ) : null
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -204,6 +223,24 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
               <p className="sm:col-span-2 text-xs text-ink-subtle">{temp.reasons.join(' · ')}</p>
             </CardContent>
           </Card>
+
+          {school.photos.length > 0 || canEdit ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SchoolPhotos
+                  schoolId={school.id}
+                  canEdit={canEdit}
+                  photos={school.photos.map((p) => ({
+                    id: p.id,
+                    label: `${p.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}${p.createdLabel ? ` · ${p.createdLabel}` : ''}`,
+                  }))}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -516,10 +553,11 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                       {school.visits.map((v) => (
                         <li key={v.id}>
                           <p className="text-sm text-ink">
-                            {format(v.visitedAt, 'd MMM yyyy')}
+                            {v.visitedAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                             {v.meetingType ? ` · ${v.meetingType}` : ''}
+                            {v.contactsMet ? ` · met ${v.contactsMet}` : ''}
                           </p>
-                          <p className="text-xs text-ink-subtle">{v.contactsMet || v.summary}</p>
+                          <p className="whitespace-pre-line text-xs text-ink-subtle">{v.summary}</p>
                         </li>
                       ))}
                     </ul>

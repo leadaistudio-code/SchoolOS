@@ -38,6 +38,10 @@ export const TENANT_SCOPED_MODELS = [
   'AssessmentAssignment',
   'AssessmentAttempt',
   'StudentAnswer',
+  'AnswerSheet',
+  'EvaluationJob',
+  'EvaluatedAnswer',
+  'AiUsageEvent',
   'StudentAttendance',
   'StaffAttendance',
   'StaffSalaryStructure',
@@ -89,6 +93,7 @@ export const TENANT_SCOPED_MODELS = [
   'FeeReminderLog',
   'TransportFeeRate',
   'SchoolExpense',
+  'ExpenseHead',
   'GradingScale',
   'GradeBand',
   'Exam',
@@ -101,6 +106,7 @@ export const TENANT_SCOPED_MODELS = [
   'ReportCardTemplate',
   'CertificateTemplate',
   'Certificate',
+  'TransferCertificate',
   'Homework',
   'HomeworkSubmission',
   'Classwork',
@@ -121,6 +127,12 @@ export const TENANT_SCOPED_MODELS = [
   'AssetCategory',
   'Asset',
   'AssetHistory',
+  'StoreItem',
+  'StockMovement',
+  'StorePurchase',
+  'StorePurchaseLine',
+  'StoreSale',
+  'StoreSaleLine',
   'Visitor',
   'Appointment',
   'AdmissionLead',
@@ -157,6 +169,33 @@ export const TENANT_SCOPED_MODELS = [
   'TeacherRefreshQuestion',
   'TeacherRefreshAttempt',
   'TeacherRefreshAttemptAnswer',
+
+  // Tally.ERP 9 integration
+  'TallyIntegration',
+  'TallyConnector',
+  'TallyPairingCode',
+  'TallyCommand',
+  'TallyLedgerCache',
+  'TallyMapping',
+  'TallyVoucherLink',
+  'TallyAccountingRule',
+  'TallySyncLog',
+  'TallyReconciliationItem',
+
+  // Accounts & ledger
+  'LedgerAccount',
+  'JournalEntry',
+  'JournalLine',
+  'LedgerAccountMap',
+  'LedgerSettings',
+
+  // Daily operations
+  'Substitution',
+  'GatePass',
+  'ParentQuery',
+  // CCTV
+  'CctvSite',
+  'CctvCamera',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -257,6 +296,10 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'CrmDiscoveryRun',
   'CrmDiscoveryCandidate',
   'CrmDiscoveryEvidence',
+  'PlatformMailbox',
+  'PlatformEmail',
+  'PlatformEmailAttachment',
+  'PlatformDocument',
 ])
 
 export function isPlatformOnly(model: string | undefined): boolean {

@@ -22,8 +22,22 @@ export const EXPENSE_PAYMENT_MODES = [
   { value: 'OTHER', label: 'Other' },
 ] as const
 
+export const EXPENSE_NATURES = [
+  {
+    value: 'DIRECT',
+    label: 'Direct expense',
+    hint: 'Cost of delivering teaching: teaching salaries, academic material, student transport, labs, exams, meals.',
+  },
+  {
+    value: 'INDIRECT',
+    label: 'Indirect expense',
+    hint: 'Cost of running the school: admin salaries, rent, electricity, repairs, office, marketing, bank charges.',
+  },
+] as const
+
 export type ExpenseCategoryValue = (typeof EXPENSE_CATEGORIES)[number]['value']
 export type ExpensePaymentModeValue = (typeof EXPENSE_PAYMENT_MODES)[number]['value']
+export type ExpenseNatureValue = (typeof EXPENSE_NATURES)[number]['value']
 
 export function categoryLabel(value: string) {
   return EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value
@@ -31,4 +45,8 @@ export function categoryLabel(value: string) {
 
 export function paymentModeLabel(value: string) {
   return EXPENSE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
+}
+
+export function natureLabel(value: string) {
+  return value === 'DIRECT' ? 'Direct' : 'Indirect'
 }

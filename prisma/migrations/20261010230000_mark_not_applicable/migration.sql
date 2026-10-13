@@ -1,0 +1,1 @@
+ALTER TABLE "Mark" ADD COLUMN "notApplicable" BOOLEAN NOT NULL DEFAULT false;

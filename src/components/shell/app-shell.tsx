@@ -4,7 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
-import type { NavItem } from '@/lib/navigation'
+import type { NavItem, QuickAction } from '@/lib/navigation'
 import { navIconTone, seriesToneClass } from '@/lib/chart-tones'
 import { Sidebar } from './sidebar'
 import { Topbar, type TopbarUser } from './topbar'
@@ -46,6 +46,7 @@ export function AppShell({
   unreadMessages,
   sessionName,
   assistant,
+  quickActions,
   children,
 }: {
   navigation: NavItem[]
@@ -56,6 +57,7 @@ export function AppShell({
   unreadMessages: number
   sessionName: string | null
   assistant?: React.ReactNode
+  quickActions?: QuickAction[]
   children: React.ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = React.useState(false)
@@ -161,6 +163,7 @@ export function AppShell({
             onToggleCollapse={toggleCollapse}
             onOpenMenu={() => setDrawerOpen(true)}
             assistant={assistant}
+            quickActions={quickActions}
           />
           {/* One page container: every screen gets the same gutters and the
               same maximum measure, so nothing has to set its own. */}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requirePlatformContext } from '@/server/context'
-import { runSchoolLeadDiscovery } from '@/server/modules/platform/growth/discovery/runner'
+import { refreshDiscoveryContacts, runSchoolLeadDiscovery } from '@/server/modules/platform/growth/discovery/runner'
 import {
   discoverySettingsSchema,
   locationCreateSchema,
@@ -42,6 +42,25 @@ export async function createCrmLeadFromDiscoveryAction(candidateId: string) {
       ok: true as const,
       message: result.action === 'created' ? 'CRM lead created' : 'CRM lead updated',
       schoolId: result.schoolId,
+    }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function findContactsAction(candidateId: string) {
+  try {
+    const ctx = await requirePlatformContext('platform.crm_edit')
+    const row = await refreshDiscoveryContacts(candidateId)
+    if (row.crmSchoolId) await syncCandidateToCrm(ctx, row.id)
+    revalidatePath('/platform/growth/discovery')
+    revalidatePath(`/platform/growth/discovery/${candidateId}`)
+    const found = [row.email && 'email', row.phone && 'phone', row.address && 'address'].filter(Boolean)
+    return {
+      ok: true as const,
+      message: found.length
+        ? `Found ${found.join(', ')} · contact confidence ${row.contactConfidence}%`
+        : 'No contact details found in public sources',
     }
   } catch (err) {
     return fail(err)

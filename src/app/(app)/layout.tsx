@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getContext } from '@/server/context'
 import { getEntitlements } from '@/server/entitlements'
-import { NAVIGATION, visibleNavigation } from '@/lib/navigation'
+import { NAVIGATION, visibleNavigation, visibleQuickActions } from '@/lib/navigation'
 import { AppShell } from '@/components/shell/app-shell'
 import { ROLE_BY_KEY } from '@/lib/rbac/roles'
 import { unreadThreadCount } from '@/server/modules/messages/service'
@@ -59,6 +59,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       unreadCount={unreadCount}
       unreadMessages={unreadMessages}
       sessionName={session?.name ?? null}
+      quickActions={isPortalOnlyRole(ctx.user.roleKeys) ? [] : visibleQuickActions(navigation)}
       // Three gates, all server-side: the deployment has a model configured,
       // the school's plan includes the module, and this user's role allows it.
       // The API route checks the last two again — the shell deciding not to
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user={{
         firstName: ctx.user.firstName,
         lastName: ctx.user.lastName,
+        displayName: ctx.user.displayName,
         email: ctx.user.email,
         roleLabel,
         avatarUrl: ctx.user.avatarUrl,

@@ -2,9 +2,11 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
+import type { TenantClient } from '@/server/db/tenant-client'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
+import { presetRange } from '@/lib/periods'
 import { accessibleStudentIds, isPortalOnlyRole } from '@/server/scope'
 import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { paymentProvider } from '@/server/providers'
@@ -102,6 +104,94 @@ export type CollectResult = {
   unallocatedMinor: Minor
   discountedMinor: Minor
   invoices: { number: string; appliedMinor: Minor; balanceMinor: Minor }[]
+  /** Cheque receipted but not yet cleared; dues stay open until it is. */
+  pendingClearance?: boolean
+}
+
+type OpenInvoice = {
+  id: string
+  number: string
+  balanceMinor: number
+  totalMinor: number
+  paidMinor: number
+  dueOn: Date
+}
+
+/**
+ * Applies money oldest-first to the given open invoices, records allocations,
+ * updates balances and parks any excess as advance credit. Caller holds the
+ * invoice row locks and the transaction.
+ */
+async function settleAgainstInvoices(
+  tx: Pick<TenantClient, 'feePaymentAllocation' | 'feeInvoice' | 'studentFeeCredit'>,
+  params: {
+    tenantId: string
+    studentId: string
+    paymentId: string
+    amountMinor: number
+    outstanding: OpenInvoice[]
+    receiptNumber: string
+    userId: string
+  },
+) {
+  const applied: CollectResult['invoices'] = []
+  if (params.amountMinor <= 0) return { applied, unallocatedMinor: 0 }
+  const { allocations, unallocatedMinor } = allocatePayment(
+    params.amountMinor,
+    params.outstanding.map((i) => ({ id: i.id, balanceMinor: i.balanceMinor })),
+  )
+
+  for (const allocation of allocations) {
+    const invoice = params.outstanding.find((i) => i.id === allocation.id)!
+    const paidMinor = invoice.paidMinor + allocation.amountMinor
+    const balanceMinor = invoice.totalMinor - paidMinor
+
+    await tx.feePaymentAllocation.create({
+      data: {
+        tenantId: params.tenantId,
+        paymentId: params.paymentId,
+        invoiceId: invoice.id,
+        amountMinor: allocation.amountMinor,
+      },
+    })
+    await tx.feeInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        paidMinor,
+        balanceMinor,
+        status: deriveInvoiceStatus({ totalMinor: invoice.totalMinor, paidMinor, dueOn: invoice.dueOn }),
+      },
+    })
+    applied.push({ number: invoice.number, appliedMinor: allocation.amountMinor, balanceMinor })
+  }
+
+  if (unallocatedMinor > 0) {
+    await tx.studentFeeCredit.create({
+      data: {
+        tenantId: params.tenantId,
+        studentId: params.studentId,
+        type: 'CREDIT',
+        amountMinor: unallocatedMinor,
+        paymentId: params.paymentId,
+        reference: params.receiptNumber,
+        notes: 'Advance payment available for future fees',
+        createdById: params.userId,
+      },
+    })
+  }
+  return { applied, unallocatedMinor }
+}
+
+/** Fire-and-forget: internal ledger always, Tally only for settled payments. */
+function afterPaymentChange(tenantId: string, paymentId: string, options: { tally?: boolean } = {}) {
+  void import('@/server/modules/accounts/posting')
+    .then(({ syncPaymentLedger }) => syncPaymentLedger(tenantId, paymentId))
+    .catch((err) => console.error('[ledger] post hook failed', err))
+  if (options.tally) {
+    void import('@/server/modules/tally/receipts')
+      .then(({ queueFeePaymentForTally }) => queueFeePaymentForTally(tenantId, paymentId))
+      .catch((err) => console.error('[tally] enqueue failed', err))
+  }
 }
 
 export async function feeCollectorOptions(ctx: AppContext) {
@@ -191,6 +281,7 @@ export async function collectPayment(
           appliedMinor: a.amountMinor,
           balanceMinor: a.invoice.balanceMinor,
         })),
+        pendingClearance: existing.status === 'PENDING',
       }
     }
   }
@@ -353,13 +444,8 @@ export async function collectPayment(
       }
     }
 
-    const { allocations, unallocatedMinor } =
-      input.amount > 0
-        ? allocatePayment(
-            input.amount,
-            outstanding.map((i) => ({ id: i.id, balanceMinor: i.balanceMinor })),
-          )
-        : { allocations: [] as { id: string; amountMinor: number }[], unallocatedMinor: 0 }
+    // A cheque is receipted at the counter but only settles dues once it clears.
+    const pendingCheque = input.mode === 'CHEQUE' && input.amount > 0
 
     const paymentNotes = [
       discountedMinor > 0
@@ -379,7 +465,7 @@ export async function collectPayment(
         mode: input.mode,
         // Counter collection is confirmed by the cashier taking it, so it is
         // SUCCESS at once. Gateway payments are not - see startOnlinePayment.
-        status: 'SUCCESS',
+        status: pendingCheque ? 'PENDING' : 'SUCCESS',
         provider: 'manual',
         reference: input.reference,
         billBookNo: input.billBookNo,
@@ -387,44 +473,15 @@ export async function collectPayment(
         idempotencyKey: input.idempotencyKey,
         paidAt,
         collectedById: collector.id,
+        ...(pendingCheque
+          ? {
+              providerResponse: {
+                cheque: { status: 'PENDING', invoiceIds: outstanding.map((i) => i.id) },
+              },
+            }
+          : {}),
       },
     })
-
-    const applied: CollectResult['invoices'] = []
-
-    for (const allocation of allocations) {
-      const invoice = outstanding.find((i) => i.id === allocation.id)!
-      const paidMinor = invoice.paidMinor + allocation.amountMinor
-      const balanceMinor = invoice.totalMinor - paidMinor
-
-      await tx.feePaymentAllocation.create({
-        data: {
-          tenantId: ctx.tenant.id,
-          paymentId: payment.id,
-          invoiceId: invoice.id,
-          amountMinor: allocation.amountMinor,
-        },
-      })
-
-      await tx.feeInvoice.update({
-        where: { id: invoice.id },
-        data: {
-          paidMinor,
-          balanceMinor,
-          status: deriveInvoiceStatus({
-            totalMinor: invoice.totalMinor,
-            paidMinor,
-            dueOn: invoice.dueOn,
-          }),
-        },
-      })
-
-      applied.push({
-        number: invoice.number,
-        appliedMinor: allocation.amountMinor,
-        balanceMinor,
-      })
-    }
 
     const receiptNumber = await nextDocumentNumber(tx, {
       tenantId: ctx.tenant.id,
@@ -435,6 +492,18 @@ export async function collectPayment(
     await tx.feeReceipt.create({
       data: { tenantId: ctx.tenant.id, number: receiptNumber, paymentId: payment.id },
     })
+
+    const { applied, unallocatedMinor } = pendingCheque
+      ? { applied: [] as CollectResult['invoices'], unallocatedMinor: 0 }
+      : await settleAgainstInvoices(tx, {
+          tenantId: ctx.tenant.id,
+          studentId: input.studentId,
+          paymentId: payment.id,
+          amountMinor: input.amount,
+          outstanding,
+          receiptNumber,
+          userId: ctx.user.userId,
+        })
 
     if (discountedMinor > 0) {
       // One audit row per collection keeps the ledger readable; invoice links
@@ -451,28 +520,14 @@ export async function collectPayment(
       })
     }
 
-    if (unallocatedMinor > 0) {
-      await tx.studentFeeCredit.create({
-        data: {
-          tenantId: ctx.tenant.id,
-          studentId: input.studentId,
-          type: 'CREDIT',
-          amountMinor: unallocatedMinor,
-          paymentId: payment.id,
-          reference: receiptNumber,
-          notes: 'Advance payment available for future fees',
-          createdById: ctx.user.userId,
-        },
-      })
-    }
-
     return {
       paymentId: payment.id,
       receiptNumber,
-      allocatedMinor: input.amount - unallocatedMinor,
+      allocatedMinor: pendingCheque ? 0 : input.amount - unallocatedMinor,
       unallocatedMinor,
       discountedMinor,
       invoices: applied,
+      pendingClearance: pendingCheque,
     }
   })
 
@@ -484,7 +539,7 @@ export async function collectPayment(
     module: 'fees',
     entityType: 'FeePayment',
     entityId: result.paymentId,
-    summary: `Collected ₹${input.amount / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${input.mode.toLowerCase()}, receipt ${result.receiptNumber}${result.discountedMinor > 0 ? `, discounted ₹${result.discountedMinor / 100}` : ''}${input.billBookNo ? `, bill book ${input.billBookNo}` : ''}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
+    summary: `Collected ₹${input.amount / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${input.mode.toLowerCase()}${result.pendingClearance ? ' (pending clearance)' : ''}, receipt ${result.receiptNumber}${result.discountedMinor > 0 ? `, discounted ₹${result.discountedMinor / 100}` : ''}${input.billBookNo ? `, bill book ${input.billBookNo}` : ''}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
     after: {
       amountMinor: input.amount,
       discountMinor: result.discountedMinor,
@@ -504,9 +559,13 @@ export async function collectPayment(
       .filter((id): id is string => !!id),
     eventKey: 'fee.payment_received',
     title: 'Fee payment received',
-    body: `We have received ₹${(input.amount / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}.`,
+    body: result.pendingClearance
+      ? `We have received a cheque of ₹${(input.amount / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}; dues will update once the cheque clears.`
+      : `We have received ₹${(input.amount / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}.`,
     linkUrl: '/finance',
   })
+
+  if (!result.pendingClearance) afterPaymentChange(ctx.tenant.id, result.paymentId, { tally: true })
 
   return result
 }
@@ -887,6 +946,10 @@ export async function handleWebhook(
   })
   await prisma.paymentEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } })
 
+  if (outcome.status === 'SUCCESS') {
+    afterPaymentChange(payment.tenantId, payment.id, { tally: true })
+  }
+
   return { handled: outcome.status === 'SUCCESS', reason: outcome.reason ?? outcome.status }
 }
 
@@ -1060,6 +1123,7 @@ export async function refundPayment(ctx: AppContext, input: z.infer<typeof refun
     before: { status: result.payment.status, refundedMinor: result.alreadyRefunded },
     after: { refundedMinor: result.alreadyRefunded + input.amount },
   })
+  afterPaymentChange(ctx.tenant.id, result.payment.id)
 
   return result.refund
 }
@@ -1155,6 +1219,7 @@ async function refundOnlinePayment(ctx: AppContext, input: z.infer<typeof refund
     entityId: reserved.payment.id,
     summary: `Gateway refund of ₹${input.amount / 100} completed for ${reserved.payment.student.firstName} ${reserved.payment.student.lastName} (${reserved.payment.student.admissionNo})`,
   })
+  afterPaymentChange(ctx.tenant.id, reserved.payment.id)
   return refund
 }
 
@@ -1281,6 +1346,7 @@ export async function reconcilePendingOnlineRefunds(limit = 50) {
       data: { providerRefundId: providerResult.providerMessageId },
     })
     await finalizePendingOnlineRefund(refund.id, providerResult.providerMessageId)
+    afterPaymentChange(refund.tenantId, refund.paymentId)
     completed++
   }
   return { pending: pending.length, completed, failed }
@@ -1387,6 +1453,7 @@ export async function reversePayment(ctx: AppContext, input: z.infer<typeof reve
     before: { status: payment.status },
     after: { status: 'REVERSED' },
   })
+  afterPaymentChange(ctx.tenant.id, payment.id)
   return { paymentId: payment.id, studentId: payment.studentId }
 }
 
@@ -1461,57 +1528,325 @@ export async function editPayment(ctx: AppContext, input: z.infer<typeof editPay
       notes: updated.notes,
     },
   })
+  afterPaymentChange(ctx.tenant.id, payment.id)
 
+  return { paymentId: payment.id, studentId: payment.studentId }
+}
+
+/* ---------------------------------------------------------- cheque clearing */
+
+type ChequeMeta = {
+  status?: 'PENDING' | 'CLEARED' | 'BOUNCED'
+  invoiceIds?: string[]
+  clearedOn?: string
+  bouncedOn?: string
+}
+
+export function chequeMeta(providerResponse: unknown): ChequeMeta | null {
+  if (!providerResponse || typeof providerResponse !== 'object') return null
+  const cheque = (providerResponse as { cheque?: unknown }).cheque
+  return cheque && typeof cheque === 'object' ? (cheque as ChequeMeta) : null
+}
+
+export const clearChequeSchema = z.object({
+  paymentId: z.string().min(1),
+  clearedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid clearance date'),
+})
+
+/**
+ * Marks a receipted cheque as cleared by the bank: the money is now settled
+ * against the dues it was collected for (or oldest-first if those are paid).
+ */
+export async function clearCheque(ctx: AppContext, input: z.infer<typeof clearChequeSchema>) {
+  ctx.require('fees.collect')
+  const clearedOn = attendanceDate(input.clearedOn)
+  if (clearedOn.getTime() > attendanceDate(new Date()).getTime()) {
+    throw conflict('Clearance date cannot be in the future')
+  }
+  const payment = await ctx.db.feePayment.findFirst({
+    where: { id: input.paymentId },
+    include: {
+      receipt: { select: { number: true } },
+      student: { select: { firstName: true, lastName: true, admissionNo: true } },
+    },
+  })
+  if (!payment) throw notFound('Payment')
+  if (payment.status !== 'PENDING' || payment.mode !== 'CHEQUE' || payment.provider !== 'manual') {
+    throw conflict('Only a cheque pending clearance can be marked cleared')
+  }
+  if (payment.paidAt && clearedOn.getTime() < attendanceDate(payment.paidAt).getTime()) {
+    throw conflict('Clearance date cannot be before the cheque was received')
+  }
+  const meta = chequeMeta(payment.providerResponse) ?? {}
+
+  const result = await ctx.db.$transaction(async (tx) => {
+    const claimed = await tx.feePayment.updateMany({
+      where: { id: payment.id, status: 'PENDING', mode: 'CHEQUE' },
+      data: {
+        status: 'SUCCESS',
+        providerResponse: { cheque: { ...meta, status: 'CLEARED', clearedOn: input.clearedOn } },
+      },
+    })
+    if (claimed.count !== 1) throw conflict('This cheque was already updated by another user')
+
+    await tx.$queryRaw`
+      SELECT "id" FROM "FeeInvoice"
+      WHERE "tenantId" = ${ctx.tenant.id}
+        AND "studentId" = ${payment.studentId}
+        AND "balanceMinor" > 0
+        AND "status" NOT IN ('CANCELLED', 'DRAFT')
+      ORDER BY "dueOn", "id"
+      FOR UPDATE`
+    const open = await tx.feeInvoice.findMany({
+      where: {
+        studentId: payment.studentId,
+        balanceMinor: { gt: 0 },
+        status: { notIn: ['CANCELLED', 'DRAFT'] },
+      },
+      orderBy: { dueOn: 'asc' },
+      select: { id: true, number: true, balanceMinor: true, totalMinor: true, paidMinor: true, dueOn: true },
+    })
+    // Dues the cheque was written for come first, then anything else open.
+    const preferred = new Set(meta.invoiceIds ?? [])
+    const ordered = [
+      ...open.filter((i) => preferred.has(i.id)),
+      ...open.filter((i) => !preferred.has(i.id)),
+    ]
+    return settleAgainstInvoices(tx, {
+      tenantId: ctx.tenant.id,
+      studentId: payment.studentId,
+      paymentId: payment.id,
+      amountMinor: payment.amountMinor,
+      outstanding: ordered,
+      receiptNumber: payment.receipt?.number ?? payment.id,
+      userId: ctx.user.userId,
+    })
+  }, { isolationLevel: 'Serializable' })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_payment.cheque_cleared',
+    module: 'fees',
+    entityType: 'FeePayment',
+    entityId: payment.id,
+    summary: `Cheque ${payment.reference ?? ''} on receipt ${payment.receipt?.number ?? payment.id} cleared on ${input.clearedOn} for ${payment.student.firstName} ${payment.student.lastName} (${payment.student.admissionNo})`,
+    before: { status: 'PENDING' },
+    after: { status: 'SUCCESS', clearedOn: input.clearedOn, advanceMinor: result.unallocatedMinor },
+  })
+  afterPaymentChange(ctx.tenant.id, payment.id, { tally: true })
+  return { paymentId: payment.id, studentId: payment.studentId }
+}
+
+export const bounceChequeSchema = z.object({
+  paymentId: z.string().min(1),
+  reason: z.string().trim().min(3, 'Give the bank return reason').max(300),
+})
+
+/** The bank returned the cheque: receipt is voided as bounced, dues stay open. */
+export async function bounceCheque(ctx: AppContext, input: z.infer<typeof bounceChequeSchema>) {
+  ctx.require('fees.collect')
+  const payment = await ctx.db.feePayment.findFirst({
+    where: { id: input.paymentId },
+    include: {
+      receipt: { select: { number: true } },
+      student: { select: { firstName: true, lastName: true, admissionNo: true } },
+    },
+  })
+  if (!payment) throw notFound('Payment')
+  if (payment.status !== 'PENDING' || payment.mode !== 'CHEQUE' || payment.provider !== 'manual') {
+    throw conflict('Only a cheque pending clearance can be marked bounced. Cancel a cleared receipt instead.')
+  }
+  const meta = chequeMeta(payment.providerResponse) ?? {}
+  const claimed = await ctx.db.feePayment.updateMany({
+    where: { id: payment.id, status: 'PENDING', mode: 'CHEQUE' },
+    data: {
+      status: 'FAILED',
+      failedAt: new Date(),
+      failureReason: `Cheque bounced: ${input.reason}`,
+      providerResponse: { cheque: { ...meta, status: 'BOUNCED', bouncedOn: toDateInput(new Date()) } },
+    },
+  })
+  if (claimed.count !== 1) throw conflict('This cheque was already updated by another user')
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_payment.cheque_bounced',
+    module: 'fees',
+    entityType: 'FeePayment',
+    entityId: payment.id,
+    summary: `Cheque ${payment.reference ?? ''} on receipt ${payment.receipt?.number ?? payment.id} bounced for ${payment.student.firstName} ${payment.student.lastName}: ${input.reason}`,
+    before: { status: 'PENDING' },
+    after: { status: 'FAILED' },
+  })
   return { paymentId: payment.id, studentId: payment.studentId }
 }
 
 /* ------------------------------------------------------------ payment list */
 
+const optionalDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional()
+  .or(z.literal('').transform(() => undefined))
+
 export const paymentFilterSchema = z.object({
   status: z
     .enum(['INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'REVERSED'])
-    .optional(),
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  /** Receipt-book view: cleared money, cheques awaiting the bank, bounced or cancelled. */
+  view: z.enum(['cleared', 'pending_cheque', 'bounced', 'void']).optional().or(z.literal('').transform(() => undefined)),
+  /** Office counter vs online / app payments. */
+  channel: z.enum(['office', 'online']).optional().or(z.literal('').transform(() => undefined)),
   mode: z.string().optional(),
-  from: z.string().optional(),
-  to: z.string().optional(),
+  preset: z.string().optional(),
+  from: optionalDate,
+  to: optionalDate,
 })
+
+export type PaymentFilter = z.infer<typeof paymentFilterSchema>
+
+const RECEIVED_STATUSES = ['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'] as const
+const DIGITAL_MODES = ['UPI', 'ONLINE', 'NET_BANKING', 'CARD', 'WALLET', 'BANK_TRANSFER'] as const
+
+async function paymentWhere(
+  ctx: AppContext,
+  q: string | undefined,
+  filter: PaymentFilter,
+): Promise<Prisma.FeePaymentWhereInput> {
+  const allowed = await accessibleStudentIds(ctx)
+  const range = filter.preset ? presetRange(filter.preset) : null
+  const from = range?.from ?? filter.from
+  const to = range?.to ?? filter.to
+
+  const viewWhere: Prisma.FeePaymentWhereInput =
+    filter.view === 'cleared'
+      ? { status: { in: [...RECEIVED_STATUSES] } }
+      : filter.view === 'pending_cheque'
+        ? { status: 'PENDING', mode: 'CHEQUE', provider: 'manual' }
+        : filter.view === 'bounced'
+          ? { status: 'FAILED', mode: 'CHEQUE', provider: 'manual' }
+          : filter.view === 'void'
+            ? { status: 'REVERSED' }
+            : {}
+
+  return {
+    AND: [
+      allowed === null ? {} : { studentId: { in: allowed } },
+      filter.status ? { status: filter.status } : {},
+      viewWhere,
+      filter.channel === 'office'
+        ? { provider: 'manual' }
+        : filter.channel === 'online'
+          ? { OR: [{ provider: { not: 'manual' } }, { provider: null }] }
+          : {},
+      filter.mode ? { mode: filter.mode as never } : {},
+      from || to
+        ? {
+            paidAt: {
+              ...(from ? { gte: attendanceDate(from) } : {}),
+              ...(to ? { lte: new Date(attendanceDate(to).getTime() + 86_399_000) } : {}),
+            },
+          }
+        : {},
+      q
+        ? {
+            OR: [
+              { reference: { contains: q, mode: 'insensitive' } },
+              { providerPaymentId: { contains: q, mode: 'insensitive' } },
+              { billBookNo: { contains: q, mode: 'insensitive' } },
+              { receipt: { number: { contains: q, mode: 'insensitive' } } },
+              { student: { firstName: { contains: q, mode: 'insensitive' } } },
+              { student: { lastName: { contains: q, mode: 'insensitive' } } },
+              { student: { admissionNo: { contains: q, mode: 'insensitive' } } },
+            ],
+          }
+        : {},
+    ],
+  }
+}
+
+/** Totals for the receipts header cards: money actually received, by channel. */
+export async function paymentSummary(ctx: AppContext, q: string | undefined, filter: PaymentFilter) {
+  ctx.require('fees.view')
+  const where = await paymentWhere(ctx, q, filter)
+  const [received, pending, voided] = await Promise.all([
+    ctx.db.feePayment.groupBy({
+      by: ['mode'],
+      where: { AND: [where, { status: { in: [...RECEIVED_STATUSES] } }] },
+      _sum: { amountMinor: true },
+      _count: { _all: true },
+    }),
+    ctx.db.feePayment.aggregate({
+      where: { AND: [where, { status: 'PENDING', mode: 'CHEQUE', provider: 'manual' }] },
+      _sum: { amountMinor: true },
+      _count: { _all: true },
+    }),
+    ctx.db.feePayment.count({ where: { AND: [where, { status: { in: ['REVERSED', 'FAILED'] } }] } }),
+  ])
+  const sumFor = (modes: readonly string[]) =>
+    received.filter((r) => modes.includes(r.mode)).reduce((t, r) => t + (r._sum.amountMinor ?? 0), 0)
+  return {
+    totalMinor: received.reduce((t, r) => t + (r._sum.amountMinor ?? 0), 0),
+    receiptCount: received.reduce((t, r) => t + r._count._all, 0),
+    cashMinor: sumFor(['CASH']),
+    digitalMinor: sumFor(DIGITAL_MODES),
+    chequeMinor: sumFor(['CHEQUE']),
+    pendingChequeMinor: pending._sum.amountMinor ?? 0,
+    pendingChequeCount: pending._count._all,
+    voidCount: voided,
+  }
+}
+
+/** All matching receipts for CSV export (capped). */
+export async function exportPayments(ctx: AppContext, q: string | undefined, filter: PaymentFilter) {
+  ctx.require('fees.export')
+  const where = await paymentWhere(ctx, q, filter)
+  return ctx.db.feePayment.findMany({
+    where,
+    orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
+    take: 20_000,
+    select: {
+      amountMinor: true,
+      mode: true,
+      status: true,
+      reference: true,
+      providerPaymentId: true,
+      billBookNo: true,
+      paidAt: true,
+      createdAt: true,
+      provider: true,
+      failureReason: true,
+      receipt: { select: { number: true } },
+      refunds: { select: { amountMinor: true, status: true } },
+      student: {
+        select: {
+          firstName: true,
+          lastName: true,
+          admissionNo: true,
+          enrollments: {
+            where: { isCurrent: true },
+            take: 1,
+            select: { classLevel: { select: { name: true } }, section: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  })
+}
 
 export async function listPayments(
   ctx: AppContext,
   query: { page: number; pageSize: number; q?: string },
-  filter: z.infer<typeof paymentFilterSchema>,
+  filter: PaymentFilter,
 ) {
   ctx.require('fees.view')
 
-  const allowed = await accessibleStudentIds(ctx)
-
-  const where: Prisma.FeePaymentWhereInput = {
-    ...(allowed === null ? {} : { studentId: { in: allowed } }),
-    ...(filter.status ? { status: filter.status } : {}),
-    ...(filter.mode ? { mode: filter.mode as never } : {}),
-    ...(filter.from || filter.to
-      ? {
-          paidAt: {
-            ...(filter.from ? { gte: attendanceDate(filter.from) } : {}),
-            ...(filter.to
-              ? { lte: new Date(attendanceDate(filter.to).getTime() + 86_399_000) }
-              : {}),
-          },
-        }
-      : {}),
-    ...(query.q
-      ? {
-          OR: [
-            { reference: { contains: query.q, mode: 'insensitive' } },
-            { billBookNo: { contains: query.q, mode: 'insensitive' } },
-            { receipt: { number: { contains: query.q, mode: 'insensitive' } } },
-            { student: { firstName: { contains: query.q, mode: 'insensitive' } } },
-            { student: { lastName: { contains: query.q, mode: 'insensitive' } } },
-            { student: { admissionNo: { contains: query.q, mode: 'insensitive' } } },
-          ],
-        }
-      : {}),
-  }
+  const where = await paymentWhere(ctx, query.q, filter)
 
   const [rows, total, agg] = await Promise.all([
     ctx.db.feePayment.findMany({
@@ -1529,6 +1864,8 @@ export async function listPayments(
         paidAt: true,
         createdAt: true,
         provider: true,
+        providerPaymentId: true,
+        failureReason: true,
         receipt: { select: { number: true } },
         refunds: { select: { amountMinor: true, status: true } },
         student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },
@@ -1536,7 +1873,7 @@ export async function listPayments(
     }),
     ctx.db.feePayment.count({ where }),
     ctx.db.feePayment.aggregate({
-      where: { ...where, status: 'SUCCESS' },
+      where: { AND: [where, { status: 'SUCCESS' }] },
       _sum: { amountMinor: true },
     }),
   ])
@@ -1552,6 +1889,8 @@ export async function listPayments(
       reference: p.reference,
       billBookNo: p.billBookNo,
       provider: p.provider,
+      providerPaymentId: p.providerPaymentId,
+      failureReason: p.failureReason,
       paidAt: p.paidAt,
       createdAt: p.createdAt,
       receiptNumber: p.receipt?.number ?? null,

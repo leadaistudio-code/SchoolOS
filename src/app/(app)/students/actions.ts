@@ -7,9 +7,11 @@ import { requireContext } from '@/server/context'
 import {
   archiveStudent,
   createStudent,
+  suggestAdmissionNumber,
   updateStudent,
 } from '@/server/modules/students/service'
 import { studentCreateSchema, studentUpdateSchema } from '@/server/modules/students/schema'
+import { saveStudentParentNames } from '@/server/modules/students/parent-names'
 import { splitPersonName } from '@/lib/person-name'
 import type { FormState } from '@/lib/form-state'
 
@@ -21,21 +23,40 @@ function readForm(formData: FormData) {
     if (raw[key] === '') delete raw[key]
   }
 
-  const parentName = raw['guardian.name'] ?? raw['guardian.firstName']
-  if (parentName) {
-    const { firstName, lastName } = splitPersonName(String(parentName))
-    raw.guardian = {
+  if (raw.middleName && raw.firstName) raw.firstName = `${raw.firstName} ${raw.middleName}`
+  delete raw.middleName
+
+  const parent = (prefix: string, fallbackRelation: string) => {
+    const name = raw[`${prefix}.name`] ?? raw[`${prefix}.firstName`]
+    if (!name) return undefined
+    const { firstName, lastName } = splitPersonName(String(name))
+    return {
       firstName,
       lastName,
-      relation: 'GUARDIAN',
-      phone: raw['guardian.phone'],
-      email: raw['guardian.email'],
-      occupation: raw['guardian.occupation'],
-      createLogin: raw['guardian.createLogin'] === 'on',
+      relation: raw[`${prefix}.relation`] ?? fallbackRelation,
+      phone: raw[`${prefix}.phone`],
+      email: raw[`${prefix}.email`],
+      occupation: raw[`${prefix}.occupation`],
     }
   }
+
+  const createLogin = raw['guardian.createLogin'] === 'on'
+  const legacy = parent('guardian', 'GUARDIAN')
+  if (legacy) {
+    raw.guardian = { ...legacy, createLogin }
+  } else {
+    // Admission form: two parent blocks, one marked as the primary contact.
+    const first = parent('parent1', 'FATHER')
+    const second = parent('parent2', 'MOTHER')
+    const primaryIsSecond = raw.primaryParent === 'parent2' && second
+    const primary = primaryIsSecond ? second : (first ?? second)
+    const other = primary === first ? second : first
+    if (primary) raw.guardian = { ...primary, createLogin }
+    if (other) raw.secondGuardian = other
+  }
+  delete raw.primaryParent
   for (const key of Object.keys(raw)) {
-    if (key.startsWith('guardian.')) delete raw[key]
+    if (/^(guardian|parent1|parent2)\./.test(key)) delete raw[key]
   }
   return raw
 }
@@ -55,7 +76,9 @@ export async function createStudentAction(
   let studentId: string
   let temporaryPassword: string | undefined
   try {
-    const input = studentCreateSchema.parse(readForm(formData))
+    const raw = readForm(formData)
+    if (!raw.admissionNo) raw.admissionNo = await suggestAdmissionNumber(ctx)
+    const input = studentCreateSchema.parse(raw)
     const student = await createStudent(ctx, input)
     studentId = student.id
     temporaryPassword = student.temporaryPassword
@@ -85,8 +108,13 @@ export async function updateStudentAction(
   const ctx = await requireContext('students.edit')
 
   try {
-    const input = studentUpdateSchema.parse(readForm(formData))
+    const raw = readForm(formData)
+    const parents = { fatherName: String(raw.fatherName ?? ''), motherName: String(raw.motherName ?? '') }
+    delete raw.fatherName
+    delete raw.motherName
+    const input = studentUpdateSchema.parse(raw)
     await updateStudent(ctx, studentId, input)
+    await saveStudentParentNames(ctx, studentId, parents)
   } catch (err) {
     if (err instanceof ZodError) {
       return { error: 'Please correct the highlighted fields', fieldErrors: toFieldErrors(err) }

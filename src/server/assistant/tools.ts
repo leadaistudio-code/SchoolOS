@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import type { AppContext } from '@/server/context'
-import { getAdminDashboard } from '@/server/modules/dashboard/service'
+import { getAdminDashboard, getTeacherDashboard } from '@/server/modules/dashboard/service'
 import { attendanceReport, unmarkedSections } from '@/server/modules/attendance/service'
 import { outstandingByClass, listInvoices } from '@/server/modules/finance/service'
+import { listExpenses, categoryLabel } from '@/server/modules/finance/expenses'
 import { listPayments } from '@/server/modules/finance/payments'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
 import { facultyReadinessOverview } from '@/server/modules/teacher-refresh/analytics'
@@ -10,8 +11,11 @@ import {
   learningInsightsOverview,
 } from '@/server/modules/ai-assessment/insights'
 import { assignmentAnalytics } from '@/server/modules/assessments/evaluation'
+import { listPayslips, payrollSummary } from '@/server/modules/staff/payroll'
 import { formatMoney } from '@/lib/utils'
-import { formatDay } from '@/lib/dates'
+import { attendanceDate, formatDay, toDateInput } from '@/lib/dates'
+import { hasSchoolWideScope, isTeacherScoped } from '@/lib/rbac/roles'
+import { studentIdScopeWhere } from '@/server/scope'
 
 /**
  * The assistant's tools.
@@ -94,16 +98,46 @@ function num(value: bigint | number | null): number {
 const overview: AssistantTool = {
   name: 'school_overview',
   description:
-    'Headline figures for the whole school right now: students enrolled, teaching and total staff, attendance marked today, fees collected today and this month, and total outstanding. Call this for broad questions ("how are we doing", "give me today\'s summary") or to get a total before drilling into one class.',
+    'Headline figures for the caller right now. School admins and principals get the whole school; teachers get only their assigned students and classes. Call this for broad questions ("how are we doing", "give me today\'s summary").',
   permission: 'dashboard.view',
   input: z.object({}),
   async run(ctx) {
+    if (isTeacherScoped(ctx.user.roleKeys)) {
+      const dash = await getTeacherDashboard(ctx)
+      return {
+        href: '/',
+        data: {
+          scope: 'Your assigned classes only',
+          students: dash.studentCount,
+          classes: dash.classCount,
+          sections: dash.sectionCount,
+          subjects: dash.subjects,
+          feeStatus: {
+            note: 'Paid vs unpaid student counts only — rupee amounts are not available to teachers',
+            paidStudents: dash.paidCount,
+            unpaidStudents: dash.unpaidCount,
+          },
+        },
+      }
+    }
+
+    if (!hasSchoolWideScope(ctx.user.roleKeys)) {
+      return {
+        href: '/',
+        data: {
+          scope: 'Role dashboard',
+          note: 'Open the home dashboard for figures that apply to your role. School-wide overview is for school leadership.',
+        },
+      }
+    }
+
     const dash = await getAdminDashboard(ctx)
     const money = (minor: number) => formatMoney(minor, ctx.tenant.currency, ctx.tenant.locale)
 
     return {
       href: '/',
       data: {
+        scope: 'Whole school',
         students: dash.people.students,
         teachers: dash.people.teachers,
         totalStaff: dash.people.staff,
@@ -531,9 +565,10 @@ const attendanceCompare: AssistantTool = {
     const prevStart = isoDay(new Date(today.getTime() - 13 * 86_400_000))
 
     async function totals(from: string, to: string) {
+      const scope = await studentIdScopeWhere(ctx)
       const rows = await ctx.db.studentAttendance.groupBy({
         by: ['status'],
-        where: { onDate: { gte: from, lte: to } },
+        where: { onDate: { gte: from, lte: to }, ...scope },
         _count: { _all: true },
       })
       const map = Object.fromEntries(rows.map((r) => [r.status, r._count._all])) as Record<string, number>
@@ -586,22 +621,27 @@ const feesCompare: AssistantTool = {
     const prevWeekStart = isoDay(new Date(today.getTime() - 13 * 86_400_000))
     const lastWeekSameDay = isoDay(new Date(today.getTime() - 7 * 86_400_000))
     const money = (minor: number) => formatMoney(minor, ctx.tenant.currency, ctx.tenant.locale)
+    const scope = await studentIdScopeWhere(ctx)
 
     const [thisWeek, lastWeek, todayPay, sameDayLastWeek] = await Promise.all([
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: weekStart, lte: todayStr } },
+        where: { status: 'SUCCESS', paidAt: { gte: weekStart, lte: todayStr }, ...scope },
         _sum: { amountMinor: true },
       }),
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: prevWeekStart, lte: prevWeekEnd } },
+        where: { status: 'SUCCESS', paidAt: { gte: prevWeekStart, lte: prevWeekEnd }, ...scope },
         _sum: { amountMinor: true },
       }),
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: todayStr, lte: todayStr } },
+        where: { status: 'SUCCESS', paidAt: { gte: todayStr, lte: todayStr }, ...scope },
         _sum: { amountMinor: true },
       }),
       ctx.db.feePayment.aggregate({
-        where: { status: 'SUCCESS', paidAt: { gte: lastWeekSameDay, lte: lastWeekSameDay } },
+        where: {
+          status: 'SUCCESS',
+          paidAt: { gte: lastWeekSameDay, lte: lastWeekSameDay },
+          ...scope,
+        },
         _sum: { amountMinor: true },
       }),
     ])
@@ -666,6 +706,250 @@ const pendingLeave: AssistantTool = {
           to: formatDay(row.toDate),
           reason: row.reason ?? 'No reason given',
         })),
+      },
+    }
+  },
+}
+
+const expensesReport: AssistantTool = {
+  name: 'expenses_report',
+  description:
+    'School expenses recorded in a date range: total spent, breakdown by category, and recent expense rows. Use for "how much was today\'s expense", "what did we spend this month", "expense records".',
+  permission: 'expenses.view',
+  input: z.object({
+    from: dayArg,
+    to: dayArg,
+    limit: z.number().int().min(1).max(40).optional().describe('Default 15.'),
+  }),
+  async run(ctx, args) {
+    const a = args as unknown as { from?: string; to?: string; limit?: number }
+    const to = parseDay(a.to, new Date())
+    const from = parseDay(a.from, to)
+    const result = await listExpenses(
+      ctx,
+      { page: 1, pageSize: a.limit ?? 15, dir: 'desc', sort: 'expenseDate' },
+      { from: isoDay(from), to: isoDay(to) },
+    )
+    const money = (minor: number) => formatMoney(minor, ctx.tenant.currency, ctx.tenant.locale)
+
+    return {
+      href: '/finance/expenses',
+      data: {
+        from: formatDay(from),
+        to: formatDay(to),
+        expensesMatching: result.total,
+        totalSpent: money(result.totalMinor),
+        byCategory: result.byCategory.map((row) => ({
+          category: categoryLabel(row.category),
+          count: row.count,
+          amount: money(row.amountMinor),
+        })),
+        expenses: result.rows.map((row) => ({
+          date: row.expenseDateInput,
+          title: row.title,
+          category: categoryLabel(row.category),
+          amount: money(row.amountMinor),
+          vendor: row.vendor,
+        })),
+      },
+    }
+  },
+}
+
+const payrollMonth: AssistantTool = {
+  name: 'payroll_month',
+  description:
+    'Staff payroll for a calendar month: how many people are on salary, payslips drafted/published/paid, totals, and which teachers or staff have not been paid yet (or have no salary structure). Use for "who has not got salary this month", "payroll status", "salary not paid".',
+  permission: 'staff.payroll',
+  input: z.object({
+    year: z.number().int().min(2000).max(2100).optional().describe('Defaults to the current year.'),
+    month: z
+      .number()
+      .int()
+      .min(1)
+      .max(12)
+      .optional()
+      .describe('Calendar month 1-12. Defaults to the current month.'),
+  }),
+  async run(ctx, args) {
+    const a = args as unknown as { year?: number; month?: number }
+    const now = new Date()
+    const year = a.year ?? now.getFullYear()
+    const month = a.month ?? now.getMonth() + 1
+    const money = (minor: number) => formatMoney(minor, ctx.tenant.currency, ctx.tenant.locale)
+
+    const [summary, payslips, teachingStaff] = await Promise.all([
+      payrollSummary(ctx, year, month),
+      listPayslips(ctx, { periodYear: year, periodMonth: month }),
+      ctx.db.staff.findMany({
+        where: { deletedAt: null, leftOn: null, staffType: 'TEACHING' },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          salaryStructures: { select: { id: true }, take: 1 },
+        },
+        orderBy: { firstName: 'asc' },
+      }),
+    ])
+
+    const paidIds = new Set(payslips.filter((p) => p.status === 'PAID').map((p) => p.staffId))
+    const anyPayslipIds = new Set(payslips.map((p) => p.staffId))
+
+    const teachersNotPaid = teachingStaff
+      .filter((s) => !paidIds.has(s.id))
+      .map((s) => ({
+        name: `${s.firstName} ${s.lastName}`,
+        employeeCode: s.employeeCode,
+        hasSalaryStructure: s.salaryStructures.length > 0,
+        payslipStatus: anyPayslipIds.has(s.id)
+          ? (payslips.find((p) => p.staffId === s.id)?.status ?? 'UNKNOWN')
+          : 'NONE',
+      }))
+
+    return {
+      href: '/staff/payroll',
+      data: {
+        period: `${year}-${String(month).padStart(2, '0')}`,
+        headcount: summary.headcount,
+        onSalary: summary.onSalary,
+        withoutSalaryStructure: summary.withoutSalary,
+        payslipsGenerated: summary.generated,
+        paidCount: summary.paidCount,
+        draftTotal: money(summary.draftMinor),
+        publishedTotal: money(summary.publishedMinor),
+        paidTotal: money(summary.paidMinor),
+        teachersNotPaidYet: teachersNotPaid.slice(0, 40),
+        teachersNotPaidCount: teachersNotPaid.length,
+      },
+    }
+  },
+}
+
+const examsOnDate: AssistantTool = {
+  name: 'exams_on_date',
+  description:
+    'Exam papers scheduled on a calendar day: subject, class, teacher, time and room. Use for "what are the exam papers today", "exams tomorrow", "which papers are scheduled".',
+  permission: 'exams.view',
+  input: z.object({ date: dayArg }),
+  async run(ctx, args) {
+    const { date } = args as unknown as { date?: string }
+    const on = parseDay(date, new Date())
+    const day = attendanceDate(isoDay(on))
+
+    const papers = await ctx.db.examSubject.findMany({
+      where: {
+        examDate: day,
+        exam: { status: { not: 'ARCHIVED' } },
+      },
+      orderBy: [{ startTime: 'asc' }, { classSubject: { subject: { name: 'asc' } } }],
+      select: {
+        examDate: true,
+        startTime: true,
+        endTime: true,
+        roomName: true,
+        maxMarks: true,
+        exam: { select: { id: true, name: true, status: true } },
+        classSubject: {
+          select: {
+            classLevel: { select: { name: true } },
+            subject: { select: { name: true, code: true } },
+            teacher: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    })
+
+    return {
+      href: '/exams',
+      data: {
+        date: formatDay(on),
+        papersScheduled: papers.length,
+        papers: papers.map((paper) => ({
+          exam: paper.exam.name,
+          examStatus: paper.exam.status,
+          class: paper.classSubject.classLevel.name,
+          subject: paper.classSubject.subject.name,
+          teacher: paper.classSubject.teacher
+            ? `${paper.classSubject.teacher.firstName} ${paper.classSubject.teacher.lastName}`
+            : 'Unassigned',
+          time:
+            paper.startTime || paper.endTime
+              ? `${paper.startTime ?? '—'}–${paper.endTime ?? '—'}`
+              : null,
+          room: paper.roomName,
+          maxMarks: paper.maxMarks,
+        })),
+      },
+    }
+  },
+}
+
+const pendingExamMarks: AssistantTool = {
+  name: 'pending_exam_marks',
+  description:
+    'Exam subjects that still need marks entered: which teacher owns the subject and how many marks are already saved. Use for "which teachers have not updated exam marks", "marks pending", "who has not entered marks".',
+  permission: 'exams.marks',
+  input: z.object({
+    limit: z.number().int().min(1).max(50).optional().describe('Default 25.'),
+  }),
+  async run(ctx, args) {
+    const a = args as unknown as { limit?: number }
+    const exams = await ctx.db.exam.findMany({
+      where: { status: { in: ['SCHEDULED', 'ONGOING', 'MARKS_ENTRY'] } },
+      orderBy: { startsOn: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        subjects: {
+          select: {
+            id: true,
+            examDate: true,
+            classSubject: {
+              select: {
+                classLevel: { select: { name: true } },
+                subject: { select: { name: true } },
+                teacher: { select: { firstName: true, lastName: true } },
+              },
+            },
+            _count: { select: { marks: true } },
+          },
+        },
+      },
+    })
+
+    const pending = exams.flatMap((exam) =>
+      exam.subjects
+        .filter((subject) => subject._count.marks === 0)
+        .map((subject) => ({
+          exam: exam.name,
+          examStatus: exam.status,
+          class: subject.classSubject.classLevel.name,
+          subject: subject.classSubject.subject.name,
+          teacher: subject.classSubject.teacher
+            ? `${subject.classSubject.teacher.firstName} ${subject.classSubject.teacher.lastName}`
+            : 'Unassigned',
+          examDate: subject.examDate ? toDateInput(subject.examDate) : null,
+          marksEntered: subject._count.marks,
+        })),
+    )
+
+    const byTeacher = new Map<string, number>()
+    for (const row of pending) {
+      byTeacher.set(row.teacher, (byTeacher.get(row.teacher) ?? 0) + 1)
+    }
+
+    return {
+      href: '/exams',
+      data: {
+        subjectsStillWithoutMarks: pending.length,
+        teachersWithPendingMarks: [...byTeacher.entries()]
+          .map(([teacher, subjects]) => ({ teacher, subjectsPending: subjects }))
+          .sort((a, b) => b.subjectsPending - a.subjectsPending),
+        subjects: pending.slice(0, a.limit ?? 25),
       },
     }
   },
@@ -862,6 +1146,10 @@ const ALL_TOOLS: AssistantTool[] = [
   learningTopicGaps,
   assignmentTopicGaps,
   pendingLeave,
+  expensesReport,
+  payrollMonth,
+  examsOnDate,
+  pendingExamMarks,
   draftNotice,
   draftFeeReminder,
   draftAttendanceNudge,

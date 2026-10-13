@@ -88,6 +88,13 @@ const serverSchema = z.object({
 
   WHATSAPP_DRIVER: z.enum(['log', 'meta_cloud', 'gupshup', 'twilio']).default('log'),
   WHATSAPP_API_VERSION: z.string().default('v21.0'),
+  /**
+   * Shared secret in the inbound webhook URL (?token=…) given to the provider,
+   * and Meta's verify token. Unset means the parent assistant ignores all traffic.
+   */
+  WHATSAPP_INBOUND_SECRET: z.string().min(16).optional(),
+  /** Meta app's App Secret: verifies the X-Hub-Signature-256 header on inbound webhooks. */
+  WHATSAPP_APP_SECRET: z.string().optional(),
   /** The sending number's id in the WhatsApp Business account, not the number. */
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),

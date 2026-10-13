@@ -2,6 +2,77 @@ import { requireContext } from '@/server/context'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
+import { accessibleStudentIds } from '@/server/scope'
 import { StudentFeedbackForm } from './student-feedback-form'
+
 export const metadata = { title: 'Give student feedback' }
-export default async function StudentFeedbackPage() { const ctx = await requireContext('feedback.teacher_give_student'); const staff = await ctx.db.staff.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } }); if (!staff) return <div className="space-y-4"><PageHeader title="Give student feedback" description="Share specific, constructive feedback with the student and family." /><Card variant="elevated"><EmptyState title="Staff profile needed" description="Your account must be linked to a staff profile before you can give student feedback." /></Card></div>; const classes = await ctx.db.classSubject.findMany({ where: { teacherId: staff.id }, select: { subject: { select: { id: true, name: true } }, classLevelId: true } }); const classIds = [...new Set(classes.map((item) => item.classLevelId))]; const students = await ctx.db.student.findMany({ where: { status: 'ACTIVE', enrollments: { some: { isCurrent: true, classLevelId: { in: classIds } } } }, select: { id: true, firstName: true, lastName: true, admissionNo: true }, orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }] }); return <div className="space-y-4"><PageHeader title="Give student feedback" description="Share specific, constructive feedback with the student and family." /><Card><CardContent className="p-5">{students.length ? <StudentFeedbackForm students={students.map((student) => ({ id: student.id, name: `${student.firstName} ${student.lastName}`, admissionNo: student.admissionNo }))} subjects={classes.map((item) => item.subject)} /> : <EmptyState title="No assigned students" description="Students appear here when you are assigned to teach their class." />}</CardContent></Card></div> }
+
+export default async function StudentFeedbackPage() {
+  const ctx = await requireContext('feedback.teacher_give_student')
+  const staff = await ctx.db.staff.findFirst({
+    where: { userId: ctx.user.userId },
+    select: { id: true },
+  })
+  if (!staff) {
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title="Give student feedback"
+          description="Share specific, constructive feedback with the student and family."
+        />
+        <Card variant="elevated">
+          <EmptyState
+            title="Staff profile needed"
+            description="Your account must be linked to a staff profile before you can give student feedback."
+          />
+        </Card>
+      </div>
+    )
+  }
+
+  const classes = await ctx.db.classSubject.findMany({
+    where: { teacherId: staff.id },
+    select: { subject: { select: { id: true, name: true } }, classLevelId: true },
+  })
+  const allowed = await accessibleStudentIds(ctx)
+  const students =
+    allowed !== null && allowed.length === 0
+      ? []
+      : await ctx.db.student.findMany({
+          where: {
+            status: 'ACTIVE',
+            deletedAt: null,
+            ...(allowed === null ? {} : { id: { in: allowed } }),
+          },
+          select: { id: true, firstName: true, lastName: true, admissionNo: true },
+          orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        })
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Give student feedback"
+        description="Share specific, constructive feedback with the student and family."
+      />
+      <Card>
+        <CardContent className="p-5">
+          {students.length ? (
+            <StudentFeedbackForm
+              students={students.map((student) => ({
+                id: student.id,
+                name: `${student.firstName} ${student.lastName}`,
+                admissionNo: student.admissionNo,
+              }))}
+              subjects={classes.map((item) => item.subject)}
+            />
+          ) : (
+            <EmptyState
+              title="No assigned students"
+              description="Students appear here when you are assigned to teach their section."
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

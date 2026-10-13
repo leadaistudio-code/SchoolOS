@@ -52,7 +52,7 @@ export const STUDENT_METRICS: MetricDef[] = [
     label: 'Academics',
     description: 'Marks and results across the session.',
     source: 'Mean percentage of published exam results.',
-    defaultWeight: 30,
+    defaultWeight: 28,
   },
   {
     key: 'ATTENDANCE',
@@ -61,7 +61,7 @@ export const STUDENT_METRICS: MetricDef[] = [
     description: 'Being in school.',
     source:
       'Days present as a share of days marked. Half days count half; approved leave and holidays are excluded rather than counted against.',
-    defaultWeight: 25,
+    defaultWeight: 24,
   },
   {
     key: 'PUNCTUALITY',
@@ -69,7 +69,7 @@ export const STUDENT_METRICS: MetricDef[] = [
     label: 'Punctuality',
     description: 'Arriving on time.',
     source: 'Attended days not marked late.',
-    defaultWeight: 10,
+    defaultWeight: 9,
   },
   {
     key: 'HOMEWORK',
@@ -77,7 +77,7 @@ export const STUDENT_METRICS: MetricDef[] = [
     label: 'Homework',
     description: 'Work handed in.',
     source: 'Submissions made, with a late submission counted as half.',
-    defaultWeight: 15,
+    defaultWeight: 14,
   },
   {
     key: 'FEE_TIMELINESS',

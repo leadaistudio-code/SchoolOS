@@ -17,6 +17,7 @@ import {
 } from '@/server/modules/platform/growth/discovery/service'
 import { CandidateActions, RunDiscoveryButton } from './discovery-controls'
 import { DiscoverySettingsForm } from './settings-form'
+import { ContactFoundCell } from './contact-findings'
 
 export const metadata = { title: 'AI Lead Discovery' }
 
@@ -82,8 +83,8 @@ export default async function DiscoveryPage({
         <ColorTile label="Rejected / ignored" value={formatNumber(dash.stats.rejected)} tone="overdue" delayMs={200} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 overflow-hidden">
+      <div className="space-y-4">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Discoveries</CardTitle>
             <form className="flex flex-wrap gap-2 text-sm">
@@ -144,6 +145,7 @@ export default async function DiscoveryPage({
                 <THead>
                   <tr>
                     <TH>School</TH>
+                    <TH>Contact found</TH>
                     <TH>Status</TH>
                     <TH>Verification</TH>
                     <TH>Priority</TH>
@@ -155,7 +157,7 @@ export default async function DiscoveryPage({
                 <TBody>
                   {rows.map((row) => (
                     <TR key={row.id}>
-                      <TD>
+                      <TD className="min-w-48">
                         <Link
                           href={`/platform/growth/discovery/${row.id}`}
                           className="font-medium text-ink hover:underline"
@@ -165,6 +167,9 @@ export default async function DiscoveryPage({
                         <p className="text-xs text-ink-muted">
                           {[row.sector, row.area, row.city].filter(Boolean).join(' · ') || '—'}
                         </p>
+                      </TD>
+                      <TD>
+                        <ContactFoundCell row={row} />
                       </TD>
                       <TD className="text-sm text-ink-muted">
                         {row.schoolStatus
@@ -199,6 +204,7 @@ export default async function DiscoveryPage({
                             id={row.id}
                             crmSchoolId={row.crmSchoolId}
                             website={row.website}
+                            compact
                           />
                         ) : null}
                       </TD>
@@ -210,7 +216,7 @@ export default async function DiscoveryPage({
           )}
         </Card>
 
-        <div className="space-y-4">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Discovery runs</CardTitle>

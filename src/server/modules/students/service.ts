@@ -199,6 +199,35 @@ export async function getStudent(ctx: AppContext, id: string) {
 }
 
 /**
+ * The next admission number in the school's own series: the most recently
+ * admitted student's number with its trailing digits incremented (padding
+ * kept), skipping any already taken. A school with no students starts at
+ * ADM-<year>-0001.
+ */
+export async function suggestAdmissionNumber(ctx: AppContext): Promise<string> {
+  const recent = await ctx.db.student.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 25,
+    select: { admissionNo: true },
+  })
+  const seed = recent.map((s) => s.admissionNo).find((n) => /\d+$/.test(n))
+  let candidate = seed ?? `ADM-${new Date().getFullYear()}-0000`
+  for (let i = 0; i < 50; i++) {
+    candidate = incrementTrailingNumber(candidate)
+    const taken = await ctx.db.student.findFirst({ where: { admissionNo: candidate }, select: { id: true } })
+    if (!taken) return candidate
+  }
+  return `${candidate}-${Date.now().toString(36).slice(-4).toUpperCase()}`
+}
+
+export function incrementTrailingNumber(value: string): string {
+  const m = /^(.*?)(\d+)$/.exec(value)
+  if (!m) return `${value}1`
+  const next = String(Number(m[2]) + 1).padStart(m[2]!.length, '0')
+  return `${m[1]}${next}`
+}
+
+/**
  * Creates a student, their first enrollment and optionally a guardian, in one
  * transaction. Either the whole record exists or none of it does - a student
  * without a class placement is not a valid state.
@@ -251,6 +280,13 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
         religion: input.religion,
         nationality: input.nationality,
         motherTongue: input.motherTongue,
+        caste: input.caste,
+        aadhaarNo: input.aadhaarNo,
+        birthPlace: input.birthPlace,
+        identificationMark: input.identificationMark,
+        disability: input.disability,
+        house: input.house,
+        whatsappPhone: input.whatsappPhone,
         admissionDate: input.admissionDate
           ? attendanceDate(input.admissionDate)
           : attendanceDate(new Date()),
@@ -299,6 +335,29 @@ export async function createStudent(ctx: AppContext, input: StudentCreateInput) 
           relation: input.guardian.relation,
           isPrimary: true,
           isEmergencyContact: true,
+        },
+      })
+    }
+
+    if (input.secondGuardian) {
+      const { storePhone } = await import('@/server/auth/phone')
+      const parent = await tx.parent.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          firstName: input.secondGuardian.firstName,
+          lastName: input.secondGuardian.lastName,
+          phone: storePhone(input.secondGuardian.phone),
+          email: input.secondGuardian.email || null,
+          occupation: input.secondGuardian.occupation,
+        },
+      })
+      await tx.studentGuardian.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          studentId: student.id,
+          parentId: parent.id,
+          relation: input.secondGuardian.relation,
+          isPrimary: !input.guardian,
         },
       })
     }

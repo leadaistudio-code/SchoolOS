@@ -6,7 +6,9 @@ import { notFound, conflict, badRequest } from '@/server/api/response'
 import { skipTake, orderByFrom, type ListQuery } from '@/lib/query'
 import { normalizePhone } from '@/server/auth/phone'
 import { renderTemplate } from '@/lib/notification-templates'
-import { emailProvider, smsProvider, whatsappProvider } from '@/server/providers'
+import { emailProvider, smsProvider, storageProvider, whatsappProvider } from '@/server/providers'
+import { validateUpload, type ValidatedUpload } from '@/server/files'
+import { randomToken } from '@/server/crypto'
 import {
   ACTIVITY_TYPE_LABELS,
   CRM_CHANNEL_LABELS,
@@ -76,7 +78,7 @@ async function touchSchool(
   await applyTemperature(ctx, schoolId)
 }
 
-async function writeActivity(
+export async function writeActivity(
   ctx: PlatformContext,
   input: {
     schoolId: string
@@ -253,13 +255,92 @@ export async function createSchool(ctx: PlatformContext, input: SchoolCreateInpu
   return school
 }
 
+export const MAX_VISIT_PHOTOS = 6
+const PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+/** Checks every photo before anything is written, so a bad file never leaves a half-saved visit. */
+async function validatePhotos(files: File[]): Promise<ValidatedUpload[]> {
+  const real = files.filter((f) => f.size > 0)
+  if (real.length > MAX_VISIT_PHOTOS) throw badRequest(`Attach up to ${MAX_VISIT_PHOTOS} photos at a time`)
+  for (const f of real) {
+    if (!PHOTO_MIMES.has(f.type)) throw badRequest('Photos must be JPEG, PNG or WebP images')
+  }
+  return Promise.all(real.map(validateUpload))
+}
+
+async function storePhotos(
+  ctx: PlatformContext,
+  schoolId: string,
+  visitId: string | null,
+  uploads: ValidatedUpload[],
+) {
+  for (const u of uploads) {
+    const storageKey = `platform/crm-photos/${schoolId}/${randomToken(12)}.${u.extension}`
+    await storageProvider().put(storageKey, u.buffer, u.mimeType)
+    await ctx.db.crmPhoto.create({
+      data: {
+        schoolId,
+        visitId,
+        storageKey,
+        fileName: u.safeName,
+        mimeType: u.mimeType,
+        sizeBytes: u.buffer.length,
+        createdById: ctx.user.userId,
+        createdLabel: actorLabel(ctx),
+      },
+    })
+  }
+}
+
+export async function addSchoolPhotos(ctx: PlatformContext, schoolId: string, files: File[]) {
+  assertPerm(ctx, 'platform.crm_edit')
+  const school = await ctx.db.crmSchool.findFirst({ where: { id: schoolId, deletedAt: null }, select: { id: true } })
+  if (!school) throw notFound('School not found')
+  const uploads = await validatePhotos(files)
+  if (uploads.length === 0) throw badRequest('Choose at least one photo')
+  await storePhotos(ctx, schoolId, null, uploads)
+  await writeActivity(ctx, {
+    schoolId,
+    type: 'NOTE',
+    summary: `Added ${uploads.length} photo${uploads.length === 1 ? '' : 's'}`,
+    meta: { source: 'photos' },
+  })
+  return uploads.length
+}
+
+export async function readCrmPhoto(ctx: PlatformContext, id: string) {
+  assertPerm(ctx, 'platform.crm')
+  const photo = await ctx.db.crmPhoto.findFirst({ where: { id, deletedAt: null } })
+  if (!photo) throw notFound('Photo')
+  return { body: await storageProvider().get(photo.storageKey), mimeType: photo.mimeType, fileName: photo.fileName }
+}
+
+export async function deleteCrmPhoto(ctx: PlatformContext, id: string) {
+  assertPerm(ctx, 'platform.crm_edit')
+  const photo = await ctx.db.crmPhoto.findFirst({ where: { id, deletedAt: null } })
+  if (!photo) throw notFound('Photo')
+  await ctx.db.crmPhoto.update({ where: { id }, data: { deletedAt: new Date() } })
+  await audit({
+    tenantId: null,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'crm.photo.delete',
+    module: 'growth',
+    entityType: 'CrmPhoto',
+    entityId: id,
+    summary: `Removed photo ${photo.fileName}`,
+  })
+  return photo.schoolId
+}
+
 /**
  * One-shot field capture for sales reps on campus.
- * Creates the prospect, primary contact, visit log, and next follow-up together
- * so the funnel always has an owner, a contact, and a next action.
+ * Creates the prospect, primary contact, visit log, photos and next follow-up
+ * together so the funnel always has an owner, a contact, and a next action.
  */
-export async function captureFieldLead(ctx: PlatformContext, input: FieldCaptureInput) {
+export async function captureFieldLead(ctx: PlatformContext, input: FieldCaptureInput, photos: File[] = []) {
   assertPerm(ctx, 'platform.crm_create')
+  const photoUploads = await validatePhotos(photos)
 
   const duplicates = await findDuplicates(ctx, {
     name: input.name,
@@ -286,6 +367,7 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
       name: input.name,
       city: input.city,
       phone: mobile,
+      email: input.contactEmail ?? null,
       currentErp: input.currentErp ?? null,
       primaryObjection: input.primaryObjection ?? null,
       leadSource: input.leadSource ?? 'SCHOOL_VISIT',
@@ -315,6 +397,7 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
           designation: input.contactDesignation ?? 'PRINCIPAL',
           mobile,
           whatsapp: mobile,
+          email: input.contactEmail ?? null,
           isPrimary: true,
           isDecisionMaker: input.isDecisionMaker,
         },
@@ -324,9 +407,9 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
   })
 
   const contact = school.contacts[0]
-  const visitedAt = new Date()
+  const visitedAt = input.visitedAt
 
-  await ctx.db.crmVisit.create({
+  const visit = await ctx.db.crmVisit.create({
     data: {
       schoolId: school.id,
       visitedAt,
@@ -340,6 +423,7 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
       createdById: ownerId,
     },
   })
+  await storePhotos(ctx, school.id, visit.id, photoUploads)
 
   const followUp = await ctx.db.crmFollowUp.create({
     data: {
@@ -360,7 +444,7 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
     summary: `Field capture · met ${input.contactName}`,
     body: input.visitSummary,
     contactId: contact?.id,
-    meta: { followUpId: followUp.id, source: 'field_capture' },
+    meta: { followUpId: followUp.id, source: 'field_capture', photos: photoUploads.length },
   })
 
   await audit({
@@ -560,6 +644,12 @@ export async function getSchool(ctx: PlatformContext, id: string) {
       activities: { orderBy: { createdAt: 'desc' }, take: 80 },
       followUps: { orderBy: { dueAt: 'asc' }, include: { contact: { select: { fullName: true } } } },
       visits: { orderBy: { visitedAt: 'desc' }, take: 20 },
+      photos: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 40,
+        select: { id: true, fileName: true, createdAt: true, createdLabel: true, visitId: true },
+      },
       meetings: { orderBy: { startsAt: 'desc' }, take: 20 },
       tasks: { orderBy: [{ status: 'asc' }, { dueAt: 'asc' }], take: 30, include: { owner: { select: { firstName: true, lastName: true } } } },
       communications: {
@@ -1379,7 +1469,7 @@ export async function sendCrmMessage(ctx: PlatformContext, schoolId: string, inp
       ? destinationRaw
       : (normalizePhone(destinationRaw) ?? destinationRaw)
 
-  const dispatched = await dispatchCrmMessage(input.channel, { to, subject, body })
+  const dispatched = await dispatchCrmMessage(ctx, input.channel, { to, subject, body })
   const status = dispatched.ok ? 'SENT' : 'FAILED'
 
   const communication = await ctx.db.crmCommunication.create({
@@ -1434,6 +1524,7 @@ export async function sendCrmMessage(ctx: PlatformContext, schoolId: string, inp
 }
 
 async function dispatchCrmMessage(
+  ctx: PlatformContext,
   channel: CrmMessageChannel,
   message: { to: string; subject: string | null; body: string },
 ) {
@@ -1447,11 +1538,21 @@ async function dispatchCrmMessage(
     const result = await provider.send({ to: message.to, body: message.body })
     return { ...result, provider: provider.name }
   }
-  const provider = emailProvider()
   const html = `<p>${escapeHtml(message.body)
     .split('\n\n')
     .map((p) => p.replaceAll('\n', '<br/>'))
     .join('</p><p>')}</p>`
+  // Imported lazily: the mail module imports this one for writeActivity.
+  const { sendViaDefaultMailbox } = await import('@/server/modules/platform/mail/service')
+  const viaMailbox = await sendViaDefaultMailbox(ctx, {
+    to: message.to,
+    subject: message.subject || 'MyCampusView',
+    text: message.body,
+    bodyHtml: html,
+  })
+  if (viaMailbox) return viaMailbox
+
+  const provider = emailProvider()
   const result = await provider.send({
     to: message.to,
     subject: message.subject || 'MyCampusView',

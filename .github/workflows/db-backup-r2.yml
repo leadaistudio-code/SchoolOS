@@ -1,0 +1,85 @@
+name: Database backup to Cloudflare R2
+
+# Nightly pg_dump of production Postgres → Cloudflare R2 (off Railway).
+# Manual run: Actions → this workflow → Run workflow
+
+on:
+  schedule:
+    # 20:30 UTC = 02:00 IST
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup-r2
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Install PostgreSQL client and AWS CLI
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client awscli
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "Missing secret BACKUP_DATABASE_URL (Railway Postgres public/proxy URL)"
+            exit 1
+          fi
+          stamp="$(date -u +%Y%m%d-%H%M%S)"
+          outfile="mycampusview-railway-${stamp}.dump"
+          echo "Writing ${outfile}"
+          pg_dump --no-owner --format=custom --dbname="$DATABASE_URL" --file="$outfile"
+          ls -lh "$outfile"
+          echo "DUMP_FILE=${outfile}" >> "$GITHUB_ENV"
+
+      - name: Upload dump to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          for v in R2_ENDPOINT R2_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing secret ${v}"
+              exit 1
+            fi
+          done
+          key="database/$(date -u +%Y/%m)/${DUMP_FILE}"
+          aws s3 cp "$DUMP_FILE" "s3://${R2_BUCKET}/${key}" \
+            --endpoint-url "$R2_ENDPOINT"
+          echo "Uploaded s3://${R2_BUCKET}/${key}"
+
+      - name: Prune R2 dumps older than 30 days
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          cutoff="$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          aws s3api list-objects-v2 \
+            --bucket "$R2_BUCKET" \
+            --prefix "database/" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --query "Contents[?LastModified<\`${cutoff}\`].[Key]" \
+            --output text | while read -r key; do
+              [ -z "$key" ] || [ "$key" = "None" ] && continue
+              echo "Deleting old dump: ${key}"
+              aws s3 rm "s3://${R2_BUCKET}/${key}" --endpoint-url "$R2_ENDPOINT"
+            done

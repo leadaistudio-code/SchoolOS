@@ -8,6 +8,7 @@ import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
 import { applyConcession, computeInvoiceTotals, deriveInvoiceStatus, sumMinor } from '@/lib/money'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
+import { feeHeadActiveOn } from './fee-head-window'
 import { accessibleStudentIds } from '@/server/scope'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -17,10 +18,16 @@ const frequencies = ['ONE_TIME', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'TERM_WI
 export const simpleFeePlanSchema = z.object({
   id: z.string().optional(),
   sessionId: z.string().min(1),
-  classLevelId: z.string().min(1),
+  /** Null / empty = school-wide fee not tied to a class (books, trip, etc.). */
+  classLevelId: z
+    .union([z.string().min(1), z.literal(''), z.null()])
+    .optional()
+    .transform((value) => (value ? value : null)),
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(300).optional(),
   dueDay: z.coerce.number().int().min(1).max(28).default(10),
+  /** Day of the month invoices are generated. Later than the due day = the month before. */
+  generateDay: z.coerce.number().int().min(1).max(28).default(1),
   items: z.array(z.object({
     feeHeadId: z.string().min(1),
     amount: rupees,
@@ -61,11 +68,23 @@ function dueDate(sessionStart: Date, monthOffset: number, dueDay: number) {
   return new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), dueDay))
 }
 
+export function issueDateFor(dueOn: Date, generateDay: number) {
+  const monthBack = generateDay > dueOn.getUTCDate() ? 1 : 0
+  return new Date(Date.UTC(dueOn.getUTCFullYear(), dueOn.getUTCMonth() - monthBack, generateDay))
+}
+
+/** When an installment's invoices are generated: its own date, else the 1st of the due month. */
+export function installmentIssueDate(installment: { issueOn: Date | null; dueOn: Date }) {
+  return installment.issueOn
+    ?? new Date(Date.UTC(installment.dueOn.getUTCFullYear(), installment.dueOn.getUTCMonth(), 1))
+}
+
 export type FeePlanPreview = {
   annualMinor: number
   monthlyEquivalentMinor: number
   installments: {
     name: string
+    issueOn: Date
     dueOn: Date
     amountMinor: number
     lines: { feeHeadId: string; label: string; amountMinor: number }[]
@@ -94,6 +113,7 @@ export async function previewFeePlan(ctx: AppContext, raw: unknown): Promise<Fee
     if (!input.customInstallments?.length) throw conflict('Add at least one custom installment')
     const installments = input.customInstallments.map((installment) => ({
       name: installment.name,
+      issueOn: issueDateFor(attendanceDate(installment.dueOn), input.generateDay),
       dueOn: attendanceDate(installment.dueOn),
       amountMinor: sumMinor(installment.lines.map((line) => line.amount)),
       lines: installment.lines.map((line) => ({
@@ -125,6 +145,7 @@ export async function previewFeePlan(ctx: AppContext, raw: unknown): Promise<Fee
       const date = dueDate(session.startsOn, month, input.dueDay)
       return {
         name: date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+        issueOn: issueDateFor(date, input.generateDay),
         dueOn: date,
         amountMinor: sumMinor(lines.map((line) => line.amountMinor)),
         lines,
@@ -136,7 +157,7 @@ export async function previewFeePlan(ctx: AppContext, raw: unknown): Promise<Fee
 
 async function resolveDraftStructure(
   ctx: AppContext,
-  input: { id?: string; sessionId: string; classLevelId: string; name: string },
+  input: { id?: string; sessionId: string; classLevelId: string | null; name: string },
 ) {
   const named = await ctx.db.feeStructure.findFirst({
     where: { sessionId: input.sessionId, name: input.name },
@@ -145,7 +166,10 @@ async function resolveDraftStructure(
   const requested = input.id
     ? await ctx.db.feeStructure.findFirst({ where: { id: input.id } })
     : named && (named.status !== 'PUBLISHED' || named.deletedAt)
-      && (!named.classLevelId || named.classLevelId === input.classLevelId)
+      && (
+        (!named.classLevelId && !input.classLevelId)
+        || (named.classLevelId != null && named.classLevelId === input.classLevelId)
+      )
       ? named
       : null
 
@@ -161,11 +185,13 @@ async function resolveDraftStructure(
     && (!named.deletedAt || named.classLevelId !== input.classLevelId),
   )
   if (occupiesName && named) {
-    const classLevel = await ctx.db.classLevel.findFirst({
-      where: { id: input.classLevelId },
-      select: { name: true },
-    })
-    const suffix = classLevel?.name ? ` · ${classLevel.name}` : ' (2)'
+    const classLevel = input.classLevelId
+      ? await ctx.db.classLevel.findFirst({
+          where: { id: input.classLevelId },
+          select: { name: true },
+        })
+      : null
+    const suffix = classLevel?.name ? ` · ${classLevel.name}` : ' · School-wide'
     const candidate = name.endsWith(suffix) ? name : `${name.slice(0, Math.max(2, 80 - suffix.length))}${suffix}`
     const candidateClash = await ctx.db.feeStructure.findFirst({
       where: { sessionId: input.sessionId, name: candidate, id: requested ? { not: requested.id } : undefined },
@@ -246,6 +272,7 @@ export async function saveFeePlanDraft(ctx: AppContext, raw: unknown) {
           tenantId: ctx.tenant.id,
           structureId: row.id,
           name: installment.name,
+          issueOn: installment.issueOn,
           dueOn: installment.dueOn,
           amountMinor: installment.amountMinor,
           sortOrder: index,
@@ -350,6 +377,7 @@ export async function copyFeePlan(ctx: AppContext, raw: unknown) {
           tenantId: ctx.tenant.id,
           structureId: structure.id,
           name: installment.name,
+          issueOn: installment.issueOn ? addMonths(installment.issueOn, monthShift) : null,
           dueOn: addMonths(installment.dueOn, monthShift),
           amountMinor: increase(installment.amountMinor),
           sortOrder: installment.sortOrder,
@@ -388,9 +416,6 @@ export const publishFeePlanSchema = z.object({
   if (input.assignment === 'SECTION' && !input.sectionId) {
     validation.addIssue({ code: z.ZodIssueCode.custom, path: ['sectionId'], message: 'Choose a section' })
   }
-  if (input.assignment === 'SELECTED' && !input.studentIds?.length) {
-    validation.addIssue({ code: z.ZodIssueCode.custom, path: ['studentIds'], message: 'Choose at least one student' })
-  }
 })
 
 export async function previewFeePlanAssignment(ctx: AppContext, raw: unknown) {
@@ -401,14 +426,21 @@ export async function previewFeePlanAssignment(ctx: AppContext, raw: unknown) {
     include: { installments: { include: { lines: true }, orderBy: { sortOrder: 'asc' } } },
   })
   if (!structure) throw notFound('Fee structure')
+  if (!structure.classLevelId && input.assignment !== 'SELECTED') {
+    throw conflict('Non class linked fees must be assigned to selected students')
+  }
+  const pickingStudents =
+    input.assignment === 'SELECTED' && !(input.studentIds && input.studentIds.length > 0)
   const enrollments = await ctx.db.enrollment.findMany({
     where: {
       sessionId: structure.sessionId,
-      classLevelId: structure.classLevelId ?? undefined,
+      ...(structure.classLevelId ? { classLevelId: structure.classLevelId } : {}),
       isCurrent: true,
       student: { deletedAt: null, status: 'ACTIVE' },
       ...(input.assignment === 'SECTION' ? { sectionId: input.sectionId } : {}),
-      ...(input.assignment === 'SELECTED' ? { studentId: { in: input.studentIds ?? [] } } : {}),
+      ...(input.assignment === 'SELECTED' && !pickingStudents
+        ? { studentId: { in: input.studentIds ?? [] } }
+        : {}),
     },
     orderBy: [{ section: { name: 'asc' } }, { student: { firstName: 'asc' } }],
     select: {
@@ -499,6 +531,9 @@ async function ensureDraftInstallments(ctx: AppContext, structureId: string) {
 export async function publishAndAssignFeePlan(ctx: AppContext, raw: unknown) {
   ctx.require('fees.structure_publish')
   const input = publishFeePlanSchema.parse(raw)
+  if (input.assignment === 'SELECTED' && !input.studentIds?.length) {
+    throw conflict('Choose at least one student')
+  }
   await ensureDraftInstallments(ctx, input.structureId)
   const preview = await previewFeePlanAssignment(ctx, input)
   if (preview.students.length === 0) throw conflict('No active students match this assignment')
@@ -632,6 +667,7 @@ export async function customInvoiceGenerationOptions(ctx: AppContext) {
         select: {
           id: true,
           name: true,
+          issueOn: true,
           dueOn: true,
           lines: {
             orderBy: { label: 'asc' },
@@ -664,6 +700,7 @@ export async function customInvoiceGenerationOptions(ctx: AppContext) {
     installments: structure.installments.map((installment) => ({
       id: installment.id,
       name: installment.name,
+      issueOn: installmentIssueDate(installment).toISOString(),
       dueOn: installment.dueOn.toISOString(),
       month: installment.dueOn.toISOString().slice(0, 7),
       lines: installment.lines.map((line) => ({
@@ -679,9 +716,10 @@ export async function customInvoiceGenerationOptions(ctx: AppContext) {
 
 /**
  * Creates one immutable invoice per student/month/fee-head occurrence.
- * This lets schools backfill only selected months and heads without future
- * installments leaking into outstanding balances. The source key makes every
- * occurrence idempotent across manual and scheduled runs.
+ * Future months are never billed here — they wait for the daily job when
+ * automatic billing is on, or for a later generate run when that month is due
+ * (so Computer Fee etc. do not inflate outstanding upfront). The source key
+ * makes every occurrence idempotent across manual and scheduled runs.
  */
 export async function generateCustomInvoices(
   ctx: AppContext,
@@ -743,6 +781,16 @@ export async function generateCustomInvoices(
       .map((line) => ({ installment, line })))
   if (selectedLines.length === 0) throw conflict('The selected fee heads are not due in these months')
 
+  // Never bill months that are still in the future. When automatic billing is
+  // on, also leave months from autoGenerateFrom onward for the daily job.
+  const today = attendanceDate(new Date())
+  const nextMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1))
+  const autoFrom = input.autoGenerateFrom
+    ? attendanceDate(`${input.autoGenerateFrom}-01`)
+    : null
+  const generateUntilExclusive =
+    autoFrom && autoFrom.getTime() > nextMonthStart.getTime() ? autoFrom : nextMonthStart
+
   const [concessions, existing] = await Promise.all([
     ctx.db.feeConcession.findMany({ where: { studentId: { in: studentIds } } }),
     ctx.db.feeInvoice.findMany({
@@ -779,6 +827,18 @@ export async function generateCustomInvoices(
         remaining = applied.net
         discountMinor += applied.discount
       }
+      let skipReason: string | undefined
+      if (existingKeys.has(sourceKey)) {
+        skipReason = 'Already invoiced'
+      } else if (!feeHeadActiveOn(line.feeHead, installment.dueOn)) {
+        skipReason = `Outside the ${line.feeHead.name} billing period`
+      } else if (installment.issueOn && installment.issueOn > today) {
+        skipReason = `Invoice generation date is ${toDateInput(installment.issueOn)}`
+      } else if ((installment.issueOn ?? installment.dueOn) >= generateUntilExclusive) {
+        skipReason = autoFrom
+          ? `Scheduled from ${input.autoGenerateFrom} — billed on that month’s generation date`
+          : 'Future month — billed when due (not upfront)'
+      }
       preview.push({
         studentId: enrollment.studentId,
         studentName: `${enrollment.student.firstName} ${enrollment.student.lastName}`,
@@ -790,7 +850,7 @@ export async function generateCustomInvoices(
         amountMinor: line.amountMinor,
         discountMinor,
         netMinor: line.amountMinor - discountMinor,
-        ...(existingKeys.has(sourceKey) ? { skipReason: 'Already invoiced' } : {}),
+        ...(skipReason ? { skipReason } : {}),
       })
     }
   }
@@ -867,7 +927,7 @@ export async function generateCustomInvoices(
           structureId: structure.id,
           sourceKey,
           title: `${item.feeHead} — ${monthLabel}`,
-          issuedOn: new Date(Date.UTC(installment.dueOn.getUTCFullYear(), installment.dueOn.getUTCMonth(), 1)),
+          issuedOn: installmentIssueDate(installment),
           dueOn: installment.dueOn,
           status: deriveInvoiceStatus({ totalMinor: item.netMinor, paidMinor: 0, dueOn: installment.dueOn }),
           subtotalMinor: item.amountMinor,
@@ -911,47 +971,116 @@ export async function generateCustomInvoices(
   }
 }
 
-export async function listStudentFeeAccounts(
+export type FeeLedgerBalanceFilter = 'all' | 'due' | 'clear' | 'credit'
+
+export type FeeLedgerListQuery = {
+  q?: string
+  classLevelId?: string
+  sectionId?: string
+  /** all | due (balance > 0) | clear (= 0) | credit (< 0) */
+  balance?: FeeLedgerBalanceFilter
+  page?: number
+  pageSize?: number
+}
+
+export type StudentFeeAccountRow = {
+  id: string
+  name: string
+  admissionNo: string
+  className: string
+  sectionName: string
+  lastSessionDueMinor: number
+  amountRequestedMinor: number
+  discountMinor: number
+  paidMinor: number
+  balanceMinor: number
+}
+
+export const feeLedgerExportQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  classLevelId: z.string().min(1).optional(),
+  sectionId: z.string().min(1).optional(),
+  balance: z.enum(['all', 'due', 'clear', 'credit']).optional().default('all'),
+  format: z.enum(['csv', 'xlsx', 'tally', 'pdf']),
+})
+
+async function loadStudentFeeAccountRows(
   ctx: AppContext,
-  query: { q?: string; page: number; pageSize: number },
-) {
-  ctx.require('fees.accounts')
+  query: FeeLedgerListQuery,
+): Promise<StudentFeeAccountRow[]> {
+  const allowedStudentIds = await accessibleStudentIds(ctx)
+  if (allowedStudentIds !== null && allowedStudentIds.length === 0) return []
+
+  const classLevelId = query.classLevelId?.trim() || undefined
+  const sectionId = query.sectionId?.trim() || undefined
+  const q = query.q?.trim() || undefined
+
   const where: Prisma.StudentWhereInput = {
     deletedAt: null,
     status: 'ACTIVE',
-    ...(query.q ? {
-      OR: [
-        { firstName: { contains: query.q, mode: 'insensitive' } },
-        { lastName: { contains: query.q, mode: 'insensitive' } },
-        { admissionNo: { contains: query.q, mode: 'insensitive' } },
-        { guardians: { some: { parent: { OR: [
-          { firstName: { contains: query.q, mode: 'insensitive' } },
-          { lastName: { contains: query.q, mode: 'insensitive' } },
-          { phone: { contains: query.q } },
-        ] } } } },
-      ],
-    } : {}),
+    ...(allowedStudentIds === null ? {} : { id: { in: allowedStudentIds } }),
+    ...(classLevelId || sectionId
+      ? {
+          enrollments: {
+            some: {
+              isCurrent: true,
+              ...(classLevelId ? { classLevelId } : {}),
+              ...(sectionId ? { sectionId } : {}),
+            },
+          },
+        }
+      : {}),
+    ...(q
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { admissionNo: { contains: q, mode: 'insensitive' } },
+            {
+              guardians: {
+                some: {
+                  parent: {
+                    OR: [
+                      { firstName: { contains: q, mode: 'insensitive' } },
+                      { lastName: { contains: q, mode: 'insensitive' } },
+                      { phone: { contains: q } },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
   }
-  const [students, total, currentSession] = await Promise.all([
+
+  const [students, currentSession] = await Promise.all([
     ctx.db.student.findMany({
       where,
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
       select: {
-        id: true, firstName: true, lastName: true, admissionNo: true,
+        id: true,
+        firstName: true,
+        lastName: true,
+        admissionNo: true,
         enrollments: {
-          where: { isCurrent: true }, take: 1,
-          select: { classLevel: { select: { name: true } }, section: { select: { name: true } } },
+          where: { isCurrent: true },
+          take: 1,
+          select: {
+            classLevel: { select: { name: true } },
+            section: { select: { name: true } },
+          },
         },
       },
     }),
-    ctx.db.student.count({ where }),
     ctx.db.academicSession.findFirst({
       where: { isCurrent: true },
       select: { id: true, startsOn: true },
     }),
   ])
+
+  if (students.length === 0) return []
+
   const ids = students.map((student) => student.id)
   const previousSession = currentSession
     ? await ctx.db.academicSession.findFirst({
@@ -960,6 +1089,7 @@ export async function listStudentFeeAccounts(
         select: { id: true },
       })
     : null
+
   const [currentInvoiceAgg, previousInvoiceAgg] = await Promise.all([
     ctx.db.feeInvoice.groupBy({
       by: ['studentId'],
@@ -985,11 +1115,13 @@ export async function listStudentFeeAccounts(
       _sum: { balanceMinor: true },
     }),
   ])
+
   const currentInvoices = new Map(currentInvoiceAgg.map((row) => [row.studentId, row._sum]))
   const previousInvoices = new Map(previousInvoiceAgg.map((row) => [row.studentId, row._sum]))
-  return {
-    total,
-    rows: students.map((student) => {
+  const balanceFilter = query.balance ?? 'all'
+
+  return students
+    .map((student) => {
       const current = currentInvoices.get(student.id)
       const lastSessionDueMinor = previousInvoices.get(student.id)?.balanceMinor ?? 0
       const discountMinor = current?.discountMinor ?? 0
@@ -998,7 +1130,7 @@ export async function listStudentFeeAccounts(
       const balanceMinor = lastSessionDueMinor + (current?.balanceMinor ?? 0)
       return {
         id: student.id,
-        name: `${student.firstName} ${student.lastName}`,
+        name: `${student.firstName} ${student.lastName}`.trim(),
         admissionNo: student.admissionNo,
         className: student.enrollments[0]?.classLevel.name ?? '—',
         sectionName: student.enrollments[0]?.section.name ?? '—',
@@ -1008,8 +1140,460 @@ export async function listStudentFeeAccounts(
         paidMinor,
         balanceMinor,
       }
+    })
+    .filter((row) => {
+      if (balanceFilter === 'due') return row.balanceMinor > 0
+      if (balanceFilter === 'clear') return row.balanceMinor === 0
+      if (balanceFilter === 'credit') return row.balanceMinor < 0
+      return true
+    })
+}
+
+export async function listStudentFeeAccounts(ctx: AppContext, query: FeeLedgerListQuery) {
+  ctx.require('fees.accounts')
+  const page = Math.max(1, query.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 25))
+  const allRows = await loadStudentFeeAccountRows(ctx, query)
+  const summary = allRows.reduce(
+    (acc, row) => ({
+      students: acc.students + 1,
+      studentsWithDue: acc.studentsWithDue + (row.balanceMinor > 0 ? 1 : 0),
+      requestedMinor: acc.requestedMinor + row.amountRequestedMinor,
+      paidMinor: acc.paidMinor + row.paidMinor,
+      discountMinor: acc.discountMinor + row.discountMinor,
+      outstandingMinor: acc.outstandingMinor + row.balanceMinor,
+      lastSessionDueMinor: acc.lastSessionDueMinor + row.lastSessionDueMinor,
     }),
+    {
+      students: 0,
+      studentsWithDue: 0,
+      requestedMinor: 0,
+      paidMinor: 0,
+      discountMinor: 0,
+      outstandingMinor: 0,
+      lastSessionDueMinor: 0,
+    },
+  )
+  return {
+    total: allRows.length,
+    summary,
+    rows: allRows.slice((page - 1) * pageSize, page * pageSize),
   }
+}
+
+const LEDGER_EXPORT_HEADERS = [
+  'Student name',
+  'Admission no.',
+  'Class',
+  'Section',
+  'Last Session Due',
+  'Amount Requested',
+  'Discount',
+  'Amount Paid',
+  'Balance',
+] as const
+
+function rupeesFromMinor(minor: number) {
+  return (minor / 100).toFixed(2)
+}
+
+function ledgerExportMatrix(rows: StudentFeeAccountRow[]) {
+  return rows.map((row) => [
+    row.name,
+    row.admissionNo,
+    row.className,
+    row.sectionName,
+    rupeesFromMinor(row.lastSessionDueMinor),
+    rupeesFromMinor(row.amountRequestedMinor),
+    rupeesFromMinor(row.discountMinor),
+    rupeesFromMinor(row.paidMinor),
+    rupeesFromMinor(row.balanceMinor),
+  ])
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+}
+
+export async function exportStudentFeeLedger(
+  ctx: AppContext,
+  query: z.infer<typeof feeLedgerExportQuerySchema>,
+) {
+  ctx.require('fees.export')
+  const rows = await loadStudentFeeAccountRows(ctx, {
+    q: query.q,
+    classLevelId: query.classLevelId,
+    sectionId: query.sectionId,
+    balance: query.balance,
+  })
+
+  const stamp = new Date().toISOString().slice(0, 10)
+  const school = ctx.tenant.name
+  const currency = ctx.tenant.currency
+  const filterBits = [
+    query.classLevelId ? 'class' : null,
+    query.sectionId ? 'section' : null,
+    query.balance && query.balance !== 'all' ? `balance-${query.balance}` : null,
+    query.q ? 'search' : null,
+  ].filter(Boolean)
+  const filterLabel = filterBits.length ? filterBits.join('-') : 'all'
+  const baseName = `fee-ledger-${filterLabel}-${stamp}`
+
+  if (query.format === 'csv') {
+    const { toCsv } = await import('@/lib/csv')
+    return {
+      filename: `${baseName}.csv`,
+      contentType: 'text/csv; charset=utf-8',
+      body: Buffer.from(`\uFEFF${toCsv([...LEDGER_EXPORT_HEADERS], ledgerExportMatrix(rows))}`, 'utf8'),
+    }
+  }
+
+  if (query.format === 'xlsx') {
+    const XLSX = await import('xlsx')
+    const sheetRows = [
+      [`${school} — Fee ledger`],
+      [`Generated ${stamp}`, `Currency ${currency}`, `Students ${rows.length}`],
+      [],
+      [...LEDGER_EXPORT_HEADERS],
+      ...ledgerExportMatrix(rows),
+    ]
+    const sheet = XLSX.utils.aoa_to_sheet(sheetRows)
+    sheet['!cols'] = [
+      { wch: 28 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 12 },
+    ]
+    const book = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(book, sheet, 'Fee ledger')
+    const body = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    return {
+      filename: `${baseName}.xlsx`,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      body,
+    }
+  }
+
+  if (query.format === 'tally') {
+    // Tally-friendly party outstanding CSV (Ledger masters / opening style).
+    const { toCsv } = await import('@/lib/csv')
+    const tallyHeaders = ['Ledger Name', 'Under', 'Opening Balance', 'Dr/Cr', 'Admission No', 'Class', 'Section']
+    const tallyRows = rows.map((row) => [
+      row.name,
+      'Sundry Debtors',
+      rupeesFromMinor(Math.abs(row.balanceMinor)),
+      row.balanceMinor < 0 ? 'Cr' : 'Dr',
+      row.admissionNo,
+      row.className,
+      row.sectionName,
+    ])
+    return {
+      filename: `${baseName}-tally.csv`,
+      contentType: 'text/csv; charset=utf-8',
+      body: Buffer.from(`\uFEFF${toCsv(tallyHeaders, tallyRows)}`, 'utf8'),
+    }
+  }
+
+  // Printable HTML — open in browser and Save as PDF / Print.
+  const totals = rows.reduce(
+    (acc, row) => ({
+      requested: acc.requested + row.amountRequestedMinor,
+      paid: acc.paid + row.paidMinor,
+      balance: acc.balance + row.balanceMinor,
+    }),
+    { requested: 0, paid: 0, balance: 0 },
+  )
+  const balanceLabel =
+    query.balance === 'due'
+      ? 'Balance due only'
+      : query.balance === 'clear'
+        ? 'Cleared accounts'
+        : query.balance === 'credit'
+          ? 'Credit balance'
+          : 'All balances'
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(school)} — Fee ledger</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; color: #111827; margin: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .meta { color: #4b5563; font-size: 12px; margin-bottom: 16px; }
+    .summary { display: flex; gap: 24px; margin-bottom: 16px; font-size: 13px; }
+    .summary strong { display: block; font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; }
+    th { background: #f3f4f6; font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.due td.bal { color: #b91c1c; font-weight: 600; }
+    tr.clear td.bal { color: #047857; }
+    .actions { margin-bottom: 16px; }
+    button { padding: 8px 14px; border: 1px solid #9ca3af; border-radius: 6px; background: #111827; color: #fff; cursor: pointer; }
+    @media print {
+      .actions { display: none; }
+      body { margin: 8mm; }
+      th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="actions"><button type="button" onclick="window.print()">Print / Save as PDF</button></div>
+  <h1>${escapeHtml(school)} — Fee ledger</h1>
+  <p class="meta">Generated ${escapeHtml(stamp)} · ${escapeHtml(balanceLabel)} · ${rows.length} student${rows.length === 1 ? '' : 's'} · Currency ${escapeHtml(currency)}</p>
+  <div class="summary">
+    <div><span>Amount requested</span><strong>${escapeHtml(rupeesFromMinor(totals.requested))}</strong></div>
+    <div><span>Amount paid</span><strong>${escapeHtml(rupeesFromMinor(totals.paid))}</strong></div>
+    <div><span>Balance</span><strong>${escapeHtml(rupeesFromMinor(totals.balance))}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Student name</th>
+        <th>Admission no.</th>
+        <th>Class</th>
+        <th>Section</th>
+        <th class="num">Last Session Due</th>
+        <th class="num">Amount Requested</th>
+        <th class="num">Discount</th>
+        <th class="num">Amount Paid</th>
+        <th class="num">Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr class="${row.balanceMinor > 0 ? 'due' : 'clear'}">
+        <td>${escapeHtml(row.name)}</td>
+        <td>${escapeHtml(row.admissionNo)}</td>
+        <td>${escapeHtml(row.className)}</td>
+        <td>${escapeHtml(row.sectionName)}</td>
+        <td class="num">${escapeHtml(rupeesFromMinor(row.lastSessionDueMinor))}</td>
+        <td class="num">${escapeHtml(rupeesFromMinor(row.amountRequestedMinor))}</td>
+        <td class="num">${escapeHtml(rupeesFromMinor(row.discountMinor))}</td>
+        <td class="num">${escapeHtml(rupeesFromMinor(row.paidMinor))}</td>
+        <td class="num bal">${escapeHtml(rupeesFromMinor(row.balanceMinor))}</td>
+      </tr>`,
+        )
+        .join('\n')}
+    </tbody>
+  </table>
+  <script>window.addEventListener('load', () => { /* ready for print */ })</script>
+</body>
+</html>`
+
+  return {
+    filename: `${baseName}.html`,
+    contentType: 'text/html; charset=utf-8',
+    body: Buffer.from(html, 'utf8'),
+  }
+}
+
+const FY_MONTH_LABELS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'] as const
+
+export type FeeMonthStatus = 'paid' | 'pending' | 'overdue' | 'upcoming'
+
+export type FeeMonthPill = {
+  key: string
+  label: (typeof FY_MONTH_LABELS)[number]
+  year: number
+  monthIndex: number
+  status: FeeMonthStatus
+  billedMinor: number
+  paidMinor: number
+  balanceMinor: number
+}
+
+export type FeeHeadLedgerRow = {
+  key: string
+  feeHeadId: string | null
+  name: string
+  classLinked: boolean
+  totalFeesMinor: number
+  amountRequestedMinor: number
+  collectionMinor: number
+  discountMinor: number
+  balanceMinor: number
+}
+
+/** Indian academic-year month keys starting from session start (Apr–Mar by default). */
+function academicYearMonths(sessionStart: Date) {
+  const startYear = sessionStart.getUTCFullYear()
+  const startMonth = sessionStart.getUTCMonth()
+  // Prefer Apr–Mar grid when session begins Jan–Jun; otherwise roll from session month.
+  const baseMonth = startMonth <= 5 ? 3 : startMonth
+  const baseYear = startMonth <= 5 ? (startMonth < 3 ? startYear - 1 : startYear) : startYear
+  return FY_MONTH_LABELS.map((label, index) => {
+    const monthIndex = (baseMonth + index) % 12
+    const year = baseYear + Math.floor((baseMonth + index) / 12)
+    return {
+      key: `${year}-${String(monthIndex + 1).padStart(2, '0')}`,
+      label,
+      year,
+      monthIndex,
+    }
+  })
+}
+
+function monthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+export function buildFeeMonthPills(
+  invoices: { dueOn: Date; totalMinor: number; paidMinor: number; balanceMinor: number }[],
+  sessionStart: Date,
+  today: Date,
+): FeeMonthPill[] {
+  const byMonth = new Map<string, { billed: number; paid: number; balance: number; dueOn: Date }>()
+  for (const invoice of invoices) {
+    const key = monthKey(invoice.dueOn)
+    const current = byMonth.get(key) ?? { billed: 0, paid: 0, balance: 0, dueOn: invoice.dueOn }
+    current.billed += invoice.totalMinor
+    current.paid += invoice.paidMinor
+    current.balance += invoice.balanceMinor
+    byMonth.set(key, current)
+  }
+
+  return academicYearMonths(sessionStart).map((slot) => {
+    const row = byMonth.get(slot.key)
+    const billedMinor = row?.billed ?? 0
+    const paidMinor = row?.paid ?? 0
+    const balanceMinor = row?.balance ?? 0
+    let status: FeeMonthStatus = 'upcoming'
+    if (row) {
+      if (balanceMinor <= 0) status = 'paid'
+      else if (row.dueOn < today) status = 'overdue'
+      else status = 'pending'
+    }
+    return { ...slot, status, billedMinor, paidMinor, balanceMinor }
+  })
+}
+
+export function buildFeeHeadLedger(
+  assignments: {
+    structure: {
+      classLevelId: string | null
+      items: {
+        amountMinor: number
+        feeHeadId: string
+        feeHead: { id: string; name: string; code: string } | null
+      }[]
+    }
+  }[],
+  invoices: {
+    paidMinor: number
+    totalMinor: number
+    lines: {
+      feeHeadId: string | null
+      label: string
+      amountMinor: number
+      discountMinor: number
+      feeHead: { id: string; name: string; code: string } | null
+    }[]
+  }[],
+): FeeHeadLedgerRow[] {
+  type Acc = {
+    feeHeadId: string | null
+    name: string
+    classLinked: boolean
+    plannedMinor: number
+    billedMinor: number
+    discountMinor: number
+    collectionMinor: number
+  }
+  const map = new Map<string, Acc>()
+
+  const touch = (key: string, patch: Partial<Acc> & { name: string; feeHeadId: string | null }) => {
+    const current = map.get(key) ?? {
+      feeHeadId: patch.feeHeadId,
+      name: patch.name,
+      classLinked: false,
+      plannedMinor: 0,
+      billedMinor: 0,
+      discountMinor: 0,
+      collectionMinor: 0,
+    }
+    map.set(key, {
+      ...current,
+      ...patch,
+      classLinked: current.classLinked || Boolean(patch.classLinked),
+      plannedMinor: current.plannedMinor + (patch.plannedMinor ?? 0),
+      billedMinor: current.billedMinor + (patch.billedMinor ?? 0),
+      discountMinor: current.discountMinor + (patch.discountMinor ?? 0),
+      collectionMinor: current.collectionMinor + (patch.collectionMinor ?? 0),
+    })
+  }
+
+  // Same fee head on multiple ACTIVE plans (e.g. Monthly Tuition + Session)
+  // must not stack — that doubled Tuition 36k → 72k on the ledger.
+  for (const assignment of assignments) {
+    const classLinked = Boolean(assignment.structure.classLevelId)
+    for (const item of assignment.structure.items) {
+      const name = item.feeHead?.name ?? 'Fee'
+      const existing = map.get(item.feeHeadId)
+      if (existing) {
+        map.set(item.feeHeadId, {
+          ...existing,
+          classLinked: existing.classLinked || classLinked,
+          plannedMinor: Math.max(existing.plannedMinor, item.amountMinor),
+        })
+        continue
+      }
+      touch(item.feeHeadId, {
+        feeHeadId: item.feeHeadId,
+        name,
+        classLinked,
+        plannedMinor: item.amountMinor,
+      })
+    }
+  }
+
+  for (const invoice of invoices) {
+    const nets = invoice.lines.map((line) => Math.max(0, line.amountMinor - line.discountMinor))
+    const netTotal = sumMinor(nets)
+    invoice.lines.forEach((line, index) => {
+      const key = line.feeHeadId ?? `label:${line.label}`
+      const name = line.feeHead?.name ?? line.label
+      const share =
+        netTotal > 0 ? Math.round((invoice.paidMinor * nets[index]!) / netTotal) : 0
+      touch(key, {
+        feeHeadId: line.feeHeadId,
+        name,
+        billedMinor: line.amountMinor,
+        discountMinor: line.discountMinor,
+        collectionMinor: share,
+      })
+    })
+  }
+
+  return [...map.values()]
+    .map((row) => {
+      const totalFeesMinor = Math.max(row.plannedMinor, row.billedMinor)
+      const amountRequestedMinor = Math.max(0, row.billedMinor - row.discountMinor)
+      const balanceMinor = Math.max(0, amountRequestedMinor - row.collectionMinor)
+      return {
+        key: row.feeHeadId ?? row.name,
+        feeHeadId: row.feeHeadId,
+        name: row.name,
+        classLinked: row.classLinked,
+        totalFeesMinor,
+        amountRequestedMinor,
+        collectionMinor: row.collectionMinor,
+        discountMinor: row.discountMinor,
+        balanceMinor,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function getStudentFeeAccount(ctx: AppContext, studentId: string) {
@@ -1022,7 +1606,27 @@ export async function getStudentFeeAccount(ctx: AppContext, studentId: string) {
         include: { classLevel: true, section: true, session: true },
       },
       guardians: { where: { isPrimary: true }, take: 1, include: { parent: true } },
-      feeAssignments: { where: { status: 'ACTIVE' }, include: { structure: true } },
+      feeAssignments: {
+        where: { status: 'ACTIVE' },
+        include: {
+          structure: {
+            include: {
+              classLevel: { select: { id: true, name: true } },
+              items: {
+                include: { feeHead: { select: { id: true, name: true, code: true } } },
+              },
+              installments: {
+                orderBy: [{ dueOn: 'asc' }, { sortOrder: 'asc' }],
+                include: {
+                  lines: {
+                    include: { feeHead: { select: { id: true, name: true, code: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   })
   if (!student) throw notFound('Student')
@@ -1030,12 +1634,24 @@ export async function getStudentFeeAccount(ctx: AppContext, studentId: string) {
     ctx.db.feeInvoice.findMany({
       where: { studentId, status: { not: 'CANCELLED' } },
       orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
-      include: { lines: true },
+      include: {
+        lines: {
+          include: { feeHead: { select: { id: true, name: true, code: true } } },
+        },
+      },
     }),
     ctx.db.feePayment.findMany({
       where: { studentId, status: { in: ['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
       orderBy: { paidAt: 'asc' },
-      include: { receipt: true, refunds: true },
+      include: {
+        receipt: true,
+        refunds: true,
+        allocations: {
+          include: {
+            invoice: { select: { id: true, title: true, number: true } },
+          },
+        },
+      },
     }),
     ctx.db.feeConcession.findMany({ where: { studentId }, orderBy: { createdAt: 'asc' } }),
     ctx.db.studentFeeCredit.findMany({ where: { studentId }, orderBy: { createdAt: 'asc' } }),
@@ -1074,22 +1690,32 @@ export async function getStudentFeeAccount(ctx: AppContext, studentId: string) {
       creditMinor: 0,
       ...emptyPaymentMeta,
     })),
-    ...payments.map((payment) => ({
-      date: payment.paidAt ?? payment.createdAt,
-      type: 'PAYMENT' as const,
-      reference: payment.receipt?.number ?? payment.id,
-      description: `${payment.mode.toLowerCase().replaceAll('_', ' ')} payment`,
-      debitMinor: 0,
-      creditMinor: payment.amountMinor,
-      paymentId: payment.id,
-      provider: payment.provider,
-      status: payment.status,
-      mode: payment.mode,
-      paidOn: payment.paidAt ? toDateInput(payment.paidAt) : null,
-      billBookNo: payment.billBookNo,
-      paymentReference: payment.reference,
-      notes: payment.notes,
-    })),
+    ...payments.map((payment) => {
+      const allocatedTitles = payment.allocations
+        .map((allocation) => allocation.invoice.title)
+        .filter(Boolean)
+      const uniqueTitles = [...new Set(allocatedTitles)]
+      const receiptNo = payment.receipt?.number
+      const collectedLabel = uniqueTitles.length
+        ? `Collected — ${uniqueTitles.slice(0, 2).join(', ')}${uniqueTitles.length > 2 ? ` +${uniqueTitles.length - 2}` : ''}`
+        : `${payment.mode.toLowerCase().replaceAll('_', ' ')} payment`
+      return {
+        date: payment.paidAt ?? payment.createdAt,
+        type: 'PAYMENT' as const,
+        reference: receiptNo ?? payment.id,
+        description: receiptNo ? `${collectedLabel} (#${receiptNo})` : collectedLabel,
+        debitMinor: 0,
+        creditMinor: payment.amountMinor,
+        paymentId: payment.id,
+        provider: payment.provider,
+        status: payment.status,
+        mode: payment.mode,
+        paidOn: payment.paidAt ? toDateInput(payment.paidAt) : null,
+        billBookNo: payment.billBookNo,
+        paymentReference: payment.reference,
+        notes: payment.notes,
+      }
+    }),
     ...payments.flatMap((payment) =>
       payment.refunds
         .filter((refund) => refund.status === 'SUCCESS')
@@ -1115,12 +1741,24 @@ export async function getStudentFeeAccount(ctx: AppContext, studentId: string) {
     })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime())
   let balanceMinor = 0
+  const ledgerWithBalance = ledger.map((entry) => {
+    balanceMinor += entry.debitMinor - entry.creditMinor
+    return { ...entry, balanceMinor }
+  })
+  const session = student.enrollments[0]?.session
+  const months = buildFeeMonthPills(invoices, session?.startsOn ?? new Date(), today)
+  const heads = buildFeeHeadLedger(student.feeAssignments, invoices)
+
   return {
-    student, invoices, payments, concessions, credits, summary,
-    ledger: ledger.map((entry) => {
-      balanceMinor += entry.debitMinor - entry.creditMinor
-      return { ...entry, balanceMinor }
-    }),
+    student,
+    invoices,
+    payments,
+    concessions,
+    credits,
+    summary,
+    months,
+    heads,
+    ledger: ledgerWithBalance,
   }
 }
 
@@ -1401,8 +2039,8 @@ export async function setInvoiceChargeAmount(
   ctx: AppContext,
   raw: z.infer<typeof setInvoiceChargeAmountSchema>,
 ) {
-  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice')) {
-    ctx.require('fees.concession')
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice') && !ctx.can('fees.accounts')) {
+    ctx.require('fees.accounts')
   }
 
   const input = setInvoiceChargeAmountSchema.parse(raw)
@@ -1522,4 +2160,364 @@ export async function setInvoiceChargeAmount(
   })
 
   return { invoiceId: invoice.id, studentId: invoice.studentId, totalMinor: amountMinor }
+}
+
+const OPEN_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] as const
+
+function lineIdFromSourceKey(sourceKey: string | null) {
+  const match = sourceKey?.match(/^fee-line:([^:]+):student:/)
+  return match?.[1] ?? null
+}
+
+export type FeeStructureSchedule = {
+  id: string
+  name: string
+  className: string
+  sessionName: string
+  status: string
+  installments: {
+    id: string
+    name: string
+    issueOn: string
+    issueOnIsDefault: boolean
+    dueOn: string
+    amountMinor: number
+    lines: { label: string; amountMinor: number; isOptional: boolean }[]
+    invoiceCount: number
+    /** Generated invoices whose dates no longer match this installment. */
+    differentDates: number
+  }[]
+  /** Invoices not tied to an installment (title-based generation), grouped by title. */
+  invoiceGroups: {
+    title: string
+    issuedFrom: string
+    issuedTo: string
+    dueFrom: string
+    dueTo: string
+    invoiceCount: number
+  }[]
+}
+
+export async function getFeeStructureSchedule(
+  ctx: AppContext,
+  structureId: string,
+): Promise<FeeStructureSchedule> {
+  ctx.require('fees.structure')
+  const structure = await ctx.db.feeStructure.findFirst({
+    where: { id: structureId, deletedAt: null },
+    include: {
+      classLevel: { select: { name: true } },
+      session: { select: { name: true } },
+      items: { select: { feeHeadId: true, isOptional: true } },
+      installments: {
+        orderBy: [{ dueOn: 'asc' }, { sortOrder: 'asc' }],
+        include: { lines: { select: { id: true, feeHeadId: true, label: true, amountMinor: true } } },
+      },
+    },
+  })
+  if (!structure) throw notFound('Fee structure')
+
+  const optionalHeads = new Set(structure.items.filter((item) => item.isOptional).map((item) => item.feeHeadId))
+  const installmentByLine = new Map(
+    structure.installments.flatMap((installment) => installment.lines.map((line) => [line.id, installment.id] as const)),
+  )
+  const invoices = await ctx.db.feeInvoice.findMany({
+    where: { structureId, status: { not: 'CANCELLED' }, sourceKey: { startsWith: 'fee-line:' } },
+    select: { sourceKey: true, issuedOn: true, dueOn: true },
+  })
+  const stats = new Map<string, { count: number; different: number }>()
+  const byId = new Map(structure.installments.map((installment) => [installment.id, installment]))
+  for (const invoice of invoices) {
+    const installmentId = installmentByLine.get(lineIdFromSourceKey(invoice.sourceKey) ?? '')
+    const installment = installmentId ? byId.get(installmentId) : undefined
+    if (!installment) continue
+    const row = stats.get(installment.id) ?? { count: 0, different: 0 }
+    row.count++
+    if (
+      invoice.dueOn.getTime() !== installment.dueOn.getTime()
+      || invoice.issuedOn.getTime() !== installmentIssueDate(installment).getTime()
+    ) {
+      row.different++
+    }
+    stats.set(installment.id, row)
+  }
+  const groups = await ctx.db.feeInvoice.groupBy({
+    by: ['title'],
+    where: { structureId, status: { not: 'CANCELLED' }, ...UNSCHEDULED_INVOICES },
+    _count: { _all: true },
+    _min: { issuedOn: true, dueOn: true },
+    _max: { issuedOn: true, dueOn: true },
+    orderBy: { title: 'asc' },
+  })
+
+  return {
+    id: structure.id,
+    name: structure.name,
+    className: structure.classLevel?.name ?? 'Not linked to a class',
+    sessionName: structure.session.name,
+    status: structure.status,
+    installments: structure.installments.map((installment) => ({
+      id: installment.id,
+      name: installment.name,
+      issueOn: toDateInput(installmentIssueDate(installment)),
+      issueOnIsDefault: installment.issueOn === null,
+      dueOn: toDateInput(installment.dueOn),
+      amountMinor: installment.amountMinor,
+      lines: installment.lines.map((line) => ({
+        label: line.label,
+        amountMinor: line.amountMinor,
+        isOptional: optionalHeads.has(line.feeHeadId),
+      })),
+      invoiceCount: stats.get(installment.id)?.count ?? 0,
+      differentDates: stats.get(installment.id)?.different ?? 0,
+    })),
+    invoiceGroups: groups.map((group) => ({
+      title: group.title,
+      issuedFrom: toDateInput(group._min.issuedOn!),
+      issuedTo: toDateInput(group._max.issuedOn!),
+      dueFrom: toDateInput(group._min.dueOn!),
+      dueTo: toDateInput(group._max.dueOn!),
+      invoiceCount: group._count._all,
+    })),
+  }
+}
+
+const UNSCHEDULED_INVOICES: Prisma.FeeInvoiceWhereInput = {
+  OR: [{ sourceKey: null }, { NOT: { sourceKey: { startsWith: 'fee-line:' } } }],
+}
+
+export const invoiceGroupDatesSchema = z.object({
+  structureId: z.string().min(1),
+  groups: z.array(z.object({
+    title: z.string().min(1).max(300),
+    issuedOn: isoDate,
+    dueOn: isoDate,
+  })).min(1).max(120),
+}).superRefine((input, validation) => {
+  input.groups.forEach((group, index) => {
+    if (group.issuedOn > group.dueOn) {
+      validation.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['groups', index, 'dueOn'],
+        message: 'The due date cannot be before the invoice date',
+      })
+    }
+  })
+})
+
+/** Moves the dates of a structure's title-based invoices, one title/date group at a time. */
+export async function updateInvoiceGroupDates(ctx: AppContext, raw: unknown) {
+  ctx.require('fees.structure')
+  const input = invoiceGroupDatesSchema.parse(raw)
+  const structure = await ctx.db.feeStructure.findFirst({
+    where: { id: input.structureId, deletedAt: null },
+    select: { id: true, name: true },
+  })
+  if (!structure) throw notFound('Fee structure')
+
+  const now = new Date()
+  const before: { title: string; issued: string[]; due: string[] }[] = []
+  const moved = await ctx.db.$transaction(async (tx) => {
+    let count = 0
+    for (const group of input.groups) {
+      const issuedOn = attendanceDate(group.issuedOn)
+      const dueOn = attendanceDate(group.dueOn)
+      const found = await tx.feeInvoice.findMany({
+        where: {
+          structureId: structure.id,
+          status: { not: 'CANCELLED' },
+          title: group.title,
+          ...UNSCHEDULED_INVOICES,
+        },
+        select: { id: true, issuedOn: true, dueOn: true },
+      })
+      const ids = found.map((item) => item.id)
+      if (ids.length === 0) continue
+      before.push({
+        title: group.title,
+        issued: [...new Set(found.map((item) => toDateInput(item.issuedOn)))].sort(),
+        due: [...new Set(found.map((item) => toDateInput(item.dueOn)))].sort(),
+      })
+      await tx.feeInvoice.updateMany({ where: { id: { in: ids } }, data: { issuedOn, dueOn } })
+      const open = { id: { in: ids }, balanceMinor: { gt: 0 }, status: { in: [...OPEN_STATUSES] } }
+      if (dueOn < now) {
+        await tx.feeInvoice.updateMany({ where: open, data: { status: 'OVERDUE' } })
+      } else {
+        await tx.feeInvoice.updateMany({ where: { ...open, paidMinor: { gt: 0 } }, data: { status: 'PARTIALLY_PAID' } })
+        await tx.feeInvoice.updateMany({ where: { ...open, paidMinor: 0 }, data: { status: 'ISSUED' } })
+      }
+      count += ids.length
+    }
+    return count
+  }, { timeout: 120_000 })
+
+  if (moved > 0) {
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'fee_structure.invoice_dates_update',
+      module: 'fees',
+      entityType: 'FeeStructure',
+      entityId: structure.id,
+      summary: `Moved the dates of ${moved} invoices in ${structure.name}`,
+      before: { groups: before },
+      after: { groups: input.groups.map((group) => ({ title: group.title, issuedOn: group.issuedOn, dueOn: group.dueOn })), moved },
+    })
+  }
+  return { invoicesMoved: moved }
+}
+
+export const installmentDatesSchema = z.object({
+  structureId: z.string().min(1),
+  rows: z.array(z.object({
+    installmentId: z.string().min(1),
+    issueOn: isoDate,
+    dueOn: isoDate,
+  })).min(1).max(120),
+  /** Also move invoices already generated from these installments (cancelled ones are left alone). */
+  applyToInvoices: z.coerce.boolean().default(false),
+}).superRefine((input, validation) => {
+  input.rows.forEach((row, index) => {
+    if (row.issueOn > row.dueOn) {
+      validation.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['rows', index, 'dueOn'],
+        message: 'The due date cannot be before the invoice generation date',
+      })
+    }
+  })
+})
+
+/**
+ * Changes when a structure's installments are invoiced and when they are due.
+ * Only dates move: amounts, payments, late fees and the books are untouched.
+ */
+export async function updateInstallmentDates(ctx: AppContext, raw: unknown) {
+  ctx.require('fees.structure')
+  const input = installmentDatesSchema.parse(raw)
+  const structure = await ctx.db.feeStructure.findFirst({
+    where: { id: input.structureId, deletedAt: null },
+    include: {
+      installments: {
+        where: { id: { in: input.rows.map((row) => row.installmentId) } },
+        include: { lines: { select: { id: true } } },
+      },
+    },
+  })
+  if (!structure) throw notFound('Fee structure')
+  if (structure.installments.length !== new Set(input.rows.map((row) => row.installmentId)).size) {
+    throw conflict('One or more installments do not belong to this fee structure')
+  }
+
+  const byId = new Map(structure.installments.map((installment) => [installment.id, installment]))
+  const now = new Date()
+  const changes: { name: string; before: { issueOn: string; dueOn: string }; after: { issueOn: string; dueOn: string } }[] = []
+
+  const result = await ctx.db.$transaction(async (tx) => {
+    let installmentsChanged = 0
+    let invoicesMoved = 0
+    for (const row of input.rows) {
+      const installment = byId.get(row.installmentId)!
+      const issueOn = attendanceDate(row.issueOn)
+      const dueOn = attendanceDate(row.dueOn)
+      const scheduleChanged =
+        installmentIssueDate(installment).getTime() !== issueOn.getTime()
+        || installment.dueOn.getTime() !== dueOn.getTime()
+      if (scheduleChanged) {
+        await tx.feeInstallment.update({ where: { id: installment.id }, data: { issueOn, dueOn } })
+        installmentsChanged++
+        changes.push({
+          name: installment.name,
+          before: { issueOn: toDateInput(installmentIssueDate(installment)), dueOn: toDateInput(installment.dueOn) },
+          after: { issueOn: row.issueOn, dueOn: row.dueOn },
+        })
+      }
+      if (!input.applyToInvoices || installment.lines.length === 0) continue
+
+      const invoiceWhere: Prisma.FeeInvoiceWhereInput = {
+        structureId: structure.id,
+        status: { not: 'CANCELLED' },
+        OR: installment.lines.map((line) => ({ sourceKey: { startsWith: `fee-line:${line.id}:student:` } })),
+        NOT: { issuedOn: issueOn, dueOn },
+      }
+      const ids = (await tx.feeInvoice.findMany({ where: invoiceWhere, select: { id: true } })).map((item) => item.id)
+      if (ids.length === 0) continue
+      await tx.feeInvoice.updateMany({ where: { id: { in: ids } }, data: { issuedOn: issueOn, dueOn } })
+      const open = { id: { in: ids }, balanceMinor: { gt: 0 }, status: { in: [...OPEN_STATUSES] } }
+      if (dueOn < now) {
+        await tx.feeInvoice.updateMany({ where: open, data: { status: 'OVERDUE' } })
+      } else {
+        await tx.feeInvoice.updateMany({ where: { ...open, paidMinor: { gt: 0 } }, data: { status: 'PARTIALLY_PAID' } })
+        await tx.feeInvoice.updateMany({ where: { ...open, paidMinor: 0 }, data: { status: 'ISSUED' } })
+      }
+      invoicesMoved += ids.length
+    }
+    return { installmentsChanged, invoicesMoved }
+  }, { timeout: 120_000 })
+
+  if (result.installmentsChanged > 0 || result.invoicesMoved > 0) {
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'fee_structure.dates_update',
+      module: 'fees',
+      entityType: 'FeeStructure',
+      entityId: structure.id,
+      summary: `Changed billing dates of ${result.installmentsChanged} installments in ${structure.name}${input.applyToInvoices ? ` and moved ${result.invoicesMoved} existing invoices` : ''}`,
+      before: { installments: changes.map((change) => ({ name: change.name, ...change.before })) },
+      after: {
+        installments: changes.map((change) => ({ name: change.name, ...change.after })),
+        invoicesMoved: result.invoicesMoved,
+      },
+    })
+  }
+  return result
+}
+
+export const invoiceDatesSchema = z.object({
+  invoiceId: z.string().min(1),
+  issuedOn: isoDate,
+  dueOn: isoDate,
+  reason: z.string().trim().max(300).optional(),
+}).refine((input) => input.issuedOn <= input.dueOn, {
+  message: 'The due date cannot be before the invoice date',
+  path: ['dueOn'],
+})
+
+/** Moves one invoice's invoice date and due date. Amounts and payments are untouched. */
+export async function setInvoiceDates(ctx: AppContext, raw: unknown) {
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice') && !ctx.can('fees.accounts')) {
+    ctx.require('fees.accounts')
+  }
+  const input = invoiceDatesSchema.parse(raw)
+  const invoice = await ctx.db.feeInvoice.findFirst({
+    where: { id: input.invoiceId, status: { not: 'CANCELLED' } },
+  })
+  if (!invoice) throw notFound('Invoice')
+
+  const issuedOn = attendanceDate(input.issuedOn)
+  const dueOn = attendanceDate(input.dueOn)
+  if (invoice.issuedOn.getTime() === issuedOn.getTime() && invoice.dueOn.getTime() === dueOn.getTime()) {
+    throw conflict('The dates are unchanged')
+  }
+  const status = invoice.status === 'DRAFT'
+    ? invoice.status
+    : deriveInvoiceStatus({ totalMinor: invoice.totalMinor, paidMinor: invoice.paidMinor, dueOn })
+  await ctx.db.feeInvoice.update({ where: { id: invoice.id }, data: { issuedOn, dueOn, status } })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee.invoice.dates_set',
+    module: 'fees',
+    entityType: 'FeeInvoice',
+    entityId: invoice.id,
+    summary: `Changed ${invoice.number} dates: invoice ${toDateInput(invoice.issuedOn)} → ${input.issuedOn}, due ${toDateInput(invoice.dueOn)} → ${input.dueOn}${input.reason ? `: ${input.reason}` : ''}`,
+    before: { issuedOn: toDateInput(invoice.issuedOn), dueOn: toDateInput(invoice.dueOn), status: invoice.status },
+    after: { issuedOn: input.issuedOn, dueOn: input.dueOn, status },
+  })
+  return { invoiceId: invoice.id, studentId: invoice.studentId }
 }

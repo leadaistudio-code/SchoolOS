@@ -3,6 +3,7 @@ import { listStudentDues } from '@/server/modules/finance/service'
 import { parseListQuery } from '@/lib/query'
 import { attendanceDate } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { Metric } from '@/components/ui/metric'
 import { accessibleStudentIds } from '@/server/scope'
 import { DuesTable } from './dues-table'
@@ -35,7 +36,18 @@ export default async function DuesPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Dues" description="Find overdue accounts and take action" />
+      <PageHeader
+        title="Dues"
+        description="Find overdue accounts and take action"
+        actions={
+          <div className="flex items-center gap-3">
+            <a href="/finance/dues/monthly" className="text-sm font-medium text-[var(--brand-600)] hover:underline">
+              Month-wise grid
+            </a>
+            <BackButton fallbackHref="/finance" />
+          </div>
+        }
+      />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Total due" value={new Intl.NumberFormat('en-IN', { style: 'currency', currency: ctx.tenant.currency, maximumFractionDigits: 0 }).format((totalDue._sum.balanceMinor ?? 0) / 100)} />
         <Metric label="Overdue" value={new Intl.NumberFormat('en-IN', { style: 'currency', currency: ctx.tenant.currency, maximumFractionDigits: 0 }).format((overdue._sum.balanceMinor ?? 0) / 100)} emphasis="danger" />

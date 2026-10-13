@@ -8,6 +8,7 @@ type SaveRow = {
   studentId: string
   marksObtained: number | null
   isAbsent: boolean
+  notApplicable: boolean
   remarks: string | null
 }
 
@@ -53,6 +54,10 @@ function parseAbsent(value: string): boolean {
   return ['y', 'yes', 'true', '1', 'absent', 'abs', 'a'].includes(normalized)
 }
 
+function isNotApplicable(value: string): boolean {
+  return ['na', 'n/a', 'n a', 'not applicable', 'not opted'].includes(value.trim().toLowerCase())
+}
+
 function parseMarksValue(value: string): number | null {
   const trimmed = value.trim()
   if (!trimmed) return null
@@ -79,6 +84,7 @@ type ParsedImportRow = {
   rollNumber: string | null
   marksObtained: number | null
   isAbsent: boolean
+  notApplicable: boolean
   remarks: string | null
   subject: string | null
   className: string | null
@@ -105,21 +111,25 @@ function parseImportRows(buffer: Buffer, fileName: string, mimeType: string): Pa
     const row = table.rows[index]!
     const admissionNo = (row[admissionHeader] ?? '').trim()
     if (!admissionNo) continue
+    const notApplicable = isNotApplicable(row[marksHeader] ?? '') || (absentHeader ? isNotApplicable(row[absentHeader] ?? '') : false)
     let marksObtained: number | null = null
-    try {
-      marksObtained = parseMarksValue(row[marksHeader] ?? '')
-    } catch {
-      throw badRequest(`Row ${headerRowIndex + index + 2}: marks must be a number`)
+    if (!notApplicable) {
+      try {
+        marksObtained = parseMarksValue(row[marksHeader] ?? '')
+      } catch {
+        throw badRequest(`Row ${headerRowIndex + index + 2}: marks must be a number, or NA if not applicable`)
+      }
     }
-    const isAbsent = absentHeader ? parseAbsent(row[absentHeader] ?? '') : false
+    const isAbsent = !notApplicable && absentHeader ? parseAbsent(row[absentHeader] ?? '') : false
     const remarks = remarksHeader ? (row[remarksHeader] ?? '').trim() || null : null
-    if (!isAbsent && marksObtained === null && !remarks) continue
+    if (!isAbsent && !notApplicable && marksObtained === null && !remarks) continue
     rows.push({
       line: headerRowIndex + index + 2,
       admissionNo,
       rollNumber: rollHeader ? (row[rollHeader] ?? '').trim() || null : null,
-      marksObtained: isAbsent ? null : marksObtained,
+      marksObtained: isAbsent || notApplicable ? null : marksObtained,
       isAbsent,
+      notApplicable,
       remarks,
       subject: subjectHeader ? (row[subjectHeader] ?? '').trim() || null : null,
       className: classHeader ? (row[classHeader] ?? '').trim() || null : null,
@@ -182,15 +192,15 @@ export async function importPaperMarksFromSpreadsheet(
       })
       continue
     }
-    if (!row.isAbsent && row.marksObtained === null) {
+    if (!row.isAbsent && !row.notApplicable && row.marksObtained === null) {
       issues.push({
         row: row.line,
         admissionNo: row.admissionNo,
-        message: 'Enter marks or mark the student absent',
+        message: 'Enter marks, mark the student absent, or NA if not applicable',
       })
       continue
     }
-    if (!row.isAbsent && row.marksObtained! > roster.maxMarks) {
+    if (!row.isAbsent && !row.notApplicable && row.marksObtained! > roster.maxMarks) {
       issues.push({
         row: row.line,
         admissionNo: row.admissionNo,
@@ -201,8 +211,9 @@ export async function importPaperMarksFromSpreadsheet(
     seen.add(studentId)
     saveRows.push({
       studentId,
-      marksObtained: row.isAbsent ? null : row.marksObtained,
+      marksObtained: row.isAbsent || row.notApplicable ? null : row.marksObtained,
       isAbsent: row.isAbsent,
+      notApplicable: row.notApplicable,
       remarks: row.remarks,
     })
   }
@@ -215,7 +226,7 @@ export async function importPaperMarksFromSpreadsheet(
     )
   }
 
-  const result = await saveMarks(ctx, examId, examSubjectId, { rows: saveRows })
+  const result = await saveMarks(ctx, examId, examSubjectId, { rows: saveRows }, { csv: true })
   return {
     saved: result.saved,
     skipped: issues.length,
@@ -340,15 +351,15 @@ export async function importExamMarksFromSpreadsheet(
         })
         continue
       }
-      if (!row.isAbsent && row.marksObtained === null) {
+      if (!row.isAbsent && !row.notApplicable && row.marksObtained === null) {
         issues.push({
           row: row.line,
           admissionNo: row.admissionNo,
-          message: 'Enter marks or mark the student absent',
+          message: 'Enter marks, mark the student absent, or NA if not applicable',
         })
         continue
       }
-      if (!row.isAbsent && row.marksObtained! > roster.maxMarks) {
+      if (!row.isAbsent && !row.notApplicable && row.marksObtained! > roster.maxMarks) {
         issues.push({
           row: row.line,
           admissionNo: row.admissionNo,
@@ -359,14 +370,19 @@ export async function importExamMarksFromSpreadsheet(
       seen.add(studentId)
       saveRows.push({
         studentId,
-        marksObtained: row.isAbsent ? null : row.marksObtained,
+        marksObtained: row.isAbsent || row.notApplicable ? null : row.marksObtained,
         isAbsent: row.isAbsent,
+        notApplicable: row.notApplicable,
         remarks: row.remarks,
       })
     }
 
     if (saveRows.length === 0) continue
-    const result = await saveMarks(ctx, examId, examSubjectId, { rows: saveRows })
+    if (roster.marksStatus === 'LOCKED' || (roster.marksStatus === 'SUBMITTED' && !ctx.can('exams.manage'))) {
+      issues.push({ row: rows[0]!.line, message: `${roster.subject.name}: marks sheet is ${roster.marksStatus.toLowerCase()} — rows skipped` })
+      continue
+    }
+    const result = await saveMarks(ctx, examId, examSubjectId, { rows: saveRows }, { csv: true })
     saved += result.saved
     papersTouched += 1
   }
@@ -398,7 +414,7 @@ export async function buildExamMarksTemplateCsv(ctx: AppContext, examId: string)
         row.student.admissionNo,
         subject.classSubject.classLevel.name,
         subject.classSubject.subject.name,
-        row.mark?.isAbsent ? '' : (row.mark?.marksObtained ?? ''),
+        row.mark?.notApplicable ? 'NA' : row.mark?.isAbsent ? '' : (row.mark?.marksObtained ?? ''),
         row.mark?.isAbsent ? 'Y' : '',
         row.mark?.remarks ?? '',
       ])

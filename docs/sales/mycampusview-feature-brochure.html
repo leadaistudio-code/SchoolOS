@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MyCampusView — Complete Feature Brochure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0a1024;
+      --ink-soft: #3a4254;
+      --ink-faint: #6b7385;
+      --paper: #ffffff;
+      --wash: #f4f5f8;
+      --rule: #d8dce6;
+      --violet: #5b3fd4;
+      --violet-deep: #3d28a8;
+      --violet-soft: #efeaff;
+      --mint: #1f9d5c;
+      --mint-soft: #e8f8ef;
+      --lime: #b8e04a;
+      --on-dark: #f6f5f2;
+      --on-dark-soft: #b0b6c6;
+      --black: #000000;
+      --soon: #9a6b00;
+      --soon-bg: #fff6e0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @page { size: A4; margin: 0; }
+
+    html, body {
+      background: #cfcad8;
+      color: var(--ink);
+      font-family: "Source Sans 3", "Segoe UI", sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
+      padding: 12px 14px; background: var(--ink); color: var(--on-dark); font-size: 14px;
+    }
+    .toolbar button {
+      background: var(--violet); color: #fff; border: 0; border-radius: 8px;
+      padding: 10px 18px; font: inherit; font-weight: 700; cursor: pointer;
+      min-height: 44px;
+    }
+    .toolbar span { color: var(--on-dark-soft); font-size: 13px; }
+
+    .page {
+      width: min(210mm, 100%);
+      max-width: 100%;
+      height: auto;
+      min-height: 0;
+      margin: 12px auto;
+      background: var(--paper);
+      box-shadow: 0 12px 40px rgba(10, 16, 36, 0.18);
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+      position: relative;
+    }
+
+    @media print {
+      html, body {
+        background: #fff;
+        font-size: 10pt;
+        line-height: 1.35;
+      }
+      .toolbar { display: none !important; }
+      .page {
+        width: auto !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-after: auto;
+        break-after: auto;
+        overflow: visible !important;
+      }
+      .page.cover-page {
+        page-break-after: always;
+        break-after: page;
+      }
+      .page.cover-page .cover-body {
+        min-height: 277mm !important;
+      }
+      .page.closing-page {
+        page-break-before: always;
+        break-before: page;
+        page-break-after: auto;
+        break-after: auto;
+        min-height: 0 !important;
+      }
+      .page.closing-page .close-grid { flex: 0 0 auto !important; }
+      .page.closing-page .ftr { margin-top: 8px; }
+      .content {
+        flex: 0 0 auto !important;
+        padding: 8px 9mm 10px !important;
+        gap: 8px !important;
+      }
+      .mods { flex: 0 0 auto !important; gap: 8px !important; }
+      .mod, .band, .close-grid, .hdr, .ftr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .slim-ftr { display: none !important; }
+      .page + .page .hdr { margin-top: 8px; }
+      .mod li { font-size: 9pt !important; line-height: 1.35 !important; }
+      .mod-h h2 { font-size: 11pt !important; }
+      .page-title { font-size: 16pt !important; }
+      .page-sub { font-size: 10pt !important; }
+    }
+
+    .hdr {
+      background: var(--black);
+      padding: 12px 9mm;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-shrink: 0;
+    }
+    .hdr img { height: 42px; width: auto; max-width: 58%; display: block; background: #000; }
+    .hdr-meta { text-align: right; color: var(--on-dark-soft); font-size: 10pt; line-height: 1.35; }
+    .hdr-meta strong { display: block; color: var(--on-dark); font-size: 13pt; font-weight: 700; }
+
+    .ftr {
+      background: var(--black);
+      padding: 10px 9mm;
+      display: flex; align-items: center; justify-content: space-between;
+      flex: 0 0 auto; min-height: 52px;
+    }
+    .ftr img { height: 34px; width: auto; display: block; background: #000; }
+    .ftr-meta { text-align: right; color: var(--on-dark-soft); font-size: 10pt; }
+    .ftr-meta strong { display: block; color: var(--on-dark); font-size: 12pt; }
+
+    .slim-ftr {
+      flex-shrink: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 9mm;
+      border-top: 1px solid var(--rule);
+      font-size: 10pt; color: var(--ink-faint); background: var(--wash);
+    }
+    .slim-ftr strong { color: var(--ink); }
+
+    .content {
+      flex: 0 0 auto;
+      min-height: 0;
+      overflow: visible;
+      padding: 12px 9mm 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+
+    .cover-body {
+      flex: 1;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 0;
+      min-height: min(277mm, 92vh);
+      background:
+        radial-gradient(120% 80% at 100% 0%, rgba(91,63,212,0.22), transparent 55%),
+        radial-gradient(90% 60% at 0% 100%, rgba(31,157,92,0.16), transparent 50%),
+        linear-gradient(165deg, #070b16 0%, #12182c 48%, #0a1024 100%);
+      color: var(--on-dark);
+    }
+    .cover-top {
+      padding: 16px 10mm 0;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+      flex-wrap: wrap;
+    }
+    .cover-top img { height: 52px; background: transparent; max-width: 70%; }
+    .cover-badge {
+      font-family: Manrope, sans-serif;
+      font-size: 10pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--lime); border: 1px solid rgba(184,224,74,0.45);
+      padding: 6px 12px; border-radius: 999px;
+    }
+    .cover-hero {
+      padding: 16px 10mm;
+      display: flex; flex-direction: column; justify-content: center; gap: 14px;
+    }
+    .cover-hero h1 {
+      font-family: Manrope, sans-serif;
+      font-size: clamp(26pt, 8vw, 34pt); font-weight: 800; line-height: 1.08;
+      letter-spacing: -0.03em; text-wrap: balance;
+      max-width: 16ch;
+    }
+    .cover-hero h1 em {
+      font-style: normal;
+      background: linear-gradient(90deg, #7b61ff, #b8e04a);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .cover-hero p.lead {
+      font-size: clamp(12pt, 3.4vw, 14pt); line-height: 1.45; color: var(--on-dark-soft); max-width: 42ch;
+    }
+    .cover-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cover-pills span {
+      font-size: 11pt; font-weight: 700;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      padding: 7px 12px; border-radius: 999px;
+    }
+    .cover-bottom {
+      padding: 14px 10mm 16px;
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.28);
+    }
+    .cover-bottom h3 {
+      font-family: Manrope, sans-serif; font-size: 11pt; font-weight: 800;
+      letter-spacing: 0.05em; text-transform: uppercase; color: var(--lime);
+      margin-bottom: 6px;
+    }
+    .cover-bottom p, .cover-bottom li {
+      font-size: 11pt; color: var(--on-dark-soft); line-height: 1.4;
+    }
+    .cover-bottom ul { list-style: none; display: grid; gap: 4px; }
+    .cover-bottom li::before { content: "✓ "; color: var(--mint); font-weight: 700; }
+    .cover-cta strong { color: #fff; font-size: 14pt; display: block; margin-top: 6px; }
+
+    .page-title {
+      font-family: Manrope, sans-serif;
+      font-size: clamp(16pt, 4.5vw, 20pt); font-weight: 800; letter-spacing: -0.02em;
+      color: var(--ink); line-height: 1.2; text-wrap: balance;
+    }
+    .page-sub {
+      font-size: clamp(11pt, 3vw, 12.5pt); color: var(--ink-faint); margin-top: 2px; line-height: 1.4;
+    }
+
+    .legend {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      font-size: 11pt; color: var(--ink-soft);
+      padding: 8px 10px; background: var(--wash); border-radius: 8px;
+    }
+    .legend b.live { color: var(--mint); }
+    .legend b.soon { color: var(--soon); }
+
+    .mods {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-content: start;
+      align-items: start;
+      flex: 0 1 auto;
+      min-height: 0;
+    }
+    .mods.one-col { grid-template-columns: 1fr; }
+    .mods.three { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .mods.fill { flex: 1 1 0; align-content: start; }
+
+    .mod {
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: var(--paper);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: auto;
+    }
+    .mod.span2 { grid-column: 1 / -1; }
+    .mod-h {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      padding: 8px 10px;
+      background: linear-gradient(90deg, var(--violet-soft), #fff);
+      border-bottom: 1px solid var(--rule);
+      flex-shrink: 0;
+    }
+    .mod-h h2 {
+      font-family: Manrope, sans-serif;
+      font-size: 13pt; font-weight: 800; color: var(--violet-deep);
+      letter-spacing: -0.01em;
+    }
+    .mod-h .n {
+      font-size: 10pt; font-weight: 700; color: var(--violet);
+      background: #fff; border: 1px solid #d9d0ff;
+      padding: 2px 8px; border-radius: 999px;
+    }
+    .mod ul {
+      list-style: none;
+      padding: 8px 10px 10px;
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+    .mod.dense ul { gap: 5px; }
+    .mod li {
+      display: grid;
+      grid-template-columns: 16px 1fr;
+      gap: 8px;
+      align-items: start;
+      font-size: 11.5pt;
+      line-height: 1.4;
+      color: var(--ink-soft);
+    }
+    .mod li .mark {
+      width: 14px; height: 14px; margin-top: 3px;
+      border-radius: 4px;
+      background: var(--mint);
+      color: #fff;
+      font-size: 9px; font-weight: 800;
+      display: grid; place-items: center;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .mod li.soon .mark { background: var(--soon); }
+    .mod li strong { color: var(--ink); font-weight: 700; }
+    .mod li .b { color: var(--ink-faint); font-weight: 400; }
+
+    .band {
+      background: var(--ink);
+      color: var(--on-dark);
+      border-radius: 10px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .band h3 {
+      font-family: Manrope, sans-serif;
+      font-size: 10pt; font-weight: 800; color: var(--lime);
+      letter-spacing: 0.04em; text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .band p { font-size: 11pt; color: var(--on-dark-soft); line-height: 1.35; }
+    .band .price { font-size: 15pt; font-weight: 800; color: #fff; }
+
+    .close-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 10px;
+      flex: 0 0 auto;
+      min-height: 0;
+      align-items: stretch;
+    }
+    .close-card {
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      padding: 14px;
+      background: var(--wash);
+      height: auto;
+    }
+    .close-card.dark {
+      background: linear-gradient(145deg, #0a1024, #1a1240);
+      color: var(--on-dark);
+      border: 0;
+    }
+    .close-card h2 {
+      font-family: Manrope, sans-serif;
+      font-size: 16pt; font-weight: 800; margin-bottom: 8px;
+    }
+    .close-card.dark h2 { color: #fff; }
+    .close-card p, .close-card li {
+      font-size: 12pt; color: var(--ink-soft); line-height: 1.45;
+    }
+    .close-card.dark p, .close-card.dark li { color: var(--on-dark-soft); }
+    .close-card ul { list-style: none; display: grid; gap: 6px; margin-top: 8px; }
+    .close-card li::before { content: "→ "; color: var(--violet); font-weight: 700; }
+    .close-card.dark li::before { color: var(--lime); }
+    .contact-big {
+      margin-top: 12px;
+      font-size: 15pt; font-weight: 800; color: #fff;
+      word-break: break-word;
+    }
+
+    @media screen and (max-width: 820px) {
+      html, body {
+        font-size: 16px;
+        line-height: 1.45;
+        background: #e8e6ef;
+      }
+      .toolbar { padding: 10px 12px; gap: 8px; font-size: 14px; }
+      .toolbar button { width: 100%; max-width: 280px; }
+      .page {
+        width: 100%;
+        margin: 0 0 16px;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .hdr, .ftr, .slim-ftr, .content,
+      .cover-top, .cover-hero, .cover-bottom {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .hdr {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+      }
+      .hdr img { height: 40px; max-width: 85%; }
+      .hdr-meta { text-align: left; font-size: 13px; }
+      .hdr-meta strong { font-size: 16px; }
+      .ftr {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-height: 0;
+        padding-top: 14px;
+        padding-bottom: 14px;
+      }
+      .ftr-meta { text-align: left; font-size: 13px; }
+      .ftr-meta strong { font-size: 15px; }
+      .content { padding-top: 16px; padding-bottom: 18px; gap: 12px; }
+      .cover-body { min-height: auto; }
+      .cover-top {
+        padding-top: 18px;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .cover-top img { height: 44px; max-width: 90%; }
+      .cover-hero { padding-top: 20px; padding-bottom: 20px; gap: 14px; }
+      .cover-hero h1 { font-size: 32px; max-width: none; }
+      .cover-hero p.lead { font-size: 16px; max-width: none; }
+      .cover-pills span { font-size: 14px; padding: 8px 12px; }
+      .cover-bottom {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding-top: 16px;
+        padding-bottom: 20px;
+      }
+      .cover-bottom h3 { font-size: 13px; }
+      .cover-bottom p, .cover-bottom li { font-size: 15px; }
+      .cover-cta strong { font-size: 17px; }
+      .page-title { font-size: 22px; }
+      .page-sub { font-size: 15px; }
+      .legend { font-size: 14px; padding: 10px 12px; gap: 10px; }
+      .mods,
+      .mods.three {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+      }
+      .mod.span2 { grid-column: auto; }
+      .mod-h { padding: 10px 12px; }
+      .mod-h h2 { font-size: 16px; }
+      .mod-h .n { font-size: 12px; }
+      .mod ul {
+        padding: 10px 12px 12px;
+        gap: 8px;
+        grid-template-columns: 1fr !important;
+      }
+      .mod li {
+        font-size: 15px;
+        line-height: 1.45;
+        grid-template-columns: 18px 1fr;
+        gap: 10px;
+      }
+      .mod li .mark {
+        width: 16px; height: 16px; font-size: 10px; margin-top: 4px;
+      }
+      .band {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 14px;
+      }
+      .band h3 { font-size: 12px; }
+      .band .price { font-size: 20px; }
+      .band p { font-size: 14px; }
+      .close-grid { grid-template-columns: 1fr; gap: 12px; }
+      .close-card { padding: 16px; }
+      .close-card h2 { font-size: 18px; }
+      .close-card p, .close-card li { font-size: 15px; }
+      .contact-big { font-size: 17px; }
+      .slim-ftr {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        font-size: 13px;
+      }
+    }
+
+    @media screen and (max-width: 420px) {
+      .cover-hero h1 { font-size: 28px; }
+      .page-title { font-size: 20px; }
+      .mod li { font-size: 14px; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <span>Larger type · mobile-friendly · Print / Save as PDF</span>
+  </div>
+
+  <!-- ===================== COVER ===================== -->
+  <section class="page cover-page">
+    <div class="cover-body">
+      <div class="cover-top">
+        <img src="mycampusview-logo.png" alt="MyCampusView" />
+        <div class="cover-badge">Complete feature brochure</div>
+      </div>
+      <div class="cover-hero">
+        <h1>One campus.<br /><em>Every operation.</em></h1>
+        <p class="lead">
+          Admissions, fees, attendance, academics, parents, transport, and more —
+          on one connected record for your school. Built for principals who want
+          less Excel and WhatsApp chasing.
+        </p>
+        <div class="cover-pills">
+          <span>Admissions CRM</span>
+          <span>Fees &amp; receipts</span>
+          <span>Attendance</span>
+          <span>Exams &amp; report cards</span>
+          <span>Parent portals</span>
+          <span>Transport GPS</span>
+          <span>AI teaching tools</span>
+          <span>Android app</span>
+        </div>
+      </div>
+      <div class="cover-bottom">
+        <div>
+          <h3>Why schools choose us</h3>
+          <ul>
+            <li>One student file — fees, attendance, results, documents</li>
+            <li>Parents see only their children; roles stay clean</li>
+            <li>Your logo, colours, receipts &amp; certificates</li>
+            <li>Fast setup — live modules in weeks, not years</li>
+          </ul>
+        </div>
+        <div class="cover-cta">
+          <h3>Talk to us</h3>
+          <p>Book a 15-minute fees or attendance demo.</p>
+          <strong>contact@mycampusview.com</strong>
+          <p style="margin-top:4px">www.mycampusview.com</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PAGE 2 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Feature checklist</strong>
+        Admissions · Students · Attendance
+      </div>
+    </header>
+    <div class="content">
+      <div>
+        <div class="page-title">Enrolment, records &amp; daily presence</div>
+        <div class="page-sub">Every enquiry and every child on one system — mark attendance without parallel spreadsheets.</div>
+      </div>
+      <div class="legend">
+        <span><b class="live">■</b> Included / live</span>
+        <span><b class="soon">■</b> Coming soon / setup-dependent</span>
+      </div>
+      <div class="mods">
+        <div class="mod dense">
+          <div class="mod-h"><h2>Admissions / CRM</h2><span class="n">7</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Enquiry capture</strong> <span class="b">— walk-ins &amp; calls, not notebooks</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Kanban pipeline</strong> <span class="b">— visit → application → enrolment</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Follow-ups &amp; call logs</strong> <span class="b">— clear overdue queues</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Conversion analytics</strong> <span class="b">— by source &amp; stage</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Public enquiry form</strong> <span class="b">— lands in your pipeline</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Convert to student</strong> <span class="b">— no retyping guardians</span></div></li>
+            <li><span class="mark">✓</span><div><strong>AI counsellor assists</strong> <span class="b">— you approve before send</span></div></li>
+          </ul>
+          <div class="mod-h" style="border-top:1px solid var(--rule)"><h2>Front office</h2><span class="n">3</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Visitor logging</strong> <span class="b">— who arrives at the desk</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Gate passes &amp; appointments</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Walk-in → lead</strong> <span class="b">— reception to enquiry</span></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>SIS / Students</h2><span class="n">10</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Student master record</strong> <span class="b">— fees, attendance, results</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Parent &amp; guardian records</strong> <span class="b">— own sign-in</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Parent portal</strong> <span class="b">— only their children</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Student portal</strong> <span class="b">— homework, results, admit cards</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Bulk import pack</strong> <span class="b">— classes, staff, students</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Year-end promotions</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Document vault</strong> <span class="b">— TC, birth cert, medical</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Student ID cards</strong> <span class="b">— branded CR80</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Bulk photo import</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Child switcher</strong> <span class="b">— siblings, one login</span></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Attendance</h2><span class="n">7</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Daily student register</strong> <span class="b">— bulk save</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Absence notifications</strong> <span class="b">— alert parents</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Attendance reports</strong> <span class="b">— class / student / range</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Exam attendance desk</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Staff attendance</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Geofenced staff check-in</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Biometric punch ingest</strong> <span class="b">— Connect add-on</span></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Leave</h2><span class="n">3</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Leave types &amp; balances</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Apply → approve workflow</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Register reconciliation</strong> <span class="b">— writes to attendance</span></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slim-ftr"><span>MyCampusView · Feature brochure</span><strong>Page 2 / 6</strong></div>
+  </section>
+
+  <!-- ===================== PAGE 3 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Feature checklist</strong>
+        Academics · Exams · Certificates · Teaching
+      </div>
+    </header>
+    <div class="content">
+      <div>
+        <div class="page-title">Teaching, exams &amp; documents</div>
+        <div class="page-sub">Timetable to report cards to AI-assisted assessments — with certificates parents can verify.</div>
+      </div>
+      <div class="mods">
+        <div class="mod dense">
+          <div class="mod-h"><h2>Academics</h2><span class="n">8</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Academic sessions</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Classes &amp; sections</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Subjects &amp; electives</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Syllabus / curriculum</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Timetable builder</strong> <span class="b">— conflict detection</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Homework cycle</strong> <span class="b">— set → review</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Classwork lesson log</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Academic calendar</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Examinations</h2><span class="n">7</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Exam schedules</strong> <span class="b">— papers &amp; rooms</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Admit cards</strong> <span class="b">— print + parent view</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Marks entry</strong> <span class="b">— own classes only</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Grading scales</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Results &amp; ranking</strong> <span class="b">— hold then publish</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Report cards</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Results CSV export</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Certificates</h2><span class="n">4</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Certificate builder</strong> <span class="b">— bonafide / TC / character</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Branded templates</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>QR public verification</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Issue &amp; revoke</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Teaching tools</h2><span class="n">9</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Question bank</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Paper builder</strong> <span class="b">— print or online</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Online / print assessments</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Per-question analytics</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>AI question drafts</strong> <span class="b">— approve before use</span></div></li>
+            <li><span class="mark">✓</span><div><strong>AI answer evaluation</strong> <span class="b">— teacher final say</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Learning insights</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>AI usage metering</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Teacher knowledge refresh</strong></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slim-ftr"><span>MyCampusView · Feature brochure</span><strong>Page 3 / 6</strong></div>
+  </section>
+
+  <!-- ===================== PAGE 4 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Feature checklist</strong>
+        Fees · HR · Communication · Transport
+      </div>
+    </header>
+    <div class="content">
+      <div>
+        <div class="page-title">Fees, staff, parents &amp; buses</div>
+        <div class="page-sub">Collect cleanly, pay staff, message parents, and track the fleet — one connected campus.</div>
+      </div>
+      <div class="mods">
+        <div class="mod dense span2">
+          <div class="mod-h"><h2>Fees &amp; finance</h2><span class="n">15</span></div>
+          <ul style="grid-template-columns:1fr 1fr;display:grid;gap:1px 10px">
+            <li><span class="mark">✓</span><div><strong>Fee heads &amp; structures</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Instalments &amp; due dates</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Bulk invoice generation</strong> <span class="b">— dry-run; no double billing</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Concessions</strong> <span class="b">— sibling / staff / scholarship</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Counter collection</strong> <span class="b">— cash / cheque / online + receipts</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Oldest-first allocation</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Student fee ledger</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Outstanding &amp; ageing</strong> <span class="b">— live defaulters</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Online parent pay</strong> <span class="b">— gateway at setup</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Refunds</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Late-fee / penalty rules</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Fee reminders</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Fee reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Expense tracker</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Transport fee rates</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>HR / Staff</h2><span class="n">5</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Staff directory</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Roles on staff</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Staff appraisals</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Leave approvals desk</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Payroll &amp; payslips</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Transport</h2><span class="n">7</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Buses &amp; fleet</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Routes &amp; stops</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Student–stop assignments</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Driver console</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Live bus tracking</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Approach notifications</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>GPS tracker settings</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense span2">
+          <div class="mod-h"><h2>Communication / Parents</h2><span class="n">11</span></div>
+          <ul style="grid-template-columns:1fr 1fr;display:grid;gap:1px 10px">
+            <li><span class="mark">✓</span><div><strong>Notice board</strong> <span class="b">— all / role / class / section</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Internal messaging</strong> <span class="b">— staff ↔ parent</span></div></li>
+            <li><span class="mark">✓</span><div><strong>School email (SMTP)</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Message templates</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>SMS delivery</strong> <span class="b">— gateway at setup</span></div></li>
+            <li><span class="mark">✓</span><div><strong>WhatsApp delivery</strong> <span class="b">— Business at setup</span></div></li>
+            <li><span class="mark">✓</span><div><strong>360° feedback campaigns</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Teacher → student feedback</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Confidential concerns</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Ask Me campus assistant</strong> <span class="b">— never auto-sends</span></div></li>
+            <li class="soon"><span class="mark">…</span><div><strong>Push notification centre</strong> <span class="b">— coming soon</span></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slim-ftr"><span>MyCampusView · Feature brochure</span><strong>Page 4 / 6</strong></div>
+  </section>
+
+  <!-- ===================== PAGE 5 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Feature checklist</strong>
+        Campus life · Reports · Platform · Security
+      </div>
+    </header>
+    <div class="content">
+      <div>
+        <div class="page-title">Campus ops, insights &amp; trust</div>
+        <div class="page-sub">Library to biometrics — plus white-label branding and an honest integrations roadmap.</div>
+      </div>
+      <div class="mods three">
+        <div class="mod dense">
+          <div class="mod-h"><h2>Library</h2><span class="n">3</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Catalogue</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Issue / return</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Overdue fines</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Inventory</h2><span class="n">2</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Asset register</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Lifecycle history</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Events &amp; Sports</h2><span class="n">4</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>School events</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Participant registration</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Sports &amp; teams</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Fixtures / participation</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense span2" style="grid-column:1/-1">
+          <div class="mod-h"><h2>Reports &amp; insights · Website</h2><span class="n">14</span></div>
+          <ul style="grid-template-columns:1fr 1fr 1fr;display:grid;gap:1px 8px">
+            <li><span class="mark">✓</span><div><strong>Admin dashboard</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Fee collection reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Attendance reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Exam / result reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Enrolment reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Admissions funnel</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Staff reports</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>School health score</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Student &amp; staff scores</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>ROI calculator</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Editable public site</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Publish on school host</strong></div></li>
+            <li class="soon"><span class="mark">…</span><div><strong>Custom MIS builder</strong> <span class="b">— soon</span></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Branding / access</h2><span class="n">11</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Per-school isolation</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Subdomain access</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>White-label branding</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Receipt &amp; certificate branding</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Custom domain + TLS</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>PWA</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Role-based portals</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Native Android app</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>School-branded app</strong> <span class="b">— Growth / Elite</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Plan entitlements</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Multi-campus console</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Security &amp; Connect</h2><span class="n">11</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Auth &amp; sessions</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>MFA (TOTP)</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>RBAC</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Row-level scoping</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Audit trail</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Support tickets</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Data export / exit</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Biometric admin</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Windows Connect gateway</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>RS9W push</strong></div></li>
+            <li><span class="mark">✓</span><div><strong>Device user mapping</strong></div></li>
+          </ul>
+        </div>
+        <div class="mod dense">
+          <div class="mod-h"><h2>Integrations / roadmap</h2><span class="n">—</span></div>
+          <ul>
+            <li><span class="mark">✓</span><div><strong>Email · vehicle tracking</strong> <span class="b">— live</span></div></li>
+            <li><span class="mark">✓</span><div><strong>SMS / WhatsApp / pay / API</strong> <span class="b">— at setup</span></div></li>
+            <li><span class="mark">✓</span><div><strong>Mobile push pipeline</strong></div></li>
+            <li class="soon"><span class="mark">…</span><div><strong>Tally · SSO · Hostel · Alumni</strong></div></li>
+            <li class="soon"><span class="mark">…</span><div><strong>Full accounting · barcode scan</strong></div></li>
+            <li class="soon"><span class="mark">…</span><div><strong>Transport auto-invoice</strong></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slim-ftr"><span>MyCampusView · Feature brochure</span><strong>Page 5 / 6</strong></div>
+  </section>
+
+  <!-- ===================== PAGE 6 ===================== -->
+  <section class="page closing-page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Packs &amp; next step</strong>
+        Start with what hurts most — expand later
+      </div>
+    </header>
+    <div class="content">
+      <div>
+        <div class="page-title">Simple packs. Clear next step.</div>
+        <div class="page-sub">Setup ₹15,000 once · GST extra · feature annex available with formal quotation.</div>
+      </div>
+      <div class="band">
+        <div>
+          <h3>Essential</h3>
+          <div class="price">₹36,000 / yr</div>
+          <p>₹3,500 / mo · lean start for smaller schools</p>
+        </div>
+        <div>
+          <h3>Starter</h3>
+          <div class="price">₹60,000 / yr</div>
+          <p>₹5,500 / mo · core SIS + fees + academics</p>
+        </div>
+        <div>
+          <h3>Growth ★</h3>
+          <div class="price">₹84,000 / yr</div>
+          <p>₹7,500 / mo · Play Store school app</p>
+        </div>
+        <div>
+          <h3>Elite</h3>
+          <div class="price">₹1,20,000 / yr</div>
+          <p>₹10,500 / mo · Play Store &amp; App Store</p>
+        </div>
+      </div>
+      <div class="close-grid">
+        <div class="close-card">
+          <h2>How schools start with us</h2>
+          <ul>
+            <li>15-minute demo on fees or attendance</li>
+            <li>Feature annex + draft quotation (MCV/Q/…)</li>
+            <li>30–45 day focused go-live, then expand modules</li>
+            <li>Your branding on login, receipts, certificates</li>
+          </ul>
+          <p style="margin-top:8px;font-size:8pt;color:var(--ink-faint)">
+            Caps, credits, and pack inclusions are confirmed on the formal quotation.
+            Hardware (biometric terminals, GPS devices) is optional and quoted separately.
+          </p>
+        </div>
+        <div class="close-card dark">
+          <h2>Ready for a demo?</h2>
+          <p>We’ll show unpaid fees or today’s attendance on a live screen — not a brochure dump.</p>
+          <div class="contact-big">contact@mycampusview.com</div>
+          <p style="margin-top:6px">www.mycampusview.com</p>
+          <p style="margin-top:10px;font-size:7.5pt;color:var(--on-dark-soft)">
+            MyCampusView · Lead AI Studio<br />
+            Complete feature brochure · sales edition
+          </p>
+        </div>
+      </div>
+    </div>
+    <footer class="ftr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="ftr-meta">
+        <strong>contact@mycampusview.com</strong>
+        Sales edition
+      </div>
+    </footer>
+  </section>
+
+</body>
+</html>

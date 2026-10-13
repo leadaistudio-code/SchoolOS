@@ -2,12 +2,19 @@ import { requireContext } from '@/server/context'
 import { getClassTree } from '@/server/modules/academics/service'
 import { listFeeHeads } from '@/server/modules/finance/service'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { FeePlanWizard } from './fee-plan-wizard'
 
 export const metadata = { title: 'Create fee structure' }
 
-export default async function CreateFeeStructurePage() {
+export default async function CreateFeeStructurePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>
+}) {
   const ctx = await requireContext('fees.structure')
+  const params = await searchParams
+  const initialNonClass = params.scope === 'non-class'
   const [sessions, classes, heads] = await Promise.all([
     ctx.db.academicSession.findMany({ orderBy: { startsOn: 'desc' }, select: { id: true, name: true, startsOn: true, endsOn: true, isCurrent: true } }),
     getClassTree(ctx),
@@ -17,12 +24,29 @@ export default async function CreateFeeStructurePage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Create fee structure"
-        description="Set the annual plan once; MyCampusView creates the installments"
-        breadcrumbs={[{ label: 'Fee Setup', href: '/finance/structures' }, { label: 'Create' }]}
+        title={initialNonClass ? 'Create non class linked fee' : 'Create fee structure'}
+        description={
+          initialNonClass
+            ? 'Trip, books and other fees not tied to a class — assign to selected students'
+            : 'Set the annual plan once; MyCampusView creates the installments'
+        }
+        breadcrumbs={[
+          { label: 'Fees & Collections', href: '/finance' },
+          {
+            label: initialNonClass ? 'Non class linked fees' : 'Fee Setup',
+            href: initialNonClass ? '/finance/non-class-fees' : '/finance/structures',
+          },
+          { label: 'Create' },
+        ]}
+        actions={
+          <BackButton
+            fallbackHref={initialNonClass ? '/finance/non-class-fees' : '/finance/structures'}
+          />
+        }
       />
       <FeePlanWizard
         currency={ctx.tenant.currency}
+        initialNonClass={initialNonClass}
         sessions={sessions.map((session) => ({ ...session, startsOn: session.startsOn.toISOString(), endsOn: session.endsOn.toISOString() }))}
         classes={classes.map((classLevel) => ({
           id: classLevel.id,

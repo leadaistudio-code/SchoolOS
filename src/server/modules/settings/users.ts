@@ -318,8 +318,8 @@ export async function setUserRoles(ctx: AppContext, input: z.infer<typeof userRo
     select: { id: true, key: true, name: true },
   })
   if (roles.length !== input.roleIds.length) throw notFound('Role')
-  if (roles.some((role) => role.key === ROLE.SUPER_ADMIN)) {
-    throw new ApiException(403, 'FORBIDDEN', 'Platform administrator cannot be assigned by a school')
+  if (roles.some((role) => role.key === ROLE.SUPER_ADMIN || role.key === ROLE.MYCAMPUS_SUPPORT)) {
+    throw new ApiException(403, 'FORBIDDEN', 'Platform roles cannot be assigned by a school')
   }
 
   // Locking yourself out of role management is a support ticket nobody enjoys.

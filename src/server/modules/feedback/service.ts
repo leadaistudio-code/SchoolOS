@@ -3,6 +3,8 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { notify } from '@/server/notifications'
+import { assertStudentAccess } from '@/server/scope'
+import { classSubjectAppliesToSection } from '@/server/modules/exams/section-subjects'
 
 const date = z.string().datetime().optional()
 const ids = z.array(z.string().min(1)).max(100).default([])
@@ -674,13 +676,86 @@ export async function teacherInsights(ctx: AppContext) {
 }
 
 export async function createTeacherStudentFeedback(ctx: AppContext, input: z.infer<typeof teacherStudentFeedbackSchema>) {
-  ctx.require('feedback.teacher_give_student'); const teacher = await ctx.db.staff.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } }); if (!teacher) throw new ApiException(403, 'FORBIDDEN', 'Only staff can give student feedback')
-  const enrollment = await ctx.db.enrollment.findFirst({ where: { studentId: input.studentId, isCurrent: true }, select: { classLevelId: true, sectionId: true, student: { select: { userId: true, guardians: { select: { parent: { select: { userId: true } } } } } } } }); if (!enrollment) throw notFound('Active student')
-  if (input.subjectId) { const assignment = await ctx.db.classSubject.findFirst({ where: { classLevelId: enrollment.classLevelId, subjectId: input.subjectId, teacherId: teacher.id } }); if (!assignment) throw new ApiException(403, 'FORBIDDEN', 'You do not teach this subject to this student') }
-  const created = await ctx.db.teacherStudentFeedback.create({ data: { tenantId: ctx.tenant.id, studentId: input.studentId, teacherId: teacher.id, subjectId: input.subjectId, classLevelId: enrollment.classLevelId, sectionId: enrollment.sectionId, tags: input.tags, performance: input.performance, participation: input.participation, homework: input.homework, behaviour: input.behaviour, strengths: input.strengths, improvement: input.improvement, actions: input.actions, comment: input.comment, visibility: input.visibility } })
-  const recipients = [input.visibility === 'STUDENT' || input.visibility === 'STUDENT_AND_PARENT' ? enrollment.student.userId : undefined, ...(input.visibility === 'PARENT' || input.visibility === 'STUDENT_AND_PARENT' ? enrollment.student.guardians.map((g) => g.parent.userId) : [])].filter((id): id is string => !!id)
-  await notify(ctx, { userIds: recipients, eventKey: 'feedback.student', title: 'New teacher feedback', body: 'Your teacher has shared feedback and recommended next steps.', linkUrl: '/feedback/received' })
-  await record(ctx, 'teacher_student_feedback.create', 'TeacherStudentFeedback', created.id, 'Shared student feedback', created)
+  ctx.require('feedback.teacher_give_student')
+  await assertStudentAccess(ctx, input.studentId)
+  const teacher = await ctx.db.staff.findFirst({ where: { userId: ctx.user.userId }, select: { id: true } })
+  if (!teacher) throw new ApiException(403, 'FORBIDDEN', 'Only staff can give student feedback')
+  const enrollment = await ctx.db.enrollment.findFirst({
+    where: { studentId: input.studentId, isCurrent: true },
+    select: {
+      classLevelId: true,
+      sectionId: true,
+      student: {
+        select: {
+          userId: true,
+          guardians: { select: { parent: { select: { userId: true } } } },
+        },
+      },
+    },
+  })
+  if (!enrollment) throw notFound('Active student')
+  if (input.subjectId) {
+    const assignment = await ctx.db.classSubject.findFirst({
+      where: {
+        classLevelId: enrollment.classLevelId,
+        subjectId: input.subjectId,
+        teacherId: teacher.id,
+      },
+      select: { sections: { select: { sectionId: true } } },
+    })
+    if (
+      !assignment ||
+      !classSubjectAppliesToSection(
+        assignment.sections.map((s) => s.sectionId),
+        enrollment.sectionId,
+      )
+    ) {
+      throw new ApiException(403, 'FORBIDDEN', 'You do not teach this subject to this student')
+    }
+  }
+  const created = await ctx.db.teacherStudentFeedback.create({
+    data: {
+      tenantId: ctx.tenant.id,
+      studentId: input.studentId,
+      teacherId: teacher.id,
+      subjectId: input.subjectId,
+      classLevelId: enrollment.classLevelId,
+      sectionId: enrollment.sectionId,
+      tags: input.tags,
+      performance: input.performance,
+      participation: input.participation,
+      homework: input.homework,
+      behaviour: input.behaviour,
+      strengths: input.strengths,
+      improvement: input.improvement,
+      actions: input.actions,
+      comment: input.comment,
+      visibility: input.visibility,
+    },
+  })
+  const recipients = [
+    input.visibility === 'STUDENT' || input.visibility === 'STUDENT_AND_PARENT'
+      ? enrollment.student.userId
+      : undefined,
+    ...(input.visibility === 'PARENT' || input.visibility === 'STUDENT_AND_PARENT'
+      ? enrollment.student.guardians.map((g) => g.parent.userId)
+      : []),
+  ].filter((id): id is string => !!id)
+  await notify(ctx, {
+    userIds: recipients,
+    eventKey: 'feedback.student',
+    title: 'New teacher feedback',
+    body: 'Your teacher has shared feedback and recommended next steps.',
+    linkUrl: '/feedback/received',
+  })
+  await record(
+    ctx,
+    'teacher_student_feedback.create',
+    'TeacherStudentFeedback',
+    created.id,
+    'Shared student feedback',
+    created,
+  )
   return created
 }
 

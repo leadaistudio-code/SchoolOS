@@ -419,15 +419,19 @@ export function PayslipDeductionButton({
 export function PayslipStatusControl({ id, status }: { id: string; status: string }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
+  const [payOpen, setPayOpen] = React.useState(false)
+  const [paymentMode, setPaymentMode] = React.useState('BANK_TRANSFER')
+  const [paidOn, setPaidOn] = React.useState(() => todayInIndia())
 
-  const move = (next: string) =>
+  const move = (next: string, extra: { paymentMode?: string; paidOn?: string } = {}) =>
     startTransition(async () => {
-      const result = await setPayslipStatusAction({ id, status: next })
+      const result = await setPayslipStatusAction({ id, status: next, ...extra })
       toast.push({
         tone: result.ok ? 'success' : 'error',
         title: result.ok ? 'Payslip updated' : 'Could not update',
         description: result.message,
       })
+      if (result.ok) setPayOpen(false)
     })
 
   const remove = () => {
@@ -484,11 +488,57 @@ export function PayslipStatusControl({ id, status }: { id: string; status: strin
       >
         Unpublish
       </Button>
-      <Button size="sm" loading={pending} onClick={() => move('PAID')}>
+      <Button size="sm" loading={pending} onClick={() => setPayOpen(true)}>
         Mark paid
       </Button>
+      <Dialog
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        title="Mark salary paid"
+        description="The salary is recorded in Accounts as a Salaries & Wages expense, paid from the account chosen below. A paid payslip cannot be reopened."
+        footer={
+          <>
+            <Button onClick={() => move('PAID', { paymentMode, paidOn })} loading={pending} disabled={!paidOn}>
+              Mark paid
+            </Button>
+            <Button variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Paid by" htmlFor={`pay-mode-${id}`} required hint="Cash is paid from Cash in Hand; the others from the bank account">
+            <Select id={`pay-mode-${id}`} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+              {SALARY_MODES.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Paid on" htmlFor={`pay-date-${id}`} required>
+            <Input
+              id={`pay-date-${id}`}
+              type="date"
+              max={todayInIndia()}
+              value={paidOn}
+              onChange={(e) => setPaidOn(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Dialog>
     </>
   )
+}
+
+const SALARY_MODES: [string, string][] = [
+  ['BANK_TRANSFER', 'Bank transfer'],
+  ['CASH', 'Cash'],
+  ['CHEQUE', 'Cheque'],
+  ['UPI', 'UPI'],
+]
+
+function todayInIndia() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date())
 }
 
 /** Opens an appraisal cycle for one person. */

@@ -32,6 +32,7 @@ function contextWith(...permissions: string[]): AppContext {
       email: null,
       phone: null,
       avatarUrl: null,
+      displayName: null,
       mustChangePassword: false,
       roleKeys: ['TEACHER'],
       permissions: held,
@@ -53,14 +54,61 @@ describe('assistant tool exposure', () => {
   })
 
   it('offers a teacher attendance tools but not fees', () => {
-    const tools = toolsFor(contextWith('attendance.view', 'students.view')).map((t) => t.name)
+    const tools = toolsFor(
+      contextWith(
+        'assistant.use',
+        'dashboard.view',
+        'attendance.view',
+        'students.view',
+        'academics.view',
+      ),
+    ).map((t) => t.name)
 
+    expect(tools).toContain('school_overview')
     expect(tools).toContain('unmarked_registers')
     expect(tools).toContain('attendance_report')
     expect(tools).toContain('find_students')
+    expect(tools).toContain('list_classes')
     expect(tools).not.toContain('fees_outstanding')
     expect(tools).not.toContain('fees_collected')
     expect(tools).not.toContain('fees_invoices')
+    expect(tools).not.toContain('pending_leave')
+  })
+
+  it('offers school admin whole-school tools including fees and leave', () => {
+    const tools = toolsFor(
+      contextWith(
+        'assistant.use',
+        'dashboard.view',
+        'attendance.view',
+        'students.view',
+        'fees.view',
+        'leave.approve',
+        'notices.create',
+        'expenses.view',
+        'staff.payroll',
+        'exams.view',
+        'exams.marks',
+      ),
+    ).map((t) => t.name)
+
+    expect(tools).toContain('school_overview')
+    expect(tools).toContain('fees_outstanding')
+    expect(tools).toContain('pending_leave')
+    expect(tools).toContain('draft_notice')
+    expect(tools).toContain('expenses_report')
+    expect(tools).toContain('payroll_month')
+    expect(tools).toContain('exams_on_date')
+    expect(tools).toContain('pending_exam_marks')
+  })
+
+  it('withholds finance and exam tools without the matching permissions', () => {
+    const tools = toolsFor(contextWith('fees.view', 'attendance.view')).map((t) => t.name)
+
+    expect(tools).not.toContain('expenses_report')
+    expect(tools).not.toContain('payroll_month')
+    expect(tools).not.toContain('exams_on_date')
+    expect(tools).not.toContain('pending_exam_marks')
   })
 
   it('offers an accountant fees tools but not attendance', () => {

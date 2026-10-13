@@ -1,0 +1,12 @@
+MyCampusView Tally Connector
+Copyright (c) MyCampusView
+
+This software is provided for licensed MyCampusView customers to connect a
+school's on-premise Tally.ERP 9 installation with their MyCampusView tenant.
+
+By installing this software you agree to:
+1. Use it only for the school tenant that issued the pairing code.
+2. Keep connector credentials confidential on this computer.
+3. Not expose Tally port 9000 to the public internet.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

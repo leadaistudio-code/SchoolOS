@@ -6,6 +6,7 @@ import { PERMISSION_KEYS, PERMISSIONS } from './permissions'
  */
 export const ROLE = {
   SUPER_ADMIN: 'SUPER_ADMIN',
+  MYCAMPUS_SUPPORT: 'MYCAMPUS_SUPPORT',
   SCHOOL_ADMIN: 'SCHOOL_ADMIN',
   PRINCIPAL: 'PRINCIPAL',
   TEACHER: 'TEACHER',
@@ -24,7 +25,10 @@ export type RoleKey = (typeof ROLE)[keyof typeof ROLE]
 const all = (module: string) =>
   PERMISSIONS.filter((p) => p.module === module).map((p) => p.key)
 
-const tenantPermissions = PERMISSION_KEYS.filter((k) => !k.startsWith('platform.'))
+/** Every school-side permission — never includes platform.* keys. */
+export const TENANT_PERMISSION_KEYS = PERMISSION_KEYS.filter((k) => !k.startsWith('platform.'))
+
+const tenantPermissions = TENANT_PERMISSION_KEYS
 
 export type RoleDef = {
   key: RoleKey
@@ -41,6 +45,22 @@ export const SYSTEM_ROLES: RoleDef[] = [
     description: 'Operates the SaaS platform across all tenants.',
     isPlatform: true,
     permissions: PERMISSION_KEYS.slice(),
+  },
+  {
+    key: ROLE.MYCAMPUS_SUPPORT,
+    name: 'MyCampus Support',
+    description:
+      'Product support for schools. Opens any school with full view and manage access so a school admin’s question can be answered without permission denials.',
+    isPlatform: true,
+    // Full school catalogue + the platform tools support needs to enter schools,
+    // reply to tickets and check health. Plans/billing/CRM stay with Super Admin.
+    permissions: [
+      ...tenantPermissions,
+      'platform.tenants',
+      'platform.impersonate',
+      'platform.support',
+      'platform.health',
+    ],
   },
   {
     key: ROLE.SCHOOL_ADMIN,
@@ -70,7 +90,9 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('biometric'),
       ...all('leave'),
       'fees.view', 'fees.accounts', 'fees.export', 'fees.concession', 'fees.report', 'fees.reminder', 'fees.owner_analytics',
+      'fees.tally',
       'expenses.view',
+      'accounts.view',
       ...all('exams'),
       ...all('results'),
       ...all('certificates'),
@@ -82,7 +104,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'teacher_refresh.view_school',
       'teacher_refresh.configure',
       'teacher_refresh.question_review',
-      'library.view', 'inventory.view', 'frontoffice.view',
+      'library.view', 'inventory.view', 'store.view', 'frontoffice.view', 'frontoffice.gatepass',
+      'cctv.view_all',
       'admissions.view', 'admissions.manage', 'admissions.convert',
       'transport.view', 'transport.track',
       ...all('sports'),
@@ -153,6 +176,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'feedback.teacher_give_student',
       'teacher_refresh.view_self',
       'teacher_refresh.take',
+      'assistant.use',
     ],
   },
   {
@@ -163,6 +187,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'dashboard.view',
       ...all('fees'),
       ...all('expenses'),
+      ...all('accounts'),
+      ...all('store'),
       'notices.view',
       'messages.view', 'messages.send',
       'assistant.use',
@@ -217,8 +243,10 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('admissions'),
       'expenses.view',
       'expenses.manage',
+      'store.view', 'store.sell',
       'notices.view',
-      'messages.view', 'messages.send',
+      'messages.view', 'messages.send', 'messages.parent_queries',
+      'cctv.view_gate',
       'feedback.view', 'feedback.parent_submit', 'feedback.submit',
       'calendar.view',
       'events.view',
@@ -300,6 +328,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'events.view',
       'transport.track',
       'documents.view',
+      'cctv.view_child',
     ],
   },
 ]
@@ -313,7 +342,12 @@ export const ROLE_BY_KEY = new Map(SYSTEM_ROLES.map((r) => [r.key, r]))
 export const SELF_SCOPED_ROLES: RoleKey[] = [ROLE.STUDENT, ROLE.PARENT]
 
 export function hasSchoolWideScope(roleKeys: string[]): boolean {
-  const schoolWideRoleKeys: string[] = [ROLE.SUPER_ADMIN, ROLE.SCHOOL_ADMIN, ROLE.PRINCIPAL]
+  const schoolWideRoleKeys: string[] = [
+    ROLE.SUPER_ADMIN,
+    ROLE.MYCAMPUS_SUPPORT,
+    ROLE.SCHOOL_ADMIN,
+    ROLE.PRINCIPAL,
+  ]
   return roleKeys.some((key) => schoolWideRoleKeys.includes(key))
 }
 
@@ -326,6 +360,7 @@ export function isSelfScoped(roleKeys: string[]): boolean {
 export function isTeacherScoped(roleKeys: string[]): boolean {
   const schoolWide: string[] = [
     ROLE.SUPER_ADMIN,
+    ROLE.MYCAMPUS_SUPPORT,
     ROLE.SCHOOL_ADMIN,
     ROLE.PRINCIPAL,
     ROLE.ACCOUNTANT,

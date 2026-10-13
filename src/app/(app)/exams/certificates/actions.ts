@@ -18,6 +18,28 @@ import {
   reportCardTemplateSchema,
 } from '@/server/modules/exams/report-templates'
 import type { FormState } from '@/lib/form-state'
+import { linesToList } from '@/lib/exams/report-card-config'
+
+function reportCardConfigFromForm(formData: FormData) {
+  const str = (key: string) => String(formData.get(key) ?? '')
+  return {
+    layout: str('layout') === 'CLASSIC' ? 'CLASSIC' : 'HOLISTIC',
+    design: str('design'),
+    showPhoto: formData.get('showPhoto') === 'on',
+    signatureImages: [str('signatureImage0'), str('signatureImage1'), str('signatureImage2')],
+    title: str('title'),
+    subtitle: str('subtitle'),
+    affiliation: str('affiliation'),
+    affiliationNo: str('affiliationNo'),
+    boardBadge: str('boardBadge'),
+    accent: str('accent'),
+    showPart2: formData.get('showPart2') === 'on',
+    showSeal: formData.get('showSeal') === 'on',
+    competencies: linesToList(str('competencies')),
+    coScholastic: linesToList(str('coScholastic')),
+    signatories: [str('signatory0'), str('signatory1'), str('signatory2')],
+  }
+}
 
 function fields(error: ZodError) {
   return Object.fromEntries(error.issues.map((issue) => [issue.path.join('.'), issue.message]))
@@ -94,9 +116,10 @@ export async function createReportCardTemplateAction(
         showRemarks: formData.get('showRemarks') === 'on',
         headerHtml: formData.get('headerHtml') || null,
         footerHtml: formData.get('footerHtml') || null,
+        config: reportCardConfigFromForm(formData),
       }),
     )
-    revalidatePath('/exams/report-cards/templates')
+    revalidatePath('/exams/report-cards', 'layout')
     return { ok: true, error: null, fieldErrors: {}, message: 'Report card template saved.' }
   } catch (error) {
     if (error instanceof ZodError) return { error: 'Please correct the template fields', fieldErrors: fields(error) }
@@ -122,9 +145,10 @@ export async function updateReportCardTemplateAction(
         showRemarks: formData.get('showRemarks') === 'on',
         headerHtml: formData.get('headerHtml') || null,
         footerHtml: formData.get('footerHtml') || null,
+        config: reportCardConfigFromForm(formData),
       }),
     )
-    revalidatePath('/exams/report-cards/templates')
+    revalidatePath('/exams/report-cards', 'layout')
     return { ok: true, error: null, fieldErrors: {}, message: 'Report card template updated.' }
   } catch (error) {
     if (error instanceof ZodError) return { error: 'Please correct the template fields', fieldErrors: fields(error) }

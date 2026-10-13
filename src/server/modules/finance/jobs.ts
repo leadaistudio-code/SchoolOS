@@ -6,6 +6,7 @@ import { prisma } from '@/server/db/prisma'
 import { attendanceDate } from '@/lib/dates'
 import { applyConcession, deriveInvoiceStatus, lateFeeFor } from '@/lib/money'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
+import { feeHeadActiveOn } from './fee-head-window'
 
 /**
  * Generates only the current month's selected-plan occurrences. Running this
@@ -28,7 +29,13 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
       structure: {
         include: {
           installments: {
-            where: { dueOn: { gte: monthStart, lt: nextMonth } },
+            where: {
+              OR: [
+                { issueOn: null, dueOn: { gte: monthStart, lt: nextMonth } },
+                // A set generation date bills as soon as it arrives, even ahead of the due month.
+                { issueOn: { lte: today }, dueOn: { gte: monthStart } },
+              ],
+            },
             include: { lines: { include: { feeHead: true } } },
           },
         },
@@ -47,6 +54,10 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
           assignment.autoFeeHeadIds.length > 0
           && !assignment.autoFeeHeadIds.includes(line.feeHeadId)
         ) {
+          continue
+        }
+        if (!feeHeadActiveOn(line.feeHead, installment.dueOn)) {
+          skipped++
           continue
         }
         const sourceKey = `fee-line:${line.id}:student:${assignment.studentId}`
@@ -94,7 +105,7 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
                 structureId: assignment.structureId,
                 sourceKey,
                 title: `${line.feeHead.name} — ${label}`,
-                issuedOn: monthStart,
+                issuedOn: installment.issueOn ?? monthStart,
                 dueOn: installment.dueOn,
                 status: deriveInvoiceStatus({
                   totalMinor: remaining,
@@ -259,10 +270,10 @@ export async function syncTransportFeeInvoices() {
           OR: [{ effectiveTo: null }, { effectiveTo: { gte: today } }],
         },
         orderBy: { effectiveFrom: 'desc' },
-        include: { feeHead: { select: { name: true } } },
+        include: { feeHead: { select: { name: true, startsOn: true, endsOn: true } } },
       }),
     ])
-    if (!session || !rate) {
+    if (!session || !rate || !feeHeadActiveOn(rate.feeHead, dueOn)) {
       skipped++
       continue
     }
@@ -312,10 +323,10 @@ export async function syncTransportFeeInvoices() {
   return { assignments: assignments.length, created, skipped }
 }
 
-export async function runLateFeeRules() {
+export async function runLateFeeRules(options: { tenantId?: string; actorLabel?: string } = {}) {
   const today = attendanceDate(new Date())
   const rules = await prisma.feePenaltyRule.findMany({
-    where: { isActive: true },
+    where: { isActive: true, ...(options.tenantId ? { tenantId: options.tenantId } : {}) },
     orderBy: { name: 'asc' },
   })
   const rulesByTenant = new Map<string, typeof rules>()
@@ -368,7 +379,7 @@ export async function runLateFeeRules() {
       await prisma.auditLog.create({
         data: {
           tenantId,
-          actorLabel: 'Scheduled finance job',
+          actorLabel: options.actorLabel ?? 'Scheduled finance job',
           action: 'fee.late_fee_run',
           module: 'fees',
           summary: `Applied late fees to ${tenantUpdated} invoices, adding ₹${tenantAdded / 100}`,

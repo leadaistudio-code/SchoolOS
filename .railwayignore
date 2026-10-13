@@ -15,6 +15,9 @@ mobile/backup key/
 connect/
 cloud/
 scroll-site-generator/
+tools/
+releases/
+docs/sales/
 Payment-Collection-Data-*
 docs/Payment-Collection-Data-*
 prisma/Payment-Collection-Data-*

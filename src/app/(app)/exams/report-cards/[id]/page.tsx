@@ -1,162 +1,51 @@
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ClipboardList } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getReportCard } from '@/server/modules/exams/service'
-import { formatDay } from '@/lib/dates'
-import { Badge } from '@/components/ui/badge'
-import { DocumentLetterhead } from '@/components/print/document-letterhead'
+import { HolisticReportCard } from '@/components/print/holistic-report-card'
+import { resultCorrectionSheet } from '@/server/modules/exams/result-correction'
 import { PrintReportCardButton } from './print-button'
+import { CorrectMarksDialog } from './correct-marks-dialog'
 
 export const metadata = { title: 'Report card' }
 
 /**
  * Report card.
  *
- * This screen is a document: it is printed, signed and filed. School letterhead
- * images (Settings → Branding) apply here the same as on receipts and certificates.
+ * This screen is a document: it is printed, signed and filed. The layout and
+ * Part 2 sections come from the default report card template.
  */
 export default async function ReportCardPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireContext('results.view')
   const { id } = await params
   const card = await getReportCard(ctx, id)
-  const { result, template } = card
-  const school = ctx.tenant.school
-  const hasLetterheadHeader = Boolean(school?.letterheadHeaderUrl)
-  const hasLetterheadFooter = Boolean(school?.letterheadFooterUrl)
+  const correction = ctx.can('exams.manage') ? await resultCorrectionSheet(ctx, id).catch(() => null) : null
 
   return (
-    <div className="max-w-4xl">
-      <div className="no-print mb-4 flex items-center justify-between gap-3">
+    <div className="max-w-[230mm]">
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/exams/report-cards"
+          href="/exams/report-cards?tab=generated"
           className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"
         >
           <ChevronLeft className="size-4" aria-hidden />
           All report cards
         </Link>
-        <PrintReportCardButton />
-      </div>
-
-      <DocumentLetterhead
-        schoolName={school?.name ?? ctx.tenant.name}
-        logoUrl={school?.logoUrl}
-        letterheadHeaderUrl={school?.letterheadHeaderUrl}
-        letterheadFooterUrl={school?.letterheadFooterUrl}
-        footerText={school?.footerText}
-        signatureUrl={school?.signatureUrl}
-      >
-        {!hasLetterheadHeader && template?.headerHtml ? (
-          <div
-            className="mb-4 text-center prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: template.headerHtml }}
-          />
-        ) : null}
-        <header className="border-b border-line pb-4 text-center">
-          <p className="caption">Academic report card</p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">{result.exam.name}</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            Published {result.publishedAt ? formatDay(result.publishedAt) : '—'}
-          </p>
-        </header>
-
-        <section className="grid gap-4 border-b border-line py-4 sm:grid-cols-2">
-          <div>
-            <p className="caption">Student</p>
-            <p className="mt-1 text-lg font-semibold text-ink">
-              {result.student.firstName} {result.student.lastName}
-            </p>
-            <p className="text-sm text-ink-muted">
-              Admission no. {result.student.admissionNo}
-            </p>
-          </div>
-          <div className="sm:text-right">
-            <p className="caption">Class</p>
-            <p className="mt-1 text-lg font-semibold text-ink">
-              {card.className} · Section {card.sectionName}
-            </p>
-            <p className="text-sm text-ink-muted">
-              Rank in class {template?.showRank === false ? '—' : (result.rankInClass ?? '—')}
-            </p>
-          </div>
-        </section>
-
-        <section className="py-4">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line">
-                <th className="pb-2 text-xs font-semibold text-ink-muted">Subject</th>
-                <th className="pb-2 text-xs font-semibold text-ink-muted text-right">Marks</th>
-                <th className="pb-2 text-xs font-semibold text-ink-muted text-right">Grade</th>
-                <th className="pb-2 text-xs font-semibold text-ink-muted text-right">Result</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {card.subjects.map((subject) => (
-                <tr key={subject.code}>
-                  <td className="py-2.5">
-                    <p className="text-sm font-medium text-ink">{subject.name}</p>
-                    <p className="text-xs text-ink-subtle">
-                      {subject.code}
-                      {template?.showRemarks !== false && subject.remarks ? ` · ${subject.remarks}` : ''}
-                    </p>
-                  </td>
-                  <td className="py-2.5 text-right text-sm tnum">
-                    {subject.isAbsent
-                      ? 'Absent'
-                      : `${subject.marksObtained ?? '—'} / ${subject.maxMarks}`}
-                  </td>
-                  <td className="py-2.5 text-right text-sm text-ink">{subject.grade ?? '—'}</td>
-                  <td className="py-2.5 text-right">
-                    <Badge tone={subject.isPass ? 'success' : 'danger'}>
-                      {subject.isPass ? 'Pass' : 'Not passed'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <div className="grid gap-3 border-t border-line pt-4 sm:grid-cols-4">
-          <div>
-            <p className="caption">Total</p>
-            <p className="text-lg font-semibold text-ink tnum">
-              {result.totalObtained} / {result.totalMax}
-            </p>
-          </div>
-          <div>
-            <p className="caption">Percentage</p>
-            <p className="text-lg font-semibold text-ink tnum">{result.percentage}%</p>
-          </div>
-          <div>
-            <p className="caption">Overall grade</p>
-            <p className="text-lg font-semibold text-ink">{result.grade ?? '—'}</p>
-          </div>
-          <div>
-            <p className="caption">Outcome</p>
-            <p className="mt-1">
-              <Badge tone={result.isPass ? 'success' : 'danger'}>
-                {result.isPass ? 'Pass' : 'Not passed'}
-              </Badge>
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {ctx.can('exams.marks') ? (
+            <Link
+              href={`/exams/report-cards?tab=matrix&exam=${card.examId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink hover:bg-surface-2"
+            >
+              <ClipboardList className="size-4" aria-hidden />
+              Holistic assessment
+            </Link>
+          ) : null}
+          {correction ? <CorrectMarksDialog resultId={correction.resultId} published={correction.published} papers={correction.papers} /> : null}
+          <PrintReportCardButton />
         </div>
-        {template?.showAttendance && card.attendance ? (
-          <section className="mt-4 border-t border-line pt-4 text-sm">
-            <p className="caption">Attendance (session)</p>
-            <p className="mt-1 text-ink">
-              Present {card.attendance.present} · Absent {card.attendance.absent} ·{' '}
-              {card.attendance.percent}% of {card.attendance.total} marked days
-            </p>
-          </section>
-        ) : null}
-        {!hasLetterheadFooter && template?.footerHtml ? (
-          <div
-            className="mt-6 border-t border-line pt-4 prose prose-sm max-w-none text-center"
-            dangerouslySetInnerHTML={{ __html: template.footerHtml }}
-          />
-        ) : null}
-      </DocumentLetterhead>
+      </div>
+      <HolisticReportCard data={card} />
     </div>
   )
 }

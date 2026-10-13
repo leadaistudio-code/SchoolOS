@@ -312,6 +312,9 @@ model User {
   passwordHash String?
   firstName    String
   lastName     String
+  /// Optional display name / alias shown in the app shell (topbar, menus).
+  /// When null, firstName + lastName are used.
+  displayName  String?
   avatarUrl    String?
   status       UserStatus @default(ACTIVE)
   isSuperAdmin Boolean    @default(false)
@@ -569,6 +572,8 @@ model Section {
   assessments           Assessment[]
   assessmentAssignments AssessmentAssignment[]
   subjects              SectionSubject[]
+  substitutions         Substitution[]
+  cctvCameras           CctvCamera[]
 
   @@unique([tenantId, classLevelId, name])
   @@index([tenantId])
@@ -590,11 +595,17 @@ model Subject {
 }
 
 model ClassSubject {
-  id           String  @id @default(cuid())
-  tenantId     String
-  classLevelId String
-  subjectId    String
-  teacherId    String?
+  id             String  @id @default(cuid())
+  tenantId       String
+  classLevelId   String
+  subjectId      String
+  teacherId      String?
+  /// Timetable generator: lessons a week for each section taking this subject.
+  periodsPerWeek Int?
+  /// Timetable generator: most lessons of this subject in one section on one day.
+  maxPerDay      Int?
+  /// Timetable generator: lessons come in back-to-back pairs (labs, practicals).
+  doublePeriod   Boolean @default(false)
 
   classLevel                ClassLevel                 @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
   subject                   Subject                    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -609,6 +620,7 @@ model ClassSubject {
   assessments               Assessment[]
   teacherRefreshAssessments TeacherRefreshAssessment[]
   sections                  SectionSubject[]
+  substitutions             Substitution[]
 
   @@unique([tenantId, classLevelId, subjectId])
   @@index([tenantId, teacherId])
@@ -1176,10 +1188,10 @@ model AssessmentAssignment {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  assessment Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  classLevel ClassLevel?         @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
-  section    Section?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  attempts   AssessmentAttempt[]
+  assessment   Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  classLevel   ClassLevel?         @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
+  section      Section?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  attempts     AssessmentAttempt[]
   answerSheets AnswerSheet[]
 
   @@index([tenantId, assessmentId])
@@ -1212,9 +1224,9 @@ model AssessmentAttempt {
   publishedAt    DateTime?
   teacherComment String?
 
-  assignment AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  answers    StudentAnswer[]
+  assignment   AssessmentAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers      StudentAnswer[]
   answerSheets AnswerSheet[]
 
   @@unique([tenantId, assignmentId, studentId, attemptNumber])
@@ -1365,16 +1377,16 @@ model EvaluatedAnswer {
 
 /// School-level AI usage for cost control (no provider secrets).
 model AiUsageEvent {
-  id           String   @id @default(cuid())
-  tenantId     String
-  kind         String
+  id                 String   @id @default(cuid())
+  tenantId           String
+  kind               String
   /// e.g. evaluation.pages, question.generate
-  units        Int      @default(1)
-  model        String?
+  units              Int      @default(1)
+  model              String?
   estimatedCostMinor Int?
-  meta         Json?
-  createdById  String?
-  createdAt    DateTime @default(now())
+  meta               Json?
+  createdById        String?
+  createdAt          DateTime @default(now())
 
   @@index([tenantId, kind, createdAt])
 }
@@ -1394,20 +1406,27 @@ enum StudentStatus {
 }
 
 model Student {
-  id           String    @id @default(cuid())
-  tenantId     String
-  userId       String?   @unique
-  admissionNo  String
-  firstName    String
-  lastName     String
-  photoUrl     String?
-  dateOfBirth  DateTime? @db.Date
-  gender       Gender?
-  bloodGroup   String?
-  nationality  String?
-  religion     String?
-  category     String?
-  motherTongue String?
+  id                 String    @id @default(cuid())
+  tenantId           String
+  userId             String?   @unique
+  admissionNo        String
+  firstName          String
+  lastName           String
+  photoUrl           String?
+  dateOfBirth        DateTime? @db.Date
+  gender             Gender?
+  bloodGroup         String?
+  nationality        String?
+  religion           String?
+  category           String?
+  motherTongue       String?
+  caste              String?
+  aadhaarNo          String?
+  birthPlace         String?
+  identificationMark String?
+  disability         String?
+  house              String?
+  whatsappPhone      String?
 
   admissionDate  DateTime? @db.Date
   previousSchool String?
@@ -1428,36 +1447,40 @@ model Student {
   updatedAt DateTime      @updatedAt
   deletedAt DateTime?
 
-  user                User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  enrollments         Enrollment[]
-  guardians           StudentGuardian[]
-  attendance          StudentAttendance[]
-  leaveRequests       LeaveRequest[]
-  invoices            FeeInvoice[]
-  payments            FeePayment[]
-  concessions         FeeConcession[]
-  feeOptions          StudentFeeOption[]
-  feeAssignments      StudentFeeAssignment[]
-  feeCredits          StudentFeeCredit[]
-  feeAdjustments      FeeAdjustment[]
-  feeReminderLogs     FeeReminderLog[]
-  marks               Mark[]
-  examAttendance      ExamAttendance[]
-  results             Result[]
-  certificates        Certificate[]
-  admitCards          AdmitCard[]
-  homeworkSubmissions HomeworkSubmission[]
-  libraryLoans        LibraryLoan[]
-  transport           TransportAssignment[]
-  boardingLogs        TransportBoardingLog[]
-  documents           Document[]
-  sportsTeams         SportsTeamMember[]
-  disciplineRecords   DisciplineRecord[]
-  assessmentAttempts  AssessmentAttempt[]
-  answerSheets        AnswerSheet[]
-  feedbackAssignments FeedbackAssignment[]
-  feedbackResponses   FeedbackResponse[]
-  receivedFeedback    TeacherStudentFeedback[]
+  user                 User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  enrollments          Enrollment[]
+  guardians            StudentGuardian[]
+  attendance           StudentAttendance[]
+  leaveRequests        LeaveRequest[]
+  invoices             FeeInvoice[]
+  storeSales           StoreSale[]
+  payments             FeePayment[]
+  concessions          FeeConcession[]
+  feeOptions           StudentFeeOption[]
+  feeAssignments       StudentFeeAssignment[]
+  feeCredits           StudentFeeCredit[]
+  feeAdjustments       FeeAdjustment[]
+  feeReminderLogs      FeeReminderLog[]
+  marks                Mark[]
+  examAttendance       ExamAttendance[]
+  results              Result[]
+  certificates         Certificate[]
+  transferCertificates TransferCertificate[]
+  admitCards           AdmitCard[]
+  homeworkSubmissions  HomeworkSubmission[]
+  libraryLoans         LibraryLoan[]
+  transport            TransportAssignment[]
+  boardingLogs         TransportBoardingLog[]
+  documents            Document[]
+  sportsTeams          SportsTeamMember[]
+  disciplineRecords    DisciplineRecord[]
+  assessmentAttempts   AssessmentAttempt[]
+  answerSheets         AnswerSheet[]
+  feedbackAssignments  FeedbackAssignment[]
+  feedbackResponses    FeedbackResponse[]
+  receivedFeedback     TeacherStudentFeedback[]
+  gatePasses           GatePass[]
+  parentQueries        ParentQuery[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])
@@ -1513,6 +1536,8 @@ model Parent {
   documents           Document[]
   feedbackAssignments FeedbackAssignment[]
   feedbackResponses   FeedbackResponse[]
+  gatePasses          GatePass[]
+  queries             ParentQuery[]
 
   @@index([tenantId, lastName, firstName])
   @@index([tenantId, phone])
@@ -1555,41 +1580,45 @@ enum StaffType {
 }
 
 model Staff {
-  id              String    @id @default(cuid())
-  tenantId        String
-  userId          String?   @unique
-  employeeCode    String
-  firstName       String
-  lastName        String
-  photoUrl        String?
-  staffType       StaffType @default(TEACHING)
-  designation     String?
-  department      String?
-  qualification   String?
-  experienceYears Float?
-  dateOfBirth     DateTime? @db.Date
-  gender          Gender?
-  phone           String?
-  email           String?
-  joinedOn        DateTime? @db.Date
-  leftOn          DateTime?
-  salaryMinor     Int?
-  bankAccount     String?
-  addressLine1    String?
-  city            String?
-  state           String?
-  postalCode      String?
+  id                         String    @id @default(cuid())
+  tenantId                   String
+  userId                     String?   @unique
+  employeeCode               String
+  firstName                  String
+  lastName                   String
+  photoUrl                   String?
+  staffType                  StaffType @default(TEACHING)
+  designation                String?
+  department                 String?
+  qualification              String?
+  experienceYears            Float?
+  dateOfBirth                DateTime? @db.Date
+  gender                     Gender?
+  phone                      String?
+  email                      String?
+  joinedOn                   DateTime? @db.Date
+  leftOn                     DateTime?
+  salaryMinor                Int?
+  bankAccount                String?
+  addressLine1               String?
+  city                       String?
+  state                      String?
+  postalCode                 String?
   /// When true, attendance uses this staff member's own check-in/out window (guest / part-time).
-  customAttendanceHours Boolean @default(false)
+  customAttendanceHours      Boolean   @default(false)
   /// Check-in start — minutes from midnight in the school timezone. Null = school open.
-  attendanceStartMinutes Int?
+  attendanceStartMinutes     Int?
   /// Check-out end — minutes from midnight. Null = school close.
-  attendanceEndMinutes   Int?
+  attendanceEndMinutes       Int?
   /// Late after this minute-of-day. Null = attendanceStartMinutes (or school staff late setting).
   attendanceLateAfterMinutes Int?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  /// Timetable generator: most lessons this teacher takes in one day.
+  timetableMaxPerDay         Int?
+  /// Timetable generator: slots the teacher cannot take, as "day:periodId".
+  timetableUnavailable       String[]  @default([])
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  deletedAt                  DateTime?
 
   user                      User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
   classSubjects             ClassSubject[]
@@ -1613,6 +1642,8 @@ model Staff {
   teacherKnowledgeProfiles  TeacherKnowledgeProfile[]
   teacherRefreshAssessments TeacherRefreshAssessment[]
   teacherRefreshAttempts    TeacherRefreshAttempt[]
+  absences                  Substitution[]             @relation("SubstitutionAbsent")
+  coverDuties               Substitution[]             @relation("SubstitutionCover")
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType])
@@ -1831,6 +1862,9 @@ model FeeHead {
   isRefundable Boolean      @default(false)
   isDeposit    Boolean      @default(false)
   sortOrder    Int          @default(0)
+  /// Optional billing window: no charges for this head fall outside it.
+  startsOn     DateTime?    @db.Date
+  endsOn       DateTime?    @db.Date
   deletedAt    DateTime?
 
   items            FeeStructureItem[]
@@ -1898,6 +1932,8 @@ model FeeInstallment {
   tenantId    String
   structureId String
   name        String
+  /// Invoice generation date. Null = the 1st of the due month.
+  issueOn     DateTime? @db.Date
   dueOn       DateTime @db.Date
   amountMinor Int
   sortOrder   Int      @default(0)
@@ -2695,13 +2731,50 @@ model SchoolExpense {
   notes           String?
   recordedById    String?
   recordedByLabel String?
+  headId          String?
+  /// Copied from the head so dashboards and P&L agree without a join.
+  nature          ExpenseNature      @default(INDIRECT)
+  receiptKey      String?
+  receiptName     String?
+  receiptMime     String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
 
+  head ExpenseHead? @relation(fields: [headId], references: [id], onDelete: SetNull)
+
   @@index([tenantId, expenseDate])
   @@index([tenantId, category, expenseDate])
+  @@index([tenantId, nature, expenseDate])
+  @@index([tenantId, headId])
   @@index([tenantId, deletedAt])
+}
+
+/// Direct = cost of delivering teaching; indirect = running the school.
+enum ExpenseNature {
+  DIRECT
+  INDIRECT
+}
+
+/// A school-defined expense head (Electricity, Rent, Teaching salary ...).
+model ExpenseHead {
+  id          String          @id @default(cuid())
+  tenantId    String
+  name        String
+  category    ExpenseCategory @default(OTHER)
+  nature      ExpenseNature   @default(INDIRECT)
+  /// Ledger account the head posts to; each head normally has its own.
+  accountId   String?
+  description String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  account  LedgerAccount?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  expenses SchoolExpense[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
 }
 
 // ===========================================================================
@@ -2727,13 +2800,35 @@ enum ExamStatus {
   ARCHIVED
 }
 
+enum GradingSystem {
+  GRADES
+  POINTS
+  DESCRIPTIVE
+  MARKS_ONLY
+}
+
+enum GradingBasis {
+  PERCENT
+  MARKS
+}
+
 model GradingScale {
-  id        String      @id @default(cuid())
-  tenantId  String
-  name      String
-  isDefault Boolean     @default(false)
-  bands     GradeBand[]
-  exams     Exam[]
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isDefault   Boolean       @default(false)
+  system      GradingSystem @default(GRADES)
+  /// MARKS: bands were entered as marks out of `outOf`; minPercent/maxPercent
+  /// are always kept in sync so grading code works in percent only.
+  basis       GradingBasis  @default(PERCENT)
+  outOf       Float?
+  /// ALL_PAPERS: pass needs a passing band and every paper at its pass mark.
+  /// OVERALL: pass needs only the overall percentage at or above passPercent.
+  passRule    String        @default("ALL_PAPERS")
+  passPercent Float         @default(33)
+  bands       GradeBand[]
+  exams       Exam[]
 
   @@unique([tenantId, name])
 }
@@ -2745,6 +2840,8 @@ model GradeBand {
   grade      String
   minPercent Float
   maxPercent Float
+  minMarks   Float?
+  maxMarks   Float?
   points     Float?
   remark     String?
   isPass     Boolean @default(true)
@@ -2792,16 +2889,30 @@ model ExamClass {
 }
 
 model ExamSubject {
-  id             String    @id @default(cuid())
-  tenantId       String
-  examId         String
-  classSubjectId String
-  maxMarks       Float     @default(100)
-  passMarks      Float     @default(33)
-  examDate       DateTime? @db.Date
-  startTime      String?
-  endTime        String?
-  roomName       String?
+  id               String    @id @default(cuid())
+  tenantId         String
+  examId           String
+  classSubjectId   String
+  /// Total for the paper, including the optional internal and oral parts.
+  maxMarks         Float     @default(100)
+  passMarks        Float     @default(33)
+  internalMaxMarks Float?
+  oralMaxMarks     Float?
+  examDate         DateTime? @db.Date
+  startTime        String?
+  endTime          String?
+  roomName         String?
+
+  /// Marks sheet workflow: teachers submit a sheet, an administrator locks it.
+  marksStatus        MarksSheetStatus @default(OPEN)
+  marksSubmittedAt   DateTime?
+  marksSubmittedById String?
+  marksLockedAt      DateTime?
+  marksLockedById    String?
+  /// Paper closed by an administrator without (complete) marks, e.g. not
+  /// conducted. It stays locked and is left out of results and report cards.
+  closedWithoutMarks Boolean          @default(false)
+  closedReason       String?
 
   exam         Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
   classSubject ClassSubject     @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
@@ -2810,19 +2921,39 @@ model ExamSubject {
 
   @@unique([tenantId, examId, classSubjectId])
   @@index([tenantId, examDate])
+  @@index([tenantId, marksStatus])
+}
+
+enum MarksSheetStatus {
+  OPEN
+  SUBMITTED
+  LOCKED
+}
+
+enum MarkEntrySource {
+  TEACHER_MANUAL
+  ADMIN_MANUAL
+  CSV_IMPORT
 }
 
 model Mark {
-  id            String   @id @default(cuid())
+  id            String          @id @default(cuid())
   tenantId      String
   examSubjectId String
   studentId     String
+  /// Total across written, internal and oral parts.
   marksObtained Float?
-  isAbsent      Boolean  @default(false)
+  internalMarks Float?
+  oralMarks     Float?
+  isAbsent      Boolean         @default(false)
+  /// Student did not opt for this paper; it is left out of their result.
+  notApplicable Boolean         @default(false)
   grade         String?
   remarks       String?
   enteredById   String?
-  updatedAt     DateTime @updatedAt
+  source        MarkEntrySource @default(ADMIN_MANUAL)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   examSubject ExamSubject @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
   student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -2873,6 +3004,9 @@ model Result {
   isPass          Boolean   @default(true)
   teacherRemark   String?
   principalRemark String?
+  /// Part 2 of the holistic card: { competencies: {name: {score, note}}, coScholastic: {name: {grade, note}} }
+  holistic        Json?
+  promotionStatus String?
   publishedAt     DateTime?
   reportCardUrl   String?
   computedAt      DateTime  @default(now())
@@ -2969,6 +3103,42 @@ model Certificate {
   @@index([tenantId, studentId])
 }
 
+enum TransferCertificateStatus {
+  ISSUED
+  CANCELLED
+}
+
+/// School leaving / transfer certificate. Issuing marks the student TRANSFERRED
+/// and disables their login; cancelling restores both.
+model TransferCertificate {
+  id              String                    @id @default(cuid())
+  tenantId        String
+  studentId       String
+  number          String
+  bookNo          String?
+  applicationDate DateTime?                 @db.Date
+  issuedOn        DateTime                  @db.Date
+  reason          String?
+  /// Every printed row of the certificate, as filled in when issued.
+  details         Json
+  status          TransferCertificateStatus @default(ISSUED)
+  previousStatus  StudentStatus             @default(ACTIVE)
+  loginDisabled   Boolean                   @default(false)
+  issuedById      String?
+  issuedByLabel   String?
+  cancelledAt     DateTime?
+  cancelReason    String?
+  cancelledById   String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, number])
+  @@index([tenantId, studentId])
+  @@index([tenantId, issuedOn])
+}
+
 // ===========================================================================
 // TEACHING - HOMEWORK, CLASSWORK, TIMETABLE, CALENDAR
 // ===========================================================================
@@ -3061,7 +3231,8 @@ model TimetablePeriod {
   sortOrder Int     @default(0)
   isBreak   Boolean @default(false)
 
-  slots TimetableSlot[]
+  slots         TimetableSlot[]
+  substitutions Substitution[]
 
   @@unique([tenantId, name])
 }
@@ -3583,6 +3754,188 @@ model AssetHistory {
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, assetId, occurredAt])
+}
+
+// ===========================================================================
+// SCHOOL STORE (sale stock: books, uniforms, stationery …)
+// ===========================================================================
+
+enum StoreCategory {
+  BOOKS
+  STATIONERY
+  UNIFORM
+  SHOES
+  BAGS
+  ACCESSORIES
+  SPORTS
+  OTHER
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  SALE_RETURN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
+enum StoreSaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+/// Quantity is a cache of the movement ledger and only changes with a StockMovement.
+model StoreItem {
+  id                String        @id @default(cuid())
+  tenantId          String
+  sku               String
+  name              String
+  category          StoreCategory @default(OTHER)
+  /// Size, colour or class, e.g. "Size 32", "Class 5".
+  variant           String?
+  unit              String        @default("pcs")
+  hsnCode           String?
+  barcode           String?
+  /// GST included in the selling price.
+  taxPercent        Float         @default(0)
+  sellingPriceMinor Int
+  /// Weighted average cost of units in stock.
+  avgCostMinor      Int           @default(0)
+  quantity          Int           @default(0)
+  reorderLevel      Int           @default(0)
+  description       String?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  movements     StockMovement[]
+  saleLines     StoreSaleLine[]
+  purchaseLines StorePurchaseLine[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, category])
+  @@index([tenantId, name])
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  tenantId      String
+  itemId        String
+  type          StockMovementType
+  /// Signed: positive adds stock, negative removes it.
+  quantity      Int
+  unitCostMinor Int               @default(0)
+  balanceAfter  Int
+  saleId        String?
+  purchaseId    String?
+  reason        String?
+  actorId       String?
+  actorLabel    String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, itemId, createdAt])
+  @@index([tenantId, type, createdAt])
+  @@index([tenantId, saleId])
+}
+
+/// Stock received (goods receipt). Paid at the time of receipt.
+model StorePurchase {
+  id             String   @id @default(cuid())
+  tenantId       String
+  number         String
+  vendorName     String
+  invoiceNo      String?
+  purchaseDate   DateTime @db.Date
+  paymentMode    String   @default("CASH")
+  totalMinor     Int
+  notes          String?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  lines StorePurchaseLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, purchaseDate])
+}
+
+model StorePurchaseLine {
+  id            String @id @default(cuid())
+  tenantId      String
+  purchaseId    String
+  itemId        String
+  quantity      Int
+  unitCostMinor Int
+  amountMinor   Int
+
+  purchase StorePurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  item     StoreItem     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, itemId])
+}
+
+model StoreSale {
+  id            String          @id @default(cuid())
+  tenantId      String
+  number        String
+  soldAt        DateTime        @default(now())
+  studentId     String?
+  customerName  String?
+  customerPhone String?
+  /// Before line discounts, GST included.
+  grossMinor    Int
+  discountMinor Int             @default(0)
+  taxMinor      Int             @default(0)
+  totalMinor    Int
+  /// Cost of goods sold at weighted average cost.
+  costMinor     Int             @default(0)
+  paymentMode   String
+  paymentRef    String?
+  status        StoreSaleStatus @default(COMPLETED)
+  voidedAt      DateTime?
+  voidReason    String?
+  voidedById    String?
+  soldById      String?
+  soldByLabel   String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  student Student?        @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lines   StoreSaleLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, soldAt])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
+}
+
+model StoreSaleLine {
+  id             String @id @default(cuid())
+  tenantId       String
+  saleId         String
+  itemId         String
+  description    String
+  quantity       Int
+  unitPriceMinor Int
+  discountMinor  Int    @default(0)
+  taxPercent     Float  @default(0)
+  taxMinor       Int    @default(0)
+  /// Line total after discount, GST included.
+  amountMinor    Int
+  unitCostMinor  Int    @default(0)
+
+  sale StoreSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, saleId])
+  @@index([tenantId, itemId])
 }
 
 // ===========================================================================
@@ -4257,6 +4610,8 @@ model StaffPayslip {
   notes         String?
   generatedById String?
   paidAt        DateTime?
+  /// How the salary was paid (CASH, BANK_TRANSFER, CHEQUE, UPI); picks the ledger account it is paid from.
+  paymentMode   String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -4873,6 +5228,8 @@ model CrmSchool {
   meetings       CrmMeeting[]
   tasks          CrmTask[]
   communications CrmCommunication[]
+  platformEmails PlatformEmail[]
+  photos         CrmPhoto[]
 
   @@index([stage, nextFollowUpAt])
   @@index([ownerId])
@@ -5003,10 +5360,32 @@ model CrmVisit {
   createdBy          User?     @relation("CrmVisitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt          DateTime  @default(now())
 
-  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school CrmSchool  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  photos CrmPhoto[]
 
   @@index([schoolId, visitedAt])
   @@index([visitedAt])
+}
+
+/// A photo taken on a field visit (school front, notice board, prospectus…).
+model CrmPhoto {
+  id           String    @id @default(cuid())
+  schoolId     String
+  visitId      String?
+  storageKey   String    @unique
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  createdById  String?
+  createdLabel String?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  school CrmSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  visit  CrmVisit? @relation(fields: [visitId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([visitId])
 }
 
 model CrmMeeting {
@@ -5111,6 +5490,179 @@ model CrmCommunication {
 
   @@index([schoolId, createdAt])
   @@index([channel, status])
+}
+
+// ---------------------------------------------------------------------------
+// Platform mail: the MyCampusView team's own mailbox (e.g. Hostinger), used
+// from the console to send proposals and correspondence. Platform-only.
+// ---------------------------------------------------------------------------
+
+model PlatformMailbox {
+  id                String    @id @default(cuid())
+  fromName          String
+  fromEmail         String    @unique
+  replyTo           String?
+  username          String
+  /// AES-256-GCM via encryptSecret(). Never returned to a browser.
+  passwordEncrypted String
+  smtpHost          String    @default("smtp.hostinger.com")
+  smtpPort          Int       @default(465)
+  smtpSecure        Boolean   @default(true)
+  /// SMTP, or RESEND (HTTPS API) for hosts that block outbound mail ports.
+  sendVia           String    @default("SMTP")
+  /// AES-256-GCM via encryptSecret(). Falls back to RESEND_API_KEY when empty.
+  resendKeyEncrypted String?
+  imapEnabled       Boolean   @default(true)
+  imapHost          String    @default("imap.hostinger.com")
+  imapPort          Int       @default(993)
+  /// Detected on first successful append; blank until then.
+  sentFolder        String?
+  signatureName     String?
+  signatureTitle    String?
+  signaturePhone    String?
+  signatureWebsite  String?
+  isDefault         Boolean   @default(false)
+  verifiedAt        DateTime?
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  emails    PlatformEmail[]
+  campaigns PlatformCampaign[]
+}
+
+/// One message sent individually to a list of schools, usually from a CSV.
+/// Each recipient gets their own copy, personalised, with an unsubscribe link.
+model PlatformCampaign {
+  id               String    @id @default(cuid())
+  name             String
+  mailboxId        String?
+  subject          String
+  /// Sanitised editor content with {{placeholders}} still in place.
+  bodyHtml         String
+  layout           String    @default("BRANDED")
+  demoButton       Boolean   @default(false)
+  includeSignature Boolean   @default(true)
+  documentIds      String[]
+  /// DRAFT, SENDING, PAUSED, COMPLETED, CANCELLED
+  status           String    @default("DRAFT")
+  sourceFileName   String?
+  lastError        String?
+  actorId          String?
+  actorLabel       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  mailbox    PlatformMailbox?            @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  recipients PlatformCampaignRecipient[]
+
+  @@index([createdAt])
+}
+
+model PlatformCampaignRecipient {
+  id             String    @id @default(cuid())
+  campaignId     String
+  email          String
+  schoolName     String?
+  contactName    String?
+  area           String?
+  crmSchoolId    String?
+  /// PENDING, SENDING, SENT, FAILED, SKIPPED
+  status         String    @default("PENDING")
+  skipReason     String?
+  error          String?
+  messageId      String?
+  /// Opaque, unguessable; identifies the recipient on the public unsubscribe page.
+  token          String    @unique
+  sentAt         DateTime?
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  campaign PlatformCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+  @@index([email])
+}
+
+/// Addresses that asked not to be emailed again. Checked before every bulk send.
+model PlatformUnsubscribe {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  /// LINK (unsubscribe page), ONE_CLICK (mail client button), MANUAL (added by the team)
+  source     String
+  campaignId String?
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+model PlatformEmail {
+  id            String   @id @default(cuid())
+  mailboxId     String?
+  fromName      String
+  fromEmail     String
+  to            String[]
+  cc            String[]
+  bcc           String[]
+  subject       String
+  /// The complete rendered HTML exactly as sent.
+  html          String
+  text          String
+  /// Sanitised editor content, used to start a new draft from this email.
+  bodyHtml      String
+  layout        String   @default("BRANDED")
+  status        String
+  messageId     String?
+  error         String?
+  savedToSent   Boolean  @default(false)
+  sentCopyError String?
+  crmSchoolId   String?
+  actorId       String?
+  actorLabel    String?
+  createdAt     DateTime @default(now())
+
+  mailbox     PlatformMailbox?          @relation(fields: [mailboxId], references: [id], onDelete: SetNull)
+  crmSchool   CrmSchool?                @relation(fields: [crmSchoolId], references: [id], onDelete: SetNull)
+  attachments PlatformEmailAttachment[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([crmSchoolId])
+}
+
+model PlatformEmailAttachment {
+  id         String  @id @default(cuid())
+  emailId    String
+  documentId String?
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  storageKey String
+
+  email    PlatformEmail     @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  document PlatformDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([emailId])
+}
+
+/// Reusable files (proposals, brochures, quotations) attachable in one click.
+model PlatformDocument {
+  id              String    @id @default(cuid())
+  title           String
+  fileName        String
+  mimeType        String
+  sizeBytes       Int
+  storageKey      String    @unique
+  uploadedById    String?
+  uploadedByLabel String?
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  attachments PlatformEmailAttachment[]
+
+  @@index([deletedAt, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -5222,6 +5774,13 @@ model CrmDiscoveryCandidate {
   alternatePhone String?
   email          String?
   website        String?
+  address        String?
+
+  /// 0–100 average of the email, phone and address confidences (missing = 0).
+  contactConfidence Int       @default(0)
+  /// ContactFindings (src/lib/lead-discovery.ts): value, source page and confidence per detail.
+  contactFindings   Json?
+  contactCheckedAt  DateTime?
 
   verificationStatus CrmDiscoveryVerification @default(NEEDS_VERIFICATION)
   confidenceScore    Int                      @default(0)
@@ -5268,4 +5827,694 @@ model CrmDiscoveryEvidence {
 
   @@index([candidateId])
   @@index([url])
+}
+
+// ===========================================================================
+// TALLY.ERP 9 INTEGRATION
+//
+// Cloud never dials the school LAN. The school runs a local Tally Connector
+// (same pairing/command pattern as DeviceConnector) that talks to Tally on
+// localhost:9000 via XML over HTTP and reports results back.
+//
+// DIRECT mode exists only for self-hosted deployments where the app can reach
+// Tally safely — it is off by default and gated by env.
+// ===========================================================================
+
+enum TallyProviderKind {
+  ERP9
+  PRIME
+}
+
+enum TallyConnectionMode {
+  CONNECTOR
+  DIRECT
+}
+
+enum TallyPartyModel {
+  STUDENT_LEDGER
+  CLASS_LEDGER
+  FEE_CATEGORY_LEDGER
+  CUSTOM
+}
+
+enum TallyConnectionHealth {
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  OFFLINE
+  REQUIRES_ATTENTION
+}
+
+enum TallyConnectorStatus {
+  PENDING
+  ONLINE
+  OFFLINE
+  DISABLED
+  REVOKED
+}
+
+enum TallyCommandType {
+  TEST_CONNECTION
+  LIST_COMPANIES
+  FETCH_MASTERS
+  CREATE_LEDGER
+  CREATE_RECEIPT_VOUCHER
+  CREATE_PAYMENT_VOUCHER
+  FETCH_VOUCHERS
+  FETCH_BALANCES
+  RECONCILE
+}
+
+enum TallyCommandStatus {
+  PENDING
+  CLAIMED
+  SUCCEEDED
+  FAILED
+  EXPIRED
+}
+
+enum TallyMappingKind {
+  FEE_HEAD
+  PAYMENT_MODE
+  STUDENT
+  EXPENSE_CATEGORY
+  VENDOR
+  COST_CENTRE
+  VOUCHER_TYPE
+  INCOME_LEDGER
+}
+
+enum TallySyncStatus {
+  PENDING
+  PROCESSING
+  SYNCED
+  FAILED
+  RETRYING
+  REQUIRES_REVIEW
+  SKIPPED
+}
+
+enum TallyEntityKind {
+  FEE_PAYMENT
+  FEE_RECEIPT
+  SCHOOL_EXPENSE
+  LEDGER
+  MASTER
+}
+
+enum TallyReconStatus {
+  MATCHED
+  UNMATCHED_MCV
+  UNMATCHED_TALLY
+  AMOUNT_MISMATCH
+  DATE_MISMATCH
+  LEDGER_MISMATCH
+  DUPLICATE
+  FAILED_SYNC
+  REVIEW
+}
+
+/// One row per school. Holds company, sync flags and accounting model.
+model TallyIntegration {
+  id                  String                @id @default(cuid())
+  tenantId            String                @unique
+  enabled             Boolean               @default(false)
+  provider            TallyProviderKind     @default(ERP9)
+  mode                TallyConnectionMode   @default(CONNECTOR)
+  companyName         String?
+  companyGuid         String?
+  /// DIRECT mode only — never expose to browsers. Prefer private IP / hostname.
+  host                String?
+  port                Int                   @default(9000)
+  timeoutMs           Int                   @default(15000)
+  syncFrequencyMin    Int                   @default(15)
+  autoSyncReceipts    Boolean               @default(true)
+  autoSyncExpenses    Boolean               @default(false)
+  autoCreateLedgers   Boolean               @default(false)
+  autoSyncMasters     Boolean               @default(false)
+  testMode            Boolean               @default(true)
+  partyModel          TallyPartyModel       @default(STUDENT_LEDGER)
+  health              TallyConnectionHealth @default(UNKNOWN)
+  lastConnectionAt    DateTime?
+  lastConnectionError String?
+  lastSyncAt          DateTime?
+  lastMasterSyncAt    DateTime?
+  settingsJson        Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  connectors      TallyConnector[]
+  commands        TallyCommand[]
+  ledgers         TallyLedgerCache[]
+  mappings        TallyMapping[]
+  voucherLinks    TallyVoucherLink[]
+  syncLogs        TallySyncLog[]
+  accountingRules TallyAccountingRule[]
+  reconItems      TallyReconciliationItem[]
+
+  @@index([enabled, health])
+}
+
+model TallyConnector {
+  id            String               @id @default(cuid())
+  tenantId      String
+  integrationId String
+  name          String
+  connectorKey  String               @unique
+  secretHash    String
+  secretPrefix  String
+  status        TallyConnectorStatus @default(PENDING)
+  enabled       Boolean              @default(true)
+  version       String?
+  hostname      String?
+  osInfo        String?
+  tallyHost     String               @default("127.0.0.1")
+  tallyPort     Int                  @default(9000)
+  pendingJobs   Int                  @default(0)
+  lastSeenAt    DateTime?
+  pairedAt      DateTime?
+  revokedAt     DateTime?
+  createdById   String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  commands    TallyCommand[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, lastSeenAt])
+  @@index([integrationId])
+}
+
+model TallyPairingCode {
+  id                String    @id @default(cuid())
+  tenantId          String
+  codeHash          String    @unique
+  codeDisplay       String
+  connectorName     String?
+  expiresAt         DateTime
+  usedAt            DateTime?
+  usedByConnectorId String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+
+  @@index([tenantId, expiresAt])
+}
+
+model TallyCommand {
+  id             String             @id @default(cuid())
+  tenantId       String
+  integrationId  String
+  connectorId    String?
+  type           TallyCommandType
+  payload        Json?
+  status         TallyCommandStatus @default(PENDING)
+  /// schoolId + entity + voucher type — prevents duplicate Tally posts
+  idempotencyKey String?
+  resultJson     Json?
+  error          String?
+  errorCode      String?
+  attempts       Int                @default(0)
+  maxAttempts    Int                @default(5)
+  runAfter       DateTime           @default(now())
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  claimedAt      DateTime?
+  completedAt    DateTime?
+  expiresAt      DateTime?
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  connector   TallyConnector?  @relation(fields: [connectorId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, runAfter])
+  @@index([connectorId, status, createdAt])
+  @@index([integrationId, type, status])
+}
+
+/// Snapshot of ledgers/groups imported from Tally (read cache, not source of truth).
+model TallyLedgerCache {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  integrationId       String
+  name                String
+  parent              String?
+  guid                String?
+  isParty             Boolean  @default(false)
+  isRevenue           Boolean  @default(false)
+  closingBalanceMinor Int?
+  rawJson             Json?
+  syncedAt            DateTime @default(now())
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, integrationId, name])
+  @@index([tenantId, parent])
+  @@index([integrationId, isParty])
+}
+
+model TallyMapping {
+  id              String           @id @default(cuid())
+  tenantId        String
+  integrationId   String
+  kind            TallyMappingKind
+  /// FeeHead.id / PaymentMode enum / Student.id / ExpenseCategory / etc.
+  localKey        String
+  localLabel      String?
+  tallyLedgerName String
+  tallyGuid       String?
+  tallyParent     String?
+  active          Boolean          @default(true)
+  autoMatched     Boolean          @default(false)
+  matchScore      Int?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, integrationId, kind, localKey])
+  @@index([tenantId, kind, active])
+}
+
+/// Links a MyCampusView money entity to a Tally voucher (idempotent).
+model TallyVoucherLink {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  integrationId      String
+  entityKind         TallyEntityKind
+  entityId           String
+  idempotencyKey     String
+  status             TallySyncStatus @default(PENDING)
+  voucherType        String?
+  tallyVoucherNumber String?
+  tallyMasterId      String?
+  amountMinor        Int?
+  voucherDate        DateTime?       @db.Date
+  previewJson        Json?
+  lastError          String?
+  lastErrorCode      String?
+  attempts           Int             @default(0)
+  lastSyncedAt       DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, entityKind, entityId])
+  @@index([tenantId, status])
+  @@index([integrationId, status, updatedAt])
+}
+
+model TallyAccountingRule {
+  id                String       @id @default(cuid())
+  tenantId          String
+  integrationId     String
+  name              String
+  /// When set, applies to this PaymentMode; null = default receipt rule.
+  paymentMode       PaymentMode?
+  feeHeadId         String?
+  debitLedgerName   String
+  creditLedgerName  String?
+  voucherType       String       @default("Receipt")
+  narrationTemplate String?
+  active            Boolean      @default(true)
+  sortOrder         Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, integrationId, name])
+  @@index([tenantId, paymentMode, active])
+}
+
+model TallySyncLog {
+  id            String          @id @default(cuid())
+  tenantId      String
+  integrationId String
+  userId        String?
+  operation     String
+  entityKind    String?
+  entityId      String?
+  correlationId String
+  status        TallySyncStatus
+  httpStatus    Int?
+  errorCode     String?
+  errorMessage  String?
+  /// Sanitized / truncated — never store secrets or full PII dumps.
+  detailJson    Json?
+  durationMs    Int?
+  createdAt     DateTime        @default(now())
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([integrationId, status, createdAt])
+  @@index([correlationId])
+}
+
+model TallyReconciliationItem {
+  id               String           @id @default(cuid())
+  tenantId         String
+  integrationId    String
+  runId            String
+  status           TallyReconStatus
+  mcvEntityKind    TallyEntityKind?
+  mcvEntityId      String?
+  mcvAmountMinor   Int?
+  mcvDate          DateTime?        @db.Date
+  tallyVoucherNo   String?
+  tallyAmountMinor Int?
+  tallyDate        DateTime?        @db.Date
+  notes            String?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  createdAt        DateTime         @default(now())
+
+  integration TallyIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, runId, status])
+  @@index([integrationId, status])
+}
+
+// ===========================================================================
+// ACCOUNTS & LEDGER (internal double-entry books)
+// ===========================================================================
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum JournalVoucherType {
+  JOURNAL
+  RECEIPT
+  PAYMENT
+  CONTRA
+}
+
+enum JournalSourceType {
+  MANUAL
+  FEE_PAYMENT
+  FEE_REFUND
+  EXPENSE
+  STORE_SALE
+  STORE_PURCHASE
+  STORE_STOCK
+  PAYROLL
+}
+
+enum LedgerMapKind {
+  FEE_HEAD
+  PAYMENT_MODE
+  EXPENSE_CATEGORY
+}
+
+/// Chart of accounts. Opening balance is signed: positive = Debit, negative = Credit.
+model LedgerAccount {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  code                String
+  name                String
+  type                LedgerAccountType
+  description         String?
+  openingBalanceMinor Int               @default(0)
+  /// Stable key for accounts the posting engine relies on (CASH, BANK, ...).
+  systemKey           String?
+  isActive            Boolean           @default(true)
+  /// Expense accounts only: drives the direct / indirect split in P&L.
+  expenseNature       ExpenseNature?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  lines        JournalLine[]
+  expenseHeads ExpenseHead[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, systemKey])
+  @@index([tenantId, type])
+}
+
+/// A balanced voucher. Posted entries are never edited; corrections post a reversal.
+model JournalEntry {
+  id             String             @id @default(cuid())
+  tenantId       String
+  number         String
+  voucherType    JournalVoucherType @default(JOURNAL)
+  date           DateTime           @db.Date
+  reference      String?
+  narration      String?
+  sourceType     JournalSourceType  @default(MANUAL)
+  sourceId       String?
+  /// Makes automatic posting idempotent, e.g. FEE_PAYMENT:<id>:v1.
+  postingKey     String?
+  totalMinor     Int
+  isReversal     Boolean            @default(false)
+  reversalOfId   String?
+  reversedAt     DateTime?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime           @default(now())
+
+  lines JournalLine[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, postingKey])
+  @@index([tenantId, date])
+  @@index([tenantId, sourceType, sourceId])
+}
+
+model JournalLine {
+  id          String  @id @default(cuid())
+  tenantId    String
+  entryId     String
+  accountId   String
+  debitMinor  Int     @default(0)
+  creditMinor Int     @default(0)
+  memo        String?
+
+  entry   JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, accountId])
+  @@index([entryId])
+}
+
+/// Which ledger account a fee head, payment mode or expense category posts to.
+model LedgerAccountMap {
+  id        String        @id @default(cuid())
+  tenantId  String
+  kind      LedgerMapKind
+  localKey  String
+  accountId String
+  updatedAt DateTime      @updatedAt
+
+  @@unique([tenantId, kind, localKey])
+}
+
+model LedgerSettings {
+  id               String    @id @default(cuid())
+  tenantId         String    @unique
+  autoPostFees     Boolean   @default(true)
+  autoPostExpenses Boolean   @default(true)
+  autoPostStore    Boolean   @default(true)
+  lastSyncedAt     DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+// ===========================================================================
+// DAILY OPERATIONS: SUBSTITUTIONS, GATE PASSES, PARENT WHATSAPP ASSISTANT
+// ===========================================================================
+
+enum SubstitutionStatus {
+  OPEN
+  ASSIGNED
+  CANCELLED
+}
+
+/// Cover for one lesson on one date while its teacher is away. OPEN rows are
+/// lessons still needing someone; ASSIGNED rows name the substitute.
+model Substitution {
+  id              String             @id @default(cuid())
+  tenantId        String
+  onDate          DateTime           @db.Date
+  sectionId       String
+  periodId        String
+  classSubjectId  String?
+  absentTeacherId String
+  substituteId    String?
+  status          SubstitutionStatus @default(OPEN)
+  /// LEAVE | ABSENT | MANUAL
+  reason          String?
+  note            String?
+  notifiedAt      DateTime?
+  assignedById    String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  section       Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  period        TimetablePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  classSubject  ClassSubject?   @relation(fields: [classSubjectId], references: [id], onDelete: SetNull)
+  absentTeacher Staff           @relation("SubstitutionAbsent", fields: [absentTeacherId], references: [id], onDelete: Cascade)
+  substitute    Staff?          @relation("SubstitutionCover", fields: [substituteId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, onDate, sectionId, periodId])
+  @@index([tenantId, onDate])
+  @@index([tenantId, substituteId, onDate])
+}
+
+enum GatePassStatus {
+  AWAITING_OTP
+  APPROVED
+  EXITED
+  CANCELLED
+}
+
+/// A student leaving before the end of the day. The desk raises it, the
+/// collector is verified (guardian OTP or in person), the gate scans it out
+/// and the parents are told.
+model GatePass {
+  id               String         @id @default(cuid())
+  tenantId         String
+  passNumber       String
+  /// Unguessable value the QR code carries.
+  token            String         @unique
+  studentId        String
+  reason           String
+  pickupName       String
+  pickupRelation   String?
+  pickupPhone      String?
+  guardianId       String?
+  /// OTP | IN_PERSON
+  verification     String?
+  otpHash          String?
+  otpExpiresAt     DateTime?
+  otpAttempts      Int            @default(0)
+  otpSentTo        String?
+  status           GatePassStatus @default(AWAITING_OTP)
+  issuedById       String?
+  issuedByLabel    String?
+  approvedAt       DateTime?
+  exitedAt         DateTime?
+  exitedByLabel    String?
+  parentNotifiedAt DateTime?
+  cancelReason     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Parent? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, passNumber])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, studentId])
+}
+
+enum ParentQueryStatus {
+  OPEN
+  RESOLVED
+}
+
+/// A question a parent sent to the WhatsApp assistant that needs a person.
+model ParentQuery {
+  id          String            @id @default(cuid())
+  tenantId    String
+  parentId    String?
+  studentId   String?
+  phone       String
+  senderName  String?
+  message     String
+  status      ParentQueryStatus @default(OPEN)
+  reply       String?
+  repliedAt   DateTime?
+  repliedById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  parent  Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, createdAt])
+}
+
+/// Where a phone number is in its WhatsApp assistant conversation. Keyed by
+/// the last ten digits because one shared business number serves every
+/// school; the school and child it has picked are remembered here.
+model WhatsAppBotSession {
+  phone         String   @id
+  schoolTenant  String?
+  studentId     String?
+  /// What the next free-text message means: null = a menu choice,
+  /// SCHOOL / CHILD = picking from a list, QUERY = a message for the office.
+  awaiting      String?
+  lastInboundAt DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===========================================================================
+// CCTV (live view through a relay on the school's own PC)
+// ===========================================================================
+
+/// One per school. Video never passes through MyCampusView: the relay on the
+/// school PC serves it and only checks the short-lived tokens we sign. The
+/// recorder password is never stored here.
+model CctvSite {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  name                String   @default("School CCTV")
+  enabled             Boolean  @default(false)
+  /// Public https address of the relay (the Cloudflare tunnel), no trailing slash.
+  streamBaseUrl       String?
+  nvrHost             String?
+  nvrPort             Int      @default(554)
+  nvrUsername         String?
+  parentAccessEnabled Boolean  @default(false)
+  /// "HH:mm" in India time.
+  parentStart         String   @default("08:00")
+  parentEnd           String   @default("14:00")
+  /// 1 = Monday … 7 = Sunday.
+  parentDays          Int[]    @default([1, 2, 3, 4, 5, 6])
+  /// SHA-256 of the relay app's connection key; the key itself is shown once.
+  relayKeyHash        String?
+  relayKeyHint        String?
+  relayKeyCreatedAt   DateTime?
+  relayLastSeenAt     DateTime?
+  relayAppVersion     String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  cameras CctvCamera[]
+}
+
+enum CctvZone {
+  GENERAL
+  GATE
+  CLASSROOM
+}
+
+model CctvCamera {
+  id        String   @id @default(cuid())
+  tenantId  String
+  siteId    String
+  name      String
+  /// Recorder channel number (1-based).
+  channel   Int
+  zone      CctvZone @default(GENERAL)
+  sectionId String?
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site    CctvSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  section Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, channel])
+  @@index([tenantId, zone])
+  @@index([tenantId, sectionId])
 }

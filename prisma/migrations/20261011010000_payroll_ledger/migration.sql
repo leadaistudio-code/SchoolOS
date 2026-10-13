@@ -1,0 +1,2 @@
+ALTER TYPE "JournalSourceType" ADD VALUE IF NOT EXISTS 'PAYROLL';
+ALTER TABLE "StaffPayslip" ADD COLUMN "paymentMode" TEXT;

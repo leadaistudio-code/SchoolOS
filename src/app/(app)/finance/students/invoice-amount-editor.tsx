@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
@@ -32,6 +33,7 @@ export function EditableInvoiceAmounts({
   canEdit: boolean
   onSaved?: () => void
 }) {
+  const router = useRouter()
   const toast = useToast()
   const [pendingId, setPendingId] = React.useState<string | null>(null)
   const [drafts, setDrafts] = React.useState<Record<string, string>>(() =>
@@ -83,6 +85,7 @@ export function EditableInvoiceAmounts({
       if (result.ok) {
         setReasons((prev) => ({ ...prev, [invoice.id]: '' }))
         onSaved?.()
+        router.refresh()
       }
     })()
   }

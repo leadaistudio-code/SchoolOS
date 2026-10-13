@@ -38,6 +38,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['promote', 'Promote / transfer'],
     ['documents', 'Manage documents'],
     ['id_cards', 'Create and print student ID cards'],
+    ['tc', 'Issue and cancel transfer certificates'],
   ]),
   ...mod('parents', [...CRUD, ['export', 'Export']]),
   ...mod('staff', [
@@ -46,6 +47,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['payroll', 'View payroll data'],
     ['payroll_manage', 'Set salaries and run payroll'],
     ['appraise', 'Run appraisals and record performance'],
+    ['id_cards', 'Create and print staff ID cards'],
   ]),
 
   ...mod('assessments', [
@@ -74,6 +76,7 @@ export const PERMISSIONS: PermissionDef[] = [
   ...mod('timetable', [
     ['view', 'View timetable'],
     ['manage', 'Manage timetable'],
+    ['substitute', 'Arrange substitute teachers for absent staff'],
   ]),
   ...mod('homework', [...CRUD, ['review', 'Review submissions'], ['submit', 'Submit homework']]),
   ...mod('classwork', [...CRUD]),
@@ -122,6 +125,13 @@ export const PERMISSIONS: PermissionDef[] = [
     ['settings', 'Manage advanced fee settings'],
     ['owner_analytics', 'View fee projections and billing simulations'],
     ['export', 'Export finance data'],
+    ['tally', 'View Tally sync status, mappings and reconciliation'],
+    ['tally_manage', 'Configure Tally mappings, rules and trigger sync'],
+  ]),
+
+  ...mod('accounts', [
+    ['view', 'View chart of accounts, journals, ledgers and financial statements'],
+    ['manage', 'Create accounts, post manual journal vouchers and change posting rules'],
   ]),
 
   ...mod('expenses', [
@@ -154,6 +164,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['view', 'View messages'],
     ['send', 'Send messages'],
     ['broadcast', 'Broadcast to audiences'],
+    ['parent_queries', 'Read and answer parent WhatsApp queries'],
   ]),
 
   ...mod('feedback', [
@@ -193,9 +204,23 @@ export const PERMISSIONS: PermissionDef[] = [
     ['issue', 'Issue and return books'],
   ]),
   ...mod('inventory', [['view', 'View assets'], ['manage', 'Manage assets']]),
+  ...mod('store', [
+    ['view', 'View school store stock and sales'],
+    ['sell', 'Sell items at the store counter'],
+    ['manage', 'Add items, receive stock and adjust quantities'],
+    ['void', 'Cancel store bills and return stock'],
+  ]),
   ...mod('frontoffice', [
     ['view', 'View front office'],
     ['manage', 'Manage visitors and appointments'],
+    ['gatepass', 'Issue student gate passes and verify pickups'],
+    ['gate', 'Scan students out at the gate'],
+  ]),
+  ...mod('cctv', [
+    ['view_all', 'Watch every CCTV camera live'],
+    ['view_gate', 'Watch the gate and entrance cameras live'],
+    ['view_child', 'Watch their own child’s classroom camera during allowed hours'],
+    ['manage', 'Connect the recorder and set up cameras'],
   ]),
   ...mod('admissions', [
     ['view', 'View admission leads'],
@@ -224,7 +249,7 @@ export const PERMISSIONS: PermissionDef[] = [
   // The in-app assistant. A separate right from the records it reads: holding
   // it grants no data access on its own, because every assistant tool re-checks
   // the permission for the module it reads (see server/assistant/tools.ts).
-  ...mod('assistant', [['use', 'Ask the school assistant']]),
+  ...mod('assistant', [['use', 'Ask Me can answer']]),
 
   ...mod('settings', [
     ['view', 'View settings'],

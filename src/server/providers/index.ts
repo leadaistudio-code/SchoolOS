@@ -382,8 +382,17 @@ export function gupshupPayload(input: {
   return body
 }
 
+/**
+ * Gupshup serves templates and free-form session text from different paths;
+ * text posted to `/template/msg` is rejected.
+ */
+export function gupshupEndpoint(configured: string, isTemplate: boolean): string {
+  if (isTemplate) return configured
+  return configured.replace(/\/template\/msg\/?$/, '/msg')
+}
+
 function gupshupWhatsApp(apiKey: string, appName: string, source: string): WhatsAppProvider {
-  const endpoint = env().GUPSHUP_API_URL
+  const configured = env().GUPSHUP_API_URL
 
   return {
     name: 'gupshup',
@@ -392,7 +401,7 @@ function gupshupWhatsApp(apiKey: string, appName: string, source: string): Whats
       if (!to) return { ok: false, error: 'No recipient number' }
 
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(gupshupEndpoint(configured, !!message.templateName), {
           method: 'POST',
           headers: {
             apikey: apiKey,

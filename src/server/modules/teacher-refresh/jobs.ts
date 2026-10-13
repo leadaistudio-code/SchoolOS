@@ -320,6 +320,7 @@ function systemContext(tenant: {
     isSuperAdmin: false,
     firstName: 'System',
     lastName: '',
+    displayName: null,
     email: null,
     phone: null,
     avatarUrl: null,

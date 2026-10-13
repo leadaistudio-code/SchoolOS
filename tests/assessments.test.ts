@@ -164,10 +164,10 @@ describe('assessment wiring', () => {
     }
   })
 
-  it('gives teachers the papers they set', () => {
+  it('gives teachers the papers they set, but not the approval of them', () => {
     const teacher = SYSTEM_ROLES.find((r) => r.key === ROLE.TEACHER)
     expect(teacher?.permissions).toContain('assessments.create')
-    expect(teacher?.permissions).toContain('assessments.approve')
+    expect(teacher?.permissions).not.toContain('assessments.approve')
   })
 
   it('lets a student sit a paper and nothing else', () => {

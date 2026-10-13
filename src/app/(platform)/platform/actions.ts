@@ -19,7 +19,7 @@ import {
   voidInvoice,
 } from '@/server/modules/platform/billing'
 import { replyPlatformTicket, updatePlatformTicket } from '@/server/modules/platform/support'
-import { startImpersonation } from '@/server/modules/platform/impersonation'
+import { startImpersonation, enterSchoolAsSupport } from '@/server/modules/platform/impersonation'
 import {
   entitlementOverrideSchema,
   generateInvoiceSchema,
@@ -190,5 +190,11 @@ export async function replyTicketAction(id: string, formData: FormData) {
 export async function impersonateAction(tenantId: string, userId: string) {
   const ctx = await requirePlatformContext('platform.impersonate')
   const result = await startImpersonation(ctx, { tenantId, userId })
+  redirect(result.redirectTo)
+}
+
+export async function enterAsSupportAction(tenantId: string) {
+  const ctx = await requirePlatformContext('platform.impersonate')
+  const result = await enterSchoolAsSupport(ctx, tenantId)
   redirect(result.redirectTo)
 }

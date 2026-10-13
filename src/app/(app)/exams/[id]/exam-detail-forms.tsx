@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useTransition } from 'react'
+import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { addExamPaperAction, updateExamMetaAction, updateExamPapersAction, deleteExamAction } from '../actions'
@@ -14,6 +14,8 @@ type Paper = {
   id: string
   maxMarks: number
   passMarks: number
+  internalMaxMarks: number | null
+  oralMaxMarks: number | null
   examDate: Date | string | null
   startTime: string | null
   endTime: string | null
@@ -22,6 +24,99 @@ type Paper = {
     classLevel: { name: string }
     subject: { name: string; code: string }
   }
+}
+
+type ComponentChoice = '' | 'INTERNAL' | 'ORAL' | 'INTERNAL,ORAL'
+
+/**
+ * Written marks plus the optional Internal and Oral parts. Neither part is
+ * required; picking one in the dropdown reveals its maximum marks field.
+ */
+function PaperMarksFields({
+  suffix = '',
+  defaults,
+  disabled,
+  error,
+}: {
+  suffix?: string
+  defaults?: { maxMarks: number; internalMaxMarks: number | null; oralMaxMarks: number | null }
+  disabled?: boolean
+  error?: string
+}) {
+  const initialInternal = defaults?.internalMaxMarks ?? null
+  const initialOral = defaults?.oralMaxMarks ?? null
+  const [choice, setChoice] = useState<ComponentChoice>(
+    initialInternal && initialOral ? 'INTERNAL,ORAL' : initialInternal ? 'INTERNAL' : initialOral ? 'ORAL' : '',
+  )
+  const [written, setWritten] = useState(String(defaults ? defaults.maxMarks - (initialInternal ?? 0) - (initialOral ?? 0) : 100))
+  const [internal, setInternal] = useState(String(initialInternal ?? 20))
+  const [oral, setOral] = useState(String(initialOral ?? 10))
+  const hasInternal = choice.includes('INTERNAL')
+  const hasOral = choice.includes('ORAL')
+  const total = (Number(written) || 0) + (hasInternal ? Number(internal) || 0 : 0) + (hasOral ? Number(oral) || 0 : 0)
+
+  return (
+    <>
+      <Field label={choice ? 'Written / theory marks' : 'Max marks'} htmlFor={`writtenMaxMarks${suffix}`} required error={error}>
+        <Input
+          id={`writtenMaxMarks${suffix}`}
+          name={`writtenMaxMarks${suffix}`}
+          type="number"
+          step="0.5"
+          min={0}
+          max={1000}
+          value={written}
+          onChange={(e) => setWritten(e.target.value)}
+          required
+          disabled={disabled}
+        />
+      </Field>
+      <Field label="Additional marks (optional)" htmlFor={`components${suffix}`} hint={choice ? `Paper total: ${total}` : 'Add internal assessment or oral marks'}>
+        <Select
+          id={`components${suffix}`}
+          name={`components${suffix}`}
+          value={choice}
+          onChange={(e) => setChoice(e.target.value as ComponentChoice)}
+          disabled={disabled}
+        >
+          <option value="">None</option>
+          <option value="INTERNAL">Internal marks</option>
+          <option value="ORAL">Oral marks</option>
+          <option value="INTERNAL,ORAL">Internal + Oral marks</option>
+        </Select>
+      </Field>
+      {hasInternal ? (
+        <Field label="Internal max marks" htmlFor={`internalMaxMarks${suffix}`}>
+          <Input
+            id={`internalMaxMarks${suffix}`}
+            name={`internalMaxMarks${suffix}`}
+            type="number"
+            step="0.5"
+            min={0}
+            max={1000}
+            value={internal}
+            onChange={(e) => setInternal(e.target.value)}
+            disabled={disabled}
+          />
+        </Field>
+      ) : null}
+      {hasOral ? (
+        <Field label="Oral max marks" htmlFor={`oralMaxMarks${suffix}`}>
+          <Input
+            id={`oralMaxMarks${suffix}`}
+            name={`oralMaxMarks${suffix}`}
+            type="number"
+            step="0.5"
+            min={0}
+            max={1000}
+            value={oral}
+            onChange={(e) => setOral(e.target.value)}
+            disabled={disabled}
+          />
+        </Field>
+      ) : null}
+    </>
+  )
 }
 
 function toDateInput(value: Date | string | null) {
@@ -116,20 +211,13 @@ export function ExamPapersForm({ examId, papers, locked }: { examId: string; pap
               <span className="ml-2 text-xs text-ink-muted">{paper.classSubject.subject.code}</span>
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Max marks" htmlFor={`maxMarks-${index}`} required>
-                <Input
-                  id={`maxMarks-${index}`}
-                  name={`maxMarks-${index}`}
-                  type="number"
-                  step="0.5"
-                  min={1}
-                  max={1000}
-                  defaultValue={paper.maxMarks}
-                  required
-                  disabled={locked}
-                />
-              </Field>
-              <Field label="Pass marks" htmlFor={`passMarks-${index}`} required>
+              <PaperMarksFields
+                suffix={`-${index}`}
+                defaults={paper}
+                disabled={locked}
+                error={state.fieldErrors[`papers.${index}.maxMarks`]}
+              />
+              <Field label="Pass marks (of total)" htmlFor={`passMarks-${index}`} required error={state.fieldErrors[`papers.${index}.passMarks`]}>
                 <Input
                   id={`passMarks-${index}`}
                   name={`passMarks-${index}`}
@@ -247,10 +335,8 @@ export function AddExamPaperForm({
             ))}
           </Select>
         </Field>
-        <Field label="Max marks" htmlFor="maxMarks" required error={state.fieldErrors.maxMarks}>
-          <Input id="maxMarks" name="maxMarks" type="number" step="0.5" min={1} max={1000} defaultValue={100} required />
-        </Field>
-        <Field label="Pass marks" htmlFor="passMarks" required error={state.fieldErrors.passMarks}>
+        <PaperMarksFields error={state.fieldErrors.maxMarks} />
+        <Field label="Pass marks (of total)" htmlFor="passMarks" required error={state.fieldErrors.passMarks}>
           <Input id="passMarks" name="passMarks" type="number" step="0.5" min={0} max={1000} defaultValue={33} required />
         </Field>
         <Field label="Room" htmlFor="roomName">

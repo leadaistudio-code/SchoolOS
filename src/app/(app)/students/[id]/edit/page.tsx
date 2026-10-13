@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { StudentForm } from '../../student-form'
 import { updateStudentAction } from '../../actions'
 import { fullName } from '@/lib/utils'
+import { parentNamesFor } from '@/server/modules/students/parent-names'
 
 export const metadata = { title: 'Edit student' }
 
@@ -18,6 +19,7 @@ export default async function EditStudentPage({
   const [student, classes] = await Promise.all([getStudent(ctx, id), getClassOptions(ctx)])
 
   const current = student.enrollments.find((e) => e.isCurrent)
+  const parents = parentNamesFor(student.guardians)
   const action = updateStudentAction.bind(null, id)
 
   return (
@@ -39,6 +41,16 @@ export default async function EditStudentPage({
           gender: student.gender ?? undefined,
           bloodGroup: student.bloodGroup ?? undefined,
           category: student.category ?? undefined,
+          religion: student.religion ?? undefined,
+          nationality: student.nationality ?? undefined,
+          motherTongue: student.motherTongue ?? undefined,
+          caste: student.caste ?? undefined,
+          aadhaarNo: student.aadhaarNo ?? undefined,
+          birthPlace: student.birthPlace ?? undefined,
+          identificationMark: student.identificationMark ?? undefined,
+          disability: student.disability ?? undefined,
+          house: student.house ?? undefined,
+          whatsappPhone: student.whatsappPhone ?? undefined,
           admissionDate: student.admissionDate
             ? formatDay(student.admissionDate, 'yyyy-MM-dd')
             : undefined,
@@ -56,6 +68,8 @@ export default async function EditStudentPage({
           medicalNotes: student.medicalNotes ?? undefined,
           allergies: student.allergies ?? undefined,
           status: student.status,
+          fatherName: parents.fatherName,
+          motherName: parents.motherName,
         }}
       />
     </div>

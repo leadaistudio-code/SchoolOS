@@ -16,7 +16,7 @@ export function TableWrap({
   return (
     <div
       className={cn(
-        'w-full overflow-x-auto scroll-thin',
+        'relative w-full overflow-x-auto scroll-thin',
         sticky && 'max-h-[70vh] overflow-y-auto',
         className,
       )}

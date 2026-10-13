@@ -6,6 +6,7 @@ import {
   listStudentsForFeeOption,
 } from '@/server/modules/finance/service'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { OptionalFeesPanel } from './optional-fees-panel'
@@ -35,6 +36,18 @@ export default async function OptionalFeesPage({
         sectionId: sectionId || undefined,
       })
     : { optedStudentIds: [], students: [] }
+  const billedIn = selectedFeeHeadId
+    ? await ctx.db.feeStructureItem.findMany({
+        where: {
+          feeHeadId: selectedFeeHeadId,
+          isOptional: true,
+          structure: { deletedAt: null, session: { isCurrent: true } },
+        },
+        select: { structure: { select: { id: true, name: true } } },
+        orderBy: { structure: { name: 'asc' } },
+      })
+    : []
+  const selectedHead = feeHeads.find((head) => head.id === selectedFeeHeadId)
 
   return (
     <div className="space-y-4">
@@ -43,6 +56,7 @@ export default async function OptionalFeesPage({
         description="Mark students who take add-ons like Computer Science. They stay in their normal section and get one invoice with the extra line."
         actions={
           <>
+            <BackButton fallbackHref="/finance/structures" />
             <Link
               href="/finance/structures"
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
@@ -77,6 +91,31 @@ export default async function OptionalFeesPage({
           />
         </CardContent>
       </Card>
+
+      {billedIn.length > 0 && selectedHead ? (
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <p className="text-sm text-ink">
+              Invoice generation and due dates for {selectedHead.name}
+            </p>
+            <p className="text-xs text-ink-muted">
+              Optional fees are billed on the schedule of the structure they belong to. Change the
+              dates there, including for invoices already generated.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {billedIn.map(({ structure }) => (
+                <Link
+                  key={structure.id}
+                  href={`/finance/structures/${structure.id}/dates`}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  Billing dates · {structure.name}
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

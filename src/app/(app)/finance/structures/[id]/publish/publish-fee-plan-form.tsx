@@ -17,15 +17,17 @@ export function PublishFeePlanForm({
   structure,
   sections,
   currency,
+  nonClass = false,
 }: {
   structure: { id: string; name: string; className: string; totalMinor: number }
   sections: { id: string; name: string }[]
   currency: string
+  nonClass?: boolean
 }) {
   const router = useRouter()
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
-  const [assignment, setAssignment] = React.useState<Assignment>('CLASS')
+  const [assignment, setAssignment] = React.useState<Assignment>(nonClass ? 'SELECTED' : 'CLASS')
   const [sectionId, setSectionId] = React.useState('')
   const [students, setStudents] = React.useState<Student[]>([])
   const [studentIds, setStudentIds] = React.useState<string[]>([])
@@ -36,9 +38,14 @@ export function PublishFeePlanForm({
   }
 
   const preview = () => startTransition(async () => {
+    const previewAssignment = nonClass
+      ? 'SELECTED'
+      : assignment === 'SELECTED'
+        ? 'CLASS'
+        : assignment
     const result = await previewFeeAssignmentAction({
       structureId: structure.id,
-      assignment: assignment === 'SELECTED' ? 'CLASS' : assignment,
+      assignment: previewAssignment,
       sectionId: sectionId || undefined,
     })
     if (!result.ok) {
@@ -47,26 +54,27 @@ export function PublishFeePlanForm({
     }
     const next = (result.data as { students: Student[] }).students
     setStudents(next)
-    setStudentIds(assignment === 'SELECTED' ? [] : next.map((student) => student.id))
+    setStudentIds(assignment === 'SELECTED' || nonClass ? [] : next.map((student) => student.id))
   })
 
   const publish = () => startTransition(async () => {
     const result = await publishFeePlanAction({
       structureId: structure.id,
-      assignment,
+      assignment: nonClass ? 'SELECTED' : assignment,
       sectionId: sectionId || undefined,
-      studentIds: assignment === 'SELECTED' ? studentIds : undefined,
+      studentIds: assignment === 'SELECTED' || nonClass ? studentIds : undefined,
     })
     if (!result.ok) {
       toast.push({ tone: 'error', title: 'Fee structure not published', description: result.message })
       return
     }
     toast.push({ tone: 'success', title: 'Fee structure published', description: result.message })
-    router.push('/finance/structures')
+    router.push(nonClass ? '/finance/non-class-fees' : '/finance/structures')
     router.refresh()
   })
 
-  const selectedCount = assignment === 'SELECTED' ? studentIds.length : students.length
+  const picking = assignment === 'SELECTED' || nonClass
+  const selectedCount = picking ? studentIds.length : students.length
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -75,7 +83,9 @@ export function PublishFeePlanForm({
           <div>
             <CardTitle>Choose students</CardTitle>
             <p className="mt-0.5 text-sm text-ink-muted">
-              Preview the students before publishing. Invoices are created only for this selection.
+              {nonClass
+                ? 'Non class linked fees are billed only to the students you select.'
+                : 'Preview the students before publishing. Invoices are created only for this selection.'}
             </p>
           </div>
         </CardHeader>
@@ -84,19 +94,20 @@ export function PublishFeePlanForm({
             <Field label="Assign to" htmlFor="publish-assignment">
               <Select
                 id="publish-assignment"
-                value={assignment}
+                value={nonClass ? 'SELECTED' : assignment}
+                disabled={nonClass}
                 onChange={(event) => {
                   setAssignment(event.target.value as Assignment)
                   setSectionId('')
                   clearPreview()
                 }}
               >
-                <option value="CLASS">Entire class</option>
-                <option value="SECTION">Specific section</option>
+                {!nonClass ? <option value="CLASS">Entire class</option> : null}
+                {!nonClass ? <option value="SECTION">Specific section</option> : null}
                 <option value="SELECTED">Selected students</option>
               </Select>
             </Field>
-            {assignment === 'SECTION' ? (
+            {assignment === 'SECTION' && !nonClass ? (
               <Field label="Section" htmlFor="publish-section" required>
                 <Select
                   id="publish-section"
@@ -130,7 +141,7 @@ export function PublishFeePlanForm({
                 <p className="text-sm font-medium text-ink">
                   {selectedCount} of {students.length} students selected
                 </p>
-                {assignment === 'SELECTED' ? (
+                {picking ? (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -145,7 +156,7 @@ export function PublishFeePlanForm({
               <ul className="max-h-80 divide-y divide-[var(--border)] overflow-y-auto">
                 {students.map((student) => (
                   <li key={student.id} className="flex items-center gap-3 px-3.5 py-2.5">
-                    {assignment === 'SELECTED' ? (
+                    {picking ? (
                       <Checkbox
                         checked={studentIds.includes(student.id)}
                         onChange={() => setStudentIds((current) =>
@@ -174,7 +185,9 @@ export function PublishFeePlanForm({
       <aside className="space-y-3 lg:sticky lg:top-4">
         <div className="rounded-[var(--radius)] border border-line bg-surface p-4">
           <p className="font-semibold text-ink">{structure.name}</p>
-          <p className="mt-0.5 text-sm text-ink-muted">{structure.className}</p>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {nonClass ? 'Not linked to a class' : structure.className}
+          </p>
           <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-3">
             <span className="text-sm text-ink-muted">Annual fee</span>
             <span className="text-lg font-semibold text-ink tnum">

@@ -1,10 +1,9 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireContext } from '@/server/context'
 import { getClassTree } from '@/server/modules/academics/service'
 import { listStructures } from '@/server/modules/finance/service'
 import { PageHeader } from '@/components/page-header'
-import { buttonVariants } from '@/components/ui/button-variants'
+import { BackButton } from '@/components/back-button'
 import { PublishFeePlanForm } from './publish-fee-plan-form'
 
 export const metadata = { title: 'Publish fee structure' }
@@ -22,6 +21,7 @@ export default async function PublishFeeStructurePage({
   ])
   const structure = structures.find((item) => item.id === id)
   if (!structure || structure.status !== 'DRAFT') notFound()
+  const nonClass = !structure.classLevelId
   const selectedClass = classes.find((item) => item.id === structure.classLevelId)
 
   return (
@@ -30,12 +30,9 @@ export default async function PublishFeeStructurePage({
         title="Publish fee structure"
         description="Confirm who should receive this fee plan before invoices are created."
         actions={
-          <Link
-            href="/finance/structures"
-            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-          >
-            Back to structures
-          </Link>
+          <BackButton
+            fallbackHref={nonClass ? '/finance/non-class-fees' : '/finance/structures'}
+          />
         }
       />
       <PublishFeePlanForm
@@ -50,6 +47,7 @@ export default async function PublishFeeStructurePage({
           name: section.name,
         })) ?? []}
         currency={ctx.tenant.currency}
+        nonClass={nonClass}
       />
     </div>
   )

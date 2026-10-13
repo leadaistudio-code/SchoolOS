@@ -1,6 +1,7 @@
 import { attendanceDate } from '@/lib/dates'
 import { ROLE_BY_KEY } from '@/lib/rbac/roles'
 import type { AppContext } from '@/server/context'
+import { accessibleStudentIds, studentIdScopeWhere } from '@/server/scope'
 
 export type AssistantActionItem = {
   id: string
@@ -200,6 +201,9 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
   const hour = now.getHours()
   const time = timeGreeting(hour)
 
+  const studentScope = await accessibleStudentIds(ctx)
+  const attendanceScope = await studentIdScopeWhere(ctx)
+
   const [staffGender, attendanceToday, studentCount] = await Promise.all([
     ctx.db.staff.findFirst({
       where: { userId: ctx.user.userId },
@@ -208,12 +212,20 @@ export async function getAssistantBriefing(ctx: AppContext): Promise<AssistantBr
     ctx.can('attendance.view') || ctx.can('dashboard.view')
       ? ctx.db.studentAttendance.groupBy({
           by: ['status'],
-          where: { onDate: today },
+          where: { onDate: today, ...attendanceScope },
           _count: { _all: true },
         })
       : Promise.resolve([]),
     ctx.can('students.view')
-      ? ctx.db.student.count({ where: { status: 'ACTIVE', deletedAt: null } })
+      ? studentScope !== null && studentScope.length === 0
+        ? Promise.resolve(0)
+        : ctx.db.student.count({
+            where: {
+              status: 'ACTIVE',
+              deletedAt: null,
+              ...(studentScope === null ? {} : { id: { in: studentScope } }),
+            },
+          })
       : Promise.resolve(0),
   ])
 

@@ -28,6 +28,7 @@ const extractionSchema = z.object({
   alternatePhone: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
+  address: z.string().max(300).nullable().optional(),
   openingEvidence: z.string().nullable().optional(),
   discoverySummary: z.string().nullable().optional(),
   whyThisLead: z.string().nullable().optional(),
@@ -62,6 +63,7 @@ function zodToLooseJsonSchema(): Record<string, unknown> {
       alternatePhone: { type: ['string', 'null'] },
       email: { type: ['string', 'null'] },
       website: { type: ['string', 'null'] },
+      address: { type: ['string', 'null'] },
       openingEvidence: { type: ['string', 'null'] },
       discoverySummary: { type: ['string', 'null'] },
       whyThisLead: { type: ['string', 'null'] },
@@ -127,7 +129,8 @@ export async function extractSchoolFromHits(
     const model = assistantModel()
     const result = await model.turn({
       system: `You extract school campus discovery facts for MyCampusView sales CRM in India.
-Only use the search snippets provided. Never invent phones, emails, names or opening dates.
+Only use the search snippets provided. Never invent phones, emails, addresses, names or opening dates.
+Copy the school's phone, email, website and full postal address exactly when a snippet shows them.
 If opening date is unknown, leave null and put evidence text in openingEvidence.
 Reject coaching institutes, tuition centres, colleges and universities (reject=true).
 Call emit_school_discovery exactly once.`,

@@ -3,6 +3,7 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { PERMISSIONS } from '@/lib/rbac/permissions'
+import { ROLE } from '@/lib/rbac/roles'
 import { currentPortalUserWhere } from '@/server/modules/settings/users'
 
 export const roleSchema = z.object({
@@ -16,13 +17,16 @@ export const rolePermissionsSchema = z.object({
   permissionKeys: z.array(z.string().min(1)).max(400).default([]),
 })
 
+/** Platform operators — never shown or edited from a school settings screen. */
+const PLATFORM_ONLY_ROLE_KEYS = new Set<string>([ROLE.SUPER_ADMIN, ROLE.MYCAMPUS_SUPPORT])
+
 /**
  * Roles, built-in and custom.
  *
- * System roles are shared across every tenant and are read-only here: editing
- * one would change what "Teacher" means for every school on the platform. A
- * school that needs a different shape copies one into a role of its own,
- * which is why creation offers a starting point rather than a blank slate.
+ * Built-in roles start as shared platform rows (`tenantId: null`). A school
+ * admin can edit their permissions: the first save clones that role into this
+ * tenant (same key), remounts this school's people onto the clone, and then
+ * edits only the clone. Other schools keep the platform defaults.
  */
 export async function listRoles(ctx: AppContext) {
   ctx.require('roles.view')
@@ -57,13 +61,39 @@ export async function listRoles(ctx: AppContext) {
     },
   })
 
-  // The platform super-admin role is not a school role and granting it from a
-  // tenant screen would be a privilege-escalation bug waiting to happen.
-  return roles.filter((role) => role.key !== 'SUPER_ADMIN')
+  // Prefer this school's clone of a built-in key over the shared platform row.
+  const byKey = new Map<string, (typeof roles)[number]>()
+  for (const role of roles) {
+    if (PLATFORM_ONLY_ROLE_KEYS.has(role.key)) continue
+    const existing = byKey.get(role.key)
+    if (!existing) {
+      byKey.set(role.key, role)
+      continue
+    }
+    if (role.tenantId === ctx.tenant.id && existing.tenantId === null) {
+      byKey.set(role.key, role)
+    }
+  }
+
+  return [...byKey.values()].sort((a, b) => {
+    if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
 }
 
 /** The permission catalogue, grouped the way the editor renders it. */
 export function permissionCatalogue() {
+  const moduleLabels: Record<string, string> = {
+    assistant: 'Ask Me',
+    fees: 'Fees',
+    students: 'Students',
+    academics: 'Academics',
+    attendance: 'Attendance',
+    exams: 'Exams',
+    settings: 'Settings',
+    users: 'Users',
+    roles: 'Roles',
+  }
   const byModule = new Map<string, { key: string; label: string }[]>()
   for (const permission of PERMISSIONS) {
     if (permission.module === 'platform') continue
@@ -73,7 +103,11 @@ export function permissionCatalogue() {
     ])
   }
   return [...byModule.entries()]
-    .map(([module, permissions]) => ({ module, permissions }))
+    .map(([module, permissions]) => ({
+      module: moduleLabels[module] ?? module,
+      moduleKey: module,
+      permissions,
+    }))
     .sort((a, b) => a.module.localeCompare(b.module))
 }
 
@@ -94,7 +128,7 @@ export async function createRole(ctx: AppContext, input: z.infer<typeof roleSche
       })
     : null
   if (input.copyFromRoleId && !source) throw notFound('Role')
-  if (source?.key === 'SUPER_ADMIN') {
+  if (source && PLATFORM_ONLY_ROLE_KEYS.has(source.key)) {
     throw new ApiException(403, 'FORBIDDEN', 'That role cannot be copied')
   }
 
@@ -132,12 +166,12 @@ export async function createRole(ctx: AppContext, input: z.infer<typeof roleSche
 }
 
 /**
- * Replaces a custom role's permission set.
+ * Saves a role's permission set for this school.
  *
- * Platform permissions are stripped rather than rejected: they are not
- * offered by the editor, so their presence means a crafted request, and
- * silently dropping them keeps the rest of the save working while granting
- * nothing it should not.
+ * - Custom school roles: updated in place.
+ * - Shared built-in roles: cloned into this tenant on first save, then people
+ *   who held the shared role here are remounted onto the clone.
+ * Platform.* keys are stripped. SUPER_ADMIN / MYCAMPUS_SUPPORT stay immutable.
  */
 export async function setRolePermissions(
   ctx: AppContext,
@@ -145,44 +179,133 @@ export async function setRolePermissions(
 ) {
   ctx.require('roles.manage')
 
-  const role = await ctx.db.role.findFirst({
-    where: { id: input.id, tenantId: ctx.tenant.id },
-    select: { id: true, name: true, isSystem: true },
-  })
-  if (!role) throw notFound('Role')
-  if (role.isSystem) {
-    throw new ApiException(409, 'CONFLICT', 'Built-in roles cannot be edited. Copy it into a custom role instead.')
-  }
-
   const wanted = input.permissionKeys.filter((key) => !key.startsWith('platform.'))
   const permissions = await ctx.db.permission.findMany({
     where: { key: { in: wanted } },
     select: { id: true },
   })
 
-  await ctx.db.$transaction(async (tx) => {
-    await tx.rolePermission.deleteMany({ where: { roleId: role.id } })
-    if (permissions.length > 0) {
-      await tx.rolePermission.createMany({
-        data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
-      })
-    }
+  const tenantRole = await ctx.db.role.findFirst({
+    where: { id: input.id, tenantId: ctx.tenant.id },
+    select: { id: true, name: true, key: true, isSystem: true },
   })
+
+  if (tenantRole) {
+    await ctx.db.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: tenantRole.id } })
+      if (permissions.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissions.map((p) => ({ roleId: tenantRole.id, permissionId: p.id })),
+        })
+      }
+    })
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'role.permissions',
+      module: 'settings',
+      entityType: 'Role',
+      entityId: tenantRole.id,
+      summary: `${tenantRole.name} now has ${permissions.length} permissions`,
+      after: { permissionKeys: wanted },
+    })
+    return { id: tenantRole.id }
+  }
+
+  const platformRole = await ctx.db.role.findFirst({
+    where: { id: input.id, tenantId: null, isSystem: true },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      description: true,
+    },
+  })
+  if (!platformRole) throw notFound('Role')
+  if (PLATFORM_ONLY_ROLE_KEYS.has(platformRole.key)) {
+    throw new ApiException(403, 'FORBIDDEN', 'Platform roles cannot be edited by a school')
+  }
+
+  const clone = await materializeBuiltInRoleForTenant(ctx, platformRole, permissions.map((p) => p.id))
 
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
     actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
-    action: 'role.permissions',
+    action: 'role.customize',
     module: 'settings',
     entityType: 'Role',
-    entityId: role.id,
-    summary: `${role.name} now has ${permissions.length} permissions`,
-    after: { permissionKeys: wanted },
+    entityId: clone.id,
+    summary: `Customized built-in role ${clone.name} for this school (${permissions.length} permissions)`,
+    after: { permissionKeys: wanted, clonedFrom: platformRole.id },
+  })
+  return { id: clone.id }
+}
+
+/**
+ * Creates (or reuses) this school's copy of a built-in role and remounts local
+ * users from the shared platform role onto it.
+ */
+async function materializeBuiltInRoleForTenant(
+  ctx: AppContext,
+  platformRole: { id: string; key: string; name: string; description: string | null },
+  permissionIds: string[],
+) {
+  const existing = await ctx.db.role.findFirst({
+    where: { tenantId: ctx.tenant.id, key: platformRole.key },
+    select: { id: true, name: true },
+  })
+
+  return ctx.db.$transaction(async (tx) => {
+    const clone =
+      existing ??
+      (await tx.role.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          key: platformRole.key,
+          name: platformRole.name,
+          description: platformRole.description,
+          // Still "built-in" for this school — appears in the built-in list,
+          // cannot be deleted like a throwaway custom role.
+          isSystem: true,
+        },
+      }))
+
+    await tx.rolePermission.deleteMany({ where: { roleId: clone.id } })
+    if (permissionIds.length > 0) {
+      await tx.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({ roleId: clone.id, permissionId })),
+        skipDuplicates: true,
+      })
+    }
+
+    // Remount this school's people from the shared role onto the school copy.
+    const holders = await tx.userRole.findMany({
+      where: {
+        roleId: platformRole.id,
+        user: { tenantId: ctx.tenant.id, deletedAt: null },
+      },
+      select: { userId: true },
+    })
+    if (holders.length > 0) {
+      await tx.userRole.createMany({
+        data: holders.map((h) => ({ userId: h.userId, roleId: clone.id })),
+        skipDuplicates: true,
+      })
+      await tx.userRole.deleteMany({
+        where: {
+          roleId: platformRole.id,
+          userId: { in: holders.map((h) => h.userId) },
+        },
+      })
+    }
+
+    return { id: clone.id, name: clone.name }
   })
 }
 
-/** Deletes a custom role. Refuses while anybody still holds it. */
+/** Deletes a custom role. Refuses built-ins and roles that still have members. */
 export async function deleteRole(ctx: AppContext, id: string) {
   ctx.require('roles.manage')
 
@@ -191,6 +314,7 @@ export async function deleteRole(ctx: AppContext, id: string) {
     select: {
       id: true,
       name: true,
+      key: true,
       isSystem: true,
       _count: {
         select: {
@@ -207,7 +331,13 @@ export async function deleteRole(ctx: AppContext, id: string) {
     },
   })
   if (!role) throw notFound('Role')
-  if (role.isSystem) throw new ApiException(409, 'CONFLICT', 'Built-in roles cannot be deleted')
+  if (role.isSystem) {
+    throw new ApiException(
+      409,
+      'CONFLICT',
+      'Built-in roles cannot be deleted. Reset them to platform defaults instead.',
+    )
+  }
   if (role._count.users > 0) {
     throw conflict(`Move the ${role._count.users} people holding this role to another one first`)
   }
@@ -224,5 +354,54 @@ export async function deleteRole(ctx: AppContext, id: string) {
     entityId: id,
     summary: `Deleted role ${role.name}`,
     before: role,
+  })
+}
+
+/**
+ * Drops this school's customized built-in role and remounts people back onto
+ * the shared platform role (restoring platform defaults for this school only).
+ */
+export async function resetBuiltInRole(ctx: AppContext, id: string) {
+  ctx.require('roles.manage')
+
+  const role = await ctx.db.role.findFirst({
+    where: { id, tenantId: ctx.tenant.id, isSystem: true },
+    select: { id: true, key: true, name: true },
+  })
+  if (!role) throw notFound('Customized role')
+  if (PLATFORM_ONLY_ROLE_KEYS.has(role.key)) {
+    throw new ApiException(403, 'FORBIDDEN', 'Platform roles cannot be reset here')
+  }
+
+  const platformRole = await ctx.db.role.findFirst({
+    where: { tenantId: null, key: role.key, isSystem: true },
+    select: { id: true },
+  })
+  if (!platformRole) throw notFound('Platform role')
+
+  await ctx.db.$transaction(async (tx) => {
+    const holders = await tx.userRole.findMany({
+      where: { roleId: role.id },
+      select: { userId: true },
+    })
+    if (holders.length > 0) {
+      await tx.userRole.createMany({
+        data: holders.map((h) => ({ userId: h.userId, roleId: platformRole.id })),
+        skipDuplicates: true,
+      })
+      await tx.userRole.deleteMany({ where: { roleId: role.id } })
+    }
+    await tx.role.delete({ where: { id: role.id } })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'role.reset',
+    module: 'settings',
+    entityType: 'Role',
+    entityId: id,
+    summary: `Reset ${role.name} to platform defaults`,
   })
 }

@@ -15,6 +15,16 @@ const phone = z
   .optional()
   .transform((v) => (v === '' ? undefined : v))
 
+const guardianSchema = z.object({
+  firstName: z.string().trim().min(1).max(60),
+  lastName: z.string().trim().max(60).default(''),
+  relation: z.enum(['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER']).default('GUARDIAN'),
+  phone: phone,
+  email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  occupation: optionalString(80),
+  createLogin: z.boolean().default(false),
+})
+
 /**
  * The single validation contract for a student. The API route, the server
  * action behind the form and the CSV importer all parse against this, so a
@@ -40,6 +50,19 @@ export const studentCreateSchema = z.object({
   religion: optionalString(40),
   nationality: optionalString(40),
   motherTongue: optionalString(40),
+  caste: optionalString(60),
+  aadhaarNo: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/[\s-]/g, ''))
+    .refine((v) => v === '' || /^\d{12}$/.test(v), 'Aadhaar number has 12 digits')
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  birthPlace: optionalString(80),
+  identificationMark: optionalString(160),
+  disability: optionalString(120),
+  house: optionalString(40),
+  whatsappPhone: phone,
 
   admissionDate: z.coerce.date().optional(),
   previousSchool: optionalString(160),
@@ -61,24 +84,16 @@ export const studentCreateSchema = z.object({
 
   // Optional guardian created and linked in the same transaction as the
   // student, so an imported record is never left without a parent.
-  guardian: z
-    .object({
-      firstName: z.string().trim().min(1).max(60),
-      lastName: z.string().trim().max(60).default(''),
-      relation: z.enum(['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER']).default('GUARDIAN'),
-      phone: phone,
-      email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
-      occupation: optionalString(80),
-      createLogin: z.boolean().default(false),
-    })
-    .optional(),
+  guardian: guardianSchema.optional(),
+  /** The other parent from the admission form (never given a login here). */
+  secondGuardian: guardianSchema.omit({ createLogin: true }).optional(),
 })
 
 export type StudentCreateInput = z.infer<typeof studentCreateSchema>
 
 export const studentUpdateSchema = studentCreateSchema
   .partial()
-  .omit({ guardian: true })
+  .omit({ guardian: true, secondGuardian: true })
   .extend({
     status: z.enum(['ACTIVE', 'ALUMNI', 'TRANSFERRED', 'WITHDRAWN', 'SUSPENDED']).optional(),
   })

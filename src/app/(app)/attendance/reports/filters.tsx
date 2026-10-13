@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Input, Select } from '@/components/ui/input'
+import { AttendanceExportMenu } from './export-menu'
 
 type ClassNode = {
   id: string
@@ -87,6 +88,8 @@ export function ReportFilters({
           </option>
         ))}
       </Select>
+
+      <AttendanceExportMenu from={from} to={to} />
     </div>
   )
 }

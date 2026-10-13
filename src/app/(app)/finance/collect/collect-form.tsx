@@ -10,10 +10,27 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog } from '@/components/ui/dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { formatMoney } from '@/lib/utils'
-import { toDateInput } from '@/lib/dates'
+import { formatDay, toDateInput } from '@/lib/dates'
+
+const MODE_LABELS: Record<string, string> = {
+  CASH: 'Cash',
+  UPI: 'UPI',
+  CARD: 'Card',
+  CHEQUE: 'Cheque',
+  BANK_TRANSFER: 'Bank transfer',
+  NET_BANKING: 'Net banking',
+}
+
+// crypto.randomUUID only exists in secure contexts (HTTPS / localhost).
+function newIdempotencyKey() {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 type StudentHit = {
   id: string
@@ -90,6 +107,7 @@ export function CollectForm({
   const [billBookNo, setBillBookNo] = React.useState('')
   const [notes, setNotes] = React.useState('')
   const [pending, startTransition] = React.useTransition()
+  const [confirming, setConfirming] = React.useState(false)
   const [receipt, setReceipt] = React.useState<{
     paymentId: string
     number: string
@@ -99,7 +117,7 @@ export function CollectForm({
   } | null>(null)
 
   // One key per attempt; regenerated only after a successful collection.
-  const idempotencyKey = React.useRef(crypto.randomUUID())
+  const idempotencyKey = React.useRef(newIdempotencyKey())
 
   const loadStudent = React.useCallback(async (id: string) => {
     const res = await fetch(`/api/v1/finance/invoices?studentId=${id}&pageSize=50`)
@@ -207,6 +225,7 @@ export function CollectForm({
 
   const submit = () => {
     if (!student) return
+    setConfirming(false)
     startTransition(async () => {
       const result = await collectPaymentAction({
         studentId: student.id,
@@ -235,7 +254,7 @@ export function CollectForm({
         discount: result.data?.discountedMinor ?? 0,
         billBookNo: billBookNo || null,
       })
-      idempotencyKey.current = crypto.randomUUID()
+      idempotencyKey.current = newIdempotencyKey()
       router.refresh()
     })
   }
@@ -279,8 +298,16 @@ export function CollectForm({
               ? ` · ${formatMoney(receipt.advance, currency)} held as advance`
               : ''}
           </p>
-          <div className="flex items-center justify-center gap-2 mt-5">
+          <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
             <Button onClick={reset}>Collect another payment</Button>
+            {student ? (
+              <Link
+                href={`/finance/students/${student.id}`}
+                className={buttonVariants({ variant: 'secondary' })}
+              >
+                View ledger
+              </Link>
+            ) : null}
             <Link href={`/finance/payments/${receipt.paymentId}`} className={buttonVariants({ variant: 'secondary' })}>
               <Receipt className="size-4" aria-hidden />
               Print or download receipt
@@ -363,15 +390,23 @@ export function CollectForm({
             </>
           ) : (
             <>
-              <div className="rounded-[var(--radius)] bg-surface-2 border border-line px-3.5 py-3">
-                <p className="text-base font-medium text-ink">
-                  {student.firstName} {student.lastName}
-                </p>
-                <p className="text-xs text-ink-subtle">
-                  {student.admissionNo}
-                  {student.parentName ? ` · Parent: ${student.parentName}` : ''}
-                  {student.className ? ` · ${student.className} ${student.sectionName ?? ''}`.trimEnd() : ''}
-                </p>
+              <div className="rounded-[var(--radius)] bg-surface-2 border border-line px-3.5 py-3 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-base font-medium text-ink">
+                    {student.firstName} {student.lastName}
+                  </p>
+                  <p className="text-xs text-ink-subtle">
+                    {student.admissionNo}
+                    {student.parentName ? ` · Parent: ${student.parentName}` : ''}
+                    {student.className ? ` · ${student.className} ${student.sectionName ?? ''}`.trimEnd() : ''}
+                  </p>
+                </div>
+                <Link
+                  href={`/finance/students/${student.id}`}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  View ledger
+                </Link>
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-[var(--radius-sm)] border border-line px-3.5 py-3 sm:grid-cols-4">
@@ -562,7 +597,7 @@ export function CollectForm({
               ) : null}
 
               <Button
-                onClick={submit}
+                onClick={() => setConfirming(true)}
                 loading={pending}
                 disabled={
                   !collectedById ||
@@ -577,6 +612,67 @@ export function CollectForm({
                     }`
                   : `Apply discount ${formatMoney(discountMinor, currency)}`}
               </Button>
+
+              <Dialog
+                open={confirming}
+                onClose={() => setConfirming(false)}
+                title={amountMinor > 0 ? 'Confirm payment' : 'Confirm discount'}
+                size="sm"
+                description="Check the details before the receipt is issued."
+                footer={
+                  <>
+                    <Button onClick={submit} loading={pending} autoFocus>
+                      {amountMinor > 0 ? `Yes, collect ${formatMoney(amountMinor, currency)}` : 'Yes, apply discount'}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirming(false)}>Go back</Button>
+                  </>
+                }
+              >
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-ink-muted">Student</dt>
+                  <dd className="text-ink">
+                    {student.firstName} {student.lastName}
+                    <span className="text-ink-subtle"> · {student.admissionNo}</span>
+                  </dd>
+                  {amountMinor > 0 ? (
+                    <>
+                      <dt className="text-ink-muted">Amount received</dt>
+                      <dd className="text-base font-semibold text-ink tnum">{formatMoney(amountMinor, currency)}</dd>
+                    </>
+                  ) : null}
+                  {discountMinor > 0 ? (
+                    <>
+                      <dt className="text-ink-muted">Discount</dt>
+                      <dd className="text-ink tnum">
+                        {formatMoney(discountMinor, currency)}
+                        <span className="text-ink-subtle"> · {discountReason.trim()}</span>
+                      </dd>
+                    </>
+                  ) : null}
+                  <dt className="text-ink-muted">Mode</dt>
+                  <dd className="text-ink">
+                    {MODE_LABELS[mode] ?? mode}
+                    {reference ? <span className="text-ink-subtle"> · {reference}</span> : null}
+                  </dd>
+                  <dt className="text-ink-muted">Payment date</dt>
+                  <dd className="text-ink">{paidOn ? formatDay(new Date(`${paidOn}T00:00:00.000Z`), 'd MMM yyyy') : '—'}</dd>
+                  <dt className="text-ink-muted">Collected by</dt>
+                  <dd className="text-ink">{collectors.find((collector) => collector.id === collectedById)?.name ?? '—'}</dd>
+                  {billBookNo ? (
+                    <>
+                      <dt className="text-ink-muted">Bill book no.</dt>
+                      <dd className="text-ink tnum">{billBookNo}</dd>
+                    </>
+                  ) : null}
+                  <dt className="text-ink-muted">Outstanding after</dt>
+                  <dd className="text-ink tnum">{formatMoney(Math.max(0, payableMinor - amountMinor), currency)}</dd>
+                </dl>
+                {advance > 0 ? (
+                  <p className="mt-3 text-xs text-warning">
+                    {formatMoney(advance, currency)} is more than what is owed and will be held as an advance.
+                  </p>
+                ) : null}
+              </Dialog>
             </>
           )}
         </CardContent>

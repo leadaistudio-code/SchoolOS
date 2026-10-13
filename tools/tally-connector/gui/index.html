@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MyCampusView Tally Connector</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="brand">
+          <img class="brand-logo" src="logo-wide.png" alt="MyCampusView" />
+          <div class="brand-copy">
+            <p class="eyebrow">Desktop connector</p>
+            <h1>Tally Connector</h1>
+          </div>
+        </div>
+        <div class="hero-meta">
+          <span id="versionLabel" class="pill">v1.0.2</span>
+          <span id="overallHealth" class="pill pill-muted">Checkingâ€¦</span>
+        </div>
+      </header>
+
+      <section class="status-grid" aria-label="Connection status">
+        <article class="stat">
+          <p class="stat-label">Cloud</p>
+          <p id="cloudStatus" class="stat-value">â€”</p>
+          <p id="cloudDetail" class="stat-detail">Not paired</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Tally.ERP 9</p>
+          <p id="tallyStatus" class="stat-value">â€”</p>
+          <p id="tallyDetail" class="stat-detail">localhost:9000</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Windows Service</p>
+          <p id="serviceStatus" class="stat-value">â€”</p>
+          <p id="serviceDetail" class="stat-detail">Starts with Windows</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Last sync</p>
+          <p id="lastSync" class="stat-value">â€”</p>
+          <p id="lastSyncDetail" class="stat-detail">Waiting</p>
+        </article>
+      </section>
+
+      <main class="panels">
+        <section class="panel" id="pairPanel">
+          <div class="panel-head">
+            <h2>Connect this PC</h2>
+            <p>Use the pairing code from MyCampusView â†’ Settings â†’ Tally ERP.</p>
+          </div>
+          <form id="pairForm" class="form">
+            <label>
+              School cloud URL
+              <input
+                id="cloudUrl"
+                name="cloud"
+                type="url"
+                required
+                placeholder="https://your-school.mycampusview.com"
+                autocomplete="off"
+              />
+            </label>
+            <label>
+              Pairing code
+              <input
+                id="pairCode"
+                name="code"
+                required
+                placeholder="MCVT-XXXX-XXXX"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <div class="row">
+              <label>
+                Tally host
+                <input id="tallyHost" name="tallyHost" value="127.0.0.1" />
+              </label>
+              <label>
+                Port
+                <input id="tallyPort" name="tallyPort" type="number" value="9000" min="1" max="65535" />
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn btn-primary" id="pairBtn">Pair with school</button>
+              <button type="button" class="btn" id="saveEndpointBtn">Save Tally address</button>
+            </div>
+            <p id="pairMessage" class="message" hidden></p>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Operations</h2>
+            <p>Test Tally, push pending jobs, and manage the auto-start service.</p>
+          </div>
+          <div class="actions wrap">
+            <button type="button" class="btn btn-primary" id="syncBtn">Sync now</button>
+            <button type="button" class="btn" id="testTallyBtn">Test Tally</button>
+            <button type="button" class="btn" id="installServiceBtn">Install Windows startup service</button>
+            <button type="button" class="btn btn-danger" id="uninstallServiceBtn">Remove startup service</button>
+            <button type="button" class="btn" id="openLogsBtn">Open data folder</button>
+          </div>
+          <p id="opMessage" class="message" hidden></p>
+        </section>
+
+        <section class="panel panel-wide">
+          <div class="panel-head">
+            <h2>Activity</h2>
+            <p>Recent connector log lines from this PC.</p>
+          </div>
+          <pre id="logView" class="log" aria-live="polite">Loadingâ€¦</pre>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>
+          Port 9000 stays on this computer. Only outbound HTTPS to MyCampusView is used.
+        </p>
+      </footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

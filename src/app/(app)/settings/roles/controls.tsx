@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast'
 import {
   createRoleAction,
   deleteRoleAction,
+  resetBuiltInRoleAction,
   setRolePermissionsAction,
 } from '../admin-actions'
 
@@ -252,6 +253,9 @@ export function NewRoleButton({
  * Grouped by module with a select-all per group, because permissions are
  * granted in blocks in practice — somebody either runs the library or they do
  * not — and a flat list of three hundred checkboxes is where mistakes live.
+ *
+ * Built-in roles: first save customizes them for this school only. Delete is
+ * replaced by "Reset to defaults" when the school already has a customized copy.
  */
 export function RoleControls({
   id,
@@ -259,18 +263,25 @@ export function RoleControls({
   members,
   catalogue,
   granted,
+  builtIn = false,
+  customized = false,
 }: {
   id: string
   name: string
   members: number
   catalogue: ModuleGroup[]
   granted: string[]
+  /** Shared / school built-in role — editable, not deletable. */
+  builtIn?: boolean
+  /** This school already has its own copy of the built-in. */
+  customized?: boolean
 }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
   const [open, setOpen] = React.useState(false)
   const [selected, setSelected] = React.useState<Set<string>>(new Set(granted))
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
+  const [confirmingReset, setConfirmingReset] = React.useState(false)
 
   const toggle = (key: string, on: boolean) =>
     setSelected((current) => {
@@ -312,6 +323,17 @@ export function RoleControls({
       if (result.ok) setConfirmingDelete(false)
     })
 
+  const reset = () =>
+    startTransition(async () => {
+      const result = await resetBuiltInRoleAction(id)
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Defaults restored' : 'Could not reset',
+        description: result.message,
+      })
+      if (result.ok) setConfirmingReset(false)
+    })
+
   return (
     <div className="flex items-center justify-end gap-1.5">
       <Button
@@ -325,7 +347,29 @@ export function RoleControls({
         Permissions
       </Button>
 
-      {confirmingDelete ? (
+      {builtIn ? (
+        customized ? (
+          confirmingReset ? (
+            <>
+              <Button size="sm" variant="danger" loading={pending} onClick={reset}>
+                Reset
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmingReset(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Restore platform permission defaults for this school"
+              onClick={() => setConfirmingReset(true)}
+            >
+              Reset
+            </Button>
+          )
+        ) : null
+      ) : confirmingDelete ? (
         <>
           <Button size="sm" variant="danger" loading={pending} onClick={remove}>
             Delete
@@ -352,9 +396,13 @@ export function RoleControls({
         size="lg"
         title={`Permissions for ${name}`}
         description={
-          members > 0
-            ? `${members} people hold this role. Changes apply at their next sign-in.`
-            : 'Nobody holds this role yet.'
+          builtIn
+            ? members > 0
+              ? `${members} people hold this role at this school. Changes apply only here, at their next sign-in.`
+              : 'Changes apply only to this school. Other schools keep the platform defaults.'
+            : members > 0
+              ? `${members} people hold this role. Changes apply at their next sign-in.`
+              : 'Nobody holds this role yet.'
         }
         footer={
           <>

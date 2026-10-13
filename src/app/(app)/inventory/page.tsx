@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Boxes, Package, Tags } from 'lucide-react'
+import { Boxes, Package, ShoppingBag, Tags } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listAssetCategories, listAssets } from '@/server/modules/inventory/service'
 import { ColorBanner, ColorTile } from '@/components/dashboard/color-tiles'
@@ -28,6 +28,24 @@ export default async function InventoryPage() {
         }
         description="Furniture, devices and equipment across the campus."
       />
+
+      {ctx.can('store.view') ? (
+        <Link
+          href="/inventory/store"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4 transition-shadow hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-[color-mix(in_srgb,#10b981_14%,transparent)] text-[#10b981]">
+              <ShoppingBag className="size-5" aria-hidden />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-ink">School store</p>
+              <p className="text-xs text-ink-muted">Books, uniforms, shoes, bags and stationery the school sells: stock, billing and reorder alerts.</p>
+            </div>
+          </div>
+          <span className="text-sm font-medium text-[var(--brand-600)]">Open store →</span>
+        </Link>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <ColorTile

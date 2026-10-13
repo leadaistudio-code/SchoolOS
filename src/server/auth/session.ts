@@ -2,6 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { prisma } from '@/server/db/prisma'
 import { env, isProd } from '@/lib/env'
 import { randomToken, sha256 } from '@/server/crypto'
+import { ROLE, TENANT_PERMISSION_KEYS } from '@/lib/rbac/roles'
 
 export const SESSION_COOKIE = 'mycampusview_session'
 
@@ -45,6 +46,7 @@ export type SessionUser = {
   isSuperAdmin: boolean
   firstName: string
   lastName: string
+  displayName: string | null
   email: string | null
   phone: string | null
   avatarUrl: string | null
@@ -188,6 +190,39 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     for (const rp of ur.role.permissions) permissions.add(rp.permission.key)
   }
 
+  // Platform operators (Super Admin / MyCampus Support) entering a school must
+  // never hit a permission wall — the school admin asked for help. Elevate to
+  // the full tenant catalogue and school-wide row scope for the session.
+  if (session.impersonatedById) {
+    const actor = await prisma.user.findFirst({
+      where: {
+        id: session.impersonatedById,
+        deletedAt: null,
+        status: 'ACTIVE',
+        tenantId: null,
+      },
+      include: {
+        roles: {
+          include: {
+            role: { include: { permissions: { include: { permission: true } } } },
+          },
+        },
+      },
+    })
+    if (actor) {
+      const actorPerms = new Set<string>()
+      for (const ur of actor.roles) {
+        for (const rp of ur.role.permissions) actorPerms.add(rp.permission.key)
+      }
+      if (actor.isSuperAdmin || actorPerms.has('platform.impersonate')) {
+        for (const key of TENANT_PERMISSION_KEYS) permissions.add(key)
+        if (!roleKeys.includes(ROLE.MYCAMPUS_SUPPORT)) {
+          roleKeys.push(ROLE.MYCAMPUS_SUPPORT)
+        }
+      }
+    }
+  }
+
   return {
     sessionId: session.id,
     userId: session.user.id,
@@ -195,6 +230,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     isSuperAdmin: session.user.isSuperAdmin,
     firstName: session.user.firstName,
     lastName: session.user.lastName,
+    displayName: session.user.displayName,
     email: session.user.email,
     phone: session.user.phone,
     avatarUrl: session.user.avatarUrl,

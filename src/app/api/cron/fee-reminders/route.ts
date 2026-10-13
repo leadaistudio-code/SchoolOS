@@ -9,6 +9,7 @@ import {
   syncTransportFeeInvoices,
 } from '@/server/modules/finance/jobs'
 import { reconcilePendingOnlineRefunds } from '@/server/modules/finance/payments'
+import { runLedgerCatchUp } from '@/server/modules/accounts/posting'
 
 /** POST with CRON_SECRET. Schedule daily after the school day begins. */
 export const POST = publicRoute(async (req: NextRequest) => {
@@ -26,5 +27,6 @@ export const POST = publicRoute(async (req: NextRequest) => {
     runLateFeeRules(),
     reconcilePendingOnlineRefunds(),
   ])
-  return ok({ monthlyInvoices, transport, reminders, lateFees, refunds })
+  const ledger = await runLedgerCatchUp()
+  return ok({ monthlyInvoices, transport, reminders, lateFees, refunds, ledger })
 })

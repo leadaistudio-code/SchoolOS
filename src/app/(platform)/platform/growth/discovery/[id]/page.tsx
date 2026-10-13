@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { opportunityLabel, SCHOOL_STATUS_LABELS, type SchoolDiscoveryStatus } from '@/lib/lead-discovery'
 import { CandidateActions } from '../discovery-controls'
+import { ContactFindingsCard } from '../contact-findings'
 
 export const metadata = { title: 'Discovery detail' }
 
@@ -55,7 +56,10 @@ export default async function DiscoveryDetailPage({
         <Badge tone="info">
           {row.opportunityScore}/100 · {opportunityLabel(row.opportunityScore)}
         </Badge>
+        <Badge tone="neutral">Lead confidence {row.confidenceScore}%</Badge>
       </div>
+
+      <ContactFindingsCard row={row} canEdit={canEdit} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -85,34 +89,6 @@ export default async function DiscoveryDetailPage({
           {row.academicSession ? (
             <p className="mt-2 text-ink-muted">Session: {row.academicSession}</p>
           ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact</CardTitle>
-        </CardHeader>
-        <CardContent className="py-3 grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <p className="text-ink-muted">Person</p>
-            <p>{row.contactPerson || '—'}</p>
-          </div>
-          <div>
-            <p className="text-ink-muted">Designation</p>
-            <p>{row.designation || '—'}</p>
-          </div>
-          <div>
-            <p className="text-ink-muted">Phone</p>
-            <p>{row.phone || '—'}</p>
-          </div>
-          <div>
-            <p className="text-ink-muted">Email</p>
-            <p>{row.email || '—'}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-ink-muted">Website</p>
-            <p>{row.website || '—'}</p>
-          </div>
         </CardContent>
       </Card>
 

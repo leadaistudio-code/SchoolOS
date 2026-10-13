@@ -1,6 +1,7 @@
 import { requireContext } from '@/server/context'
 import { feeReportsSummary } from '@/server/modules/finance/simplicity'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -35,7 +36,11 @@ export default async function FeeReportsPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Reports" description="Collection, outstanding and payment-method totals" />
+      <PageHeader
+        title="Reports"
+        description="Collection, outstanding and payment-method totals"
+        actions={<BackButton fallbackHref="/finance" />}
+      />
       <Card>
         <CardContent>
           <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">

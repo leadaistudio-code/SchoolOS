@@ -51,6 +51,95 @@ describe('identity scopes survive custom permissions', () => {
   })
 })
 
+describe('teacher student scope is section-aware', () => {
+  function teacherCtx(db: Record<string, unknown>) {
+    return {
+      user: { userId: 'teacher-user', roleKeys: [ROLE.TEACHER] },
+      db: {
+        staff: {
+          findFirst: async () => ({ id: 'staff-1' }),
+        },
+        academicSession: {
+          findFirst: async () => ({ id: 'session-1' }),
+        },
+        ...db,
+      },
+    }
+  }
+
+  it('returns no students when the teacher has no section assignments', async () => {
+    const ctx = teacherCtx({
+      section: { findMany: async () => [] },
+      classSubject: { findMany: async () => [] },
+      enrollment: { findMany: async () => [{ studentId: 'should-not-appear' }] },
+    })
+    await expect(accessibleStudentIds(ctx as never)).resolves.toEqual([])
+  })
+
+  it('scopes students to assigned sections only, not the whole class', async () => {
+    const ctx = teacherCtx({
+      section: {
+        findMany: async (args: { where?: { classTeacherId?: string; id?: { in: string[] } } }) => {
+          if (args.where?.classTeacherId) return [{ id: 'sec-a' }]
+          if (args.where?.id?.in) {
+            return args.where.id.in.map((id: string) => ({
+              id,
+              classLevelId: 'class-10',
+            }))
+          }
+          return []
+        },
+      },
+      classSubject: {
+        findMany: async () => [
+          {
+            sections: [{ sectionId: 'sec-b' }],
+            classLevel: {
+              sessionId: 'session-1',
+              deletedAt: null,
+              sections: [{ id: 'sec-a' }, { id: 'sec-b' }, { id: 'sec-c' }],
+            },
+          },
+        ],
+      },
+      enrollment: {
+        findMany: async (args: { where: { sectionId: { in: string[] } } }) => {
+          const ids = args.where.sectionId.in
+          expect(ids.sort()).toEqual(['sec-a', 'sec-b'])
+          expect(ids).not.toContain('sec-c')
+          return [{ studentId: 'stu-a' }, { studentId: 'stu-b' }, { studentId: 'stu-a' }]
+        },
+      },
+    })
+    await expect(accessibleStudentIds(ctx as never)).resolves.toEqual(['stu-a', 'stu-b'])
+  })
+
+  it('treats a class-subject with no section mappings as all sections of that class', async () => {
+    const ctx = teacherCtx({
+      section: { findMany: async () => [] },
+      classSubject: {
+        findMany: async () => [
+          {
+            sections: [],
+            classLevel: {
+              sessionId: 'session-1',
+              deletedAt: null,
+              sections: [{ id: 'sec-a' }, { id: 'sec-b' }],
+            },
+          },
+        ],
+      },
+      enrollment: {
+        findMany: async (args: { where: { sectionId: { in: string[] } } }) => {
+          expect(args.where.sectionId.in.sort()).toEqual(['sec-a', 'sec-b'])
+          return [{ studentId: 'stu-1' }]
+        },
+      },
+    })
+    await expect(accessibleStudentIds(ctx as never)).resolves.toEqual(['stu-1'])
+  })
+})
+
 describe('feedback defaults', () => {
   it('lets students submit feedback by default', () => {
     const student = SYSTEM_ROLES.find((role) => role.key === ROLE.STUDENT)!

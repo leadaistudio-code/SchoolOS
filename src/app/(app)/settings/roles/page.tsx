@@ -13,13 +13,9 @@ export const metadata = { title: 'Roles and permissions' }
 /**
  * Roles and permissions.
  *
- * Built-in roles are listed but not editable: they are shared by every school
- * on the platform, so changing "Teacher" here would change it everywhere. A
- * school that wants a different shape copies one — the dialog offers exactly
- * that — and edits the copy.
- *
- * The member count sits next to each role because the real question when
- * changing permissions is how many people it affects.
+ * Built-in roles can be edited by a school admin: the first save customizes
+ * that role for this school only. Other schools keep the platform defaults.
+ * Custom roles remain fully school-owned (create / edit / delete).
  */
 export default async function RolesPage() {
   const ctx = await requireContext('roles.view')
@@ -49,7 +45,7 @@ export default async function RolesPage() {
       <Card className="overflow-hidden">
         <SettingsPanelHeader
           title="Built-in roles"
-          description="Shared across the platform — copy one to change it."
+          description="Editable for this school. Changes do not affect other schools."
           icon="KeyRound"
           tone="brand"
         />
@@ -61,43 +57,65 @@ export default async function RolesPage() {
                 <TH>What it is for</TH>
                 <TH align="right">Permissions</TH>
                 <TH align="right">People</TH>
+                {canManage ? <TH align="right">&nbsp;</TH> : null}
               </tr>
             </THead>
             <TBody>
-              {system.map((role) => (
-                <TR key={role.id}>
-                  <TD>
-                    <RolePermissionViewer
-                      name={role.name}
-                      description={role.description}
-                      members={role._count.users}
-                      isSystem
-                      catalogue={catalogue}
-                      granted={role.permissions.map((permission) => permission.permission.key)}
-                    />
-                    <Badge tone="neutral" className="ml-2">
-                      built-in
-                    </Badge>
-                  </TD>
-                  <TD className="text-sm text-ink-muted">{role.description ?? '—'}</TD>
-                  <TD align="right" className="text-sm tnum">
-                    {role.permissions.length}
-                  </TD>
-                  <TD align="right">
-                    {canViewUsers ? (
-                      <Link
-                        href={`/settings/users?roleId=${role.id}&status=CURRENT`}
-                        className="inline-flex min-w-8 items-center justify-center rounded-full bg-[var(--product-50)] px-2.5 py-1 text-sm font-semibold text-[var(--product-600)] tnum hover:bg-[var(--product-100)] hover:underline"
-                        aria-label={`View ${role._count.users} people with the ${role.name} role`}
-                      >
-                        {role._count.users}
-                      </Link>
-                    ) : (
-                      <span className="text-sm tnum">{role._count.users}</span>
-                    )}
-                  </TD>
-                </TR>
-              ))}
+              {system.map((role) => {
+                const customized = role.tenantId === ctx.tenant.id
+                return (
+                  <TR key={role.id}>
+                    <TD>
+                      <RolePermissionViewer
+                        name={role.name}
+                        description={role.description}
+                        members={role._count.users}
+                        isSystem
+                        catalogue={catalogue}
+                        granted={role.permissions.map((permission) => permission.permission.key)}
+                      />
+                      <Badge tone="neutral" className="ml-2">
+                        built-in
+                      </Badge>
+                      {customized ? (
+                        <Badge tone="info" className="ml-1">
+                          customized
+                        </Badge>
+                      ) : null}
+                    </TD>
+                    <TD className="text-sm text-ink-muted">{role.description ?? '—'}</TD>
+                    <TD align="right" className="text-sm tnum">
+                      {role.permissions.length}
+                    </TD>
+                    <TD align="right">
+                      {canViewUsers ? (
+                        <Link
+                          href={`/settings/users?roleId=${role.id}&status=CURRENT`}
+                          className="inline-flex min-w-8 items-center justify-center rounded-full bg-[var(--product-50)] px-2.5 py-1 text-sm font-semibold text-[var(--product-600)] tnum hover:bg-[var(--product-100)] hover:underline"
+                          aria-label={`View ${role._count.users} people with the ${role.name} role`}
+                        >
+                          {role._count.users}
+                        </Link>
+                      ) : (
+                        <span className="text-sm tnum">{role._count.users}</span>
+                      )}
+                    </TD>
+                    {canManage ? (
+                      <TD align="right">
+                        <RoleControls
+                          id={role.id}
+                          name={role.name}
+                          members={role._count.users}
+                          catalogue={catalogue}
+                          granted={role.permissions.map((p) => p.permission.key)}
+                          builtIn
+                          customized={customized}
+                        />
+                      </TD>
+                    ) : null}
+                  </TR>
+                )
+              })}
             </TBody>
           </Table>
         </TableWrap>
@@ -106,7 +124,7 @@ export default async function RolesPage() {
       <Card className="overflow-hidden">
         <SettingsPanelHeader
           title="Your school’s roles"
-          description="Editable roles visible only to this school."
+          description="Extra roles you create for this school only."
           icon="KeyRound"
           tone="warning"
         />
@@ -115,7 +133,7 @@ export default async function RolesPage() {
             title="No custom roles"
             description={
               canManage
-                ? 'Copy a built-in role when somebody needs a slightly different set of permissions — a head of department, say, or an exam coordinator.'
+                ? 'Create a role when somebody needs a set of permissions that is not one of the built-ins — a head of department, say, or an exam coordinator.'
                 : 'This school has not created any roles of its own.'
             }
             action={

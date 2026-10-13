@@ -1,3 +1,4 @@
+import { CheckCheck, Star, Users, Wallet } from 'lucide-react'
 import { LinkTabs } from '@/components/ui/tabs'
 
 /**
@@ -18,13 +19,13 @@ export function StaffTabs({
     <LinkTabs
       label="Staff"
       items={[
-        { label: 'Directory', href: '/staff', active: active === 'directory' },
+        { label: 'Directory', href: '/staff', active: active === 'directory', icon: Users, accent: '#6366f1' },
         ...(ctxCan.payroll
-          ? [{ label: 'Payroll', href: '/staff/payroll', active: active === 'payroll' }]
+          ? [{ label: 'Payroll', href: '/staff/payroll', active: active === 'payroll', icon: Wallet, accent: '#10b981' }]
           : []),
-        { label: 'Appraisals', href: '/staff/appraisals', active: active === 'appraisals' },
+        { label: 'Appraisals', href: '/staff/appraisals', active: active === 'appraisals', icon: Star, accent: '#f59e0b' },
         ...(ctxCan.leave
-          ? [{ label: 'Approvals', href: '/staff/approvals', active: active === 'approvals' }]
+          ? [{ label: 'Approvals', href: '/staff/approvals', active: active === 'approvals', icon: CheckCheck, accent: '#ec4899' }]
           : []),
       ]}
     />

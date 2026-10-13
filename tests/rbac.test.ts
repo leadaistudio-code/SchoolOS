@@ -37,15 +37,31 @@ describe('system roles', () => {
     }
   })
 
-  it('only the platform role holds platform permissions', () => {
+  it('only platform roles hold platform permissions', () => {
     for (const role of SYSTEM_ROLES) {
       const platformPerms = role.permissions.filter((k) => k.startsWith('platform.'))
-      if (role.key === ROLE.SUPER_ADMIN) {
+      if (role.isPlatform) {
         expect(platformPerms.length).toBeGreaterThan(0)
       } else {
         expect(platformPerms, `${role.key} must not hold platform permissions`).toEqual([])
       }
     }
+  })
+
+  it('MyCampus Support holds every tenant permission so school questions are never blocked', () => {
+    const support = SYSTEM_ROLES.find((r) => r.key === ROLE.MYCAMPUS_SUPPORT)!
+    const tenantKeys = PERMISSION_KEYS.filter((k) => !k.startsWith('platform.'))
+    for (const key of tenantKeys) {
+      expect(support.permissions, `missing ${key}`).toContain(key)
+    }
+    expect(support.permissions).toEqual(
+      expect.arrayContaining([
+        'platform.tenants',
+        'platform.impersonate',
+        'platform.support',
+        'platform.health',
+      ]),
+    )
   })
 
   it('school admin holds every tenant permission and no platform permission', () => {

@@ -19,6 +19,7 @@ import {
 import {
   createRole,
   deleteRole,
+  resetBuiltInRole,
   roleSchema,
   rolePermissionsSchema,
   setRolePermissions,
@@ -229,6 +230,7 @@ export async function setRolePermissionsAction(payload: unknown): Promise<Result
     const ctx = await requireContext('roles.manage')
     await setRolePermissions(ctx, rolePermissionsSchema.parse(payload))
     revalidatePath('/settings/roles')
+    revalidatePath('/settings/users')
     return { ok: true, message: 'Permissions saved. They apply at each holder’s next sign-in.' }
   } catch (error) {
     return failure(error, 'The permissions could not be saved')
@@ -243,6 +245,21 @@ export async function deleteRoleAction(id: string): Promise<Result> {
     return { ok: true, message: 'Role deleted.' }
   } catch (error) {
     return failure(error, 'The role could not be deleted')
+  }
+}
+
+export async function resetBuiltInRoleAction(id: string): Promise<Result> {
+  try {
+    const ctx = await requireContext('roles.manage')
+    await resetBuiltInRole(ctx, id)
+    revalidatePath('/settings/roles')
+    revalidatePath('/settings/users')
+    return {
+      ok: true,
+      message: 'Role restored to platform defaults. People must sign in again for rights to update.',
+    }
+  } catch (error) {
+    return failure(error, 'The role could not be reset')
   }
 }
 

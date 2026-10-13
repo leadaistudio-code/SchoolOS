@@ -90,10 +90,14 @@ export function BarcodeCameraScanner({
   open,
   onClose,
   onDetected,
+  title = 'Scan admit card',
+  description = 'Point the camera at the QR code on the admit card.',
 }: {
   open: boolean
   onClose: () => void
   onDetected: (value: string) => void
+  title?: string
+  description?: string
 }) {
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const controlsRef = React.useRef<IScannerControls | null>(null)
@@ -246,8 +250,8 @@ export function BarcodeCameraScanner({
         stop()
         onClose()
       }}
-      title="Scan admit card"
-      description="Point the camera at the QR code on the admit card."
+      title={title}
+      description={description}
       size="lg"
       footer={
         <>

@@ -17,6 +17,11 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { formatMoney, formatNumber, cn } from '@/lib/utils'
 import { ParentFinance } from './parent-finance'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { channelBreakdown, collectionTrend, incomeVsExpense, topDefaulters } from '@/server/modules/finance/dashboard'
+import { CollectionTrendChart } from './collection-trend-chart'
+import { ExpenseChart } from './expenses/expense-chart'
+import { LateFinesButton } from './late-fines-button'
 
 export const metadata = { title: 'Finance' }
 
@@ -138,6 +143,16 @@ export default async function FinancePage() {
     by: ['studentId'],
     where: { ...openInvoiceWhere, dueOn: { lt: today } },
   })
+  // School-wide analytics; teachers with a scoped view do not see these.
+  const [trend, channels, defaulters, pnl] = scopedFinance
+    ? [null, null, null, null]
+    : await Promise.all([
+        collectionTrend(ctx),
+        channelBreakdown(ctx),
+        ctx.can('fees.accounts') ? topDefaulters(ctx) : Promise.resolve(null),
+        ctx.can('expenses.view') ? incomeVsExpense(ctx) : Promise.resolve(null),
+      ])
+  const channelTotal = channels ? channels.officeMinor + channels.onlineMinor : 0
 
   return (
     <div className="space-y-4">
@@ -214,6 +229,147 @@ export default async function FinancePage() {
         />
       </div>
 
+      {!scopedFinance ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {ctx.can('fees.report') ? (
+            <Link href="/finance/day-end" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Day-end sheet
+            </Link>
+          ) : null}
+          {ctx.can('fees.structure') ? <LateFinesButton /> : null}
+          {ctx.can('fees.invoice') ? (
+            <Link href="/finance/invoices" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Generate installments
+            </Link>
+          ) : null}
+          <Link href="/finance/payments?preset=today" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Today&apos;s receipts
+          </Link>
+          {ctx.can('accounts.view') ? (
+            <Link href="/accounts" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Accounts &amp; ledger
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      {trend && channels ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Collection trend (6 months)</CardTitle>
+              <Link href="/finance/reports" className="text-xs text-[var(--brand-600)] hover:underline">Reports</Link>
+            </CardHeader>
+            <CardContent>
+              <CollectionTrendChart data={trend} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>This month by channel</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {channelTotal === 0 ? (
+                <p className="text-sm text-ink-muted">No collections yet this month.</p>
+              ) : (
+                <>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-surface-2">
+                    <div className="bg-[var(--brand-500)]" style={{ width: `${(channels.officeMinor / channelTotal) * 100}%` }} />
+                    <div className="bg-success" style={{ width: `${(channels.onlineMinor / channelTotal) * 100}%` }} />
+                  </div>
+                  <div className="flex justify-between text-xs text-ink-muted">
+                    <span>Office {formatMoney(channels.officeMinor, currency)}</span>
+                    <Link href="/finance/online" className="hover:underline">Online {formatMoney(channels.onlineMinor, currency)}</Link>
+                  </div>
+                  <ul className="divide-y divide-[var(--border)]">
+                    {channels.modes.map((m) => (
+                      <li key={m.mode} className="flex items-center justify-between py-1.5 text-sm">
+                        <span className="first-letter:uppercase">{m.mode.toLowerCase().replaceAll('_', ' ')} <span className="text-xs text-ink-subtle">· {m.count}</span></span>
+                        <span className="tnum">{formatMoney(m.amountMinor, currency)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {pnl ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Income vs expenses (this financial year)</CardTitle>
+              <Link href="/finance/expenses" className="text-xs text-[var(--brand-600)] hover:underline">Expenses</Link>
+            </CardHeader>
+            <CardContent>
+              <ExpenseChart data={pnl.months} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Surplus snapshot</CardTitle>
+              {ctx.can('accounts.view') ? (
+                <Link href="/accounts/profit-loss" className="text-xs text-[var(--brand-600)] hover:underline">Profit &amp; Loss</Link>
+              ) : null}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {([['This month', pnl.month], ['Financial year to date', pnl.fy]] as const).map(([label, v]) => (
+                <div key={label}>
+                  <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</p>
+                  <ul className="mt-1.5 space-y-1 text-sm">
+                    <li className="flex justify-between"><span>Fees collected</span><span className="tnum">{formatMoney(v.incomeMinor, currency)}</span></li>
+                    <li className="flex justify-between"><span>Less direct expenses</span><span className="tnum">{formatMoney(v.directMinor, currency)}</span></li>
+                    <li className="flex justify-between"><span>Less indirect expenses</span><span className="tnum">{formatMoney(v.indirectMinor, currency)}</span></li>
+                    <li className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold">
+                      <span>{v.netMinor >= 0 ? 'Net surplus' : 'Net deficit'}</span>
+                      <span className={cn('tnum', v.netMinor >= 0 ? 'text-success' : 'text-[var(--danger)]')}>{formatMoney(v.netMinor, currency)}</span>
+                    </li>
+                  </ul>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {defaulters && defaulters.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Top defaulters</CardTitle>
+            <Link href="/finance/dues/monthly?filter=defaulters" className="text-xs text-[var(--brand-600)] hover:underline">Month-wise dues</Link>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <TableWrap>
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Student</TH>
+                    <TH>Class</TH>
+                    <TH>Overdue since</TH>
+                    <TH align="right">Invoices</TH>
+                    <TH align="right">Overdue</TH>
+                  </tr>
+                </THead>
+                <TBody>
+                  {defaulters.map((d) => (
+                    <TR key={d.studentId}>
+                      <TD>
+                        <Link href={`/finance/students/${d.studentId}`} className="text-sm font-medium text-ink hover:text-[var(--brand-600)]">{d.name}</Link>
+                        <span className="block text-xs text-ink-subtle">{d.admissionNo}</span>
+                      </TD>
+                      <TD className="text-sm text-ink-muted">{d.className}</TD>
+                      <TD className="text-sm text-ink-muted">{d.oldestDue ? formatDay(d.oldestDue) : ''}</TD>
+                      <TD align="right" className="text-sm">{d.invoices}</TD>
+                      <TD align="right" className="text-sm font-medium text-[var(--danger)]">{formatMoney(d.overdueMinor, currency)}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </TableWrap>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Student payment status</CardTitle></CardHeader>
@@ -232,7 +388,7 @@ export default async function FinancePage() {
               <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{overdueStudents.length} students have overdue fees</span><Link href="/finance/dues" className="text-xs text-[var(--brand-600)] hover:underline">View dues</Link></li>
               <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{formatMoney(dueSoon._sum.balanceMinor ?? 0, currency)} due within 7 days</span><Link href="/finance/dues" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
               <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{reconciliation} payments require reconciliation</span><Link href="/finance/payments?status=PENDING" className="text-xs text-[var(--brand-600)] hover:underline">Open payments</Link></li>
-              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{pendingCheques} cheque payments are pending</span><Link href="/finance/payments?mode=CHEQUE" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
+              <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{pendingCheques} cheques pending clearance</span><Link href="/finance/payments?view=pending_cheque" className="text-xs text-[var(--brand-600)] hover:underline">Clear / bounce</Link></li>
               <li className="flex items-center justify-between gap-3 py-2"><span className="text-sm text-ink">{pendingRefunds} refunds await approval</span><Link href="/finance/payments" className="text-xs text-[var(--brand-600)] hover:underline">Review</Link></li>
             </ul>
           </CardContent>

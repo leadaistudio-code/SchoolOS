@@ -106,6 +106,8 @@ describe('schema conventions', () => {
       expect(body, `${name} must not carry tenantId`).not.toMatch(/^\s*tenantId\s+String/m)
       crmModels.push(name)
     }
-    expect(crmModels.sort()).toEqual([...PLATFORM_ONLY_MODELS].sort())
+    expect(crmModels.sort()).toEqual(
+      [...PLATFORM_ONLY_MODELS].filter((model) => model.startsWith('Crm')).sort(),
+    )
   })
 })

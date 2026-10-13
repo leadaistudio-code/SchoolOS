@@ -67,11 +67,15 @@ export type UploadedFile = {
   checksum: string
 }
 
-export async function uploadFile(
-  ctx: AppContext,
-  file: File,
-  folder: string,
-): Promise<UploadedFile> {
+export type ValidatedUpload = {
+  buffer: Buffer
+  mimeType: string
+  extension: string
+  safeName: string
+}
+
+/** Size, allow-list and content-signature checks shared by every upload path. */
+export async function validateUpload(file: File): Promise<ValidatedUpload> {
   const maxBytes = env().MAX_UPLOAD_MB * 1024 * 1024
   if (file.size === 0) throw new ApiException(400, 'BAD_REQUEST', 'The file is empty')
   if (file.size > maxBytes) {
@@ -103,6 +107,15 @@ export async function uploadFile(
 
   const extension = extensions[0]!
   const safeName = file.name.replace(/[^\w.\- ]+/g, '').slice(0, 120) || `file.${extension}`
+  return { buffer, mimeType: file.type, extension, safeName }
+}
+
+export async function uploadFile(
+  ctx: AppContext,
+  file: File,
+  folder: string,
+): Promise<UploadedFile> {
+  const { buffer, extension, safeName } = await validateUpload(file)
 
   // Tenant-prefixed, server-generated key. Nothing from the client reaches it.
   const storageKey = `${ctx.tenant.id}/${folder}/${randomToken(12)}.${extension}`
@@ -132,6 +145,40 @@ export async function readFileForCaller(
   if (!storageKey.startsWith(`${ctx.tenant.id}/`)) {
     // Deliberately the same error as "missing": do not confirm it exists.
     throw new ApiException(404, 'NOT_FOUND', 'File not found')
+  }
+
+  if (storageKey.startsWith(`${ctx.tenant.id}/expense-receipts/`)) {
+    const expense = await ctx.db.schoolExpense.findFirst({
+      where: { receiptKey: storageKey, deletedAt: null },
+      select: { receiptName: true, receiptMime: true },
+    })
+    if (!expense) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+    if (!ctx.can('expenses.view')) {
+      throw new ApiException(403, 'FORBIDDEN', 'You cannot view this receipt')
+    }
+    return {
+      body: await storageProvider().get(storageKey),
+      mimeType: expense.receiptMime ?? 'application/octet-stream',
+      fileName: expense.receiptName ?? 'receipt',
+    }
+  }
+
+  if (storageKey.startsWith(`${ctx.tenant.id}/report-card-signatures/`)) {
+    // Printed on every report card a family receives, so any signed-in member of
+    // the school may load one — but only once a template actually uses it. The
+    // designer may preview an upload before it is saved.
+    if (!ctx.can('exams.manage')) {
+      const templates = await ctx.db.reportCardTemplate.findMany({ select: { config: true } })
+      const encoded = encodeURIComponent(storageKey)
+      const used = templates.some((t) => JSON.stringify(t.config ?? null).includes(encoded))
+      if (!used) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+    }
+    const mimeType = storageKey.endsWith('.png')
+      ? 'image/png'
+      : storageKey.endsWith('.webp')
+        ? 'image/webp'
+        : 'image/jpeg'
+    return { body: await storageProvider().get(storageKey), mimeType, fileName: 'signature' }
   }
 
   const [attachment, document, textbook, answerSheet] = await Promise.all([

@@ -12,6 +12,7 @@ import {
   GraduationCap,
   LayoutGrid,
   Library,
+  Mail,
   MessageSquareText,
   Package,
   ShieldCheck,
@@ -34,6 +35,14 @@ const HEADER_PRESENTATIONS: Array<{
   keywords: string[]
   presentation: HeaderPresentation
 }> = [
+  {
+    keywords: ['mail'],
+    presentation: {
+      icon: Mail,
+      iconClassName: 'bg-info text-white',
+      washClassName: 'bg-info-bg',
+    },
+  },
   {
     keywords: ['fee', 'finance', 'invoice', 'payment', 'receipt', 'concession', 'discount', 'expense'],
     presentation: {
@@ -260,7 +269,7 @@ export function PageHeader({
           </div>
         </div>
         {actions ? (
-          <div className="flex items-center gap-2 shrink-0">{actions}</div>
+          <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </div>

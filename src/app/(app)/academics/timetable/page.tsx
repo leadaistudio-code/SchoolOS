@@ -99,7 +99,23 @@ export default async function TimetablePage({
             ? 'A teacher week: where they are, period by period.'
             : `The weekly grid for one class section · ${periods.length} periods a day`
         }
-        actions={canManage ? <NewPeriodButton periods={periods} /> : null}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {ctx.can('timetable.substitute') ? (
+              <Link href="/academics/timetable/substitutions" className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
+                Substitutions
+              </Link>
+            ) : null}
+            {canManage ? (
+              <>
+                <Link href="/academics/timetable/generator" className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
+                  Auto-generate
+                </Link>
+                <NewPeriodButton periods={periods} />
+              </>
+            ) : null}
+          </div>
+        }
       />
 
       <Card variant="elevated" className="overflow-hidden">

@@ -1,25 +1,30 @@
 import { requireContext } from '@/server/context'
-import { getClassOptions } from '@/server/modules/students/service'
+import { getClassOptions, suggestAdmissionNumber } from '@/server/modules/students/service'
 import { PageHeader } from '@/components/page-header'
 import { StudentForm } from '../student-form'
 import { createStudentAction } from '../actions'
 
-export const metadata = { title: 'Admit student' }
+export const metadata = { title: 'New admission' }
 
 export default async function NewStudentPage() {
   const ctx = await requireContext('students.create')
-  const classes = await getClassOptions(ctx)
+  const [classes, suggestedAdmissionNo] = await Promise.all([
+    getClassOptions(ctx),
+    suggestAdmissionNumber(ctx),
+  ])
 
   return (
     <div className="max-w-5xl">
       <PageHeader
-        title="Admit a student"
+        title="New admission"
+        description="Admission number is generated for you. Fill the top block, then the tabs below as the family provides details."
       />
       <StudentForm
         action={createStudentAction}
         classes={classes}
         mode="create"
         cancelHref="/students"
+        suggestedAdmissionNo={suggestedAdmissionNo}
       />
     </div>
   )

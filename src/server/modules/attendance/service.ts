@@ -3,13 +3,21 @@ import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, attendancePercent, toDateInput } from '@/lib/dates'
-import { assertMarkableSection, assertStudentAccess, studentIdScopeWhere } from '@/server/scope'
+import { toCsv } from '@/lib/csv'
+import {
+  assertMarkableSection,
+  assertStudentAccess,
+  markableSectionIds,
+  studentIdScopeWhere,
+} from '@/server/scope'
 import { notify } from '@/server/notifications'
 import type {
+  AttendanceReportExportQuery,
   AttendanceReportQuery,
   AttendanceStatusValue,
   MarkAttendanceInput,
 } from './schema'
+import { STATUS_LABEL } from './schema'
 
 /** How far back a teacher may mark without the elevated `attendance.edit` right. */
 const BACKDATE_LIMIT_DAYS = 7
@@ -563,9 +571,15 @@ export async function attendanceTrend(ctx: AppContext, from: Date, to: Date) {
 /** Sections that still have no attendance recorded for a date. */
 export async function unmarkedSections(ctx: AppContext, dateInput: string) {
   const onDate = attendanceDate(dateInput)
+  const allowedSectionIds = await markableSectionIds(ctx)
+  if (allowedSectionIds !== null && allowedSectionIds.length === 0) return []
 
   const sections = await ctx.db.section.findMany({
-    where: { deletedAt: null, enrollments: { some: { isCurrent: true } } },
+    where: {
+      deletedAt: null,
+      enrollments: { some: { isCurrent: true } },
+      ...(allowedSectionIds === null ? {} : { id: { in: allowedSectionIds } }),
+    },
     select: {
       id: true,
       name: true,
@@ -576,7 +590,10 @@ export async function unmarkedSections(ctx: AppContext, dateInput: string) {
 
   const marked = await ctx.db.studentAttendance.groupBy({
     by: ['sectionId'],
-    where: { onDate },
+    where: {
+      onDate,
+      ...(allowedSectionIds === null ? {} : { sectionId: { in: allowedSectionIds } }),
+    },
     _count: { _all: true },
   })
   const markedMap = new Map(marked.map((m) => [m.sectionId, m._count._all]))
@@ -591,4 +608,155 @@ export async function unmarkedSections(ctx: AppContext, dateInput: string) {
     }))
     .filter((s) => s.marked < s.enrolled)
     .sort((a, b) => a.numeric - b.numeric)
+}
+
+/**
+ * CSV export for the attendance report page.
+ *
+ * `summary` mirrors the on-screen per-student table. `daily` dumps every
+ * day-record in the same filter window — what offices usually need for audits.
+ * Both honour student row-scope and the class/section filters.
+ */
+export async function exportAttendanceReport(
+  ctx: AppContext,
+  query: AttendanceReportExportQuery,
+): Promise<{ filename: string; csv: string }> {
+  ctx.require('attendance.view')
+
+  if (query.table === 'daily') {
+    return exportAttendanceDaily(ctx, query)
+  }
+  return exportAttendanceSummary(ctx, query)
+}
+
+async function exportAttendanceSummary(
+  ctx: AppContext,
+  query: AttendanceReportExportQuery,
+) {
+  const { rows } = await attendanceReport(ctx, query)
+  const headers = [
+    'Admission No',
+    'Student',
+    'Class',
+    'Section',
+    'Present',
+    'Absent',
+    'Late',
+    'Half day',
+    'Leave',
+    'Attendance %',
+  ]
+  const csvRows = rows.map((r) => [
+    r.admissionNo,
+    r.name,
+    r.className,
+    r.sectionName,
+    r.present,
+    r.absent,
+    r.late,
+    r.halfDay,
+    r.leave,
+    r.percent,
+  ])
+  return {
+    filename: `attendance-summary-${query.from}-to-${query.to}.csv`,
+    csv: toCsv(headers, csvRows),
+  }
+}
+
+async function exportAttendanceDaily(
+  ctx: AppContext,
+  query: AttendanceReportExportQuery,
+) {
+  const from = attendanceDate(query.from)
+  const to = attendanceDate(query.to)
+  if (to < from) throw new ApiException(400, 'BAD_REQUEST', 'The end date is before the start date')
+  if (differenceInCalendarDays(to, from) > 400) {
+    throw new ApiException(400, 'BAD_REQUEST', 'Choose a range of one year or less')
+  }
+
+  const scope = await studentIdScopeWhere(ctx)
+
+  const records = await ctx.db.studentAttendance.findMany({
+    where: {
+      onDate: { gte: from, lte: to },
+      ...scope,
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.classLevelId
+        ? {
+            student: {
+              enrollments: { some: { classLevelId: query.classLevelId, isCurrent: true } },
+            },
+          }
+        : {}),
+    },
+    orderBy: [{ onDate: 'asc' }, { studentId: 'asc' }],
+    select: {
+      onDate: true,
+      status: true,
+      minutesLate: true,
+      remarks: true,
+      sectionId: true,
+      student: {
+        select: {
+          admissionNo: true,
+          firstName: true,
+          lastName: true,
+          enrollments: {
+            where: { isCurrent: true },
+            take: 1,
+            select: {
+              classLevel: { select: { name: true } },
+              section: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  const sectionIds = [...new Set(records.map((r) => r.sectionId))]
+  const sections =
+    sectionIds.length === 0
+      ? []
+      : await ctx.db.section.findMany({
+          where: { id: { in: sectionIds } },
+          select: {
+            id: true,
+            name: true,
+            classLevel: { select: { name: true } },
+          },
+        })
+  const sectionById = new Map(sections.map((s) => [s.id, s]))
+
+  const headers = [
+    'Date',
+    'Admission No',
+    'Student',
+    'Class',
+    'Section',
+    'Status',
+    'Minutes late',
+    'Remarks',
+  ]
+  const csvRows = records.map((r) => {
+    const enrollment = r.student.enrollments[0]
+    const section = sectionById.get(r.sectionId)
+    return [
+      toDateInput(r.onDate),
+      r.student.admissionNo,
+      `${r.student.firstName} ${r.student.lastName}`,
+      section?.classLevel.name ?? enrollment?.classLevel.name ?? null,
+      section?.name ?? enrollment?.section.name ?? null,
+      STATUS_LABEL[r.status as AttendanceStatusValue] ?? r.status,
+      r.minutesLate,
+      r.remarks,
+    ]
+  })
+
+  return {
+    filename: `attendance-daily-${query.from}-to-${query.to}.csv`,
+    csv: toCsv(headers, csvRows),
+  }
 }

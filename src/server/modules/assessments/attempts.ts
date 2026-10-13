@@ -155,9 +155,13 @@ async function studentsInScope(
   sectionId: string | null,
   classLevelId: string | null,
 ) {
+  const allowed = await accessibleStudentIds(ctx)
+  if (allowed !== null && allowed.length === 0) return []
+
   return ctx.db.student.findMany({
     where: {
       deletedAt: null,
+      ...(allowed === null ? {} : { id: { in: allowed } }),
       enrollments: {
         some: {
           isCurrent: true,

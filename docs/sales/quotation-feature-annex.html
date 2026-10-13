@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MyCampusView — Commercial Quotation · MCV/Q/56/2026</title>
+  <style>
+    :root {
+      --ink: #0a1024;
+      --ink-soft: #3d4556;
+      --ink-faint: #6b7385;
+      --paper: #ffffff;
+      --wash: #f3f2ef;
+      --rule: #d8dce6;
+      --violet: #5b3fd4;
+      --violet-soft: #f1edff;
+      --mint: #1f9d5c;
+      --on-dark: #f6f5f2;
+      --on-dark-soft: #b0b6c6;
+      --black: #000000;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @page { size: A4; margin: 0; }
+
+    html, body {
+      background: #d5d1c9;
+      color: var(--ink);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.35;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; gap: 10px; align-items: center; justify-content: center;
+      padding: 10px; background: var(--ink); color: var(--on-dark); font-size: 13px;
+    }
+    .toolbar button {
+      background: var(--violet); color: #fff; border: 0; border-radius: 6px;
+      padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    .toolbar span { color: var(--on-dark-soft); }
+
+    .page {
+      width: 210mm;
+      height: 297mm;
+      margin: 12px auto;
+      background: var(--paper);
+      box-shadow: 0 10px 36px rgba(10, 16, 36, 0.14);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    @media print {
+      html, body { background: #fff; }
+      .toolbar { display: none !important; }
+      .page {
+        margin: 0; box-shadow: none;
+        page-break-after: always; break-after: page;
+      }
+      .page:last-child { page-break-after: auto; break-after: auto; }
+    }
+
+    .hdr {
+      background: var(--black);
+      padding: 10px 10mm;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-shrink: 0;
+    }
+    .hdr img {
+      height: 42px; width: auto; max-width: 58%;
+      object-fit: contain; display: block;
+      background: #000; border: 0; outline: 0;
+    }
+    .hdr-meta {
+      text-align: right; color: var(--on-dark-soft);
+      font-size: 9pt; line-height: 1.35;
+    }
+    .hdr-meta strong {
+      display: block; color: var(--on-dark);
+      font-size: 11pt; font-weight: 700; margin-bottom: 1px;
+    }
+
+    .slim-ftr {
+      flex-shrink: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 10mm 9px;
+      border-top: 1px solid var(--rule);
+      font-size: 8.5pt; color: var(--ink-faint); background: var(--wash);
+    }
+    .slim-ftr strong { color: var(--ink); font-weight: 700; }
+
+    .ftr {
+      background: var(--black);
+      padding: 9px 10mm;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex: 0 0 auto;
+      width: 100%;
+      z-index: 2;
+    }
+    .ftr img {
+      height: 40px;
+      width: auto;
+      max-width: 58%;
+      object-fit: contain;
+      object-position: left center;
+      display: block;
+      flex-shrink: 0;
+      background: #000;
+      border: 0;
+      outline: 0;
+    }
+    .ftr-meta {
+      text-align: right; color: var(--on-dark-soft);
+      font-size: 9pt; line-height: 1.35;
+    }
+    .ftr-meta strong {
+      display: block; color: var(--on-dark);
+      font-size: 10.5pt; font-weight: 700;
+    }
+
+    .content {
+      padding: 9px 10mm 8px;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      justify-content: flex-start;
+    }
+
+    /* Last page: keep clear air above the logo footer */
+    .page.pricing-page .content {
+      gap: 8px;
+      padding: 8px 10mm 10px;
+    }
+    .page.pricing-page .plans { gap: 7px; }
+    .page.pricing-page .plan { padding: 8px 8px 9px; }
+    .page.pricing-page .plan h3 { font-size: 11.5pt; margin-bottom: 4px; }
+    .page.pricing-page .price-line { padding: 3px 0; }
+    .page.pricing-page .price-line b { font-size: 11.5pt; }
+    .page.pricing-page .price-line span { font-size: 7.5pt; }
+    .page.pricing-page .plan ul { gap: 2.5px; }
+    .page.pricing-page .plan li { font-size: 8.2pt; line-height: 1.28; }
+    .page.pricing-page .plan .blurb { font-size: 8.2pt; margin: 5px 0 5px; min-height: 2.4em; }
+    .page.pricing-page .callout { padding: 8px 11px; }
+    .page.pricing-page .callout p { font-size: 9.5pt; margin-top: 3px; }
+    .page.pricing-page .card { padding: 8px 9px; }
+    .page.pricing-page .card li { font-size: 8.8pt; }
+    .page.pricing-page .card h4 { font-size: 10pt; margin-bottom: 5px; }
+    .page.pricing-page .sec { margin-bottom: 5px; font-size: 9pt; padding-bottom: 3px; }
+    .page.pricing-page .fine { font-size: 8pt; line-height: 1.35; }
+    .page.pricing-page .g3 { gap: 8px; }
+    .page.pricing-page .g2 { gap: 8px; }
+    .page.pricing-page .setup-fee .fee-card { padding: 9px 11px; }
+    .page.pricing-page .setup-fee .fee-card .amount { font-size: 16pt; }
+    .page.pricing-page .sign-row {
+      margin-top: 4px;
+      padding-bottom: 2px;
+    }
+    .page.pricing-page .sign-row .qbox .v {
+      margin-top: 14px;
+    }
+
+    .page .ftr {
+      flex: 0 0 58px;
+      min-height: 58px;
+    }
+
+    .setup-fee {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .setup-fee .fee-card {
+      background: var(--violet-soft);
+      border: 1.5px solid var(--violet);
+      border-radius: 7px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .setup-fee .fee-card .label {
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--violet);
+    }
+    .setup-fee .fee-card .title {
+      font-size: 11.5pt;
+      font-weight: 750;
+      color: var(--ink);
+      margin-top: 2px;
+    }
+    .setup-fee .fee-card .desc {
+      font-size: 8.5pt;
+      color: var(--ink-soft);
+      margin-top: 3px;
+      line-height: 1.3;
+    }
+    .setup-fee .fee-card .amount {
+      font-size: 18pt;
+      font-weight: 750;
+      color: var(--ink);
+      white-space: nowrap;
+      line-height: 1.1;
+      text-align: right;
+    }
+    .setup-fee .fee-card .amount small {
+      display: block;
+      font-size: 8pt;
+      font-weight: 650;
+      color: var(--ink-soft);
+      margin-top: 2px;
+    }
+    .setup-fee .note-card {
+      background: var(--wash);
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      padding: 10px 11px;
+    }
+    .setup-fee .note-card h4 {
+      font-size: 10pt;
+      font-weight: 750;
+      margin-bottom: 4px;
+    }
+    .setup-fee .note-card p {
+      font-size: 8.5pt;
+      color: var(--ink-soft);
+      line-height: 1.35;
+    }
+
+    .sec {
+      font-size: 9.5pt;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--violet);
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 3px;
+      margin-bottom: 6px;
+    }
+
+    .quote-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 0.95fr 0.85fr 0.75fr;
+      gap: 6px;
+    }
+    .qbox {
+      background: var(--wash);
+      border: 1px solid var(--rule);
+      border-radius: 5px;
+      padding: 7px 8px;
+    }
+    .qbox .l {
+      font-size: 8pt; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--ink-faint);
+    }
+    .qbox .v {
+      font-size: 10pt; font-weight: 700; color: var(--ink);
+      margin-top: 2px; line-height: 1.25;
+    }
+
+    .hero-claim {
+      background: linear-gradient(135deg, var(--violet-soft), var(--wash));
+      border: 1px solid #d4ccf5;
+      border-radius: 7px;
+      padding: 12px 14px;
+    }
+    .hero-claim h2 {
+      font-size: 16pt; font-weight: 750; letter-spacing: -0.02em;
+      margin-bottom: 5px; color: var(--ink); line-height: 1.2;
+    }
+    .hero-claim p {
+      color: var(--ink-soft); font-size: 10.5pt; line-height: 1.4;
+    }
+
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+    .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+    .card {
+      background: var(--wash);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 8px 9px 9px;
+      height: 100%;
+    }
+    .card h4 {
+      font-size: 10.5pt; font-weight: 750; margin-bottom: 4px; color: var(--ink);
+    }
+    .card h4.accent { color: var(--violet); }
+    .card ul { list-style: none; display: grid; gap: 3px; }
+    .card li {
+      font-size: 9.5pt; color: var(--ink-soft);
+      padding-left: 11px; position: relative; line-height: 1.3;
+    }
+    .card li::before {
+      content: "•"; position: absolute; left: 0;
+      color: var(--violet); font-weight: 700;
+    }
+
+    .mods { width: 100%; border-collapse: collapse; }
+    .mods td {
+      vertical-align: top;
+      padding: 6px 6px 6px 0;
+      border-bottom: 1px solid var(--rule);
+      font-size: 10pt;
+    }
+    .mods td:first-child {
+      width: 18%; font-weight: 750; color: var(--ink); white-space: nowrap;
+    }
+    .mods td:last-child { color: var(--ink-soft); }
+
+    .steps {
+      list-style: none; counter-reset: s;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px;
+    }
+    .steps li {
+      counter-increment: s;
+      font-size: 10pt; color: var(--ink-soft);
+      padding: 7px 8px 7px 30px;
+      position: relative;
+      background: var(--wash);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      line-height: 1.3;
+    }
+    .steps li::before {
+      content: counter(s);
+      position: absolute; left: 7px; top: 7px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--ink); color: #fff;
+      font-size: 8.5pt; font-weight: 750; line-height: 16px; text-align: center;
+    }
+    .steps li strong { color: var(--ink); }
+
+    table.dense { width: 100%; border-collapse: collapse; }
+    table.dense th, table.dense td {
+      text-align: left; padding: 6px 6px 6px 0;
+      border-bottom: 1px solid var(--rule);
+      font-size: 9.5pt; vertical-align: top;
+    }
+    table.dense th {
+      font-size: 8pt; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--ink-faint); font-weight: 750;
+      border-bottom: 2px solid var(--ink); padding-bottom: 4px;
+    }
+    table.dense td:first-child { font-weight: 750; width: 24%; }
+    table.dense td:nth-child(2) { width: 42%; color: var(--ink-soft); }
+    table.dense td:last-child { color: var(--ink-faint); }
+
+    .plans {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; align-items: stretch;
+    }
+    .plan {
+      border: 1px solid var(--rule); border-radius: 7px;
+      padding: 10px 10px 11px; background: #fff;
+      display: flex; flex-direction: column; position: relative;
+    }
+    .plan.rec {
+      border-color: var(--violet); background: var(--violet-soft);
+      box-shadow: inset 0 0 0 1.5px var(--violet);
+    }
+    .plan .badge {
+      position: absolute; top: -7px; right: 8px;
+      background: var(--violet); color: #fff;
+      font-size: 7.5pt; font-weight: 750; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+    }
+    .plan h3 { font-size: 14pt; font-weight: 750; margin-bottom: 6px; }
+    .price-line {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 4px 0; border-top: 1px solid rgba(10,16,36,0.1);
+    }
+    .price-line span {
+      color: var(--ink-soft); font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; font-size: 8pt;
+    }
+    .price-line b { font-size: 14pt; font-weight: 750; }
+    .price-line b i {
+      font-style: normal; font-size: 9pt; font-weight: 600; color: var(--ink-soft);
+    }
+    .plan .blurb {
+      margin: 7px 0 6px; font-size: 9.5pt; color: var(--ink-soft); line-height: 1.3;
+    }
+    .plan ul { list-style: none; display: grid; gap: 3px; margin-top: auto; }
+    .plan li {
+      font-size: 9.5pt; color: var(--ink-soft);
+      padding-left: 12px; position: relative; line-height: 1.3;
+    }
+    .plan li::before {
+      content: ""; width: 5px; height: 5px; border-radius: 50%;
+      background: var(--mint); position: absolute; left: 0; top: 5px;
+    }
+    .plan.rec li::before { background: var(--violet); }
+
+    .fine { font-size: 8.5pt; color: var(--ink-faint); line-height: 1.35; }
+
+    .terms ol {
+      columns: 2; column-gap: 12px; padding-left: 15px; margin: 0;
+    }
+    .terms li {
+      font-size: 7.8pt; color: var(--ink-soft); line-height: 1.28;
+      margin-bottom: 2.5px; break-inside: avoid;
+    }
+
+    /* Page 3: delivery + T&Cs — keep clear of slim footer */
+    .page.delivery-page .content { gap: 7px; padding: 8px 10mm 6px; }
+    .page.delivery-page .sec { margin-bottom: 4px; padding-bottom: 2px; font-size: 9pt; }
+    .page.delivery-page .steps { gap: 3px; }
+    .page.delivery-page .steps li { font-size: 8.5pt; line-height: 1.28; padding: 3px 0 3px 22px; }
+    .page.delivery-page .card { padding: 7px 8px; }
+    .page.delivery-page .card h4 { font-size: 9.5pt; margin-bottom: 4px; }
+    .page.delivery-page .card li { font-size: 8.2pt; line-height: 1.28; }
+    .page.delivery-page .g2 { gap: 7px; }
+
+    .callout {
+      background: var(--ink);
+      color: var(--on-dark);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .callout strong { color: #fff; }
+    .callout p { font-size: 10pt; line-height: 1.4; color: var(--on-dark-soft); margin-top: 3px; }
+
+    .grow { flex: 1 1 auto; display: flex; flex-direction: column; gap: 9px; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <span>A4 · 4 pages · larger type · pricing on page 4</span>
+  </div>
+
+  <!-- ===================== PAGE 1 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Commercial quotation</strong>
+        School operating system · CRM + SIS + ERP
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="quote-grid">
+        <div class="qbox">
+          <div class="l">Prepared for</div>
+          <div class="v">Vivekanand International Public School (VIPS), Faridabad</div>
+        </div>
+        <div class="qbox">
+          <div class="l">Quotation ref</div>
+          <div class="v">MCV/Q/56/2026</div>
+        </div>
+        <div class="qbox">
+          <div class="l">Valid until</div>
+          <div class="v">30 days from issue</div>
+        </div>
+        <div class="qbox">
+          <div class="l">Currency</div>
+          <div class="v">INR · GST extra</div>
+        </div>
+      </div>
+
+      <div class="hero-claim">
+        <h2>One operating system for the entire school.</h2>
+        <p>
+          <strong style="color:var(--ink)">MyCampusView</strong> brings admissions, student records, academics, fees,
+          attendance, staff, parent communication and school operations onto a single connected
+          platform — so VIPS does not have to reconcile multiple tools every week.
+        </p>
+      </div>
+
+      <div>
+        <div class="sec">What this quotation covers</div>
+        <div class="g3">
+          <div class="card">
+            <h4>Pages 1–2 · Product</h4>
+            <ul>
+              <li>Platform overview for VIPS</li>
+              <li>Full module catalogue</li>
+              <li>Department-wise capabilities</li>
+              <li>Portals, roles &amp; teaching tools</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Page 3 · Delivery</h4>
+            <ul>
+              <li>4-week implementation plan</li>
+              <li>Onboarding included for VIPS</li>
+              <li>Support channels &amp; targets</li>
+              <li>Add-ons, exclusions &amp; data ownership</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Page 4 · Commercial</h4>
+            <ul>
+              <li>Essential · Starter · Growth · Elite pricing</li>
+              <li>₹15,000 one-time setup fee</li>
+              <li>Payment terms &amp; signatures</li>
+              <li>Terms on page 3</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="grow">
+        <div>
+          <div class="sec">Why VIPS benefits</div>
+          <div class="g2">
+            <div class="card">
+              <h4>One student record</h4>
+              <ul>
+                <li>Admission, attendance, fees and results on one file</li>
+                <li>No Friday spreadsheet merge across systems</li>
+                <li>Office answers parents from live data, not last night’s export</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Role-based portals</h4>
+              <ul>
+                <li>Admin, Principal, Teachers, Accountant, Front Office</li>
+                <li>Parents and students see only their own children / self</li>
+                <li>Permissions enforced on the server, not by hiding menus</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Parent visibility</h4>
+              <ul>
+                <li>Homework, fees, results and notices in one login</li>
+                <li>Live bus tracking when transport is enabled (Growth+)</li>
+                <li>Fewer counter queries during fee and exam season</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>AI with human control</h4>
+              <ul>
+                <li>Draft question papers from your syllabus</li>
+                <li>Suggest marks on uploaded answer sheets</li>
+                <li>Ask Me campus assistant — never auto-sends to parents</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec">Access channels for VIPS staff &amp; families</div>
+          <div class="g3">
+            <div class="card">
+              <h4>Web portals</h4>
+              <ul>
+                <li>Desktop &amp; mobile browser</li>
+                <li>Full role-based application</li>
+                <li>Works on school Wi-Fi / home</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Mobile</h4>
+              <ul>
+                <li>Installable progressive web app</li>
+                <li>Native Android app</li>
+                <li>School-branded app on Growth / Elite</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>School identity</h4>
+              <ul>
+                <li>Logo &amp; colours on app &amp; documents</li>
+                <li>Custom domain (Growth / Elite)</li>
+                <li>MFA &amp; session security controls</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slim-ftr">
+      <span><strong>MCV/Q/56/2026</strong> · VIPS, Faridabad</span>
+      <span>Page 1 of 4 · Overview · Confidential</span>
+    </div>
+  </section>
+
+  <!-- ===================== PAGE 2 ===================== -->
+  <section class="page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Product modules &amp; capabilities</strong>
+        MCV/Q/56/2026 · VIPS, Faridabad
+      </div>
+    </header>
+
+    <div class="content">
+      <div>
+        <div class="sec">Modules included across the platform</div>
+        <table class="mods">
+          <tr><td>Academics</td><td>Classes &amp; sections · Subjects · Syllabus · Timetable · Homework · Classwork · Academic calendar</td></tr>
+          <tr><td>Examinations</td><td>Schedules · Admit cards · Exam attendance · Mark entry · Grading · Results · Report cards · QR certificates</td></tr>
+          <tr><td>Assessments</td><td>Question bank · Paper builder · Online / print papers · Analytics · AI drafts &amp; evaluation · Learning insights</td></tr>
+          <tr><td>People</td><td>Student SIS · Parent logins · Staff · Attendance · Leave · Appraisals · Document vault · Promotions · ID cards</td></tr>
+          <tr><td>Admissions</td><td>Enquiries · Pipeline · Follow-ups · Conversion analytics · Public form · Enrol · Visitors &amp; gate passes</td></tr>
+          <tr><td>Finance</td><td>Fee structures · Invoices · Collection &amp; receipts · Ledger · Dues · Concessions · Expenses · Online parent pay</td></tr>
+          <tr><td>Communication</td><td>Notices · Messages · School email · Templates · SMS &amp; WhatsApp · 360° feedback · Ask Me assistant</td></tr>
+          <tr><td>Operations</td><td>Transport &amp; live bus tracking · Library · Inventory · Events · Sports · School website CMS</td></tr>
+          <tr><td>Administration</td><td>Dashboard · Reports · Health score · Roles · Branding · Audit trail · Custom domain · PWA · MFA</td></tr>
+        </table>
+      </div>
+
+      <div class="grow">
+        <div>
+          <div class="sec">Capability detail by department</div>
+          <div class="g2">
+            <div class="card">
+              <h4 class="accent">Leadership &amp; office</h4>
+              <ul>
+                <li>Live dashboard — strength, attendance, collection, dues, enquiries</li>
+                <li>Standard reports with CSV / print export</li>
+                <li>School health score from attendance, marks, homework &amp; fees</li>
+                <li>Custom roles with permission-level access</li>
+                <li>Audit trail on fees, results and permission changes</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4 class="accent">Admissions &amp; front office</h4>
+              <ul>
+                <li>Enquiry capture on the system — not a notebook</li>
+                <li>Kanban pipeline from visit through to enrolment</li>
+                <li>Follow-ups, call logs and overdue queue</li>
+                <li>Public enquiry form on the school website host</li>
+                <li>Visitors, gate passes and walk-in appointments</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4 class="accent">Teachers &amp; academics</h4>
+              <ul>
+                <li>Own-class register, homework and mark entry</li>
+                <li>Question bank and section-wise paper builder</li>
+                <li>Per-question analytics after every assessment</li>
+                <li>Syllabus-linked AI question drafts (approve before use)</li>
+                <li>AI answer-sheet suggestions with teacher final say</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4 class="accent">Parents, students &amp; finance</h4>
+              <ul>
+                <li>Child-scoped attendance, homework, results &amp; admit cards</li>
+                <li>Fee dues, branded receipts and online pay (at setup)</li>
+                <li>Fee structures, instalments, late fees and concessions</li>
+                <li>Outstanding / ageing reports for the accounts desk</li>
+                <li>Live bus view when transport module is enabled</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec">Operations &amp; roadmap</div>
+          <div class="g2">
+            <div class="card">
+              <h4>Operations included today</h4>
+              <ul>
+                <li>Transport routes, stops, fleet, drivers &amp; live tracking</li>
+                <li>Library catalogue, issue / return and overdue fines</li>
+                <li>Inventory from assignment through maintenance to disposal</li>
+                <li>Events, sports fixtures and school website CMS</li>
+                <li>Staff attendance with optional geofenced check-in</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Roadmap (not live — confirm in writing)</h4>
+              <ul>
+                <li>Hostel rooms, allotment and hostel attendance</li>
+                <li>Alumni records after leaving</li>
+                <li>Full double-entry accounting / Tally export</li>
+                <li>Google / Microsoft SSO</li>
+                <li>Push notification centre · custom MIS report builder</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slim-ftr">
+      <span><strong>MCV/Q/56/2026</strong> · VIPS, Faridabad</span>
+      <span>Page 2 of 4 · Modules · Confidential</span>
+    </div>
+  </section>
+
+  <!-- ===================== PAGE 3 ===================== -->
+  <section class="page delivery-page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Delivery, support &amp; terms</strong>
+        MCV/Q/56/2026 · VIPS, Faridabad
+      </div>
+    </header>
+
+    <div class="content">
+      <div>
+        <div class="sec">Implementation journey (typical ~4 weeks)</div>
+        <ol class="steps">
+          <li><strong>Discovery &amp; scope</strong> — confirm pack, modules, data sources and go-live date with VIPS</li>
+          <li><strong>Configuration &amp; branding</strong> — academic year, classes, fees, roles, logo and colours</li>
+          <li><strong>Data migration</strong> — template import, opening balances and validation with your office</li>
+          <li><strong>Training</strong> — admin, accountant, teachers, front office and parent briefing</li>
+          <li><strong>UAT &amp; go-live</strong> — checklist sign-off; launch preferred at a term boundary</li>
+          <li><strong>Hypercare</strong> — close support through the first fee / attendance cycle</li>
+        </ol>
+      </div>
+
+      <div>
+        <div class="sec">Week-by-week plan</div>
+        <div class="g2">
+          <div class="card">
+            <h4>Week 1–2 · Build the foundation</h4>
+            <ul>
+              <li>Kick-off workshop with the VIPS project owner</li>
+              <li>Issue student / staff / fee import templates</li>
+              <li>Configure fee heads, structures and academic calendar</li>
+              <li>Create staff logins and assign roles</li>
+              <li>Guide custom domain / DNS (Growth &amp; Elite)</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Week 3–4 · Train, test, launch</h4>
+            <ul>
+              <li>Import data and clean exceptions with accounts / office</li>
+              <li>Role-based training sessions (remote or scheduled)</li>
+              <li>UAT checklist signed by VIPS before go-live</li>
+              <li>Parent communication pack for portal / app access</li>
+              <li>Go-live + hypercare for the first operating cycle</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="grow">
+        <div>
+          <div class="sec">Included in onboarding for VIPS</div>
+          <div class="g3">
+            <div class="card">
+              <h4>Configuration</h4>
+              <ul>
+                <li>School profile, logo &amp; colours</li>
+                <li>Academic year, classes &amp; sections</li>
+                <li>Fee heads &amp; structures</li>
+                <li>Roles, permissions &amp; staff logins</li>
+                <li>Receipt &amp; certificate branding</li>
+                <li>Domain setup guidance</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Data &amp; training</h4>
+              <ul>
+                <li>Student / staff import templates</li>
+                <li>Opening fee balances (if provided)</li>
+                <li>Admin + accountant walkthrough</li>
+                <li>Teacher &amp; front-office orientation</li>
+                <li>Parent portal / app briefing</li>
+                <li>Recorded how-tos for key workflows</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Go-live support</h4>
+              <ul>
+                <li>UAT checklist before launch</li>
+                <li>Hypercare in first fee cycle</li>
+                <li>Email / ticket support channel</li>
+                <li>Remote screen-share assistance</li>
+                <li>Post-go-live optimisation call</li>
+                <li>Named onboarding contact</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec">Support, responsibilities &amp; exclusions</div>
+          <div class="g2">
+            <div class="card">
+              <h4>Support (indicative)</h4>
+              <ul>
+                <li>Email — contact@mycampusview.com</li>
+                <li>In-app / ticket support · scheduled remotes</li>
+                <li>Business hours IST, Monday–Saturday</li>
+                <li>Critical — within 4 business hours</li>
+                <li>High — within 1 business day</li>
+                <li>Normal / how-to — within 2 business days</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>VIPS will</h4>
+              <ul>
+                <li>Nominate one project owner</li>
+                <li>Provide clean student / staff lists</li>
+                <li>Confirm fee structures &amp; calendar</li>
+                <li>Share logo, letterhead &amp; colours</li>
+                <li>Sign off UAT and attend training</li>
+                <li>Complete domain / DNS and keep data accurate</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Optional add-ons (extra)</h4>
+              <ul>
+                <li>Extra AI or SMS / WhatsApp credits</li>
+                <li>Payment gateway MDR / setup</li>
+                <li>Biometric / GPS hardware integration</li>
+                <li>On-site training days · custom SOW reports</li>
+                <li>App-store listing support (developer fees by school)</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h4>Not included unless quoted</h4>
+              <ul>
+                <li>Hardware, printers, devices, SIMs</li>
+                <li>Apple / Google developer accounts</li>
+                <li>School internet / end-user devices</li>
+                <li>On-site boarding, lodging &amp; local travel</li>
+                <li>VIPS owns its data; export on exit per agreement</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sec">Terms &amp; conditions</div>
+          <div class="terms">
+            <ol>
+              <li>This annex summarises features and commercial terms; the signed proposal / agreement prevails if there is any conflict.</li>
+              <li>All prices are in Indian Rupees (INR) and exclude GST and other applicable taxes unless stated as inclusive.</li>
+              <li>This quotation remains valid for thirty (30) days from the issue date unless extended in writing by MyCampusView.</li>
+              <li>Yearly fees are payable in advance. Monthly fees are billed each calendar month in advance. A one-time onboarding &amp; setup fee of ₹15,000 (GST extra) is payable at kick-off.</li>
+              <li>A minimum commitment of twelve (12) months applies unless a different term is agreed in writing.</li>
+              <li>Payment-gateway charges, SMS/WhatsApp or AI usage beyond included credits, and third-party hardware are charged extra.</li>
+              <li>On-site training, custom SOW work, or branded app listing support beyond standard remote onboarding are as per the commercial schedule.</li>
+              <li>Plan limits (students, staff, storage, credits) apply; overages may require an upgrade or prepaid add-on.</li>
+              <li>VIPS is responsible for the accuracy of migrated data and for lawful processing of parent and student personal data.</li>
+              <li>Support hours and response targets are indicative; a formal SLA, if required, will be attached to the agreement.</li>
+              <li>Roadmap items are not committed deliverables unless included in a signed statement of work.</li>
+              <li>Cancellation, refunds and early termination follow the commercial agreement; unused prepaid periods are non-refundable unless agreed otherwise.</li>
+              <li>Late payment may result in suspension of access after prior written notice; reactivation requires clearance of outstanding dues.</li>
+              <li>This document is confidential and intended solely for Vivekanand International Public School (VIPS), Faridabad.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slim-ftr">
+      <span><strong>MCV/Q/56/2026</strong> · VIPS, Faridabad</span>
+      <span>Page 3 of 4 · Delivery &amp; terms · Confidential</span>
+    </div>
+  </section>
+
+  <!-- ===================== PAGE 4 — PRICING LAST ===================== -->
+  <section class="page pricing-page">
+    <header class="hdr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="hdr-meta">
+        <strong>Subscription pricing &amp; commercial terms</strong>
+        MCV/Q/56/2026 · VIPS, Faridabad
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="callout">
+        <strong>Commercial page — select pack &amp; billing cycle for VIPS</strong>
+        <p>All figures below are in INR and exclude GST. Cite quotation <strong style="color:#fff">MCV/Q/56/2026</strong> on the order form and remittance.</p>
+      </div>
+
+      <div>
+        <div class="sec">One-time onboarding &amp; setup</div>
+        <div class="setup-fee">
+          <div class="fee-card">
+            <div>
+              <div class="label">Payable once at kick-off</div>
+              <div class="title">Onboarding &amp; setup fee</div>
+              <div class="desc">Configuration, branding, data templates, role setup, training walkthrough and go-live hypercare for VIPS.</div>
+            </div>
+            <div class="amount">₹15,000<small>one-time · GST extra</small></div>
+          </div>
+          <div class="note-card">
+            <h4>How it is billed</h4>
+            <p>Invoiced with the first subscription invoice (or separately at order confirmation). Covers standard remote onboarding for the selected pack. On-site days, custom SOW work and app-store listing support remain extra if required.</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="sec">Subscription packs</div>
+        <div class="plans">
+          <article class="plan">
+            <h3>Essential Pack</h3>
+            <div class="price-line"><span>Yearly</span><b>₹36,000 <i>/ yr</i></b></div>
+            <div class="price-line"><span>Monthly</span><b>₹3,500 <i>/ mo</i></b></div>
+            <p class="blurb">Lean entry pack for smaller campuses starting digitisation.</p>
+            <ul>
+              <li>Up to 200 students · 25 staff</li>
+              <li>Core SIS, attendance &amp; basic academics</li>
+              <li>Counter fee collection &amp; receipts</li>
+              <li>Notices &amp; parent portal basics</li>
+              <li><strong>500</strong> AI usage credits</li>
+              <li><strong>500</strong> SMS + WhatsApp credits</li>
+              <li>Web portals only</li>
+            </ul>
+          </article>
+
+          <article class="plan">
+            <h3>Starter Pack</h3>
+            <div class="price-line"><span>Yearly</span><b>₹60,000 <i>/ yr</i></b></div>
+            <div class="price-line"><span>Monthly</span><b>₹5,500 <i>/ mo</i></b></div>
+            <p class="blurb">Records, fees and academics online for a compact campus.</p>
+            <ul>
+              <li>Up to 500 students · 60 staff</li>
+              <li>Core SIS, academics, fees &amp; exams</li>
+              <li>Library, events, certificates</li>
+              <li>Online payments · 1 domain</li>
+              <li><strong>1,000</strong> AI usage credits</li>
+              <li><strong>1,000</strong> SMS + WhatsApp credits</li>
+              <li>Web portals + shared Android app</li>
+            </ul>
+          </article>
+
+          <article class="plan rec">
+            <div class="badge">Recommended</div>
+            <h3>Growth Pack</h3>
+            <div class="price-line"><span>Yearly</span><b>₹84,000 <i>/ yr</i></b></div>
+            <div class="price-line"><span>Monthly</span><b>₹7,500 <i>/ mo</i></b></div>
+            <p class="blurb">CRM, transport and operations for a growing school.</p>
+            <ul>
+              <li>Up to 2,000 students · 250 staff</li>
+              <li>Admissions CRM + front office</li>
+              <li>Transport, inventory, sports, website</li>
+              <li>Custom domain · online payments</li>
+              <li><strong>2,000</strong> AI usage credits</li>
+              <li><strong>2,000</strong> SMS + WhatsApp credits</li>
+              <li><strong>Dedicated school-name app — Play Store</strong></li>
+            </ul>
+          </article>
+
+          <article class="plan">
+            <h3>Elite Pack</h3>
+            <div class="price-line"><span>Yearly</span><b>₹1,20,000 <i>/ yr</i></b></div>
+            <div class="price-line"><span>Monthly</span><b>₹10,500 <i>/ mo</i></b></div>
+            <p class="blurb">All modules, highest limits, dual-store branded apps.</p>
+            <ul>
+              <li>Unlimited students &amp; staff*</li>
+              <li>All modules included</li>
+              <li>Up to 10 domains · 100 admin users</li>
+              <li><strong>5,000</strong> AI usage credits</li>
+              <li><strong>5,000</strong> SMS + WhatsApp credits</li>
+              <li><strong>App on Play Store &amp; App Store</strong></li>
+              <li>White-label access · priority onboarding</li>
+            </ul>
+          </article>
+        </div>
+        <p class="fine" style="margin-top:7px">
+          Subscription fees above are annual or monthly as selected. The <strong>₹15,000</strong> onboarding &amp; setup fee is one-time and additional.
+          Minimum commitment 12 months. Credits are per billing period and do not roll over unless agreed in writing.
+          *Elite student/staff caps are not limited in plan entitlements. App-store developer accounts &amp; listing fees are borne by the school unless quoted otherwise.
+        </p>
+      </div>
+
+      <div>
+        <div class="sec">Payment terms &amp; next steps</div>
+        <div class="g3">
+          <div class="card">
+            <h4>Yearly</h4>
+            <ul>
+              <li>₹15,000 setup at kick-off</li>
+              <li>100% annual fee in advance</li>
+              <li>Due within 7 days of invoice</li>
+              <li>Access on cleared funds</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>Monthly</h4>
+            <ul>
+              <li>₹15,000 setup at kick-off</li>
+              <li>Then billed monthly in advance</li>
+              <li>Min. 12-month commitment</li>
+              <li>Upgrades pro-rated mid-term</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>To proceed</h4>
+            <ul>
+              <li>Confirm pack &amp; billing cycle</li>
+              <li>Pay ₹15,000 setup + first subscription</li>
+              <li>Cite MCV/Q/56/2026 on remittance</li>
+              <li>Schedule discovery kick-off</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="g2 sign-row">
+        <div class="qbox">
+          <div class="l">Authorised for MyCampusView</div>
+          <div class="v" style="margin-top:14px;border-bottom:1px solid var(--rule);padding-bottom:2px;color:var(--ink-faint)">&nbsp;</div>
+          <div class="fine" style="margin-top:4px">Name / designation · date</div>
+        </div>
+        <div class="qbox">
+          <div class="l">Accepted for VIPS, Faridabad</div>
+          <div class="v" style="margin-top:14px;border-bottom:1px solid var(--rule);padding-bottom:2px;color:var(--ink-faint)">&nbsp;</div>
+          <div class="fine" style="margin-top:4px">Name / designation · date · stamp</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="ftr">
+      <img src="mycampusview-logo.png" alt="MyCampusView" />
+      <div class="ftr-meta">
+        <strong>contact@mycampusview.com</strong>
+        MCV/Q/56/2026 · VIPS, Faridabad · Page 4 of 4 · Confidential
+      </div>
+    </footer>
+  </section>
+</body>
+</html>

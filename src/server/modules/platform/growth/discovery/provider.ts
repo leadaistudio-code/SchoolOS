@@ -8,9 +8,20 @@ export type SearchHit = {
   sourceName?: string
 }
 
+export type PlaceHit = {
+  title: string
+  address: string | null
+  phone: string | null
+  website: string | null
+  category: string | null
+  mapsUrl: string | null
+}
+
 export type LeadDiscoveryProvider = {
   readonly name: string
   searchSchools: (query: string) => Promise<SearchHit[]>
+  /** Google Maps style business listings: phone, address, website. */
+  lookupPlaces?: (query: string) => Promise<PlaceHit[]>
   fetchEvidence?: (url: string) => Promise<{ title?: string; snippet?: string } | null>
 }
 
@@ -56,6 +67,36 @@ function serperProvider(apiKey: string): LeadDiscoveryProvider {
           url: r.link!,
           snippet: r.snippet ?? '',
           sourceName: new URL(r.link!).hostname.replace(/^www\./, ''),
+        }))
+    },
+    async lookupPlaces(query) {
+      const res = await fetch('https://google.serper.dev/places', {
+        method: 'POST',
+        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: query, gl: 'in', hl: 'en' }),
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) throw new Error(`Serper places failed (${res.status})`)
+      const data = (await res.json()) as {
+        places?: {
+          title?: string
+          address?: string
+          phoneNumber?: string
+          website?: string
+          category?: string
+          cid?: string
+        }[]
+      }
+      return (data.places ?? [])
+        .filter((p) => p.title)
+        .slice(0, 5)
+        .map((p) => ({
+          title: p.title!,
+          address: p.address ?? null,
+          phone: p.phoneNumber ?? null,
+          website: p.website ?? null,
+          category: p.category ?? null,
+          mapsUrl: p.cid ? `https://maps.google.com/?cid=${p.cid}` : null,
         }))
     },
   }

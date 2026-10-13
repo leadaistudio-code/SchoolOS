@@ -9,6 +9,7 @@ import { studentIdScopeWhere, accessibleStudentIds, isPortalOnlyRole } from '@/s
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
 import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { notify } from '@/server/notifications'
+import { feeHeadActiveOn } from './fee-head-window'
 import {
   applyConcession,
   computeInvoiceTotals,
@@ -28,6 +29,11 @@ const rupees = z.coerce
 
 /* -------------------------------------------------------------- fee heads */
 
+const optionalHeadDate = z
+  .union([isoDate, z.literal(''), z.null()])
+  .optional()
+  .transform((v) => (v ? v : null))
+
 export const feeHeadSchema = z.object({
   code: z
     .string()
@@ -41,7 +47,16 @@ export const feeHeadSchema = z.object({
     .default('ANNUAL'),
   isRefundable: z.coerce.boolean().default(false),
   isDeposit: z.coerce.boolean().default(false),
+  startsOn: optionalHeadDate,
+  endsOn: optionalHeadDate,
 })
+
+function feeHeadWindow(input: { startsOn?: string | null; endsOn?: string | null }) {
+  const startsOn = input.startsOn ? attendanceDate(input.startsOn) : null
+  const endsOn = input.endsOn ? attendanceDate(input.endsOn) : null
+  if (startsOn && endsOn && endsOn < startsOn) throw conflict('The fee head end date cannot be before its start date')
+  return { startsOn, endsOn }
+}
 
 export async function listFeeHeads(ctx: AppContext) {
   if (!ctx.canAny('fees.structure', 'fees.concession', 'fees.invoice')) {
@@ -57,6 +72,8 @@ export async function listFeeHeads(ctx: AppContext) {
       frequency: true,
       isDeposit: true,
       isRefundable: true,
+      startsOn: true,
+      endsOn: true,
       _count: {
         select: {
           items: {
@@ -73,6 +90,7 @@ export async function listFeeHeads(ctx: AppContext) {
 export async function createFeeHead(ctx: AppContext, input: z.infer<typeof feeHeadSchema>) {
   ctx.require('fees.structure')
   const code = input.code.toUpperCase()
+  const fields = { ...input, ...feeHeadWindow(input), code }
 
   const existing = await ctx.db.feeHead.findFirst({ where: { code } })
   if (existing?.deletedAt === null) {
@@ -84,10 +102,10 @@ export async function createFeeHead(ctx: AppContext, input: z.infer<typeof feeHe
     created = existing
       ? await ctx.db.feeHead.update({
           where: { id: existing.id },
-          data: { ...input, code, deletedAt: null },
+          data: { ...fields, deletedAt: null },
         })
       : await ctx.db.feeHead.create({
-          data: { tenantId: ctx.tenant.id, ...input, code },
+          data: { tenantId: ctx.tenant.id, ...fields },
         })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -130,7 +148,7 @@ export async function updateFeeHead(ctx: AppContext, input: z.infer<typeof feeHe
 
   const updated = await ctx.db.feeHead.update({
     where: { id },
-    data: { ...data, code },
+    data: { ...data, ...feeHeadWindow(data), code },
   })
 
   await audit({
@@ -1039,7 +1057,8 @@ export async function generateInvoices(
 
       const applicableItems = structure.items.filter(
         (item) =>
-          !item.isOptional || opted.has(`${enrollment.studentId}:${item.feeHeadId}`),
+          (!item.isOptional || opted.has(`${enrollment.studentId}:${item.feeHeadId}`)) &&
+          feeHeadActiveOn(item.feeHead, attendanceDate(input.dueOn)),
       )
 
       const lines = applicableItems.map((item) => {

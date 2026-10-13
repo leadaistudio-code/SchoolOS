@@ -40,6 +40,14 @@ const TILES: Tile[] = [
     tone: 'attendance',
   },
   {
+    href: '/settings/cctv',
+    title: 'CCTV',
+    description: 'Watch CP PLUS cameras live; choose who sees which camera.',
+    permission: 'cctv.manage',
+    icon: 'Cctv',
+    tone: 'transport',
+  },
+  {
     href: '/settings/teacher-refresh',
     title: 'Teacher knowledge refresh',
     description: 'Professional development frequency, questions and completion rules.',

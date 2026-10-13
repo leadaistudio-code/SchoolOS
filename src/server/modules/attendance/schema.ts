@@ -56,6 +56,13 @@ export const attendanceReportQuerySchema = z.object({
 
 export type AttendanceReportQuery = z.infer<typeof attendanceReportQuerySchema>
 
+/** CSV download from the attendance report — same filters, two table shapes. */
+export const attendanceReportExportQuerySchema = attendanceReportQuerySchema.extend({
+  table: z.enum(['summary', 'daily']).default('summary'),
+})
+
+export type AttendanceReportExportQuery = z.infer<typeof attendanceReportExportQuerySchema>
+
 export const STATUS_LABEL: Record<AttendanceStatusValue, string> = {
   PRESENT: 'Present',
   ABSENT: 'Absent',

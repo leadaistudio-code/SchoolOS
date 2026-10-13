@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>MyCampusView — School ERP Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0a1024; --ink-soft: #3a4254; --ink-faint: #6b7385;
+    --wash: #f4f5f8; --rule: #d8dce6;
+    --violet: #5b3fd4; --violet-deep: #3d28a8; --violet-soft: #efeaff;
+    --mint: #1f9d5c; --mint-soft: #e8f8ef; --lime: #b8e04a;
+    --on-dark: #f6f5f2; --on-dark-soft: #b0b6c6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+  html, body {
+    background: #cfcad8; color: var(--ink);
+    font-family: "Source Sans 3", "Segoe UI", sans-serif; font-size: 10.5pt; line-height: 1.42;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page {
+    width: 210mm; height: 297mm; margin: 12px auto; background: #fff; overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(10,16,36,.18);
+    break-after: page; page-break-after: always;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+  @media print { html, body { background: #fff; } .page { margin: 0; box-shadow: none; } }
+
+  .hdr { background: #000; padding: 11px 12mm; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .hdr img { height: 38px; display: block; }
+  .hdr-meta { text-align: right; color: var(--on-dark-soft); font-size: 9.5pt; line-height: 1.3; }
+  .hdr-meta strong { display: block; color: var(--on-dark); font-size: 12pt; }
+  .pf {
+    margin-top: auto; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12mm; border-top: 1px solid var(--rule); background: var(--wash); font-size: 9pt; color: var(--ink-faint);
+  }
+  .pf strong { color: var(--ink); }
+  .body { padding: 9mm 12mm 6mm; display: flex; flex-direction: column; gap: 5mm; }
+
+  .eyebrow { font-family: Manrope, sans-serif; font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--violet); }
+  h1.t { font-family: Manrope, sans-serif; font-size: 21pt; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px; }
+  .sub { color: var(--ink-faint); font-size: 11pt; margin-top: 3px; max-width: 150mm; }
+  h3 { font-family: Manrope, sans-serif; font-weight: 800; }
+
+  /* cover */
+  .cover {
+    flex: 1; display: grid; grid-template-rows: auto 1fr auto; color: var(--on-dark);
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(91,63,212,.24), transparent 55%),
+      radial-gradient(90% 60% at 0% 100%, rgba(31,157,92,.18), transparent 50%),
+      linear-gradient(165deg, #000 0%, #0d1224 50%, #0a1024 100%);
+  }
+  .cover-top { padding: 14mm 14mm 0; display: flex; justify-content: space-between; align-items: flex-start; }
+  .cover-top img { height: 150px; }
+  .badge { font-family: Manrope, sans-serif; font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); border: 1px solid rgba(184,224,74,.45); padding: 6px 12px; border-radius: 999px; }
+  .cover-mid { padding: 0 14mm; display: flex; flex-direction: column; justify-content: center; gap: 7mm; }
+  .cover-mid .for { font-family: Manrope, sans-serif; font-size: 11pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--on-dark-soft); }
+  .cover-mid h1 { font-family: Manrope, sans-serif; font-size: 38pt; font-weight: 800; line-height: 1.05; letter-spacing: -.03em; max-width: 165mm; }
+  .cover-mid h1 .abbr { display: block; font-size: 20pt; margin-top: 8px; background: linear-gradient(90deg, #8b74ff, #b8e04a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cover-mid .lead { font-size: 14pt; color: var(--on-dark-soft); max-width: 140mm; line-height: 1.45; }
+  .cover-mid .lead b { color: #fff; }
+  .pills { display: flex; flex-wrap: wrap; gap: 7px; max-width: 170mm; }
+  .pills span { font-size: 10pt; font-weight: 700; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); padding: 5px 11px; border-radius: 999px; }
+  .cover-meta { display: grid; grid-template-columns: 1.15fr 0.9fr 0.9fr 1.35fr; border-top: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.35); }
+  .cover-meta div { padding: 6mm 0 7mm 14mm; }
+  .cover-meta div:last-child { padding-right: 10mm; }
+  .cover-meta div + div { padding-left: 6mm; border-left: 1px solid rgba(255,255,255,.08); }
+  .cover-meta small { display: block; font-size: 8.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); margin-bottom: 3px; }
+  .cover-meta span { font-size: 10.5pt; color: #fff; font-weight: 600; }
+
+  /* letter */
+  .letter p { margin-bottom: 3mm; color: var(--ink-soft); font-size: 11pt; }
+  .letter .to { color: var(--ink); font-size: 11pt; margin-bottom: 4mm; }
+  .letter .subj { font-weight: 700; color: var(--ink); margin-bottom: 4mm; }
+  .sign { margin-top: 2mm; color: var(--ink); }
+  .sign b { display: block; font-family: Manrope, sans-serif; }
+  .glance { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .glance div { border: 1px solid var(--rule); border-radius: 10px; padding: 4mm; background: var(--wash); }
+  .glance h3 { font-size: 10.5pt; color: var(--violet-deep); margin-bottom: 2mm; }
+  .glance p { font-size: 10pt; color: var(--ink-soft); }
+
+  /* challenges table */
+  table.cmp { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  table.cmp th { font-family: Manrope, sans-serif; font-size: 10pt; text-align: left; padding: 3mm 4mm; background: var(--ink); color: #fff; }
+  table.cmp th:last-child { background: var(--violet-deep); }
+  table.cmp td { padding: 3mm 4mm; vertical-align: top; font-size: 10.5pt; border-top: 1px solid var(--rule); color: var(--ink-soft); }
+  table.cmp td:first-child { width: 27%; font-weight: 700; color: var(--ink); background: var(--wash); }
+  table.cmp td:last-child { background: #fbfaff; }
+  .outcomes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+  .outcomes div { border-radius: 10px; padding: 4mm; background: var(--ink); color: var(--on-dark-soft); font-size: 9.5pt; }
+  .outcomes b { display: block; font-family: Manrope, sans-serif; color: var(--lime); font-size: 11.5pt; margin-bottom: 1.5mm; }
+
+  /* modules */
+  .body.tight { padding-top: 7mm; gap: 3.5mm; }
+  .mods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.6mm; }
+  .mod { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .mod h3 { font-size: 10.3pt; color: var(--violet-deep); padding: 2mm 3.2mm; background: linear-gradient(90deg, var(--violet-soft), #fff); border-bottom: 1px solid var(--rule); }
+  .mod ul { list-style: none; padding: 2.2mm 3.2mm 2.6mm; display: grid; gap: 1.1mm; }
+  .mod li { font-size: 9pt; line-height: 1.28; color: var(--ink-soft); padding-left: 12px; position: relative; }
+  .strip { padding: 3mm 4.5mm !important; font-size: 9.5pt !important; }
+  .mod li::before { content: ""; position: absolute; left: 0; top: 5px; width: 7px; height: 7px; border-radius: 2px; background: var(--mint); }
+  .strip { border-radius: 10px; background: var(--ink); color: var(--on-dark-soft); padding: 4mm 5mm; font-size: 10pt; }
+  .strip b { color: var(--lime); font-family: Manrope, sans-serif; margin-right: 4px; }
+
+  /* roles */
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .role { border: 1px solid var(--rule); border-radius: 10px; padding: 4.5mm 5mm; border-left: 4px solid var(--violet); }
+  .role h3 { font-size: 12pt; margin-bottom: 2mm; }
+  .role ul { list-style: none; display: grid; gap: 1.6mm; }
+  .role li { font-size: 10.3pt; color: var(--ink-soft); padding-left: 16px; position: relative; }
+  .role li::before { content: "✓"; position: absolute; left: 0; color: var(--mint); font-weight: 800; }
+  .quote { border-radius: 10px; background: var(--violet-soft); padding: 5mm 6mm; color: var(--violet-deep); font-size: 11.5pt; font-weight: 600; }
+
+  /* plan */
+  .timeline { display: grid; gap: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .ph { display: grid; grid-template-columns: 30mm 42mm 1fr; align-items: start; }
+  .ph .wk { white-space: nowrap; }
+  .ph + .ph { border-top: 1px solid var(--rule); }
+  .ph > * { padding: 3.2mm 4mm; }
+  .ph .wk { background: var(--ink); color: var(--lime); font-family: Manrope, sans-serif; font-weight: 800; font-size: 10pt; align-self: stretch; }
+  .ph .nm { font-family: Manrope, sans-serif; font-weight: 800; font-size: 10.5pt; }
+  .ph .ds { font-size: 10pt; color: var(--ink-soft); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .box { border: 1px solid var(--rule); border-radius: 10px; padding: 4mm 5mm; background: var(--wash); }
+  .box h3 { font-size: 11pt; margin-bottom: 2mm; color: var(--violet-deep); }
+  .box ul { list-style: none; display: grid; gap: 1.4mm; }
+  .box li { font-size: 10pt; color: var(--ink-soft); padding-left: 14px; position: relative; }
+  .box li::before { content: "→"; position: absolute; left: 0; color: var(--violet); font-weight: 800; }
+  .box.dark { background: linear-gradient(145deg, #0a1024, #1a1240); border: 0; }
+  .box.dark h3 { color: var(--lime); }
+  .box.dark li { color: var(--on-dark-soft); }
+  .box.dark li::before { color: var(--lime); }
+
+  /* closing */
+  .why { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+  .why div { border: 1px solid var(--rule); border-radius: 10px; padding: 3.5mm 4mm; }
+  .why b { display: block; font-family: Manrope, sans-serif; font-size: 10.5pt; margin-bottom: 1mm; }
+  .why span { font-size: 9.6pt; color: var(--ink-soft); }
+  .steps { counter-reset: s; list-style: none; display: grid; gap: 2mm; }
+  .steps li { counter-increment: s; font-size: 10.2pt; color: var(--ink-soft); padding-left: 9mm; position: relative; min-height: 6mm; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: -1px; width: 6mm; height: 6mm; border-radius: 50%; background: var(--violet); color: #fff; font-weight: 800; font-size: 9pt; display: grid; place-items: center; }
+  .steps li b { color: var(--ink); }
+  .accept { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .accept div { border-top: 2px solid var(--ink); padding-top: 2.5mm; }
+  .accept h3 { font-size: 10.5pt; margin-bottom: 3mm; }
+  .accept p { font-size: 9.6pt; color: var(--ink-faint); border-bottom: 1px dotted #aab; padding: 3.2mm 0 1mm; }
+  .accept .fill { color: var(--ink); font-weight: 700; }
+  .note { font-size: 9pt; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+
+<!-- 1 · cover -->
+<section class="page">
+  <div class="cover">
+    <div class="cover-top">
+      <img src="mycampusview-stacked.png" alt="MyCampusView" />
+      <div class="badge">School ERP proposal</div>
+    </div>
+    <div class="cover-mid">
+      <div class="for">Prepared for school management</div>
+      <h1>One connected campus<span class="abbr">for your school</span></h1>
+      <p class="lead">Admissions, fees, academics, parents and daily operations on <b>one platform</b>, with your school’s name and logo.</p>
+      <div class="pills">
+        <span>Fees &amp; accounts</span><span>Attendance</span><span>Exams &amp; report cards</span>
+        <span>Parent app</span><span>Timetable</span><span>Transport GPS</span><span>WhatsApp</span><span>CCTV live view</span>
+      </div>
+    </div>
+    <div class="cover-meta">
+      <div><small>Reference</small><span>MCV/P/2026-27/STD</span></div>
+      <div><small>Date</small><span>October 2026</span></div>
+      <div><small>Prepared by</small><span>MyCampusView</span></div>
+      <div><small>Contact</small><span>contact@mycampusview.com</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 · letter -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Covering letter</strong>Ref. MCV/P/2026-27/STD · October 2026</div>
+  </header>
+  <div class="body letter">
+    <div class="to">To,<br /><b>The Principal &amp; Management</b></div>
+    <div class="subj">Subject: Proposal to implement MyCampusView School ERP at your school</div>
+    <p>Dear Sir / Madam,</p>
+    <p>Thank you for your interest in MyCampusView. Most schools we meet run their day on a mix of registers, Excel sheets, separate accounting software and personal WhatsApp groups. Each works on its own, but together they cost the office hours every week, make fee follow-up slow, and leave management without one clear view of the school.</p>
+    <p>MyCampusView brings admissions, student records, attendance, academics, examinations, fees, accounts, parent communication, transport and campus operations onto a single, secure platform. Every module works from the same student record, so information is entered once and is available to the right people — the office, teachers, parents and management — instantly.</p>
+    <p>This proposal sets out the challenges we will solve, the scope of the solution for your school, the benefits for each group in your school, and a practical plan to go live within four to six weeks. Commercial terms will be shared separately in a formal quotation.</p>
+    <p>We would be glad to walk your team through a live demonstration using your own classes and fee structure.</p>
+    <div class="sign">Warm regards,<b>Manmohan Singh</b>Growth Manager, MyCampusView<br />contact@mycampusview.com · www.mycampusview.com</div>
+    <div class="glance">
+      <div><h3>What we propose</h3><p>One school ERP with web portals and a mobile app for management, office, teachers, parents and students.</p></div>
+      <div><h3>What changes</h3><p>Fees, attendance and results move from registers and spreadsheets to live, shared records with automatic parent updates.</p></div>
+      <div><h3>How we deliver</h3><p>Data migration, configuration, branding and training by our team, live in 4–6 weeks, with ongoing support.</p></div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 2 / 7</strong>
+  </footer>
+</section>
+
+<!-- 3 · challenges -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Challenges &amp; outcomes</strong>Why a connected campus</div>
+  </header>
+  <div class="body">
+    <div>
+      <div class="eyebrow">The challenges we solve</div>
+      <h1 class="t">From registers and follow-up calls to one live system</h1>
+      <div class="sub">What daily work typically looks like today, and how it changes with MyCampusView at your school.</div>
+    </div>
+    <table class="cmp">
+      <tr><th>Area</th><th>Typical situation today</th><th>With MyCampusView</th></tr>
+      <tr><td>Fee collection</td><td>Dues tracked in registers or sheets; reminders made by phone; receipts written by hand.</td><td>Live dues per student, automatic reminders, printed or digital receipts and online payment.</td></tr>
+      <tr><td>Attendance</td><td>Paper registers compiled at month end; parents learn of absence late.</td><td>Registers marked on the phone in minutes; parents alerted the same morning.</td></tr>
+      <tr><td>Exams &amp; results</td><td>Marks collected in Excel from each teacher; report cards prepared by hand.</td><td>Marks entry with review and approval; report cards generated in the school’s format.</td></tr>
+      <tr><td>Accounts</td><td>Receipts and expenses re-typed into Tally; reconciliation at year end.</td><td>Ledger, trial balance and P&amp;L inside the ERP, with vouchers exported to Tally.</td></tr>
+      <tr><td>Parent communication</td><td>Notices on personal WhatsApp groups; queries reach teachers at all hours.</td><td>Official parent app, WhatsApp notifications and an assistant that answers common queries.</td></tr>
+      <tr><td>Timetable &amp; cover</td><td>Timetable built by hand; substitutions arranged on the morning of the absence.</td><td>Timetable generator and a substitution board that suggests free, fairly loaded teachers.</td></tr>
+      <tr><td>Management view</td><td>Figures gathered from several people when needed.</td><td>Live dashboard and a daily WhatsApp summary of attendance, collection and incidents.</td></tr>
+    </table>
+    <div class="outcomes">
+      <div><b>Less office work</b>Information is entered once and reused across fees, attendance, results and reports.</div>
+      <div><b>Faster collection</b>Clear dues, timely reminders and online payment help parents pay on time.</div>
+      <div><b>Happier parents</b>One trusted app for attendance, homework, results, fees and the school bus.</div>
+      <div><b>Clear control</b>Role-based access, approvals and an audit trail on every important action.</div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 3 / 7</strong>
+  </footer>
+</section>
+
+<!-- 4 · scope -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Proposed solution</strong>Scope of modules</div>
+  </header>
+  <div class="body tight">
+    <div>
+      <div class="eyebrow">Scope of the solution</div>
+      <h1 class="t">Everything your school runs, on one platform</h1>
+      <div class="sub">All modules share one student record and can be switched on in phases.</div>
+    </div>
+    <div class="mods">
+      <div class="mod"><h3>Admissions &amp; front office</h3><ul><li>Enquiry pipeline with follow-ups and conversion reports</li><li>Online admission form that feeds the pipeline</li><li>Visitor log and appointments</li><li>Gate passes and student pickup with OTP / QR check</li></ul></div><div class="mod"><h3>Student information</h3><ul><li>One record per child: profile, guardians, documents</li><li>Branded student and staff ID cards</li><li>Transfer certificates and year-end promotions</li><li>Bulk import of existing student data</li></ul></div><div class="mod"><h3>Attendance &amp; leave</h3><ul><li>Daily and period-wise registers on phone or desktop</li><li>Instant absence alerts to parents</li><li>Staff attendance with geofence or biometric devices</li><li>Leave apply → approve with balances</li></ul></div><div class="mod"><h3>Academics &amp; timetable</h3><ul><li>Automatic timetable generator with locked periods</li><li>Teacher substitution board with fair allocation</li><li>Homework, classwork log and syllabus tracking</li><li>Academic calendar for staff and parents</li></ul></div><div class="mod"><h3>Examinations &amp; report cards</h3><ul><li>Exam schedules, rooms and admit cards</li><li>Marks entry with review and approval workflow</li><li>Configurable grading and holistic report cards</li><li>Certificates with QR verification</li></ul></div><div class="mod"><h3>Fees &amp; collections</h3><ul><li>Fee structures, instalments and concessions</li><li>Counter, cheque and online collection with receipts</li><li>Live dues, reminders and late-fee rules</li><li>Day-end collection report for the accountant</li></ul></div><div class="mod"><h3>Accounts &amp; Tally</h3><ul><li>Chart of accounts and journal entries</li><li>Trial balance, profit &amp; loss, balance sheet</li><li>Expense heads and expense tracking</li><li>Export of fee and expense vouchers to Tally</li></ul></div><div class="mod"><h3>Communication</h3><ul><li>Notices by class, section or role</li><li>Parent–teacher messaging inside the app</li><li>SMS and WhatsApp notifications</li><li>Daily WhatsApp summary for the principal</li></ul></div><div class="mod"><h3>Parent self-service</h3><ul><li>Parent app: attendance, fees, results, homework</li><li>Online fee payment and receipt download</li><li>Two-way WhatsApp assistant for common queries</li><li>Parent queries routed to the front office</li></ul></div><div class="mod"><h3>Transport</h3><ul><li>Buses, routes, stops and student assignment</li><li>Live bus tracking for the school and parents</li><li>Bus-approaching alerts to parents</li><li>Transport fees linked to the stop</li></ul></div><div class="mod"><h3>Campus operations</h3><ul><li>Library catalogue, issue / return and fines</li><li>Inventory and school store with billing (POS)</li><li>Purchases, stock movements and sales reports</li><li>Events and sports management</li></ul></div><div class="mod"><h3>CCTV live view</h3><ul><li>Principal and admins watch school cameras in the app</li><li>Optional classroom view for parents in set hours</li><li>Video is relayed live, never recorded by us</li><li>Simple relay app on a school PC; no router changes</li></ul></div>
+    </div>
+    <div class="strip"><b>Platform</b> Web portals for management, office, accounts, teachers, parents and students · Android app · your school’s name, logo and colours on login, receipts, report cards and certificates · role-based permissions · two-factor sign-in · audit trail · data export at any time.</div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 4 / 7</strong>
+  </footer>
+</section>
+
+<!-- 5 · roles -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Benefits by role</strong>Who gains what</div>
+  </header>
+  <div class="body">
+    <div>
+      <div class="eyebrow">Benefits for everyone at your school</div>
+      <h1 class="t">Each person sees exactly what they need</h1>
+      <div class="sub">Access is set by role, so teachers see their own classes, parents see only their own children, and management sees the whole school.</div>
+    </div>
+    <div class="roles">
+      <div class="role"><h3>Management &amp; principal</h3><ul><li>A daily WhatsApp summary of attendance, fees and incidents</li><li>Live dashboard and school health score</li><li>Every action recorded in an audit trail</li></ul></div><div class="role"><h3>Accounts office</h3><ul><li>Receipts, dues and day-end report without registers</li><li>Concessions and late fines applied by rule, not by hand</li><li>Vouchers ready for Tally; no re-typing</li></ul></div><div class="role"><h3>Teachers</h3><ul><li>Attendance and marks from the phone in minutes</li><li>Timetable and substitutions always up to date</li><li>Question bank and paper builder with optional AI help</li></ul></div><div class="role"><h3>Front office</h3><ul><li>Enquiries and visitors captured in one place</li><li>Secure student pickup with gate passes</li><li>Parent queries answered from one inbox</li></ul></div><div class="role"><h3>Parents</h3><ul><li>Attendance, homework, results and fees on one app</li><li>Pay fees online and download receipts</li><li>Live bus location and timely alerts</li></ul></div><div class="role"><h3>Students</h3><ul><li>Homework, timetable and admit cards online</li><li>Online assessments and instant feedback</li><li>Report cards and certificates in their portal</li></ul></div>
+    </div>
+    <div class="quote">“One record for every child, entered once and trusted by everyone — from the fee counter to the principal’s phone.”</div>
+    <div class="two">
+      <div class="box"><h3>AI that assists, never decides</h3><ul>
+        <li>AI drafts questions, feedback and messages for staff to review</li>
+        <li>Nothing is sent to parents or posted to accounts without approval</li>
+        <li>Teachers keep the final say on marks and evaluation</li>
+      </ul></div>
+      <div class="box"><h3>Built for Indian schools</h3><ul>
+        <li>Fee heads, instalments, concessions and late fines as schools use them</li>
+        <li>Report-card formats, TCs and certificates in your school’s style</li>
+        <li>Tally export for your accountant or CA</li>
+      </ul></div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 5 / 7</strong>
+  </footer>
+</section>
+
+<!-- 6 · plan -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Implementation plan</strong>Live in 4–6 weeks</div>
+  </header>
+  <div class="body">
+    <div>
+      <div class="eyebrow">How we will implement</div>
+      <h1 class="t">A guided go-live, handled by our team</h1>
+      <div class="sub">A typical plan for your school. Dates are fixed with your team at kick-off; we prefer to go live at the start of a term or month.</div>
+    </div>
+    <div class="timeline">
+      <div class="ph"><div class="wk">Week 1</div><div class="nm">Discovery &amp; setup</div><div class="ds">Kick-off with management, review of current registers and fee structure, school account and branding set up.</div></div><div class="ph"><div class="wk">Weeks 1–2</div><div class="nm">Data migration</div><div class="ds">Students, parents, staff, classes, fee structures and opening dues imported from your existing sheets or software.</div></div><div class="ph"><div class="wk">Weeks 2–3</div><div class="nm">Configuration</div><div class="ds">Fee plans and concessions, timetable, exam and report-card templates, roles and permissions, notifications.</div></div><div class="ph"><div class="wk">Weeks 3–4</div><div class="nm">Training</div><div class="ds">Hands-on sessions for the office, accounts, teachers and front office, followed by a short parallel run.</div></div><div class="ph"><div class="wk">Weeks 4–6</div><div class="nm">Go-live &amp; parents</div><div class="ds">Parent app onboarding, first fee cycle and attendance on the system, close support during the first weeks.</div></div>
+    </div>
+    <div class="two">
+      <div class="box"><h3>What MyCampusView provides</h3><ul>
+        <li>A dedicated onboarding contact for your school</li>
+        <li>Import of existing student, staff and fee data</li>
+        <li>Configuration of fees, timetable, exams and roles</li>
+        <li>School branding on app, receipts and documents</li>
+        <li>Role-wise training and simple user guides</li>
+        <li>Ongoing support through the in-app help desk and email</li>
+      </ul></div>
+      <div class="box"><h3>What we need from your school</h3><ul>
+        <li>One coordinator from the office for the project</li>
+        <li>Student, parent and staff lists in any format</li>
+        <li>Current fee structure, concessions and opening dues</li>
+        <li>Report-card format and class / subject list</li>
+        <li>School logo and preferred colours</li>
+        <li>Time for staff training sessions</li>
+      </ul></div>
+    </div>
+    <div class="box dark"><h3>Data security &amp; ownership</h3><ul>
+      <li>Your school’s data is kept separate from every other school and remains the property of your school</li>
+      <li>Encrypted connections, two-factor sign-in, role-based access and a full audit trail</li>
+      <li>Regular backups, and a complete data export available whenever the school asks</li>
+    </ul></div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 6 / 7</strong>
+  </footer>
+</section>
+
+<!-- 7 · close -->
+<section class="page">
+  
+  <header class="hdr">
+    <img src="mycampusview-lockup.png" alt="MyCampusView" />
+    <div class="hdr-meta"><strong>Next steps</strong>Moving forward together</div>
+  </header>
+  <div class="body">
+    <div>
+      <div class="eyebrow">Why MyCampusView</div>
+      <h1 class="t">A partner for your school’s digital journey</h1>
+    </div>
+    <div class="why">
+      <div><b>One connected system</b><span>No separate apps for fees, attendance and parents; one record, one login.</span></div>
+      <div><b>Your brand</b><span>The school’s name and logo on the app, receipts, report cards and certificates.</span></div>
+      <div><b>Quick to adopt</b><span>Simple screens for office staff and teachers, with hands-on training for every role.</span></div>
+      <div><b>Grows with you</b><span>Start with fees and attendance; add CCTV, store, transport and more later.</span></div>
+      <div><b>Always improving</b><span>Regular updates included, based on what schools ask for.</span></div>
+      <div><b>Responsive support</b><span>An in-app help desk and a team that knows schools, not a call centre.</span></div>
+    </div>
+    <div class="two">
+      <div class="box"><h3>Proposed next steps</h3>
+        <ol class="steps">
+          <li><b>Live demo</b> for management and the office, using your school’s classes and fees.</li>
+          <li><b>Scope confirmation</b> — modules for phase one and the go-live date.</li>
+          <li><b>Formal quotation</b> and agreement shared by MyCampusView.</li>
+          <li><b>Kick-off</b> — data collection and onboarding begin.</li>
+        </ol>
+      </div>
+      <div class="box dark"><h3>Contact us</h3><ul>
+        <li>contact@mycampusview.com</li>
+        <li>www.mycampusview.com</li>
+        <li>Reference MCV/P/2026-27/STD</li>
+        <li>Proposal valid for 30 days from the date it is shared</li>
+      </ul></div>
+    </div>
+    <p class="note">This proposal describes scope and approach only. Pricing, payment terms, optional hardware (biometric devices, GPS trackers, cameras) and third-party charges (SMS, WhatsApp, payment gateway) are covered in the formal quotation and agreement.</p>
+    <div>
+      <div class="eyebrow" style="margin-bottom:3mm">Acceptance of proposal</div>
+      <div class="accept">
+        <div><h3>For the school</h3><p>School name</p><p>Name</p><p>Designation</p><p>Signature &amp; school seal</p><p>Date</p></div>
+        <div><h3>For MyCampusView</h3><p>Name: <b class="fill">Manmohan Singh</b></p><p>Designation: <b class="fill">Growth Manager</b></p><p>Signature</p><p>Date</p></div>
+      </div>
+    </div>
+  </div>
+  
+  <footer class="pf">
+    <span>MyCampusView School ERP · Proposal MCV/P/2026-27/STD</span>
+    <span>Confidential</span>
+    <strong>Page 7 / 7</strong>
+  </footer>
+</section>
+
+</body>
+</html>

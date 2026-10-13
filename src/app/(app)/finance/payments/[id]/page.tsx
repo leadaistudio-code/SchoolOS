@@ -6,6 +6,7 @@ import { formatDay, toDateInput } from '@/lib/dates'
 import { formatMoney } from '@/lib/utils'
 import { sumMinor } from '@/lib/money'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { DocumentLetterhead } from '@/components/print/document-letterhead'
@@ -13,6 +14,7 @@ import { PrintButton } from './print-button'
 import { RefundDialog } from './refund-dialog'
 import { CancelReceiptDialog } from '../cancel-receipt-dialog'
 import { EditReceiptDialog } from '../edit-receipt-dialog'
+import { ChequeActions } from '../cheque-actions'
 
 export const metadata = { title: 'Receipt' }
 
@@ -58,6 +60,15 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     : null
   const paymentMode = payment.mode.toLowerCase().replaceAll('_', ' ')
   const receiptNumber = payment.receipt?.number ?? '—'
+  const pendingCheque = payment.status === 'PENDING' && payment.mode === 'CHEQUE' && payment.provider === 'manual'
+  const bouncedCheque = payment.status === 'FAILED' && payment.mode === 'CHEQUE' && payment.provider === 'manual'
+  const statusText = pendingCheque
+    ? 'Cheque pending clearance'
+    : bouncedCheque
+      ? 'Cheque bounced'
+      : payment.status === 'REVERSED'
+        ? 'Cancelled'
+        : payment.status.toLowerCase().replaceAll('_', ' ')
 
   return (
     <div className="mx-auto max-w-[210mm]">
@@ -67,11 +78,16 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           description={
             payment.status === 'SUCCESS'
               ? `Received ${payment.paidAt ? formatDay(payment.paidAt, 'd MMMM yyyy') : ''}`
-              : `This payment is ${payment.status.toLowerCase().replace('_', ' ')}`
+              : pendingCheque
+                ? `Cheque received ${payment.paidAt ? formatDay(payment.paidAt, 'd MMMM yyyy') : ''}; dues settle once it clears`
+                : bouncedCheque
+                  ? `Cheque bounced${payment.failureReason ? `: ${payment.failureReason.replace(/^Cheque bounced:\s*/, '')}` : ''}`
+                  : `This payment is ${statusText}`
           }
           actions={
             <>
               <PrintButton />
+              {ctx.can('fees.collect') && pendingCheque ? <ChequeActions paymentId={payment.id} /> : null}
               {ctx.can('fees.collect') &&
               payment.status === 'SUCCESS' &&
               payment.provider === 'manual' ? (
@@ -98,11 +114,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
               payment.provider === 'manual' ? (
                 <CancelReceiptDialog paymentId={payment.id} />
               ) : null}
+              <BackButton fallbackHref="/finance/payments" />
               <Link
-                href="/finance/payments"
-                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                href={`/finance/students/${payment.studentId}`}
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
               >
-                Back
+                View ledger
               </Link>
             </>
           }
@@ -145,7 +162,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           }`}>
             <CheckCircle2 className="size-4" aria-hidden />
             <span className="text-xs font-semibold">
-              {payment.status === 'SUCCESS' ? 'Payment received' : payment.status.toLowerCase().replaceAll('_', ' ')}
+              {payment.status === 'SUCCESS' ? 'Payment received' : statusText}
             </span>
           </div>
         </div>
@@ -317,7 +334,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
 
         {payment.status !== 'SUCCESS' ? (
           <Badge tone={payment.status === 'FAILED' ? 'danger' : 'warning'}>
-            {payment.status.toLowerCase().replace('_', ' ')}
+            {statusText}
           </Badge>
         ) : null}
 

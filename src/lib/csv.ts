@@ -107,3 +107,25 @@ export function toCsv(headers: string[], rows: Array<Array<string | number | nul
   }
   return [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))].join('\n')
 }
+
+type Cell = string | number | null | undefined
+
+function safeCell(value: Cell): string {
+  const text = value == null ? '' : String(value)
+  // Leading = + - @ would run as a formula in Excel; plain numbers are fine.
+  const numeric = /^-?\d+(\.\d+)?$/.test(text)
+  const safe = !numeric && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+}
+
+/** CSV file response (Excel-friendly BOM, formula-injection guarded). */
+export function csvResponse(filename: string, headers: string[], rows: Cell[][]): Response {
+  const body = [headers, ...rows].map((r) => r.map(safeCell).join(',')).join('\r\n')
+  return new Response(`\uFEFF${body}\r\n`, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename.replace(/[^\w.-]+/g, '-')}"`,
+      'Cache-Control': 'no-store',
+    },
+  })
+}

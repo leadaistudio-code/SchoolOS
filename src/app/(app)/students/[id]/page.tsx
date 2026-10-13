@@ -75,15 +75,25 @@ export default async function StudentDetailPage({
           />
         }
         actions={
-          ctx.can('students.edit') ? (
-            <Link
-              href={`/students/${student.id}/edit`}
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              <Pencil aria-hidden />
-              Edit
-            </Link>
-          ) : null
+          <>
+            {ctx.can('students.tc') && student.status === 'ACTIVE' ? (
+              <Link
+                href={`/students/transfer-certificates/new?student=${student.id}`}
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                Issue TC
+              </Link>
+            ) : null}
+            {ctx.can('students.edit') ? (
+              <Link
+                href={`/students/${student.id}/edit`}
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                <Pencil aria-hidden />
+                Edit
+              </Link>
+            ) : null}
+          </>
         }
       />
 
@@ -158,6 +168,26 @@ function StudentProfile({ ctx, student }: { ctx: AppContext; student: StudentRec
               <DescriptionItem label="Gender">{student.gender ? student.gender.toLowerCase() : '-'}</DescriptionItem>
               <DescriptionItem label="Blood group">{student.bloodGroup ?? '-'}</DescriptionItem>
               <DescriptionItem label="Admitted on">{student.admissionDate ? formatDay(student.admissionDate, 'd MMM yyyy') : '-'}</DescriptionItem>
+              {student.religion || student.category || student.caste ? (
+                <DescriptionItem label="Religion / category">
+                  {[student.religion, student.category, student.caste].filter(Boolean).join(' · ')}
+                </DescriptionItem>
+              ) : null}
+              {student.motherTongue || student.nationality ? (
+                <DescriptionItem label="Mother tongue / nationality">
+                  {[student.motherTongue, student.nationality].filter(Boolean).join(' · ')}
+                </DescriptionItem>
+              ) : null}
+              {student.aadhaarNo ? (
+                <DescriptionItem label="Aadhaar">{`XXXX XXXX ${student.aadhaarNo.slice(-4)}`}</DescriptionItem>
+              ) : null}
+              {student.house ? <DescriptionItem label="House">{student.house}</DescriptionItem> : null}
+              {student.birthPlace ? <DescriptionItem label="Birth place">{student.birthPlace}</DescriptionItem> : null}
+              {student.identificationMark ? (
+                <DescriptionItem label="Identification mark">{student.identificationMark}</DescriptionItem>
+              ) : null}
+              {student.disability ? <DescriptionItem label="Disability">{student.disability}</DescriptionItem> : null}
+              {student.whatsappPhone ? <DescriptionItem label="WhatsApp">{student.whatsappPhone}</DescriptionItem> : null}
               <DescriptionItem label="Address">{
                   [student.addressLine1, student.city, student.state, student.postalCode]
                     .filter(Boolean)

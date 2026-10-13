@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.connector.json
+*.log
+service/run-service.cmd
+service/app-exe.path
+.DS_Store

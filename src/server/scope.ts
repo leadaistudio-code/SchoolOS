@@ -15,6 +15,7 @@ export type ScopedStudent = {
 
 const UNRESTRICTED_ROLE_KEYS = new Set<string>([
   ROLE.SUPER_ADMIN,
+  ROLE.MYCAMPUS_SUPPORT,
   ROLE.SCHOOL_ADMIN,
   ROLE.PRINCIPAL,
 ])
@@ -55,35 +56,57 @@ export const teachingStaffId = cache(async (ctx: AppContext): Promise<string | n
   return staff?.id ?? null
 })
 
-/** Class levels the teacher is assigned to via subject or as class teacher. */
-export const teachingClassLevelIds = cache(
-  async (ctx: AppContext): Promise<string[] | null> => {
-    const staffId = await teachingStaffId(ctx)
-    if (staffId === null) return null
-    if (!staffId) return []
+/**
+ * Sections a staff member teaches: class-teacher ownership, plus every section
+ * covered by their ClassSubject rows. When a ClassSubject has no SectionSubject
+ * mappings, every section of that class is included (core subjects).
+ */
+export async function sectionIdsForStaff(
+  ctx: AppContext,
+  staffId: string,
+  sessionId: string,
+): Promise<string[]> {
+  const [asClassTeacher, classSubjects] = await Promise.all([
+    ctx.db.section.findMany({
+      where: {
+        classTeacherId: staffId,
+        deletedAt: null,
+        classLevel: { sessionId, deletedAt: null },
+      },
+      select: { id: true },
+    }),
+    ctx.db.classSubject.findMany({
+      where: { teacherId: staffId },
+      select: {
+        sections: { select: { sectionId: true } },
+        classLevel: {
+          select: {
+            sessionId: true,
+            deletedAt: true,
+            sections: {
+              where: { deletedAt: null },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    }),
+  ])
 
-    const [fromSubjects, fromClassTeacher] = await Promise.all([
-      ctx.db.classSubject.findMany({
-        where: { teacherId: staffId },
-        select: { classLevelId: true },
-      }),
-      ctx.db.section.findMany({
-        where: { classTeacherId: staffId, deletedAt: null },
-        select: { classLevelId: true },
-      }),
-    ])
+  const sectionIds = new Set(asClassTeacher.map((s) => s.id))
+  for (const cs of classSubjects) {
+    if (cs.classLevel.sessionId !== sessionId || cs.classLevel.deletedAt) continue
+    if (cs.sections.length === 0) {
+      for (const section of cs.classLevel.sections) sectionIds.add(section.id)
+    } else {
+      for (const mapping of cs.sections) sectionIds.add(mapping.sectionId)
+    }
+  }
+  return [...sectionIds]
+}
 
-    return [
-      ...new Set([
-        ...fromSubjects.map((r) => r.classLevelId),
-        ...fromClassTeacher.map((r) => r.classLevelId),
-      ]),
-    ]
-  },
-)
-
-/** Sections a teacher-only user may mark attendance for. */
-export const markableSectionIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
+/** Sections a teacher-only user is assigned to (subject or class teacher). */
+export const teachingSectionIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
   const staffId = await teachingStaffId(ctx)
   if (staffId === null) return null
   if (!staffId) return []
@@ -94,26 +117,32 @@ export const markableSectionIds = cache(async (ctx: AppContext): Promise<string[
   })
   if (!session) return []
 
-  const rows = await ctx.db.section.findMany({
-    where: {
-      deletedAt: null,
-      classLevel: { sessionId: session.id, deletedAt: null },
-      OR: [
-        { classTeacherId: staffId },
-        { classLevel: { subjects: { some: { teacherId: staffId } } } },
-      ],
-    },
-    select: { id: true },
-  })
-  return rows.map((r) => r.id)
+  return sectionIdsForStaff(ctx, staffId, session.id)
+})
+
+/** Class levels derived from the teacher's assigned sections. */
+export const teachingClassLevelIds = cache(
+  async (ctx: AppContext): Promise<string[] | null> => {
+    const sectionIds = await teachingSectionIds(ctx)
+    if (sectionIds === null) return null
+    if (sectionIds.length === 0) return []
+
+    const sections = await ctx.db.section.findMany({
+      where: { id: { in: sectionIds }, deletedAt: null },
+      select: { classLevelId: true },
+    })
+    return [...new Set(sections.map((s) => s.classLevelId))]
+  },
+)
+
+/** Sections a teacher-only user may mark attendance for. */
+export const markableSectionIds = cache(async (ctx: AppContext): Promise<string[] | null> => {
+  return teachingSectionIds(ctx)
 })
 
 async function teachingStudentIds(ctx: AppContext): Promise<string[]> {
-  const classLevelIds = await teachingClassLevelIds(ctx)
-  if (!classLevelIds || classLevelIds.length === 0) return []
-
-  const staffId = await teachingStaffId(ctx)
-  if (!staffId) return []
+  const sectionIds = await teachingSectionIds(ctx)
+  if (!sectionIds || sectionIds.length === 0) return []
 
   const session = await ctx.db.academicSession.findFirst({
     where: { isCurrent: true },
@@ -121,21 +150,12 @@ async function teachingStudentIds(ctx: AppContext): Promise<string[]> {
   })
   if (!session) return []
 
-  const ownedSections = await ctx.db.section.findMany({
-    where: { classTeacherId: staffId, deletedAt: null },
-    select: { id: true },
-  })
-  const sectionIds = ownedSections.map((s) => s.id)
-
   const enrollments = await ctx.db.enrollment.findMany({
     where: {
       sessionId: session.id,
       isCurrent: true,
+      sectionId: { in: sectionIds },
       student: { deletedAt: null, status: 'ACTIVE' },
-      OR: [
-        { classLevelId: { in: classLevelIds } },
-        ...(sectionIds.length > 0 ? [{ sectionId: { in: sectionIds } }] : []),
-      ],
     },
     select: { studentId: true },
   })

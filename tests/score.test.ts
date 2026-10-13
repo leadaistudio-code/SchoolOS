@@ -209,7 +209,7 @@ describe('resolving stored weights', () => {
   it('lets a stored row override the default', () => {
     const resolved = resolveWeights('STUDENT', [w('ACADEMICS', 5)])
     expect(resolved.find((x) => x.metric === 'ACADEMICS')!.weight).toBe(5)
-    expect(resolved.find((x) => x.metric === 'ATTENDANCE')!.weight).toBe(25)
+    expect(resolved.find((x) => x.metric === 'ATTENDANCE')!.weight).toBe(24)
   })
 
   it('keeps a metric switched off when that is what was stored', () => {

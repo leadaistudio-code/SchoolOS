@@ -29,6 +29,8 @@ export type NavItem = {
   href: string
   icon: string
   permission?: string
+  /** Visible when the user holds at least one of these. */
+  anyPermission?: string[]
   feature?: FeatureKey
   children?: NavItem[]
   /** Which captioned block of the sidebar this belongs to. Top level only. */
@@ -64,11 +66,12 @@ export const NAVIGATION: NavItem[] = [
     mobile: true,
     children: [
       { label: 'All Students', href: '/students', icon: 'Users', permission: 'students.view' },
-      { label: 'Add Student', href: '/students/new', icon: 'UserPlus', permission: 'students.create' },
+      { label: 'New Admission', href: '/students/new', icon: 'UserPlus', permission: 'students.create' },
       { label: 'Bulk Import', href: '/students/import', icon: 'Upload', permission: 'students.import' },
       { label: 'Bulk Photos', href: '/students/photo-import', icon: 'Upload', permission: 'students.edit' },
       { label: 'Promotions', href: '/students/promotions', icon: 'ArrowUpRight', permission: 'students.promote' },
       { label: 'Documents', href: '/students/documents', icon: 'FolderOpen', permission: 'students.documents' },
+      { label: 'Transfer Certificates', href: '/students/transfer-certificates', icon: 'FileOutput', permission: 'students.tc' },
       { label: 'ID Cards', href: '/students/id-cards', icon: 'IdCard', permission: 'students.id_cards' },
     ],
   },
@@ -85,6 +88,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Payroll', href: '/staff/payroll', icon: 'Wallet', permission: 'staff.payroll' },
       { label: 'Appraisals', href: '/staff/appraisals', icon: 'ClipboardCheck', permission: 'staff.view' },
       { label: 'Approvals', href: '/staff/approvals', icon: 'CheckCheck', permission: 'leave.view' },
+      { label: 'Staff ID Cards', href: '/staff/id-cards', icon: 'IdCard', permission: 'staff.id_cards' },
     ],
   },
 
@@ -117,6 +121,8 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Homework', href: '/academics/homework', icon: 'ClipboardList', permission: 'homework.view' },
       { label: 'Classwork', href: '/academics/classwork', icon: 'PenLine', permission: 'classwork.view' },
       { label: 'Timetable', href: '/academics/timetable', icon: 'Clock', permission: 'timetable.view' },
+      { label: 'Substitutions', href: '/academics/timetable/substitutions', icon: 'UserRoundCog', permission: 'timetable.view', staffOnly: true },
+      { label: 'Timetable generator', href: '/academics/timetable/generator', icon: 'WandSparkles', permission: 'timetable.manage' },
       { label: 'Calendar', href: '/academics/calendar', icon: 'CalendarDays', permission: 'calendar.view' },
     ],
   },
@@ -199,7 +205,7 @@ export const NAVIGATION: NavItem[] = [
       },
       { label: 'Admit Cards', href: '/exams/admit-cards', icon: 'IdCard', permission: 'exams.admit_cards' },
       { label: 'Exam Attendance', href: '/exams/attendance', icon: 'ClipboardCheck', permission: 'exams.attendance' },
-      { label: 'Marks Entry', href: '/exams/marks', icon: 'PencilRuler', permission: 'exams.marks' },
+      { label: 'Marks Management', href: '/exams/marks', icon: 'PencilRuler', permission: 'exams.marks' },
       { label: 'Grading Scales', href: '/exams/grades', icon: 'Scale', permission: 'exams.manage' },
       { label: 'Results', href: '/exams/results', icon: 'Trophy', permission: 'results.view' },
       { label: 'Report Cards', href: '/exams/report-cards', icon: 'FileText', permission: 'results.view' },
@@ -222,15 +228,39 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Dashboard', href: '/finance', icon: 'LayoutDashboard', permission: 'fees.view' },
       { label: 'Fee Setup', href: '/finance/structures', icon: 'ListTree', permission: 'fees.structure' },
+      { label: 'Non class linked fees', href: '/finance/non-class-fees', icon: 'Layers', permission: 'fees.structure' },
       { label: 'Collect Fee', href: '/finance/collect', icon: 'BadgeIndianRupee', permission: 'fees.collect' },
-      { label: 'Ledger', href: '/finance/students', icon: 'Users', permission: 'fees.accounts' },
+      { label: 'Receipts', href: '/finance/payments', icon: 'ReceiptIndianRupee', permission: 'fees.view' },
+      { label: 'Online / app fees', href: '/finance/online', icon: 'Smartphone', permission: 'fees.view' },
+      { label: 'Student ledger', href: '/finance/students', icon: 'Users', permission: 'fees.accounts' },
       { label: 'Discounts', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
       { label: 'Dues', href: '/finance/dues', icon: 'AlertCircle', permission: 'fees.accounts' },
+      { label: 'Month-wise dues', href: '/finance/dues/monthly', icon: 'CalendarRange', permission: 'fees.accounts' },
+      { label: 'Day-end sheet', href: '/finance/day-end', icon: 'ClipboardList', permission: 'fees.report' },
       { label: 'Reports', href: '/finance/reports', icon: 'ReceiptText', permission: 'fees.report' },
+      { label: 'Tally', href: '/finance/tally', icon: 'BookMarked', permission: 'fees.tally' },
+      { label: 'Tally trial balance', href: '/finance/tally/trial-balance', icon: 'Scale', permission: 'fees.tally' },
     ],
   },
   {
-    label: 'Expense tracker',
+    label: 'Accounts & Ledger',
+    href: '/accounts',
+    icon: 'Landmark',
+    section: 'FINANCE' as const,
+    permission: 'accounts.view',
+    children: [
+      { label: 'Overview', href: '/accounts', icon: 'LayoutDashboard', permission: 'accounts.view' },
+      { label: 'Chart of accounts', href: '/accounts/chart', icon: 'ListTree', permission: 'accounts.view' },
+      { label: 'Journal entries', href: '/accounts/journals', icon: 'NotebookPen', permission: 'accounts.view' },
+      { label: 'General ledger', href: '/accounts/ledger', icon: 'BookOpen', permission: 'accounts.view' },
+      { label: 'Trial balance', href: '/accounts/trial-balance', icon: 'Scale', permission: 'accounts.view' },
+      { label: 'Profit & loss', href: '/accounts/profit-loss', icon: 'TrendingUp', permission: 'accounts.view' },
+      { label: 'Balance sheet', href: '/accounts/balance-sheet', icon: 'Building2', permission: 'accounts.view' },
+      { label: 'Posting rules', href: '/accounts/settings', icon: 'Settings2', permission: 'accounts.view' },
+    ],
+  },
+  {
+    label: 'Expenses',
     href: '/finance/expenses',
     icon: 'WalletCards',
     section: 'FINANCE' as const,
@@ -359,6 +389,12 @@ export const NAVIGATION: NavItem[] = [
     section: 'GROWTH' as const,
     permission: 'frontoffice.view',
     feature: FEATURE.MODULE_FRONT_OFFICE,
+    children: [
+      { label: 'Visitors & appointments', href: '/front-office', icon: 'DoorOpen', permission: 'frontoffice.view' },
+      { label: 'Gate passes', href: '/front-office/gate-passes', icon: 'TicketCheck', permission: 'frontoffice.view' },
+      { label: 'Gate scan', href: '/front-office/gate', icon: 'ScanLine', permission: 'frontoffice.gate' },
+      { label: 'Parent queries', href: '/front-office/parent-queries', icon: 'MessagesSquare', permission: 'messages.parent_queries' },
+    ],
   },
   {
     label: 'Transport',
@@ -373,8 +409,30 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Assignments', href: '/transport/assignments', icon: 'UserCheck', permission: 'transport.manage' },
     ],
   },
+  {
+    label: 'Live CCTV',
+    href: '/cctv',
+    icon: 'Cctv',
+    section: 'OPERATIONS' as const,
+    anyPermission: ['cctv.view_all', 'cctv.view_gate', 'cctv.view_child'],
+  },
   { label: 'Library', href: '/library', icon: 'Library', section: 'OPERATIONS' as const, permission: 'library.view', feature: FEATURE.MODULE_LIBRARY },
-  { label: 'Inventory', href: '/inventory', icon: 'Package', section: 'OPERATIONS' as const, permission: 'inventory.view', feature: FEATURE.MODULE_INVENTORY },
+  {
+    label: 'Inventory & Store',
+    href: '/inventory',
+    icon: 'Package',
+    section: 'OPERATIONS' as const,
+    feature: FEATURE.MODULE_INVENTORY,
+    children: [
+      { label: 'Store dashboard', href: '/inventory/store', icon: 'Store', permission: 'store.view' },
+      { label: 'Sell (POS)', href: '/inventory/store/sell', icon: 'ShoppingCart', permission: 'store.sell' },
+      { label: 'Items & stock', href: '/inventory/store/items', icon: 'Boxes', permission: 'store.view' },
+      { label: 'Stock in', href: '/inventory/store/purchases', icon: 'PackagePlus', permission: 'store.view' },
+      { label: 'Sales & bills', href: '/inventory/store/sales', icon: 'ReceiptText', permission: 'store.view' },
+      { label: 'Stock ledger', href: '/inventory/store/movements', icon: 'History', permission: 'store.view' },
+      { label: 'Fixed assets', href: '/inventory', icon: 'Armchair', permission: 'inventory.view' },
+    ],
+  },
   { label: 'Sports', href: '/sports', icon: 'Medal', section: 'OPERATIONS' as const, permission: 'sports.view', feature: FEATURE.MODULE_SPORTS },
   { label: 'Events', href: '/events', icon: 'PartyPopper', section: 'OPERATIONS' as const, permission: 'events.view', feature: FEATURE.MODULE_EVENTS },
   { label: 'School Website', href: '/website', icon: 'Globe', section: 'ENGAGEMENT' as const, permission: 'website.view', feature: FEATURE.MODULE_WEBSITE },
@@ -434,10 +492,14 @@ export const NAVIGATION: NavItem[] = [
       { label: 'School location', href: '/settings/location', icon: 'MapPin', permission: 'settings.view' },
       { label: 'GPS trackers', href: '/settings/tracking', icon: 'Satellite', permission: 'transport.manage' },
       { label: 'Biometric', href: '/settings/biometric', icon: 'Fingerprint', permission: 'biometric.view' },
+      { label: 'CCTV', href: '/settings/cctv', icon: 'Cctv', permission: 'cctv.manage' },
+      { label: 'Tally ERP', href: '/settings/tally', icon: 'BookMarked', permission: 'settings.integrations' },
       { label: 'Branding', href: '/settings/branding', icon: 'Palette', permission: 'settings.branding' },
       { label: 'Teacher knowledge refresh', href: '/settings/teacher-refresh', icon: 'BrainCircuit', permission: 'teacher_refresh.configure' },
       { label: 'Security', href: '/settings/security', icon: 'ShieldCheck', permission: 'settings.view' },
       { label: 'Custom Domains', href: '/settings/domains', icon: 'Globe', permission: 'settings.manage' },
+      { label: 'Daily WhatsApp summary', href: '/settings/daily-summary', icon: 'Sunrise', permission: 'settings.manage' },
+      { label: 'WhatsApp assistant', href: '/settings/whatsapp-assistant', icon: 'Bot', permission: 'settings.manage' },
       { label: 'Message templates', href: '/settings/templates', icon: 'FileText', permission: 'settings.manage' },
       { label: 'Email', href: '/settings/email', icon: 'Mail', permission: 'settings.manage' },
       { label: 'Help & Support', href: '/help/tickets', icon: 'LifeBuoy', permission: 'support.view' },
@@ -458,6 +520,7 @@ export function visibleNavigation(items: NavItem[], p: NavPredicate): NavItem[] 
   for (const item of items) {
     if (item.feature && !p.hasFeature(item.feature)) continue
     if (item.permission && !p.can(item.permission)) continue
+    if (item.anyPermission && !item.anyPermission.some((key) => p.can(key))) continue
     if (item.portalOnly && !p.isPortal) continue
     if (item.staffOnly && p.isPortal) continue
     const children = item.children ? visibleNavigation(item.children, p) : undefined
@@ -465,6 +528,29 @@ export function visibleNavigation(items: NavItem[], p: NavPredicate): NavItem[] 
     out.push({ ...item, children })
   }
   return out
+}
+
+export type QuickAction = {
+  label: string
+  /** Shorter label for the header pill. */
+  short: string
+  href: string
+  icon: string
+  tone: 'fees' | 'admissions' | 'attendance'
+  /** Shown only when this navigation entry is visible to the user. */
+  gate: string
+}
+
+/** Everyday desk tasks pinned to the header. */
+export const QUICK_ACTIONS: QuickAction[] = [
+  { label: 'Collect fee', short: 'Collect fee', href: '/finance/collect', icon: 'BadgeIndianRupee', tone: 'fees', gate: '/finance/collect' },
+  { label: 'New admission', short: 'Admission', href: '/students/new', icon: 'UserPlus', tone: 'admissions', gate: '/students/new' },
+  { label: 'Mark attendance', short: 'Attendance', href: '/attendance', icon: 'CalendarCheck', tone: 'attendance', gate: '/attendance' },
+]
+
+export function visibleQuickActions(visible: NavItem[]): QuickAction[] {
+  const hrefs = new Set(flattenNavigation(visible).map((i) => i.href))
+  return QUICK_ACTIONS.filter((a) => hrefs.has(a.gate))
 }
 
 /** Flattened list used by global search and the command palette. */

@@ -7,7 +7,9 @@ import { requirePlatformContext } from '@/server/context'
 import { ApiException } from '@/server/api/response'
 import { emptyFormState, type FormState } from '@/lib/form-state'
 import {
+  addSchoolPhotos,
   captureFieldLead,
+  deleteCrmPhoto,
   completeFollowUp,
   completeMeeting,
   createContact,
@@ -84,13 +86,39 @@ export async function createSchoolAction(_prev: FormState, formData: FormData): 
 export async function captureFieldLeadAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requirePlatformContext('platform.crm_create')
   try {
-    const school = await captureFieldLead(ctx, fieldCaptureSchema.parse(raw(formData)))
+    const school = await captureFieldLead(ctx, fieldCaptureSchema.parse(raw(formData)), photoFiles(formData))
     revalidatePath('/platform/growth')
     revalidatePath('/platform/growth/today')
-    redirect(`/platform/growth/schools/${school.id}`)
+    redirect(`/platform/growth/schools/${school.id}?captured=1`)
   } catch (error) {
     if (typeof error === 'object' && error && 'digest' in error) throw error
     return fail(error, 'Could not save the field capture')
+  }
+}
+
+function photoFiles(formData: FormData): File[] {
+  return formData.getAll('photos').filter((v): v is File => typeof v !== 'string' && v.size > 0)
+}
+
+export async function addSchoolPhotosAction(schoolId: string, formData: FormData): Promise<FormState> {
+  const ctx = await requirePlatformContext('platform.crm_edit')
+  try {
+    const n = await addSchoolPhotos(ctx, schoolId, photoFiles(formData))
+    revalidatePath(`/platform/growth/schools/${schoolId}`)
+    return { ...emptyFormState, ok: true, message: `${n} photo${n === 1 ? '' : 's'} added` }
+  } catch (error) {
+    return fail(error, 'Could not add the photos')
+  }
+}
+
+export async function deleteCrmPhotoAction(id: string): Promise<FormState> {
+  const ctx = await requirePlatformContext('platform.crm_edit')
+  try {
+    const schoolId = await deleteCrmPhoto(ctx, id)
+    revalidatePath(`/platform/growth/schools/${schoolId}`)
+    return { ...emptyFormState, ok: true, message: 'Photo removed' }
+  } catch (error) {
+    return fail(error, 'Could not remove the photo')
   }
 }
 

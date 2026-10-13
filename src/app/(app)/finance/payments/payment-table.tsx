@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/input'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { formatDay } from '@/lib/dates'
 import { formatMoney } from '@/lib/utils'
+import { ChequeActions } from './cheque-actions'
 
 type PaymentRow = {
   id: string
@@ -26,6 +27,26 @@ type PaymentRow = {
   amountMinor: number
   refundedMinor: number
   status: string
+  providerPaymentId?: string | null
+  failureReason?: string | null
+}
+
+function isPendingCheque(p: PaymentRow) {
+  return p.status === 'PENDING' && p.mode === 'CHEQUE' && p.provider === 'manual'
+}
+
+/** Receipt-book wording: a counter cheque is "pending clearance" or "bounced". */
+export function PaymentStatus({ payment }: { payment: PaymentRow }) {
+  if (isPendingCheque(payment)) return <StatusBadge status="PENDING" label="Pending clearance" />
+  if (payment.status === 'FAILED' && payment.mode === 'CHEQUE' && payment.provider === 'manual') {
+    return (
+      <span title={payment.failureReason ?? undefined}>
+        <StatusBadge status="FAILED" label="Bounced" />
+      </span>
+    )
+  }
+  if (payment.status === 'REVERSED') return <StatusBadge status="REVERSED" label="Cancelled" tone="neutral" />
+  return <StatusBadge status={payment.status} tone={payment.status === 'INITIATED' ? 'info' : undefined} />
 }
 
 export function PaymentTable({
@@ -35,6 +56,7 @@ export function PaymentTable({
   page,
   pageSize,
   canExport,
+  canCollect = false,
 }: {
   rows: PaymentRow[]
   currency: string
@@ -42,6 +64,7 @@ export function PaymentTable({
   page: number
   pageSize: number
   canExport: boolean
+  canCollect?: boolean
 }) {
   const selection = useBulkSelection(rows.map((row) => row.id))
   const selectedRows = rows.filter((row) => selection.selected.has(row.id))
@@ -112,8 +135,10 @@ export function PaymentTable({
                 ) : null}
                 <TD className="text-sm tnum text-ink">
                   {payment.receiptNumber ?? <span className="text-ink-subtle">—</span>}
-                  {payment.reference ? (
-                    <span className="block text-xs text-ink-subtle">{payment.reference}</span>
+                  {payment.reference || payment.providerPaymentId ? (
+                    <span className="block text-xs text-ink-subtle">
+                      {payment.reference ?? `UTR ${payment.providerPaymentId}`}
+                    </span>
                   ) : null}
                   {payment.billBookNo ? (
                     <span className="block text-xs text-ink-subtle">Bill book {payment.billBookNo}</span>
@@ -146,18 +171,18 @@ export function PaymentTable({
                   ) : null}
                 </TD>
                 <TD>
-                  <StatusBadge
-                    status={payment.status}
-                    tone={payment.status === 'INITIATED' ? 'info' : undefined}
-                  />
+                  <PaymentStatus payment={payment} />
                 </TD>
                 <TD align="right">
-                  <Link
-                    href={`/finance/payments/${payment.id}`}
-                    className="text-sm text-[var(--brand-600)] hover:underline"
-                  >
-                    Receipt
-                  </Link>
+                  <span className="inline-flex items-center gap-3">
+                    {canCollect && isPendingCheque(payment) ? <ChequeActions paymentId={payment.id} /> : null}
+                    <Link
+                      href={`/finance/payments/${payment.id}`}
+                      className="text-sm text-[var(--brand-600)] hover:underline"
+                    >
+                      Receipt
+                    </Link>
+                  </span>
                 </TD>
               </TR>
             ))}

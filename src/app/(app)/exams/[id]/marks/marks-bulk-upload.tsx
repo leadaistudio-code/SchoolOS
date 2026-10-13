@@ -18,6 +18,7 @@ type TemplateStudent = {
   name: string
   marksObtained: number | null
   isAbsent: boolean
+  notApplicable?: boolean
   remarks: string
 }
 
@@ -52,7 +53,7 @@ export function MarksBulkUpload({
         student.admissionNo,
         student.rollNumber ?? '',
         student.name,
-        student.isAbsent ? '' : (student.marksObtained ?? ''),
+        student.notApplicable ? 'NA' : student.isAbsent ? '' : (student.marksObtained ?? ''),
         student.isAbsent ? 'Y' : '',
         student.remarks || '',
       ]),
@@ -111,7 +112,8 @@ export function MarksBulkUpload({
         <p className="text-sm text-ink-muted">
           Download a template, fill marks in Excel or Google Sheets, then upload CSV or XLSX.
           Students match by admission number. Put <span className="text-ink">Y</span> under Absent
-          for absentees. Whole-exam uploads also need Class and Subject columns.
+          for absentees, and <span className="text-ink">NA</span> under Marks for students who have not
+          opted for the subject. Whole-exam uploads also need Class and Subject columns.
         </p>
 
         <div className="flex flex-wrap gap-2">

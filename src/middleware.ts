@@ -42,6 +42,7 @@ const PASSTHROUGH = [
   '/platform', // super-admin console, still reached on the apex
   '/login', // platform sign-in when no school owns the host
   '/403',
+  '/unsubscribe', // bulk email opt-out, linked from every campaign email
   '/_next',
   '/favicon',
   '/manifest.webmanifest',

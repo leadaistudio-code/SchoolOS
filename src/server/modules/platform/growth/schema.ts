@@ -244,10 +244,24 @@ export const fieldCaptureSchema = z.object({
   contactName: z.string().trim().min(2, 'Enter who you met').max(120),
   contactDesignation: z.enum(CONTACT_ROLES).optional().or(z.literal('')).transform((v) => v || 'PRINCIPAL'),
   contactMobile: z.string().trim().min(8, 'Enter a mobile number').max(20),
+  contactEmail: z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .transform((v) => v || undefined)
+    .pipe(z.string().email('Enter a valid email address').optional()),
   isDecisionMaker: optionalBool,
   leadSource: z.enum(LEAD_SOURCES).optional().or(z.literal('')).transform((v) => v || 'SCHOOL_VISIT'),
   currentErp: empty,
   primaryObjection: empty,
+  visitedAt: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? new Date(v) : new Date()))
+    .refine((d) => !Number.isNaN(d.getTime()), 'Pick a valid visit date')
+    .refine((d) => d.getTime() <= Date.now() + 36 * 3600_000, 'The visit date cannot be in the future'),
   visitSummary: z.string().trim().min(5, 'Note what was discussed').max(4000),
   nextFollowUpAt: z
     .string()

@@ -35,6 +35,7 @@ function contextFor(id: string): AppContext {
       email: null,
       phone: null,
       avatarUrl: null,
+      displayName: null,
       mustChangePassword: false,
       roleKeys: ['SCHOOL_ADMIN'],
       permissions: held,

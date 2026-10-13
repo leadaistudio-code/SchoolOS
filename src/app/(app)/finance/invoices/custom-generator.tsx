@@ -363,36 +363,66 @@ export function CustomInvoiceGenerator({
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-ink">Billing months</p>
-              <p className="text-xs text-ink-subtle">Select April–September for the requested backfill.</p>
+              <p className="text-xs text-ink-subtle">
+                Only current and past months are billed now. Future months (Computer Fee, etc.)
+                wait for automatic monthly generation.
+              </p>
             </div>
             <Button
               size="sm"
               variant="ghost"
               type="button"
               onClick={() => {
-                setInstallmentIds(structure?.installments.map((item) => item.id) ?? [])
+                const cutoff = automatic
+                  ? autoGenerateFrom
+                  : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1))
+                      .toISOString()
+                      .slice(0, 7)
+                setInstallmentIds(
+                  structure?.installments
+                    .filter((item) => item.month < cutoff)
+                    .map((item) => item.id) ?? [],
+                )
                 setFeeHeadIds([])
                 setPreview(null)
               }}
             >
-              Select all
+              Select due months
             </Button>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {structure?.installments.map((installment) => (
-              <label key={installment.id} className="flex cursor-pointer items-start gap-2 rounded-[var(--radius-sm)] border border-line p-2.5 hover:bg-surface-2">
-                <Checkbox
-                  checked={installmentIds.includes(installment.id)}
-                  onChange={() => toggleMonth(installment.id)}
-                />
-                <span>
-                  <span className="block text-sm text-ink">{monthName(installment.month)}</span>
-                  <span className="block text-xs text-ink-subtle">
-                    Due {new Date(installment.dueOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+            {structure?.installments.map((installment) => {
+              const cutoff = automatic
+                ? autoGenerateFrom
+                : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1))
+                    .toISOString()
+                    .slice(0, 7)
+              const isFuture = installment.month >= cutoff
+              return (
+                <label
+                  key={installment.id}
+                  className={`flex items-start gap-2 rounded-[var(--radius-sm)] border border-line p-2.5 ${
+                    isFuture ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-surface-2'
+                  }`}
+                >
+                  <Checkbox
+                    checked={installmentIds.includes(installment.id)}
+                    disabled={isFuture}
+                    onChange={() => {
+                      if (!isFuture) toggleMonth(installment.id)
+                    }}
+                  />
+                  <span>
+                    <span className="block text-sm text-ink">{monthName(installment.month)}</span>
+                    <span className="block text-xs text-ink-subtle">
+                      {isFuture
+                        ? 'Auto — billed on generation date'
+                        : `Due ${new Date(installment.dueOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`}
+                    </span>
                   </span>
-                </span>
-              </label>
-            ))}
+                </label>
+              )
+            })}
           </div>
         </div>
 
@@ -439,14 +469,29 @@ export function CustomInvoiceGenerator({
             <Checkbox
               checked={automatic}
               onChange={() => {
-                setAutomatic((value) => !value)
+                setAutomatic((value) => {
+                  const next = !value
+                  if (next) {
+                    // Drop future months from the manual selection when auto turns on.
+                    setInstallmentIds((current) => {
+                      const allowed = new Set(
+                        structure?.installments
+                          .filter((item) => item.month < autoGenerateFrom)
+                          .map((item) => item.id) ?? [],
+                      )
+                      return current.filter((id) => allowed.has(id))
+                    })
+                  }
+                  return next
+                })
                 setPreview(null)
               }}
             />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-ink">Generate monthly invoices automatically</span>
               <span className="block text-xs text-ink-subtle">
-                The first eligible invoice is generated on or after the first day of this month.
+                From this month onward (Computer Fee, tuition, etc.) each charge is created on that
+                month’s generation date — not all at once.
               </span>
             </span>
             <Input
@@ -455,7 +500,16 @@ export function CustomInvoiceGenerator({
               value={autoGenerateFrom}
               disabled={!automatic}
               onChange={(event) => {
-                setAutoGenerateFrom(event.target.value)
+                const value = event.target.value
+                setAutoGenerateFrom(value)
+                setInstallmentIds((current) => {
+                  const allowed = new Set(
+                    structure?.installments
+                      .filter((item) => item.month < value)
+                      .map((item) => item.id) ?? [],
+                  )
+                  return current.filter((id) => allowed.has(id))
+                })
                 setPreview(null)
               }}
               className="w-44"

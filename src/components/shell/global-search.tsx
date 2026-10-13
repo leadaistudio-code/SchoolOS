@@ -133,7 +133,8 @@ export function GlobalSearch() {
           role="combobox"
           aria-expanded={open}
           aria-controls="global-search-results"
-          placeholder="Search students, staff, fees, admissions..."
+          placeholder="Search anything — students, fees, receipts, pages…"
+          aria-label="Search the app"
           className="h-9 w-full rounded-[10px] border border-line bg-surface-2 pl-8 pr-16 text-base text-ink transition-colors placeholder:text-ink-subtle focus:border-[var(--product-500)] focus:bg-surface"
         />
         <kbd className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-[4px] border border-line px-1 text-xs text-ink-subtle sm:block">
@@ -145,7 +146,7 @@ export function GlobalSearch() {
         <div
           id="global-search-results"
           role="listbox"
-          className="pop-in scroll-thin absolute z-50 mt-2 max-h-96 w-full overflow-y-auto rounded-[var(--radius)] border border-line bg-surface py-1 shadow-[var(--shadow-pop)]"
+          className="pop-in scroll-thin absolute z-50 mt-2 max-h-[28rem] w-full min-w-80 overflow-y-auto rounded-[var(--radius)] border border-line bg-surface py-1 shadow-[var(--shadow-pop)]"
         >
           {loading ? (
             <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">

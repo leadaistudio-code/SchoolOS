@@ -13,6 +13,7 @@ import { getTenant } from '@/server/modules/platform/tenants'
 import {
   archiveTenantAction,
   changeTenantPlanAction,
+  enterAsSupportAction,
   impersonateAction,
   reactivateTenantAction,
   setOverrideAction,
@@ -42,6 +43,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       />
 
       <div className="flex flex-wrap gap-2">
+        {ctx.user.permissions.has('platform.impersonate') ? (
+          <form action={enterAsSupportAction.bind(null, id)}>
+            <Button type="submit" size="sm">
+              Enter as Support
+            </Button>
+          </form>
+        ) : null}
         {tenant.status !== 'SUSPENDED' ? (
           <form action={suspendTenantAction.bind(null, id)}>
             <Button type="submit" variant="secondary" size="sm">

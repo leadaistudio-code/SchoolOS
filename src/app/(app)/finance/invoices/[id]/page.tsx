@@ -4,9 +4,11 @@ import { getInvoice } from '@/server/modules/finance/service'
 import { formatDay } from '@/lib/dates'
 import { formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/page-header'
+import { BackButton } from '@/components/back-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button-variants'
+import { InvoiceDatesButton } from '../invoice-dates-button'
 
 export const metadata = { title: 'Invoice' }
 
@@ -28,6 +30,7 @@ export default async function InvoiceDetailPage({
   const invoice = await getInvoice(ctx, id)
 
   const currency = ctx.tenant.currency
+  const canEditDates = ctx.can('fees.concession') || ctx.can('fees.invoice') || ctx.can('fees.accounts')
   const enrollment = invoice.student.enrollments[0]
   const guardian = invoice.student.guardians[0]?.parent
 
@@ -37,14 +40,33 @@ export default async function InvoiceDetailPage({
         title={invoice.title}
         description={`${invoice.number} · issued ${formatDay(invoice.issuedOn, 'd MMM yyyy')} · due ${formatDay(invoice.dueOn, 'd MMM yyyy')}`}
         actions={
-          ctx.can('fees.collect') && invoice.balanceMinor > 0 ? (
+          <>
+            <BackButton fallbackHref="/finance/invoices" />
+            {canEditDates && invoice.status !== 'CANCELLED' ? (
+              <InvoiceDatesButton
+                invoice={{
+                  id: invoice.id,
+                  number: invoice.number,
+                  issuedOn: invoice.issuedOn.toISOString(),
+                  dueOn: invoice.dueOn.toISOString(),
+                }}
+              />
+            ) : null}
             <Link
-              href={`/finance/collect?student=${invoice.studentId}`}
-              className={buttonVariants({ size: 'sm' })}
+              href={`/finance/students/${invoice.studentId}`}
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
             >
-              Collect payment
+              View ledger
             </Link>
-          ) : null
+            {ctx.can('fees.collect') && invoice.balanceMinor > 0 ? (
+              <Link
+                href={`/finance/collect?student=${invoice.studentId}`}
+                className={buttonVariants({ size: 'sm' })}
+              >
+                Collect payment
+              </Link>
+            ) : null}
+          </>
         }
       />
 

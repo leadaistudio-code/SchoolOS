@@ -29,6 +29,9 @@ export type FeeHeadDraft = FeeHeadOption & {
   isRefundable: boolean
   isDeposit: boolean
   inUseCount: number
+  /** yyyy-MM-dd, or '' for no limit. */
+  startsOn: string
+  endsOn: string
 }
 
 export type StructureDraft = {
@@ -60,6 +63,10 @@ function FeeHeadFields({
   setIsRefundable,
   isDeposit,
   setIsDeposit,
+  startsOn,
+  setStartsOn,
+  endsOn,
+  setEndsOn,
   autoFocus,
 }: {
   idPrefix: string
@@ -73,8 +80,13 @@ function FeeHeadFields({
   setIsRefundable: (v: boolean) => void
   isDeposit: boolean
   setIsDeposit: (v: boolean) => void
+  startsOn: string
+  setStartsOn: (v: string) => void
+  endsOn: string
+  setEndsOn: (v: string) => void
   autoFocus?: boolean
 }) {
+  const badRange = Boolean(startsOn && endsOn && endsOn < startsOn)
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Code" htmlFor={`${idPrefix}-code`} required hint="Short code, e.g. TUI">
@@ -107,6 +119,25 @@ function FeeHeadFields({
           ))}
         </Select>
       </Field>
+      <Field
+        label="Billing starts"
+        htmlFor={`${idPrefix}-starts`}
+        hint="Leave blank to bill from the start of the session"
+      >
+        <Input id={`${idPrefix}-starts`} type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+      </Field>
+      <Field
+        label="Billing ends"
+        htmlFor={`${idPrefix}-ends`}
+        hint="Leave blank for no end date"
+        error={badRange ? 'End date cannot be before the start date' : undefined}
+      >
+        <Input id={`${idPrefix}-ends`} type="date" value={endsOn} min={startsOn || undefined} onChange={(e) => setEndsOn(e.target.value)} />
+      </Field>
+      <p className="-mt-1 text-xs text-ink-muted sm:col-span-2">
+        Invoices for this head are only created for months whose due date falls inside these dates — e.g. a bus fee
+        from 1 July to 31 March, or a summer camp fee for May only.
+      </p>
       <label className="flex items-center gap-2 sm:col-span-2">
         <Checkbox checked={isDeposit} onChange={(e) => setIsDeposit(e.target.checked)} />
         <span className="text-sm text-ink">Security / caution deposit</span>
@@ -237,6 +268,8 @@ export function NewFeeHeadButton({ label = 'New fee head' }: { label?: string })
   const [frequency, setFrequency] = React.useState<string>('ANNUAL')
   const [isRefundable, setIsRefundable] = React.useState(false)
   const [isDeposit, setIsDeposit] = React.useState(false)
+  const [startsOn, setStartsOn] = React.useState('')
+  const [endsOn, setEndsOn] = React.useState('')
 
   const reset = () => {
     setCode('')
@@ -244,6 +277,8 @@ export function NewFeeHeadButton({ label = 'New fee head' }: { label?: string })
     setFrequency('ANNUAL')
     setIsRefundable(false)
     setIsDeposit(false)
+    setStartsOn('')
+    setEndsOn('')
   }
 
   const submit = () =>
@@ -254,6 +289,8 @@ export function NewFeeHeadButton({ label = 'New fee head' }: { label?: string })
         frequency,
         isRefundable,
         isDeposit,
+        startsOn,
+        endsOn,
       })
       if (!result.ok) {
         toast.push({ tone: 'error', title: 'Could not create fee head', description: result.message })
@@ -299,6 +336,10 @@ export function NewFeeHeadButton({ label = 'New fee head' }: { label?: string })
           setIsRefundable={setIsRefundable}
           isDeposit={isDeposit}
           setIsDeposit={setIsDeposit}
+          startsOn={startsOn}
+          setStartsOn={setStartsOn}
+          endsOn={endsOn}
+          setEndsOn={setEndsOn}
           autoFocus
         />
       </Dialog>
@@ -316,6 +357,8 @@ export function EditFeeHeadButton({ head }: { head: FeeHeadDraft }) {
   const [frequency, setFrequency] = React.useState(head.frequency)
   const [isRefundable, setIsRefundable] = React.useState(head.isRefundable)
   const [isDeposit, setIsDeposit] = React.useState(head.isDeposit)
+  const [startsOn, setStartsOn] = React.useState(head.startsOn)
+  const [endsOn, setEndsOn] = React.useState(head.endsOn)
   const [confirmRemove, setConfirmRemove] = React.useState(false)
 
   const openDialog = () => {
@@ -324,6 +367,8 @@ export function EditFeeHeadButton({ head }: { head: FeeHeadDraft }) {
     setFrequency(head.frequency)
     setIsRefundable(head.isRefundable)
     setIsDeposit(head.isDeposit)
+    setStartsOn(head.startsOn)
+    setEndsOn(head.endsOn)
     setConfirmRemove(false)
     setOpen(true)
   }
@@ -337,6 +382,8 @@ export function EditFeeHeadButton({ head }: { head: FeeHeadDraft }) {
         frequency,
         isRefundable,
         isDeposit,
+        startsOn,
+        endsOn,
       })
       if (!result.ok) {
         toast.push({ tone: 'error', title: 'Could not update fee head', description: result.message })
@@ -369,7 +416,7 @@ export function EditFeeHeadButton({ head }: { head: FeeHeadDraft }) {
         open={open}
         onClose={() => setOpen(false)}
         title={`Edit ${head.name}`}
-        description="Change the name, code, frequency or flags for this fee type."
+        description="Change the name, code, frequency, billing period or flags for this fee type."
         footer={
           <>
             <Button onClick={submit} loading={pending} disabled={!code.trim() || !name.trim()}>
@@ -393,6 +440,10 @@ export function EditFeeHeadButton({ head }: { head: FeeHeadDraft }) {
           setIsRefundable={setIsRefundable}
           isDeposit={isDeposit}
           setIsDeposit={setIsDeposit}
+          startsOn={startsOn}
+          setStartsOn={setStartsOn}
+          endsOn={endsOn}
+          setEndsOn={setEndsOn}
         />
 
         <div className="mt-4 border-t border-line pt-3">

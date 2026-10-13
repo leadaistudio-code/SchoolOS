@@ -3,42 +3,34 @@ Derives the MyCampusView brand assets from the master artwork.
 
     python scripts/brand-assets.py
 
-The master (`public/brand/mycampusview.svg`) is a 375x375 card: an opaque navy
-field with the magnifier mark and the wordmark floating in a band across the
-middle. Used as-is it paints a navy square onto every surface it touches, and
-the lockup inside it is neither centred nor tight to the frame.
+The master (`docs/brand/mycampusview-logo-master.jpg`) is the stacked logo on
+a flat navy field: the gold magnifier-and-school mark above the wordmark,
+"MyCampus" in white and "View" in orange.
 
-This script separates the artwork from its background so the brand can sit on
-any ground:
+This script lifts both parts off the navy so the brand can sit on any ground:
 
-    mycampusview-lockup.svg        mark + wordmark, transparent, cropped tight
-    mycampusview-lockup-dark.svg   the same, for light grounds (see below)
-    mycampusview-mark.svg          the magnifier alone, square, transparent
-    mycampusview-*.png             raster twins, for OG images and slides
+    mycampusview-mark.png          the magnifier alone, transparent
+    mycampusview-lockup.png        mark + wordmark side by side, for dark grounds
+    mycampusview-lockup-dark.png   the same with "MyCampus" in navy, for light grounds
+    mycampusview-stacked.png       mark above wordmark (as drawn), for dark grounds
+    mycampusview-stacked-dark.png  the same, for light grounds
     icon-<n>.png                   PWA / favicon sizes, mark on the brand navy
 
-How the background is removed: the mark is raster, so the navy behind it is
-keyed out — a flood fill from the edges finds the true background, holes are
-filled so the interior of the magnifier stays solid, and only the boundary
-pixels keep a fractional alpha so the anti-aliasing survives. The wordmark is
-vector in the master and is copied through untouched, so it stays crisp at any
-size.
+It also refreshes the copies other surfaces carry: the Next.js app icons, the
+sales documents, the CCTV relay and Tally connector sources, and the Expo app.
 
-The one thing that does change: the master sets "MyCampus" in cream, which is
-chosen to read on the navy card and measures 1.1:1 against white — invisible.
-The light-ground variant therefore sets those same glyphs in the card's own
-navy. No new colour is introduced, "View" keeps its orange, and the shapes are
-untouched; if you would rather keep cream everywhere, delete WORDMARK_ON_LIGHT
-below and use the dark-ground file on every surface.
+How the background is removed: the mark is keyed with a flood fill from the
+edges so the navy disc inside the magnifier stays part of the mark; the
+wordmark is keyed by colour distance alone, so the counters of "a", "p" and
+"e" open up instead of being filled.
+
+On light grounds white glyphs disappear, so the light-ground cuts set the
+white "MyCampus" in the master's own navy; "View" keeps its orange.
 """
 
 from __future__ import annotations
 
-import base64
-import io
-import re
-import subprocess
-import tempfile
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -47,226 +39,185 @@ from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parent.parent
 BRAND = ROOT / "public" / "brand"
-MASTER = BRAND / "mycampusview.svg"
+MASTER = ROOT / "docs" / "brand" / "mycampusview-logo-master.jpg"
 
 # The flat field the artwork is painted on, sampled from the master's corners.
-BG = np.array([10, 26, 63])
+BG = np.array([0, 32, 70])
+NAVY = (0, 32, 70)
 
-# The wordmark as the master sets it, and what it becomes on a light ground.
-WORDMARK = "#f8e8d5"
-WORDMARK_ON_LIGHT = "#0a1a3f"   # the card's own navy, so no new colour appears
-
-# Render the master this wide before keying. The mark inside it is a raster of
-# about 210px, so this is a 4x supersample of it — enough to key cleanly and
-# downsample back to something smooth.
-RENDER = 3000
-
-CHROME = next(
-    (p for p in [
-        Path("C:/Program Files/Google/Chrome/Application/chrome.exe"),
-        Path("C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"),
-        Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"),
-        Path("C:/Program Files/Microsoft/Edge/Application/msedge.exe"),
-    ] if p.exists()),
-    None,
-)
+# Bands of the master, found by row profile. Anything below the wordmark is a
+# clipped tagline and is left out.
+MARK_ROWS = (120, 532)
+WORD_ROWS = (532, 688)
 
 
-def render(svg_text: str, px: int) -> Image.Image:
-    """Rasterise an SVG string on a transparent page."""
-    if CHROME is None:
-        raise SystemExit("no Chrome/Edge found to rasterise the SVG")
-    with tempfile.TemporaryDirectory() as tmp:
-        d = Path(tmp)
-        (d / "a.svg").write_text(svg_text, encoding="utf-8")
-        (d / "a.html").write_text(
-            "<!doctype html><meta charset='utf-8'>"
-            "<style>html,body{margin:0;background:transparent}"
-            f"img{{width:{px}px;height:{px}px;display:block}}</style>"
-            "<img src='a.svg'>",
-            encoding="utf-8",
-        )
-        subprocess.run(
-            [str(CHROME), "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             "--default-background-color=00000000",
-             f"--screenshot={d / 'a.png'}", f"--window-size={px},{px}",
-             (d / "a.html").as_uri()],
-            check=True, capture_output=True,
-        )
-        return Image.open(d / "a.png").convert("RGBA").copy()
-
-
-def key_out_background(img: Image.Image) -> Image.Image:
-    """
-    Replace the flat navy field with transparency.
-
-    Thresholding alone punches holes in the artwork wherever it happens to be
-    navy-ish — the sky inside the magnifier, the shadow under the eaves. So the
-    background is found by flooding in from the edges instead, holes in what
-    remains are filled, and only the rim of the shape keeps a soft alpha.
-    """
-    a = np.array(img).astype(int)
+def alpha_from_distance(a: np.ndarray) -> np.ndarray:
     dist = np.sqrt(((a[..., :3] - BG) ** 2).sum(axis=2))
+    return dist, np.clip((dist - 18) / 70.0, 0, 1)
 
-    near_bg = dist < 26
-    # Everything reachable from the border without crossing the artwork.
-    outside = np.zeros_like(near_bg)
-    outside[0, :] = outside[-1, :] = outside[:, 0] = outside[:, -1] = True
-    outside &= near_bg
-    outside = ndimage.binary_propagation(outside, mask=near_bg)
 
-    solid = ndimage.binary_fill_holes(~outside)
-    core = ndimage.binary_erosion(solid, iterations=2)
-
-    # Soft alpha at the boundary, hard inside, nothing outside.
-    alpha = np.clip(dist / 70.0, 0, 1)
-    alpha[core] = 1.0
-    alpha[outside] = 0.0
-
-    # Un-mix the navy the edge pixels were blended with, so nothing keeps a
-    # dark fringe when the mark is placed on a light surface.
+def unmix(a: np.ndarray, alpha: np.ndarray) -> Image.Image:
+    """Remove the navy the edge pixels were blended with, so no dark fringe remains."""
     safe = np.maximum(alpha, 1e-3)[..., None]
     rgb = BG + (a[..., :3] - BG) / safe
     out = np.dstack([np.clip(rgb, 0, 255), alpha * 255]).astype("uint8")
     return Image.fromarray(out, "RGBA")
 
 
-def trim(img: Image.Image, pad: int = 0) -> tuple[Image.Image, tuple[int, int, int, int]]:
+def key_mark(img: Image.Image) -> Image.Image:
+    a = np.array(img.convert("RGB")).astype(float)
+    dist, alpha = alpha_from_distance(a)
+    near_bg = dist < 30
+    outside = np.zeros_like(near_bg)
+    outside[0, :] = outside[-1, :] = outside[:, 0] = outside[:, -1] = True
+    outside &= near_bg
+    outside = ndimage.binary_propagation(outside, mask=near_bg)
+    solid = ndimage.binary_fill_holes(~outside)
+    core = ndimage.binary_erosion(solid, iterations=2)
+    alpha[core] = 1.0
+    alpha[outside & (dist < 30)] = 0.0
+    return unmix(a, alpha)
+
+
+def key_text(img: Image.Image) -> Image.Image:
+    a = np.array(img.convert("RGB")).astype(float)
+    _, alpha = alpha_from_distance(a)
+    return unmix(a, alpha)
+
+
+def trim(img: Image.Image, pad: int = 2) -> Image.Image:
     a = np.array(img)
-    ys, xs = np.nonzero(a[..., 3] > 6)
+    ys, xs = np.nonzero(a[..., 3] > 10)
     box = (max(0, xs.min() - pad), max(0, ys.min() - pad),
            min(img.width, xs.max() + 1 + pad), min(img.height, ys.max() + 1 + pad))
-    return img.crop(box), box
+    return img.crop(box)
 
 
-def data_uri(img: Image.Image) -> str:
-    buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+def on_light(word: Image.Image) -> Image.Image:
+    """White glyphs become navy; coloured ones (the orange "View") are untouched."""
+    a = np.array(word).astype(int)
+    rgb = a[..., :3]
+    chroma = rgb.max(axis=2) - rgb.min(axis=2)
+    white = chroma < 70
+    a[white, 0], a[white, 1], a[white, 2] = NAVY
+    return Image.fromarray(a.astype("uint8"), "RGBA")
 
 
-def text_groups(master: str) -> str:
-    """The two wordmark groups, verbatim — they are vector and stay vector."""
-    out = []
-    for anchor in ('<g transform="matrix(1, 0, 0, 1, 99, 167)">',
-                   '<g transform="matrix(1, 0, 0, 1, 284, 168)">'):
-        start = master.index(anchor)
-        depth, i = 0, start
-        while True:
-            nxt_open = master.find("<g", i + 1)
-            nxt_close = master.find("</g>", i + 1)
-            if nxt_close == -1:
-                raise SystemExit("unbalanced wordmark group")
-            if nxt_open != -1 and nxt_open < nxt_close:
-                depth += 1
-                i = nxt_open
-            else:
-                if depth == 0:
-                    out.append(master[start:nxt_close + 4])
-                    break
-                depth -= 1
-                i = nxt_close
-    return "\n  ".join(out)
+def compose_lockup(mark: Image.Image, word: Image.Image, baseline: int) -> Image.Image:
+    """Mark to the left, sized to the wordmark's cap height plus its descenders."""
+    cap = baseline
+    mh = round(word.height * 1.32)
+    m = mark.resize((round(mark.width * mh / mark.height), mh), Image.LANCZOS)
+    gap = round(word.height * 0.22)
+    w = m.width + gap + word.width
+    h = max(mh, word.height)
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    out.alpha_composite(m, (0, (h - mh) // 2))
+    # Centre the caps (not the descenders) on the mark.
+    wy = (h - cap) // 2
+    wy = max(0, min(h - word.height, wy))
+    out.alpha_composite(word, (m.width + gap, wy))
+    return trim(out, 0)
 
 
-def defs_block(master: str) -> str:
-    """The clip paths the wordmark groups reference."""
-    return master[master.index("<defs>"):master.index("</defs>") + 7]
+def compose_stacked(mark: Image.Image, word: Image.Image) -> Image.Image:
+    gap = round(word.height * 0.12)
+    w = max(mark.width, word.width)
+    out = Image.new("RGBA", (w, mark.height + gap + word.height), (0, 0, 0, 0))
+    out.alpha_composite(mark, ((w - mark.width) // 2, 0))
+    out.alpha_composite(word, ((w - word.width) // 2, mark.height + gap))
+    return out
+
+
+def tile(mark: Image.Image, n: int, fill: float = 0.74) -> Image.Image:
+    t = Image.new("RGBA", (n, n), NAVY + (255,))
+    m = mark.copy()
+    m.thumbnail((round(n * fill), round(n * fill)), Image.LANCZOS)
+    t.alpha_composite(m, ((n - m.width) // 2, (n - m.height) // 2))
+    return t
+
+
+def save_ico(img: Image.Image, path: Path, sizes=(16, 24, 32, 48, 64, 128, 256)) -> None:
+    img.save(path, format="ICO", sizes=[(s, s) for s in sizes])
 
 
 def main() -> None:
-    master = MASTER.read_text(encoding="utf-8")
+    master = Image.open(MASTER).convert("RGB")
 
-    # 1. The mark: render the master with the wordmark suppressed, then key.
-    marks_only = master
-    for anchor in ('<g transform="matrix(1, 0, 0, 1, 99, 167)">',
-                   '<g transform="matrix(1, 0, 0, 1, 284, 168)">'):
-        marks_only = marks_only.replace(anchor, anchor[:-1] + ' display="none">')
+    mark = trim(key_mark(master.crop((0, MARK_ROWS[0], master.width, MARK_ROWS[1]))))
+    word = trim(key_text(master.crop((0, WORD_ROWS[0], master.width, WORD_ROWS[1]))))
+    word_light = on_light(word)
 
-    keyed = key_out_background(render(marks_only, RENDER))
-    mark_img, (mx0, my0, mx1, my1) = trim(keyed)
+    # Baseline: the bottom of the "M", which has no descender.
+    wa = np.array(word)[..., 3]
+    m_cols = wa[:, : round(word.width * 0.08)]
+    baseline = int(np.nonzero(m_cols.max(axis=1) > 128)[0].max())
 
-    scale = 375.0 / RENDER
-    ux0, uy0 = mx0 * scale, my0 * scale
-    uw, uh = (mx1 - mx0) * scale, (my1 - my0) * scale
-    print(f"mark  : {mark_img.width}x{mark_img.height}px "
-          f"at ({ux0:.2f},{uy0:.2f}) size {uw:.2f}x{uh:.2f} user units")
+    lockup = compose_lockup(mark, word, baseline)
+    lockup_light = compose_lockup(mark, word_light, baseline)
+    stacked = compose_stacked(mark, word)
+    stacked_light = compose_stacked(mark, word_light)
 
-    # Downsample the keyed mark. The master holds it at roughly 175px, so
-    # anything much past that is empty resolution that only inflates the file.
-    target = 320
-    if mark_img.width > target:
-        h = round(mark_img.height * target / mark_img.width)
-        mark_img = mark_img.resize((target, h), Image.LANCZOS)
+    for old in ("mycampusview.svg", "mycampusview-lockup.svg",
+                "mycampusview-lockup-dark.svg", "mycampusview-mark.svg"):
+        (BRAND / old).unlink(missing_ok=True)
 
-    # 2. Where the whole lockup sits, so the crop is tight and even.
-    full = key_out_background(render(master, RENDER))
-    _, (fx0, fy0, fx1, fy1) = trim(full)
-    lx0, ly0 = fx0 * scale, fy0 * scale
-    lw, lh = (fx1 - fx0) * scale, (fy1 - fy0) * scale
-    print(f"lockup: ({lx0:.2f},{ly0:.2f}) size {lw:.2f}x{lh:.2f} user units")
+    mark.save(BRAND / "mycampusview-mark.png", optimize=True)
+    lockup.save(BRAND / "mycampusview-lockup.png", optimize=True)
+    lockup_light.save(BRAND / "mycampusview-lockup-dark.png", optimize=True)
+    stacked.save(BRAND / "mycampusview-stacked.png", optimize=True)
+    stacked_light.save(BRAND / "mycampusview-stacked-dark.png", optimize=True)
 
-    uri = data_uri(mark_img)
-    defs = defs_block(master)
-    words = text_groups(master)
-
-    # 3. The lockup, cropped to its own bounds, on each ground. A hair of
-    #    padding keeps the anti-aliased edge of the glyphs off the viewBox wall.
-    pad = 0.6
-
-    def lockup_svg(wordmark_fill: str) -> str:
-        return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"\n'
-            f'     viewBox="{lx0 - pad:.3f} {ly0 - pad:.3f} {lw + pad * 2:.3f} {lh + pad * 2:.3f}"\n'
-            f'     width="{lw + pad * 2:.3f}" height="{lh + pad * 2:.3f}"\n'
-            f'     role="img" aria-label="MyCampusView">\n'
-            f'  <title>MyCampusView</title>\n'
-            f'  {defs}\n'
-            f'  <image x="{ux0:.3f}" y="{uy0:.3f}" width="{uw:.3f}" height="{uh:.3f}"\n'
-            f'         xlink:href="{uri}" preserveAspectRatio="xMidYMid meet"/>\n'
-            f'  {words.replace(WORDMARK, wordmark_fill)}\n'
-            f'</svg>\n'
-        )
-
-    lockup = lockup_svg(WORDMARK)
-    lockup_dark = lockup_svg(WORDMARK_ON_LIGHT)
-    (BRAND / "mycampusview-lockup.svg").write_text(lockup, encoding="utf-8")
-    (BRAND / "mycampusview-lockup-dark.svg").write_text(lockup_dark, encoding="utf-8")
-
-    # 4. The mark alone, square, centred in its own box.
-    side = max(uw, uh)
-    mark_svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"\n'
-        f'     viewBox="0 0 {side:.3f} {side:.3f}" width="{side:.3f}" height="{side:.3f}"\n'
-        f'     role="img" aria-label="MyCampusView">\n'
-        f'  <title>MyCampusView</title>\n'
-        f'  <image x="{(side - uw) / 2:.3f}" y="{(side - uh) / 2:.3f}"\n'
-        f'         width="{uw:.3f}" height="{uh:.3f}" xlink:href="{uri}"/>\n'
-        f'</svg>\n'
-    )
-    (BRAND / "mycampusview-mark.svg").write_text(mark_svg, encoding="utf-8")
-
-    # 5. Raster fallbacks — anywhere an SVG cannot go (OG image, the deck).
-    lock_png = render(lockup, 2400)
-    lock_png, _ = trim(lock_png)
-    lock_png.save(BRAND / "mycampusview-lockup.png", optimize=True)
-    dark_png, _ = trim(render(lockup_dark, 2400))
-    dark_png.save(BRAND / "mycampusview-lockup-dark.png", optimize=True)
-    mark_png = render(mark_svg, 1024)
-    mark_png, _ = trim(mark_png)
-    mark_png.save(BRAND / "mycampusview-mark.png", optimize=True)
-
-    # 6. App icons: the mark on the brand navy, so a home-screen tile is a
-    #    filled square rather than a floating cut-out.
-    navy = tuple(int(c) for c in BG)
+    icons = {n: tile(mark, n) for n in (16, 24, 32, 48, 64, 128, 180, 192, 256, 512, 1024)}
     for n in (32, 180, 192, 512):
-        tile = Image.new("RGBA", (n, n), navy + (255,))
-        inner = round(n * 0.72)
-        m = mark_png.copy()
-        m.thumbnail((inner, inner), Image.LANCZOS)
-        tile.alpha_composite(m, ((n - m.width) // 2, (n - m.height) // 2))
-        tile.save(BRAND / f"icon-{n}.png", optimize=True)
+        icons[n].save(BRAND / f"icon-{n}.png", optimize=True)
 
+    # Next.js file-convention icons.
+    icons[512].save(ROOT / "src" / "app" / "icon.png", optimize=True)
+    icons[180].save(ROOT / "src" / "app" / "apple-icon.png", optimize=True)
+
+    # Sales documents (brochure, annex, proposals) sit the logo on black/navy bands.
+    lockup.save(ROOT / "docs" / "sales" / "mycampusview-logo.png", optimize=True)
+    proposals = ROOT / "docs" / "sales" / "proposals"
+    if proposals.exists():
+        lockup.save(proposals / "mycampusview-lockup.png", optimize=True)
+        stacked.save(proposals / "mycampusview-stacked.png", optimize=True)
+
+    # Tally connector: its own build derives sizes from these.
+    tally = ROOT / "tools" / "tally-connector"
+    if tally.exists():
+        b = tally / "build"
+        for n in (16, 24, 32, 48, 64, 128, 256, 512, 1024):
+            icons[n].save(b / f"icon-{n}.png", optimize=True)
+        icons[1024].save(b / "icon.png", optimize=True)
+        save_ico(icons[256], b / "icon.ico")
+        # Its window is light, so it takes the navy-wordmark cut.
+        for name in ("logo-wide.png", "logo-source.png", "brand-logo.png"):
+            lockup_light.save(b / name, optimize=True)
+        icons[256].save(tally / "gui" / "icon.png", optimize=True)
+        lockup_light.save(tally / "gui" / "logo-wide.png", optimize=True)
+
+    # Expo app. Adaptive foreground keeps the mark inside Android's 66% safe zone.
+    mobile = ROOT / "mobile" / "assets"
+    if mobile.exists():
+        icons[1024].save(mobile / "icon.png", optimize=True)
+        fg = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+        m = mark.copy()
+        m.thumbnail((600, 600), Image.LANCZOS)
+        fg.alpha_composite(m, ((1024 - m.width) // 2, (1024 - m.height) // 2))
+        fg.save(mobile / "android-icon-foreground.png", optimize=True)
+        Image.new("RGBA", (1024, 1024), NAVY + (255,)).save(mobile / "android-icon-background.png", optimize=True)
+        mono = np.array(fg)
+        mono[..., :3] = 255
+        Image.fromarray(mono, "RGBA").save(mobile / "android-icon-monochrome.png", optimize=True)
+        icons[48].save(mobile / "favicon.png", optimize=True)
+        s = mark.copy()
+        s.thumbnail((512, 512), Image.LANCZOS)
+        s.save(mobile / "splash-mark.png", optimize=True)
+        s.save(mobile / "splash-icon.png", optimize=True)
+
+    print(f"mark {mark.size}  word {word.size}  baseline {baseline}")
+    print(f"lockup {lockup.size}  stacked {stacked.size}")
     for f in sorted(BRAND.iterdir()):
         print(f"  {f.name:32} {f.stat().st_size / 1024:8.1f} KB")
 

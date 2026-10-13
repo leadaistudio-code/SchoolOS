@@ -4,6 +4,7 @@ import {
   accessibleSectionIds,
   classLevelScopeWhere,
   isPortalOnlyRole,
+  sectionIdsForStaff,
   teachingClassSubjectIds,
 } from '@/server/scope'
 import { audit } from '@/server/audit'
@@ -142,18 +143,18 @@ export async function markableSections(ctx: AppContext) {
   // No staff row and not school-wide ⇒ nothing to mark (do not open all sections).
   if (!schoolWide && !staff) return []
 
+  const assignedSectionIds = schoolWide
+    ? null
+    : await sectionIdsForStaff(ctx, staff!.id, session.id)
+
+  // Assigned but empty → no sections (do not open all).
+  if (assignedSectionIds !== null && assignedSectionIds.length === 0) return []
+
   return ctx.db.section.findMany({
     where: {
       deletedAt: null,
       classLevel: { sessionId: session.id, deletedAt: null },
-      ...(schoolWide
-        ? {}
-        : {
-            OR: [
-              { classTeacherId: staff!.id },
-              { classLevel: { subjects: { some: { teacherId: staff!.id } } } },
-            ],
-          }),
+      ...(assignedSectionIds === null ? {} : { id: { in: assignedSectionIds } }),
     },
     orderBy: [{ classLevel: { numeric: 'asc' } }, { name: 'asc' }],
     select: {

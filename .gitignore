@@ -27,3 +27,8 @@ debug.log
 
 # Design reference video — 9MB, not part of the build.
 original-*.mp4
+
+# CCTV relay app build output and the downloaded MediaMTX zip (build.ps1 fetches it).
+/tools/cctv-relay/bin/
+/tools/cctv-relay/obj/
+/tools/cctv-relay/vendor/

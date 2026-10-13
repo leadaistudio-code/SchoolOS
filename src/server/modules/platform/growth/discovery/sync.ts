@@ -2,6 +2,7 @@ import type { PlatformContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
 import { createFollowUp, createSchool, createTask, findDuplicates, logActivity, updateSchool } from '../service'
 import type { CrmDiscoveryCandidate, CrmDiscoveryEvidence } from '@prisma/client'
+import { CONTACT_SOURCE_LABELS, parseContactFindings, type ContactFinding } from '@/lib/lead-discovery'
 
 type CandidateWithEvidence = CrmDiscoveryCandidate & { evidence: CrmDiscoveryEvidence[] }
 
@@ -17,9 +18,19 @@ function dueInDays(days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+function contactNote(c: CandidateWithEvidence): string | null {
+  const f = parseContactFindings(c.contactFindings)
+  if (!f) return null
+  const line = (label: string, x: ContactFinding | null) =>
+    x ? `${label}: ${x.value} — ${x.confidence}% sure, from ${CONTACT_SOURCE_LABELS[x.source]}${x.url ? ` (${x.url})` : ''}` : null
+  const rows = [line('Email', f.email), line('Phone', f.phone), line('Address', f.address)].filter(Boolean)
+  return rows.length ? `Contact details found (overall ${c.contactConfidence}%):\n${rows.join('\n')}` : null
+}
+
 function buildNotes(c: CandidateWithEvidence): string {
   const bits = [
     c.discoverySummary,
+    contactNote(c),
     c.openingEvidence ? `Opening evidence: ${c.openingEvidence}` : null,
     c.whyThisLead ? `Why this lead:\n${c.whyThisLead}` : null,
     c.recommendedPitch ? `Recommended pitch:\n${c.recommendedPitch}` : null,
@@ -33,6 +44,7 @@ function materialUpdates(
     phone: string | null
     email: string | null
     website: string | null
+    address: string | null
     notes: string | null
   },
   c: CandidateWithEvidence,
@@ -52,6 +64,10 @@ function materialUpdates(
   if (!existing.website && c.website) {
     patch.website = c.website
     lines.push(`Official website found: ${c.website}`)
+  }
+  if (!existing.address && c.address) {
+    patch.address = c.address
+    lines.push(`Address: ${c.address}`)
   }
   if (c.openingEvidence && !(existing.notes ?? '').includes(c.openingEvidence.slice(0, 40))) {
     lines.push(`New evidence: ${c.openingEvidence.slice(0, 180)}`)
@@ -195,7 +211,7 @@ export async function syncCandidateToCrm(
       : candidate.schoolName,
     city: candidate.city ?? undefined,
     state: candidate.state ?? undefined,
-    address: [candidate.sector, candidate.area].filter(Boolean).join(', ') || undefined,
+    address: candidate.address ?? ([candidate.sector, candidate.area].filter(Boolean).join(', ') || undefined),
     website: candidate.website ?? undefined,
     phone: candidate.phone ?? undefined,
     email: candidate.email ?? undefined,
