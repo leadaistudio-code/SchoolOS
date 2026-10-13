@@ -188,6 +188,9 @@ export const TENANT_SCOPED_MODELS = [
   'JournalLine',
   'LedgerAccountMap',
   'LedgerSettings',
+  'AccountingFiscalYear',
+  'AccountingAuditEvent',
+  'AccountingSettings',
 
   // Daily operations
   'Substitution',

@@ -6328,6 +6328,86 @@ model LedgerSettings {
 }
 
 // ===========================================================================
+// ACCOUNTING EXPANSION (phase 1 foundation). Builds on the ledger above; every
+// switch defaults off so existing behaviour is unchanged until a school opts in.
+// ===========================================================================
+
+enum AccountingPeriodStatus {
+  OPEN
+  /// Postings on or before `lockedThrough` are refused; later dates stay open.
+  LOCKED
+  /// Year-end done: nothing may post into this year.
+  CLOSED
+}
+
+/// One financial year per school. Postings must fall in an OPEN (or partly
+/// locked) year; corrections to a closed year go through a later-dated voucher.
+model AccountingFiscalYear {
+  id            String                 @id @default(cuid())
+  tenantId      String
+  /// e.g. "2026-27"
+  label         String
+  startsOn      DateTime               @db.Date
+  endsOn        DateTime               @db.Date
+  status        AccountingPeriodStatus @default(OPEN)
+  /// Inclusive: no voucher may be dated on or before this day.
+  lockedThrough DateTime?              @db.Date
+  lockedById    String?
+  lockedAt      DateTime?
+  closedById    String?
+  closedAt      DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([tenantId, label])
+  @@unique([tenantId, startsOn])
+  @@index([tenantId, startsOn, endsOn])
+}
+
+/// Append-only trail of accounting actions: postings, reversals, approvals,
+/// period locks and settings changes. Never updated or deleted by the app.
+model AccountingAuditEvent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  /// e.g. JournalEntry, AccountingFiscalYear, AccountingSettings
+  entityType    String
+  entityId      String?
+  /// e.g. voucher.posted, voucher.reversed, period.locked, settings.updated
+  action        String
+  fromStatus    String?
+  toStatus      String?
+  reason        String?
+  actorId       String?
+  actorLabel    String?
+  /// Idempotency / correlation key; the same key is recorded at most once.
+  correlationId String?
+  data          Json?
+  createdAt     DateTime @default(now())
+
+  @@unique([tenantId, correlationId])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+}
+
+/// Per-school switches for the accounting expansion. A missing row means
+/// everything is off.
+model AccountingSettings {
+  id                      String   @id @default(cuid())
+  tenantId                String   @unique
+  /// Fees card on Student 360 opens the statement of account.
+  studentLedgerEnabled    Boolean  @default(false)
+  /// Multi-tier expense approval before posting.
+  approvalWorkflowEnabled Boolean  @default(false)
+  /// Queue WhatsApp receipt notifications after a fee receipt is posted.
+  whatsappReceiptsEnabled Boolean  @default(false)
+  /// 1-12; Indian schools use 4 (April-March).
+  fiscalYearStartMonth    Int      @default(4)
+  updatedById             String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// ===========================================================================
 // DAILY OPERATIONS: SUBSTITUTIONS, GATE PASSES, PARENT WHATSAPP ASSISTANT
 // ===========================================================================
 

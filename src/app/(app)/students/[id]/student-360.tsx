@@ -13,6 +13,8 @@ import { EmptyState } from '@/components/ui/states'
 import { Metric, MetricRow } from '@/components/ui/metric'
 import { ScoreDial, CoverageNote, MetricBreakdown } from '@/app/(app)/score/score-ui'
 import { DonutChart } from '@/components/dashboard/charts'
+import { FeesLedgerMetric } from '@/components/accounting/student-ledger-drawer'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
 
 type StudentRecord = Awaited<ReturnType<typeof getStudent>>
 
@@ -86,6 +88,7 @@ export async function Student360({
   const canSeeFeeAmounts = ctx.can('fees.view')
   const canSeeFeeStatus = canSeeFeeAmounts || ctx.can('fees.status')
   const currency = ctx.tenant.currency
+  const ledgerEnabled = canSeeFeeAmounts && (await getAccountingFlags(ctx.db)).studentLedger
 
   const columns = ((): 2 | 3 | 4 => {
     let n = 0
@@ -135,7 +138,16 @@ export async function Student360({
             sub="shared notes"
           />
         ) : null}
-        {canSeeFeeStatus ? (
+        {ledgerEnabled ? (
+          <FeesLedgerMetric
+            studentId={student.id}
+            currency={currency}
+            label="Fees"
+            value={formatMoney(dueMinor, currency)}
+            sub={dueMinor > 0 ? 'outstanding' : 'cleared'}
+            emphasis={dueMinor > 0 ? 'warning' : undefined}
+          />
+        ) : canSeeFeeStatus ? (
           <Metric
             label="Fees"
             value={

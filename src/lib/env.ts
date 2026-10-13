@@ -205,6 +205,15 @@ const serverSchema = z.object({
   FKWEB_GATEWAY_SECRET: z.string().min(32).optional(),
   /** Public HTTP base shown to admins when provisioning a no-PC terminal. */
   FKWEB_PUBLIC_URL: z.string().url().optional(),
+
+  /**
+   * Accounting expansion kill switches. Each is off unless set to true, and a
+   * school must also switch the matching option on in its accounting settings.
+   */
+  ACCOUNTING_MODULE_ENABLED: bool.default('false'),
+  ACCOUNTING_STUDENT_LEDGER_ENABLED: bool.default('false'),
+  ACCOUNTING_APPROVALS_ENABLED: bool.default('false'),
+  WHATSAPP_RECEIPTS_ENABLED: bool.default('false'),
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>
