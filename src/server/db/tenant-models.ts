@@ -205,6 +205,8 @@ export const TENANT_SCOPED_MODELS = [
   'DepreciationLine',
   'ExpenseApprovalRequest',
   'ExpenseApprovalStep',
+  'LedgerMonthSummary',
+  'LedgerSummaryState',
 
   // Daily operations
   'Substitution',

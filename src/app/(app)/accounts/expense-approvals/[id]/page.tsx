@@ -214,7 +214,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
                       <TR key={e.id}>
                         <TD>
                           <Link href={`/accounts/journals/${e.id}`} className="text-[var(--brand-600)] hover:underline">{e.number}</Link>
-                          {e.isReversal ? <span className="block text-xs text-ink-subtle">reversal</span> : null}
+                          {e.isReversal ? <span className="block text-xs text-ink-subtle">reversal</span> : e.reversedAt ? <span className="block text-xs text-ink-subtle">reversed</span> : null}
                         </TD>
                         <TD>{formatDay(e.date)}</TD>
                         <TD align="right">{money(e.totalMinor)}</TD>

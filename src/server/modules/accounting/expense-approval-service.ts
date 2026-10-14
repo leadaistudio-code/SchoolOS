@@ -443,7 +443,7 @@ export async function getExpenseRequest(ctx: AppContext, id: string) {
     request.expenseId
       ? ctx.db.journalEntry.findMany({
           where: { sourceType: 'EXPENSE', sourceId: request.expenseId },
-          select: { id: true, number: true, date: true, isReversal: true, totalMinor: true },
+          select: { id: true, number: true, date: true, isReversal: true, reversedAt: true, totalMinor: true },
           orderBy: { createdAt: 'asc' },
         })
       : Promise.resolve([]),

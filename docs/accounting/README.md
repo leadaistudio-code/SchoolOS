@@ -374,3 +374,99 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014160000_expense_
 
 The four `expense_approval.*` permissions can be left in place; they grant nothing once
 the code is reverted.
+
+## Phase 7: Analytics
+
+`/accounts/analytics` (needs `accounts.view` and the accounting module) shows four widgets
+for a range of whole months. The default range is the financial year to date, and the
+longest range is 36 months.
+
+| Widget | Source | Basis |
+| --- | --- | --- |
+| Cash flow breakdown | monthly ledger summary | debits (in) and credits (out) on the CASH and BANK ledgers and any payment-mode ledger, grouped by journal source |
+| Expense distribution | monthly ledger summary | net debit on each EXPENSE ledger; the total equals Profit & loss for the period |
+| Dues aging | fee invoices, live | balance of open invoices by days past the due date: not yet due, 0–30, 31–60, 60+; needs `fees.accounts` |
+| Fixed asset WDV | asset register, live | book value of assets held at each month end, after posted depreciation runs |
+
+Cash-flow sources: fees, refunds, expenses, payroll, vendors (purchase vouchers, vendor
+payments, debit notes, adjustments), store, fixed assets (including depreciation) and
+manual journals. Reversal entries keep their original source, so they offset it.
+
+### Drill-down audit pane
+
+Every figure and chart element links to `?drill=<metric>:<key>`. The audit pane shows:
+
+- the metric and the period;
+- the formula, with what is included and what is excluded;
+- the freshness time;
+- the underlying journal lines, invoices or assets, 25 per page;
+- a reconciliation table.
+
+The reconciliation compares the summary figure against a live recomputation from the
+journal. "Audit all" also checks the totals against these reports:
+
+- **Cash flow:** closing cash against the ledger balance.
+- **Expenses:** against Profit & loss.
+- **Aging:** the overdue buckets against the fee dashboards' overdue total, and all buckets
+  against all open invoices.
+- **WDV:** the register against the ledger net block.
+
+Drill-downs run through the same service checks as the page, so aging stays hidden
+without `fees.accounts`. Every query is scoped to the school.
+
+### Freshness and invalidation
+
+These figures are **not real-time**, and the page says so.
+
+Cash flow and expenses read `LedgerMonthSummary`. This table holds one row per school,
+month, ledger and journal source, with debit and credit totals.
+
+Each page load brings the summary up to date before reading it. Journal entries are
+never edited or deleted (reversals are new entries), so new entries since the last
+watermark show what changed:
+
+- **Nothing new:** no work is done.
+- **New entries:** only the months they are dated in are recomputed, so back-dated
+  postings are included.
+- **Entry count mismatch:** if the count is not the previous count plus the new entries,
+  for example because an entry was removed outside the app, the whole summary is rebuilt.
+
+The refresh runs under a per-school advisory lock. A second caller does not wait. If a
+refresh is busy or fails, the page shows the last summary with a stale warning and the
+time it was last brought up to date. `accounts.manage` users have a "Rebuild from
+journal" button (`POST /api/v1/accounting/analytics/refresh`).
+
+Aging and WDV are read live from their registers when the page loads.
+
+### Performance
+
+Measured locally with 25,000 journal entries and 50,000 lines in one school:
+
+| Operation | Time |
+| --- | --- |
+| Full rebuild | 74 ms |
+| One-month incremental refresh | 34 ms |
+| Dashboard | 35 ms |
+| Drill-down page 40 | 188 ms |
+
+### Database
+
+Migration `20261014180000_ledger_analytics` makes these changes:
+
+- **New tables:** `LedgerMonthSummary` and `LedgerSummaryState`. Both are derived and
+  safe to empty, and neither has a foreign key.
+- **New indexes:** `LedgerMonthSummary(tenantId, accountId, month)` and
+  `JournalEntry(tenantId, createdAt)`.
+- **CHECK constraints:** totals are non-negative, and each month is stored as its first
+  day.
+
+No existing column or row changes.
+
+Rollback:
+
+```sql
+DROP TABLE IF EXISTS "LedgerMonthSummary";
+DROP TABLE IF EXISTS "LedgerSummaryState";
+DROP INDEX IF EXISTS "JournalEntry_tenantId_createdAt_idx";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014180000_ledger_analytics';
+```

@@ -6301,6 +6301,7 @@ model JournalEntry {
   @@unique([tenantId, postingKey])
   @@index([tenantId, date])
   @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, createdAt])
 }
 
 model JournalLine {
@@ -6920,6 +6921,40 @@ model ExpenseApprovalStep {
 
   @@index([tenantId, requestId, createdAt])
   @@index([tenantId, actorId])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics summaries (phase 7). Derived data only: every row can be rebuilt
+// from JournalEntry / JournalLine, so deleting this table loses nothing.
+// ---------------------------------------------------------------------------
+
+/// Journal line totals per calendar month, ledger account and entry source.
+model LedgerMonthSummary {
+  tenantId    String
+  /// First day of the month of JournalEntry.date.
+  month       DateTime          @db.Date
+  accountId   String
+  sourceType  JournalSourceType
+  debitMinor  BigInt            @default(0)
+  creditMinor BigInt            @default(0)
+  lineCount   Int               @default(0)
+
+  @@id([tenantId, month, accountId, sourceType])
+  @@index([tenantId, accountId, month])
+}
+
+/// How far LedgerMonthSummary has caught up with the journal, per school.
+model LedgerSummaryState {
+  id              String    @id @default(cuid())
+  tenantId        String    @unique
+  /// Newest JournalEntry.createdAt folded into the summary.
+  watermark       DateTime?
+  /// Journal entries the summary covered; a mismatch forces a full rebuild.
+  entryCount      Int       @default(0)
+  refreshedAt     DateTime
+  rebuiltAt       DateTime?
+  monthsRefreshed Int       @default(0)
+  durationMs      Int       @default(0)
 }
 
 // ===========================================================================
