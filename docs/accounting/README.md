@@ -646,7 +646,8 @@ It is read-only. It checks that:
 - each source document has at most one posting in force;
 - cancelled payments, unapproved expenses and unposted runs are not in the books;
 - every reversal mirrors exactly one reversed voucher;
-- the analytics summary equals the journal.
+- the analytics summary equals the journal up to its last refresh (it catches up when the
+  analytics page is opened, so newer entries are not counted against it).
 
 It exits 1 if a rule fails. Opening balances that do not net to zero, and settled
 payments without a posting (automatic posting off, or not backfilled), are reported as

@@ -196,16 +196,17 @@ export const INTEGRITY_CHECKS: IntegrityCheck[] = [
         SELECT 1 FROM o FULL JOIN v ON v."rid" = o."rid" AND v."accountId" = o."accountId"
         WHERE COALESCE(o."rid", v."rid") = r."id" AND (COALESCE(o."dr", 0) <> COALESCE(v."cr", 0) OR COALESCE(o."cr", 0) <> COALESCE(v."dr", 0)))`,
   },
-  // Phase 7: the analytics summary agrees with the journal it summarises.
+  // Phase 7: the analytics summary agrees with the journal it summarises. The summary is
+  // refreshed when the analytics page loads, so only entries up to its watermark count.
   {
-    name: 'Analytics month summary equals the journal (schools with a summary)',
+    name: 'Analytics month summary equals the journal up to its last refresh (schools with a summary)',
     kind: 'rule',
     sql: Prisma.sql`
       WITH live AS (
         SELECT e."tenantId", date_trunc('month', e."date")::date AS month, l."accountId", e."sourceType",
                SUM(l."debitMinor")::bigint AS dr, SUM(l."creditMinor")::bigint AS cr
         FROM "JournalEntry" e JOIN "JournalLine" l ON l."entryId" = e."id"
-        WHERE e."tenantId" IN (SELECT "tenantId" FROM "LedgerSummaryState")
+        JOIN "LedgerSummaryState" s ON s."tenantId" = e."tenantId" AND e."createdAt" <= s."watermark"
         GROUP BY 1, 2, 3, 4),
       summ AS (SELECT "tenantId", "month", "accountId", "sourceType", "debitMinor" AS dr, "creditMinor" AS cr FROM "LedgerMonthSummary")
       SELECT COALESCE(live."tenantId", summ."tenantId") AS "tenantId", COALESCE(live."accountId", summ."accountId") AS id,

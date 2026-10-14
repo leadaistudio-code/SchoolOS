@@ -60,6 +60,10 @@ beforeAll(async () => {
     data: { tenantId, label: '2026-27', startsOn: new Date('2026-04-01T00:00:00.000Z'), endsOn: new Date('2027-03-31T00:00:00.000Z'), status: 'CLOSED', closedAt: new Date(Date.now() - 86_400_000), lockedThrough: new Date('2026-06-30T00:00:00.000Z'), lockedAt: new Date(Date.now() - 86_400_000) },
   })
 
+  // A summary last refreshed before every entry above, holding one row the journal does not have.
+  await prisma.ledgerSummaryState.create({ data: { tenantId, watermark: new Date('2000-01-01T00:00:00.000Z'), refreshedAt: new Date('2000-01-01T00:00:00.000Z') } })
+  await prisma.ledgerMonthSummary.create({ data: { tenantId, month: new Date('2026-05-01T00:00:00.000Z'), accountId: cash.id, sourceType: 'MANUAL', debitMinor: 999n } })
+
   results = await runIntegrityChecks(prisma)
 })
 
@@ -69,6 +73,8 @@ afterAll(async () => {
     await prisma.journalEntry.deleteMany({ where: { tenantId } })
     await prisma.ledgerAccount.deleteMany({ where: { tenantId } })
     await prisma.accountingFiscalYear.deleteMany({ where: { tenantId } })
+    await prisma.ledgerMonthSummary.deleteMany({ where: { tenantId } })
+    await prisma.ledgerSummaryState.deleteMany({ where: { tenantId } })
     await prisma.tenant.delete({ where: { id: tenantId } })
   }
   await prisma.$disconnect()
@@ -97,6 +103,11 @@ describe('accounting integrity checks', () => {
   it('flag vouchers created in a closed year or a locked period', () => {
     expect(findings('No voucher was created in a financial year after it was closed')).toHaveLength(n)
     expect(findings('No voucher was created inside a locked period after it was locked')).toHaveLength(n)
+  })
+
+  it('compare the analytics summary only with entries up to its last refresh', () => {
+    expect(findings('Analytics month summary equals the journal up to its last refresh (schools with a summary)').map((r) => r.detail))
+      .toEqual(['2026-05-01 MANUAL'])
   })
 
   it('report unbalanced opening balances as information', () => {

@@ -225,6 +225,12 @@ function payloadOf(form: FormState) {
   }
 }
 
+function newKey() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 function fileProblem(file: File | null) {
   if (file && file.size > MAX_RECEIPT_MB * 1024 * 1024) return `Receipts must be ${MAX_RECEIPT_MB}MB or smaller`
   return null
@@ -237,33 +243,50 @@ export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOpti
   const [pending, startTransition] = React.useTransition()
   const { form, setForm, set } = useExpenseForm(() => emptyForm(heads))
   const [file, setFile] = React.useState<File | null>(null)
+  // One key per dialog session: a repeated click or retry replays the first save.
+  const idempotencyKey = React.useRef(newKey())
+  const inFlight = React.useRef(false)
 
-  const submit = () =>
+  const submit = () => {
+    if (inFlight.current) return
+    inFlight.current = true
     startTransition(async () => {
-      const problem = fileProblem(file)
-      if (problem) {
-        toast.push({ tone: 'error', title: 'Receipt too large', description: problem })
-        return
+      try {
+        const problem = fileProblem(file)
+        if (problem) {
+          toast.push({ tone: 'error', title: 'Receipt too large', description: problem })
+          return
+        }
+        const result = await createExpenseAction({ ...payloadOf(form), idempotencyKey: idempotencyKey.current })
+        if (!result.ok) {
+          toast.push({ tone: 'error', title: 'Could not save expense', description: result.message })
+          return
+        }
+        if (file && result.id) {
+          const err = await uploadReceipt(result.id, file, result.receiptUrl)
+          if (err) toast.push({ tone: 'error', title: 'Expense saved, receipt not attached', description: err })
+        }
+        toast.push({ tone: 'success', title: approvals ? 'Submitted for approval' : 'Expense recorded', description: result.message })
+        idempotencyKey.current = newKey()
+        setOpen(false)
+        setForm(emptyForm(heads))
+        setFile(null)
+        router.refresh()
+      } finally {
+        inFlight.current = false
       }
-      const result = await createExpenseAction(payloadOf(form))
-      if (!result.ok) {
-        toast.push({ tone: 'error', title: 'Could not save expense', description: result.message })
-        return
-      }
-      if (file && result.id) {
-        const err = await uploadReceipt(result.id, file, result.receiptUrl)
-        if (err) toast.push({ tone: 'error', title: 'Expense saved, receipt not attached', description: err })
-      }
-      toast.push({ tone: 'success', title: approvals ? 'Submitted for approval' : 'Expense recorded', description: result.message })
-      setOpen(false)
-      setForm(emptyForm(heads))
-      setFile(null)
-      router.refresh()
     })
+  }
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button
+        size="sm"
+        onClick={() => {
+          idempotencyKey.current = newKey()
+          setOpen(true)
+        }}
+      >
         <Plus aria-hidden /> {approvals ? 'Submit expense' : 'Record expense'}
       </Button>
       <Dialog
