@@ -16,9 +16,11 @@ import {
   expenseHeadUpdateSchema,
   updateExpenseHead,
 } from '@/server/modules/finance/expense-heads'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
+import { createExpenseRequest } from '@/server/modules/accounting/expense-approval-service'
 
 export type ActionResult =
-  | { ok: true; message: string; id?: string }
+  | { ok: true; message: string; id?: string; receiptUrl?: string }
   | { ok: false; message: string }
 
 function fail(err: unknown, fallback: string): ActionResult {
@@ -37,6 +39,16 @@ function revalidateExpenses() {
 export async function createExpenseAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('expenses.manage')
   try {
+    if ((await getAccountingFlags(ctx.db)).approvals) {
+      const request = await createExpenseRequest(ctx, { ...(payload as object), submit: true })
+      revalidatePath('/accounts/expense-approvals')
+      return {
+        ok: true,
+        id: request.id,
+        receiptUrl: `/api/v1/accounting/expense-approvals/${request.id}/receipt`,
+        message: `${request.number} submitted for approval. It reaches the books only after final approval.`,
+      }
+    }
     const created = await createExpense(ctx, expenseSchema.parse(payload))
     revalidateExpenses()
     return { ok: true, id: created.id, message: `${created.title} recorded for ₹${created.amountMinor / 100}.` }

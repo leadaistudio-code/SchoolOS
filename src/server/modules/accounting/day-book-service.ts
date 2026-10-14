@@ -9,6 +9,7 @@ import { syncExpenseLedger } from '@/server/modules/accounts/posting'
 import { assertPostingAllowed, getAccountingFlags, recordAccountingEvent } from './service'
 import { isIsoDate, toIsoDay } from './fiscal-year'
 import { cashBankAccounts } from './cash-bank'
+import { createExpenseRequest } from './expense-approval-service'
 import {
   buildDayBookRow,
   checkExpensePostings,
@@ -362,6 +363,17 @@ export async function recordDayBookExpense(ctx: AppContext, raw: unknown) {
   const flags = await requireDayBook(ctx, 'expenses.manage')
   const input = dayBookExpenseSchema.parse(raw)
   await assertPostingAllowed(ctx.db, input.expenseDate, { startMonth: flags.fiscalYearStartMonth })
+  if (flags.approvals) {
+    const request = await createExpenseRequest(ctx, { ...input, amount: input.amount / 100, submit: true })
+    return {
+      id: request.id,
+      voucherNumber: null,
+      journalId: null,
+      journalNumber: null,
+      requestNumber: request.number,
+      receiptUrl: `/api/v1/accounting/expense-approvals/${request.id}/receipt`,
+    }
+  }
   const expense = await createExpense(ctx, input)
   await syncExpenseLedger(ctx.tenant.id, expense.id)
   const entry = await ctx.db.journalEntry.findFirst({
@@ -378,5 +390,12 @@ export async function recordDayBookExpense(ctx: AppContext, raw: unknown) {
     correlationId: `day-book:${input.idempotencyKey}`,
     data: { voucherNumber: expense.voucherNumber, amountMinor: expense.amountMinor, journalNumber: entry?.number ?? null },
   })
-  return { id: expense.id, voucherNumber: expense.voucherNumber, journalId: entry?.id ?? null, journalNumber: entry?.number ?? null }
+  return {
+    id: expense.id,
+    voucherNumber: expense.voucherNumber,
+    journalId: entry?.id ?? null,
+    journalNumber: entry?.number ?? null,
+    requestNumber: null,
+    receiptUrl: `/api/v1/finance/expenses/${expense.id}/receipt`,
+  }
 }

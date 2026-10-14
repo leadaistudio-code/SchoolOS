@@ -6833,6 +6833,95 @@ model DepreciationLine {
   @@index([tenantId, runId])
 }
 
+// ---------------------------------------------------------------------------
+// Expense approval (phase 6). An expense awaiting approval lives here, never in
+// SchoolExpense, so it cannot reach the ledgers, the expense dashboards or the
+// nightly posting job. Final approval creates the SchoolExpense and its journal
+// entry in the same transaction. Heads, ledgers, expenses and users are
+// referenced by id (no foreign keys to existing tables).
+// ---------------------------------------------------------------------------
+
+enum ExpenseApprovalStatus {
+  /// Stage 1: the creator is still preparing it.
+  DRAFT
+  /// Stage 2: submitted, awaiting validation / audit.
+  SUBMITTED
+  /// Stage 3: awaiting approver L1 (department head).
+  PENDING_L1
+  /// Stage 4: awaiting approver L2 (finance officer).
+  PENDING_L2
+  /// Stage 5: awaiting the final approver (principal).
+  PENDING_FINAL
+  /// Sent back to the creator for correction; resubmitting starts again at stage 2.
+  RETURNED
+  REJECTED
+  WITHDRAWN
+  /// Final approval and posting succeeded together; expenseId is set.
+  POSTED
+  REVERSED
+}
+
+model ExpenseApprovalRequest {
+  id             String                @id @default(cuid())
+  tenantId       String
+  /// EAR-2627-00001
+  number         String
+  title          String
+  headId         String
+  amountMinor    Int
+  expenseDate    DateTime              @db.Date
+  paymentMode    ExpensePaymentMode    @default(CASH)
+  vendor         String?
+  referenceNo    String?
+  notes          String?
+  cashAccountId  String?
+  receiptKey     String?
+  receiptName    String?
+  receiptMime    String?
+  status         ExpenseApprovalStatus @default(DRAFT)
+  /// Submission round; a return for correction starts a new one and clears earlier sign-offs.
+  cycle          Int                   @default(1)
+  createdById    String?
+  createdByLabel String?
+  submittedAt    DateTime?
+  /// The SchoolExpense created at final approval.
+  expenseId      String?
+  postedAt       DateTime?
+  reversedAt     DateTime?
+  idempotencyKey String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  steps ExpenseApprovalStep[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, expenseId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, expenseDate])
+  @@index([tenantId, createdById])
+}
+
+/// One row per transition: who moved the request from which status to which, and why.
+model ExpenseApprovalStep {
+  id         String                @id @default(cuid())
+  tenantId   String
+  requestId  String
+  cycle      Int
+  /// SUBMIT, VALIDATE, APPROVE_L1, APPROVE_L2, APPROVE_FINAL, RETURN, REJECT, WITHDRAW, EDIT, REVERSE
+  action     String
+  fromStatus ExpenseApprovalStatus
+  toStatus   ExpenseApprovalStatus
+  actorId    String?
+  actorLabel String?
+  remarks    String?
+  createdAt  DateTime              @default(now())
+
+  request ExpenseApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId, createdAt])
+  @@index([tenantId, actorId])
+}
+
 // ===========================================================================
 // DAILY OPERATIONS: SUBSTITUTIONS, GATE PASSES, PARENT WHATSAPP ASSISTANT
 // ===========================================================================

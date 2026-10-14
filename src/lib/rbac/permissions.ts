@@ -139,6 +139,14 @@ export const PERMISSIONS: PermissionDef[] = [
     ['manage', 'Record and edit school expenses'],
   ]),
 
+  // Stages of the multi-tier expense approval workflow (off unless the school switches it on).
+  ...mod('expense_approval', [
+    ['validate', 'Validate / audit submitted expenses (stage 2)'],
+    ['approve_department', 'Approve expenses as department head (stage 3)'],
+    ['approve_finance', 'Approve expenses as finance officer (stage 4)'],
+    ['approve_final', 'Give final approval and post expenses (stage 5)'],
+  ]),
+
   ...mod('exams', [
     ['view', 'View exams'],
     ['manage', 'Create and schedule exams'],

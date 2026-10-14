@@ -275,7 +275,7 @@ async function desiredRefund(db: TenantClient, resolve: AccountResolver, refundI
   return { refund, desired }
 }
 
-async function desiredExpense(db: TenantClient, resolve: AccountResolver, expenseId: string) {
+async function desiredExpense(db: Pick<TenantClient, 'schoolExpense' | 'ledgerAccount'>, resolve: AccountResolver, expenseId: string) {
   const expense = await db.schoolExpense.findFirst({
     where: { id: expenseId },
     include: { head: { select: { account: { select: { id: true, isActive: true } } } } },
@@ -446,6 +446,67 @@ async function syncPaymentWith(c: Ctx, paymentId: string) {
 async function syncRefundWith(c: Ctx, refundId: string) {
   const { desired } = await desiredRefund(c.db, c.resolve, refundId)
   return reconcileSource(c.db, c.tenantId, 'FEE_REFUND', refundId, desired, bookDay(new Date()))
+}
+
+type ExpenseWriteClient = WriteClient & Pick<TenantClient, 'schoolExpense' | 'ledgerAccount'>
+
+/**
+ * Posts a new expense inside the caller's transaction (expense approval), so
+ * the expense and its entry commit or fail together. Uses the key the sync
+ * would use for a first version, so the nightly job sees it as up to date.
+ */
+export async function postExpenseInTransaction(
+  tx: ExpenseWriteClient,
+  tenantId: string,
+  resolve: AccountResolver,
+  expenseId: string,
+  actor: { id: string; label: string },
+) {
+  const { desired } = await desiredExpense(tx, resolve, expenseId)
+  if (!desired) throw new Error('This expense has nothing to post')
+  return writeJournalEntry(tx, tenantId, {
+    ...desired,
+    sourceType: 'EXPENSE',
+    sourceId: expenseId,
+    postingKey: `EXPENSE:${expenseId}:v1`,
+    createdById: actor.id,
+    createdByLabel: actor.label,
+  })
+}
+
+/**
+ * Reverses an expense's active entry inside the caller's transaction, dated
+ * `on` (never before the original), as the sync would after a deletion.
+ */
+export async function reverseExpenseInTransaction(
+  tx: WriteClient,
+  tenantId: string,
+  expenseId: string,
+  on: Date,
+  actor: { id: string; label: string },
+) {
+  const active = await tx.journalEntry.findFirst({
+    where: { sourceType: 'EXPENSE', sourceId: expenseId, isReversal: false, reversedAt: null },
+    include: { lines: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!active) return null
+  const claimed = await tx.journalEntry.updateMany({ where: { id: active.id, reversedAt: null }, data: { reversedAt: new Date() } })
+  if (claimed.count !== 1) throw new Error('This entry is already being reversed')
+  return writeJournalEntry(tx, tenantId, {
+    date: on < active.date ? active.date : on,
+    voucherType: active.voucherType,
+    narration: `Reversal of ${active.number} (approved expense reversed)`,
+    reference: active.reference,
+    lines: reverseLines(active.lines),
+    sourceType: 'EXPENSE',
+    sourceId: expenseId,
+    postingKey: `EXPENSE:${expenseId}:rev:${active.id}`,
+    isReversal: true,
+    reversalOfId: active.id,
+    createdById: actor.id,
+    createdByLabel: actor.label,
+  })
 }
 
 async function syncExpenseWith(c: Ctx, expenseId: string) {

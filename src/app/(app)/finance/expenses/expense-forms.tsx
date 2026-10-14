@@ -67,10 +67,10 @@ const fromDraft = (e: ExpenseDraft): FormState => ({
 
 const MAX_RECEIPT_MB = 10
 
-async function uploadReceipt(expenseId: string, file: File): Promise<string | null> {
+async function uploadReceipt(expenseId: string, file: File, url = `/api/v1/finance/expenses/${expenseId}/receipt`): Promise<string | null> {
   const body = new FormData()
   body.set('file', file)
-  const res = await fetch(`/api/v1/finance/expenses/${expenseId}/receipt`, { method: 'POST', body })
+  const res = await fetch(url, { method: 'POST', body })
   if (res.ok) return null
   const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
   return json?.error?.message ?? 'The receipt could not be uploaded'
@@ -230,7 +230,7 @@ function fileProblem(file: File | null) {
   return null
 }
 
-export function NewExpenseButton({ heads }: { heads: HeadOption[] }) {
+export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOption[]; approvals?: boolean }) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
@@ -251,10 +251,10 @@ export function NewExpenseButton({ heads }: { heads: HeadOption[] }) {
         return
       }
       if (file && result.id) {
-        const err = await uploadReceipt(result.id, file)
+        const err = await uploadReceipt(result.id, file, result.receiptUrl)
         if (err) toast.push({ tone: 'error', title: 'Expense saved, receipt not attached', description: err })
       }
-      toast.push({ tone: 'success', title: 'Expense recorded', description: result.message })
+      toast.push({ tone: 'success', title: approvals ? 'Submitted for approval' : 'Expense recorded', description: result.message })
       setOpen(false)
       setForm(emptyForm(heads))
       setFile(null)
@@ -264,13 +264,15 @@ export function NewExpenseButton({ heads }: { heads: HeadOption[] }) {
   return (
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus aria-hidden /> Record expense
+        <Plus aria-hidden /> {approvals ? 'Submit expense' : 'Record expense'}
       </Button>
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
-        title="Record expense"
-        description="Every rupee the school spends: choose the head and it is filed as a direct or indirect expense automatically."
+        title={approvals ? 'Submit expense for approval' : 'Record expense'}
+        description={approvals
+          ? 'Expense approval is on: this goes through validation and four approval stages, and reaches the books only at final approval.'
+          : 'Every rupee the school spends: choose the head and it is filed as a direct or indirect expense automatically.'}
         footer={
           <>
             <Button
@@ -278,7 +280,7 @@ export function NewExpenseButton({ heads }: { heads: HeadOption[] }) {
               loading={pending}
               disabled={!form.title.trim() || !form.headId || !form.amount || Number(form.amount) <= 0}
             >
-              Save expense
+              {approvals ? 'Submit for approval' : 'Save expense'}
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
-import { badRequest, notFound } from '@/server/api/response'
+import { badRequest, conflict, notFound } from '@/server/api/response'
 import { uploadFile } from '@/server/files'
 import { storageProvider } from '@/server/providers'
 import { attendanceDate, toDateInput } from '@/lib/dates'
@@ -17,6 +17,7 @@ import {
 import { ensureExpenseHeads } from './expense-heads'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
 import { cashBankAccounts } from '@/server/modules/accounting/cash-bank'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
 
 export { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_MODES, categoryLabel, paymentModeLabel }
 
@@ -238,6 +239,9 @@ export async function createExpense(ctx: AppContext, input: z.infer<typeof expen
     ? await ctx.db.schoolExpense.findFirst({ where: { idempotencyKey: input.idempotencyKey } })
     : null
   if (replay) return replay
+  if ((await getAccountingFlags(ctx.db)).approvals) {
+    throw conflict('Expense approval is switched on: submit this expense for approval instead')
+  }
   const head = await headFor(ctx, input.headId)
   if (!head.isActive) throw badRequest(`${head.name} is switched off; choose another head`)
   const cashAccountId = await checkCashAccount(ctx, input.cashAccountId)
@@ -296,6 +300,12 @@ export async function createExpense(ctx: AppContext, input: z.infer<typeof expen
   return created
 }
 
+/** Expenses that went through approval are corrected only by reversing them from their request. */
+async function assertNotFromApproval(ctx: AppContext, expenseId: string) {
+  const request = await ctx.db.expenseApprovalRequest.findFirst({ where: { expenseId }, select: { number: true } })
+  if (request) throw conflict(`This expense was approved through ${request.number}; reverse it there instead of editing it`)
+}
+
 function postExpense(tenantId: string, expenseId: string) {
   void import('@/server/modules/accounts/posting')
     .then(({ syncExpenseLedger }) => syncExpenseLedger(tenantId, expenseId))
@@ -308,6 +318,7 @@ export async function updateExpense(ctx: AppContext, input: z.infer<typeof expen
 
   const before = await ctx.db.schoolExpense.findFirst({ where: { id, deletedAt: null } })
   if (!before) throw notFound('Expense')
+  await assertNotFromApproval(ctx, id)
   const head = await headFor(ctx, data.headId)
   if (!head.isActive && head.id !== before.headId) {
     throw badRequest(`${head.name} is switched off; choose another head`)
@@ -356,6 +367,7 @@ export async function deleteExpense(ctx: AppContext, id: string) {
 
   const before = await ctx.db.schoolExpense.findFirst({ where: { id, deletedAt: null } })
   if (!before) throw notFound('Expense')
+  await assertNotFromApproval(ctx, id)
 
   const archived = await ctx.db.schoolExpense.update({
     where: { id },

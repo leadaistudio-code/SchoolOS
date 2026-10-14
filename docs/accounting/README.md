@@ -264,3 +264,113 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014140000_fixed_as
 Postgres cannot drop enum values, so `DEPRECIATION` and `FIXED_ASSET` stay in
 `JournalSourceType`; they are harmless if unused. The ledgers created on first use are
 ordinary accounts and can be deactivated.
+
+## Phase 6: Multi-tier expense approval
+
+"Trigger Multi-Tier Approval Workflow" is off by default. It needs
+`ACCOUNTING_APPROVALS_ENABLED`, the accounting module and the school's switch
+(`AccountingSettings.approvalWorkflowEnabled`, on the Expense approvals page for
+`accounts.manage`). The same switch also drives the Phase 3 and 5 maker-checker steps.
+While it is off, expenses are recorded and posted exactly as before.
+
+While it is on, new expenses from the Expenses page and the Day Book become approval
+requests (`ExpenseApprovalRequest`, numbered `EAR-…`), not `SchoolExpense` rows. Purchase
+vouchers, vendor payments, debit notes and depreciation keep their own maker-checker.
+
+| Stage | Status | Who | Permission |
+| --- | --- | --- | --- |
+| 1 Creator / draft | `DRAFT`, `RETURNED` | the preparer | `expenses.manage` |
+| 2 Validator / audit | `SUBMITTED` | validator | `expense_approval.validate` |
+| 3 Approver L1 | `PENDING_L1` | department head | `expense_approval.approve_department` |
+| 4 Approver L2 | `PENDING_L2` | finance officer | `expense_approval.approve_finance` |
+| 5 Final approver | `PENDING_FINAL` | principal | `expense_approval.approve_final` |
+
+The default grants are as follows. School Admin gets all four permissions. Accountant gets
+validate and finance. Principal gets department and final. Custom roles get none; grant
+them in Roles. `npm run rbac:sync` (part of the Railway pre-deploy) adds the permissions and
+re-grants the system roles.
+
+### Rules
+
+- **Moving forward:** each stage holder can approve, which passes the expense to the next
+  stage.
+- **Return:** the stage holder can return it to the creator; remarks are required. The
+  creator edits it and resubmits. A resubmission starts a new cycle at stage 2, and earlier
+  sign-offs no longer count.
+- **Reject:** the stage holder can reject it; remarks are required. Rejection is final.
+- **Withdraw:** the creator can withdraw it while it is a draft, returned, or not yet
+  validated.
+- **Separation of duties:** the creator cannot act at stages 2–5, and one person signs at
+  most one stage per cycle. Returning or rejecting after signing an earlier stage is
+  allowed.
+- **Audit trail:** every transition and edit is an `ExpenseApprovalStep` recording the
+  actor, time, remarks, previous status and new status. Requests are never deleted.
+  Withdrawn, rejected and reversed requests stay for audit.
+- **Concurrency:** each transition locks the request row (`FOR UPDATE`) and re-checks the
+  rules against the locked state. The client sends the status it saw, so a double click
+  or a second approver gets a 409 instead of approving twice.
+
+### Posting
+
+Pending requests never touch the general ledger, the expense register or the expense
+dashboards.
+
+Final approval runs in one transaction:
+
+1. Checks the lock date.
+2. Creates the `SchoolExpense` (EXP voucher number, with the preparer as recorder).
+3. Posts its journal entry, Dr expense head and Cr cash / bank, under posting key
+   `EXPENSE:<id>:v1`, so the nightly sync sees it as already posted.
+4. Marks the request `POSTED` and records the step.
+
+If any part fails, nothing is saved and the request stays at stage 5. There is no
+"approved but not posted" state.
+
+Final approval needs automatic expense posting (`LedgerSettings.autoPostExpenses`) on.
+
+A posted expense is reversed from its request by a final approver, with remarks. This
+removes the expense and posts a reversing entry dated today. Expenses created through
+approval cannot be edited or deleted on the Expenses page.
+
+The workflow cannot be switched off while requests are at stages 2–5. Drafts and returned
+requests can be withdrawn afterwards.
+
+### Provisional profit and loss
+
+Profit & loss has an "Include provisional (under approval)" view next to the default
+"Actuals only".
+
+- **What it adds:** requests at stages 2–5 dated in the period. Each is counted once by
+  request, mapped to its head's ledger and shown as a `[Provisional]` row with its stage.
+- **What it leaves out:** drafts, returned, rejected, withdrawn, posted and reversed
+  requests. Posted ones are already in the actuals.
+- **What it shows:** actual income, actual expenses, provisional expenses, the projected
+  net surplus or deficit, and the variance from actual. All of it is labelled as an
+  estimate.
+- **What it never does:** write to the ledgers.
+
+### Database
+
+Migration `20261014160000_expense_approvals` adds the `ExpenseApprovalStatus` enum and two
+tables: `ExpenseApprovalRequest` and `ExpenseApprovalStep`.
+
+- **Foreign keys:** only step → request. `SchoolExpense` gains no column or foreign key.
+- **CHECK constraints:**
+  - the amount is positive;
+  - the cycle is at least 1;
+  - `expenseId` and `postedAt` are set exactly when the status is posted or reversed;
+  - `reversedAt` is set exactly when the status is reversed.
+- **Apply it before deploying the code.** Expense edits and deletes look up this table.
+
+Rollback, after a backup and with the workflow switched off and nothing in approval
+(posted expenses stay as ordinary expenses):
+
+```sql
+DROP TABLE IF EXISTS "ExpenseApprovalStep";
+DROP TABLE IF EXISTS "ExpenseApprovalRequest";
+DROP TYPE IF EXISTS "ExpenseApprovalStatus";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014160000_expense_approvals';
+```
+
+The four `expense_approval.*` permissions can be left in place; they grant nothing once
+the code is reverted.

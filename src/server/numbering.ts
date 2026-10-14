@@ -13,10 +13,11 @@ export type DocumentKind =
   | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
   | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
   | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT' | 'EXPENSE_VOUCHER'
-  | 'FIXED_ASSET' | 'DEPRECIATION_RUN'
+  | 'FIXED_ASSET' | 'DEPRECIATION_RUN' | 'EXPENSE_REQUEST'
 
 const PREFIX: Record<DocumentKind, string> = {
   EXPENSE_VOUCHER: 'EXP',
+  EXPENSE_REQUEST: 'EAR',
   FIXED_ASSET: 'FA',
   DEPRECIATION_RUN: 'DEP',
   PURCHASE_VOUCHER: 'PV',
@@ -37,6 +38,7 @@ const PREFIX: Record<DocumentKind, string> = {
 
 const TABLE: Record<DocumentKind, string> = {
   EXPENSE_VOUCHER: 'SchoolExpense',
+  EXPENSE_REQUEST: 'ExpenseApprovalRequest',
   FIXED_ASSET: 'FixedAsset',
   DEPRECIATION_RUN: 'DepreciationRun',
   PURCHASE_VOUCHER: 'PurchaseVoucher',

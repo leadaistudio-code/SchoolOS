@@ -10,7 +10,8 @@ import { formatDay } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { EmptyState } from '@/components/ui/states'
+import { EmptyState, Notice } from '@/components/ui/states'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
@@ -35,7 +36,8 @@ export default async function ExpensesPage({
   const filter = expenseFilterSchema.parse(params)
 
   const heads = await expenseHeadOptions(ctx)
-  const [list, overview] = await Promise.all([listExpenses(ctx, query, filter), expenseOverview(ctx)])
+  const [list, overview, flags] = await Promise.all([listExpenses(ctx, query, filter), expenseOverview(ctx), getAccountingFlags(ctx.db)])
+  const approvals = flags.approvals
   const { rows, total, totalMinor } = list
   const canManage = ctx.can('expenses.manage')
   const currency = ctx.tenant.currency
@@ -68,10 +70,22 @@ export default async function ExpensesPage({
                 Profit &amp; Loss
               </Link>
             ) : null}
-            {canManage ? <NewExpenseButton heads={heads} /> : null}
+            {approvals ? (
+              <Link href="/accounts/expense-approvals" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Approvals
+              </Link>
+            ) : null}
+            {canManage ? <NewExpenseButton heads={heads} approvals={approvals} /> : null}
           </>
         }
       />
+
+      {approvals ? (
+        <Notice tone="info" title="Expense approval is on">
+          New expenses go through validation and four approval stages and appear here only once finally approved and posted.
+          Track them under <Link href="/accounts/expense-approvals" className="underline">Expense approvals</Link>.
+        </Notice>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -164,7 +178,7 @@ export default async function ExpensesPage({
                 ? 'Record school spends like salaries, electricity, rent, stationery, repairs and event costs.'
                 : 'Expenses recorded by accounts or front office will appear here.'
             }
-            action={canManage ? <NewExpenseButton heads={heads} /> : undefined}
+            action={canManage ? <NewExpenseButton heads={heads} approvals={approvals} /> : undefined}
           />
         ) : (
           <>

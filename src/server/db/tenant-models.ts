@@ -203,6 +203,8 @@ export const TENANT_SCOPED_MODELS = [
   'FixedAssetRateChange',
   'DepreciationRun',
   'DepreciationLine',
+  'ExpenseApprovalRequest',
+  'ExpenseApprovalStep',
 
   // Daily operations
   'Substitution',

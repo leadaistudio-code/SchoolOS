@@ -74,6 +74,7 @@ export default async function DayBookPage({ searchParams }: { searchParams: Prom
               heads={heads.map((h) => ({ id: h.id, label: h.name }))}
               cashAccounts={activeCash.map((a) => ({ id: a.id, label: `${a.code} · ${a.name}` }))}
               today={schoolToday()}
+              approvals={flags.approvals}
             />
           ) : null
         }

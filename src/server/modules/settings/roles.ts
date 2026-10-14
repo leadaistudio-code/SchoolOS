@@ -93,6 +93,7 @@ export function permissionCatalogue() {
     settings: 'Settings',
     users: 'Users',
     roles: 'Roles',
+    expense_approval: 'Expense approval',
   }
   const byModule = new Map<string, { key: string; label: string }[]>()
   for (const permission of PERMISSIONS) {

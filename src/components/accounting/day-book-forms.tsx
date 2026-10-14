@@ -10,14 +10,16 @@ import { callApi, FormDialog } from './payables-forms'
 
 export type Option = { id: string; label: string }
 
-export function DayBookExpenseDialog({ heads, cashAccounts, today }: { heads: Option[]; cashAccounts: Option[]; today: string }) {
+export function DayBookExpenseDialog({ heads, cashAccounts, today, approvals = false }: { heads: Option[]; cashAccounts: Option[]; today: string; approvals?: boolean }) {
   return (
     <FormDialog
-      title="Record expense"
-      description="Paid now: posts Dr the expense head, Cr the cash or bank ledger. Bills paid later go through a vendor's purchase voucher."
-      trigger={(open) => <Button size="sm" onClick={open}>Record expense</Button>}
+      title={approvals ? 'Submit expense for approval' : 'Record expense'}
+      description={approvals
+        ? 'Expense approval is on: this goes to validation and four approval stages, and is posted (Dr the expense head, Cr cash or bank) only at final approval.'
+        : "Paid now: posts Dr the expense head, Cr the cash or bank ledger. Bills paid later go through a vendor's purchase voucher."}
+      trigger={(open) => <Button size="sm" onClick={open}>{approvals ? 'Submit expense' : 'Record expense'}</Button>}
     >
-      {(close, key) => <DayBookExpenseForm heads={heads} cashAccounts={cashAccounts} today={today} idempotencyKey={key} onDone={close} />}
+      {(close, key) => <DayBookExpenseForm heads={heads} cashAccounts={cashAccounts} today={today} idempotencyKey={key} approvals={approvals} onDone={close} />}
     </FormDialog>
   )
 }
@@ -27,12 +29,14 @@ function DayBookExpenseForm({
   cashAccounts,
   today,
   idempotencyKey,
+  approvals,
   onDone,
 }: {
   heads: Option[]
   cashAccounts: Option[]
   today: string
   idempotencyKey: string
+  approvals: boolean
   onDone: () => void
 }) {
   const router = useRouter()
@@ -71,15 +75,15 @@ function DayBookExpenseForm({
       setError(saved.message)
       return
     }
-    const { id, voucherNumber } = saved.data as { id: string; voucherNumber: string | null }
+    const { voucherNumber, requestNumber, receiptUrl } = saved.data as { voucherNumber: string | null; requestNumber: string | null; receiptUrl: string }
     const file = f.get('receipt')
     if (file instanceof File && file.size > 0) {
       const form = new FormData()
       form.set('file', file)
-      const uploaded = await callApi(`/api/v1/finance/expenses/${id}/receipt`, { method: 'POST', form })
+      const uploaded = await callApi(receiptUrl, { method: 'POST', form })
       if (!uploaded.ok) {
         setBusy(false)
-        setError(`${voucherNumber ?? 'The expense'} was saved, but the bill could not be attached: ${uploaded.message}. Attach it from the register.`)
+        setError(`${voucherNumber ?? requestNumber ?? 'The expense'} was saved, but the bill could not be attached: ${uploaded.message}. Attach it from the ${requestNumber ? 'approval request' : 'register'}.`)
         router.refresh()
         return
       }
@@ -135,7 +139,7 @@ function DayBookExpenseForm({
       <Field label="Remarks" htmlFor="db-notes"><Textarea id="db-notes" name="notes" rows={2} maxLength={500} /></Field>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>
-        <Button type="submit" disabled={busy}>{busy ? 'Posting…' : 'Record and post'}</Button>
+        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : approvals ? 'Submit for approval' : 'Record and post'}</Button>
       </div>
     </form>
   )

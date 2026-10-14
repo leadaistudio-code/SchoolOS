@@ -147,6 +147,19 @@ export function sourceHref(sourceType: string, sourceId: string | null): string 
   return null
 }
 
+export const APPROVAL_TONE = {
+  DRAFT: 'neutral',
+  SUBMITTED: 'warning',
+  PENDING_L1: 'warning',
+  PENDING_L2: 'warning',
+  PENDING_FINAL: 'warning',
+  RETURNED: 'info',
+  REJECTED: 'danger',
+  WITHDRAWN: 'neutral',
+  POSTED: 'success',
+  REVERSED: 'neutral',
+} as const
+
 export function isoParam(value: string | undefined, fallback: string) {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback
 }
