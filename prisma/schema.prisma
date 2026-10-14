@@ -1928,17 +1928,17 @@ model FeeStructureItem {
 
 /// A published structure's due schedule. One installment becomes one invoice per assignment.
 model FeeInstallment {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
   structureId String
   name        String
   /// Invoice generation date. Null = the 1st of the due month.
   issueOn     DateTime? @db.Date
-  dueOn       DateTime @db.Date
+  dueOn       DateTime  @db.Date
   amountMinor Int
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   structure FeeStructure         @relation(fields: [structureId], references: [id], onDelete: Cascade)
   lines     FeeInstallmentLine[]
@@ -5498,34 +5498,34 @@ model CrmCommunication {
 // ---------------------------------------------------------------------------
 
 model PlatformMailbox {
-  id                String    @id @default(cuid())
-  fromName          String
-  fromEmail         String    @unique
-  replyTo           String?
-  username          String
+  id                 String    @id @default(cuid())
+  fromName           String
+  fromEmail          String    @unique
+  replyTo            String?
+  username           String
   /// AES-256-GCM via encryptSecret(). Never returned to a browser.
-  passwordEncrypted String
-  smtpHost          String    @default("smtp.hostinger.com")
-  smtpPort          Int       @default(465)
-  smtpSecure        Boolean   @default(true)
+  passwordEncrypted  String
+  smtpHost           String    @default("smtp.hostinger.com")
+  smtpPort           Int       @default(465)
+  smtpSecure         Boolean   @default(true)
   /// SMTP, or RESEND (HTTPS API) for hosts that block outbound mail ports.
-  sendVia           String    @default("SMTP")
+  sendVia            String    @default("SMTP")
   /// AES-256-GCM via encryptSecret(). Falls back to RESEND_API_KEY when empty.
   resendKeyEncrypted String?
-  imapEnabled       Boolean   @default(true)
-  imapHost          String    @default("imap.hostinger.com")
-  imapPort          Int       @default(993)
+  imapEnabled        Boolean   @default(true)
+  imapHost           String    @default("imap.hostinger.com")
+  imapPort           Int       @default(993)
   /// Detected on first successful append; blank until then.
-  sentFolder        String?
-  signatureName     String?
-  signatureTitle    String?
-  signaturePhone    String?
-  signatureWebsite  String?
-  isDefault         Boolean   @default(false)
-  verifiedAt        DateTime?
-  lastError         String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  sentFolder         String?
+  signatureName      String?
+  signatureTitle     String?
+  signaturePhone     String?
+  signatureWebsite   String?
+  isDefault          Boolean   @default(false)
+  verifiedAt         DateTime?
+  lastError          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   emails    PlatformEmail[]
   campaigns PlatformCampaign[]
@@ -6227,6 +6227,10 @@ enum JournalSourceType {
   STORE_PURCHASE
   STORE_STOCK
   PAYROLL
+  PURCHASE_VOUCHER
+  VENDOR_PAYMENT
+  DEBIT_NOTE
+  VENDOR_ADJUSTMENT
 }
 
 enum LedgerMapKind {
@@ -6407,6 +6411,258 @@ model AccountingSettings {
   updatedAt               DateTime @updatedAt
 }
 
+// ---------------------------------------------------------------------------
+// Accounts payable (sundry creditors). Isolated tables: no foreign keys to
+// existing models. Ledger accounts, store items and users are referenced by id
+// and validated in the service, inside the tenant-scoped client.
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id            String   @id @default(cuid())
+  tenantId      String
+  /// Short unique code within the school, e.g. VEN-00001.
+  code          String
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  gstin         String?
+  pan           String?
+  /// Payment terms in days from the supplier invoice date.
+  creditDays    Int      @default(0)
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchaseVouchers PurchaseVoucher[]
+  payments         VendorPayment[]
+  debitNotes       DebitNote[]
+  adjustments      VendorAdjustment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+enum PurchaseVoucherStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+model PurchaseVoucher {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  number             String
+  vendorId           String
+  supplierInvoiceNo  String
+  /// Normalised supplier invoice number for duplicate detection. A cancelled
+  /// voucher's key is suffixed so the genuine bill can be entered again.
+  supplierInvoiceKey String
+  invoiceDate        DateTime              @db.Date
+  dueDate            DateTime              @db.Date
+  status             PurchaseVoucherStatus @default(DRAFT)
+  subtotalMinor      Int
+  taxMinor           Int                   @default(0)
+  totalMinor         Int
+  narration          String?
+  attachmentKey      String?
+  attachmentName     String?
+  attachmentMime     String?
+  attachmentSize     Int?
+  idempotencyKey     String?
+  createdById        String?
+  createdByLabel     String?
+  postedAt           DateTime?
+  postedById         String?
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancelReason       String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  vendor      Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  lines       PurchaseVoucherLine[]
+  allocations VendorPaymentAllocation[]
+  debitNotes  DebitNote[]
+  adjustments VendorAdjustment[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, vendorId, supplierInvoiceKey])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, vendorId, status])
+  @@index([tenantId, dueDate])
+}
+
+model PurchaseVoucherLine {
+  id            String  @id @default(cuid())
+  tenantId      String
+  voucherId     String
+  sortOrder     Int     @default(0)
+  description   String
+  /// Expense or asset ledger account the line is charged to.
+  accountId     String
+  /// Optional reference to a store item. Never moves stock.
+  storeItemId   String?
+  quantity      Int     @default(1)
+  unitCostMinor Int
+  amountMinor   Int
+  taxPercent    Float   @default(0)
+  taxMinor      Int     @default(0)
+  totalMinor    Int
+
+  voucher        PurchaseVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  debitNoteLines DebitNoteLine[]
+
+  @@index([tenantId, voucherId])
+}
+
+enum VendorDocumentStatus {
+  POSTED
+  CANCELLED
+}
+
+model VendorPayment {
+  id             String               @id @default(cuid())
+  tenantId       String
+  number         String
+  vendorId       String
+  paidOn         DateTime             @db.Date
+  /// CASH, BANK_TRANSFER, CHEQUE or UPI.
+  mode           String
+  reference      String?
+  amountMinor    Int
+  narration      String?
+  status         VendorDocumentStatus @default(POSTED)
+  idempotencyKey String?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime             @default(now())
+  cancelledAt    DateTime?
+  cancelledById  String?
+  cancelReason   String?
+
+  vendor      Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  allocations VendorPaymentAllocation[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, vendorId, paidOn])
+}
+
+model VendorPaymentAllocation {
+  id          String @id @default(cuid())
+  tenantId    String
+  paymentId   String
+  voucherId   String
+  amountMinor Int
+
+  payment VendorPayment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  voucher PurchaseVoucher @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, paymentId, voucherId])
+  @@index([tenantId, voucherId])
+}
+
+enum DebitNoteStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model DebitNote {
+  id              String          @id @default(cuid())
+  tenantId        String
+  number          String
+  vendorId        String
+  voucherId       String
+  noteDate        DateTime        @db.Date
+  reason          String
+  status          DebitNoteStatus @default(SUBMITTED)
+  totalMinor      Int
+  attachmentKey   String?
+  attachmentName  String?
+  attachmentMime  String?
+  attachmentSize  Int?
+  idempotencyKey  String?
+  createdById     String?
+  createdByLabel  String?
+  approvedById    String?
+  approvedByLabel String?
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancelReason    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  vendor  Vendor          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  voucher PurchaseVoucher @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  lines   DebitNoteLine[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, vendorId, status])
+  @@index([tenantId, voucherId])
+}
+
+model DebitNoteLine {
+  id            String @id @default(cuid())
+  tenantId      String
+  debitNoteId   String
+  voucherLineId String
+  quantity      Int
+  amountMinor   Int
+  taxMinor      Int    @default(0)
+  totalMinor    Int
+
+  debitNote   DebitNote           @relation(fields: [debitNoteId], references: [id], onDelete: Cascade)
+  voucherLine PurchaseVoucherLine @relation(fields: [voucherLineId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, debitNoteId])
+  @@index([tenantId, voucherLineId])
+}
+
+enum VendorAdjustmentType {
+  DISCOUNT
+  WRITE_OFF
+}
+
+model VendorAdjustment {
+  id             String               @id @default(cuid())
+  tenantId       String
+  number         String
+  vendorId       String
+  voucherId      String
+  type           VendorAdjustmentType
+  adjustedOn     DateTime             @db.Date
+  amountMinor    Int
+  reason         String
+  status         VendorDocumentStatus @default(POSTED)
+  idempotencyKey String?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime             @default(now())
+  cancelledAt    DateTime?
+  cancelledById  String?
+  cancelReason   String?
+
+  vendor  Vendor          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  voucher PurchaseVoucher @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, vendorId])
+  @@index([tenantId, voucherId])
+}
+
 // ===========================================================================
 // DAILY OPERATIONS: SUBSTITUTIONS, GATE PASSES, PARENT WHATSAPP ASSISTANT
 // ===========================================================================
@@ -6544,29 +6800,29 @@ model WhatsAppBotSession {
 /// school PC serves it and only checks the short-lived tokens we sign. The
 /// recorder password is never stored here.
 model CctvSite {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  name                String   @default("School CCTV")
-  enabled             Boolean  @default(false)
+  id                  String    @id @default(cuid())
+  tenantId            String    @unique
+  name                String    @default("School CCTV")
+  enabled             Boolean   @default(false)
   /// Public https address of the relay (the Cloudflare tunnel), no trailing slash.
   streamBaseUrl       String?
   nvrHost             String?
-  nvrPort             Int      @default(554)
+  nvrPort             Int       @default(554)
   nvrUsername         String?
-  parentAccessEnabled Boolean  @default(false)
+  parentAccessEnabled Boolean   @default(false)
   /// "HH:mm" in India time.
-  parentStart         String   @default("08:00")
-  parentEnd           String   @default("14:00")
+  parentStart         String    @default("08:00")
+  parentEnd           String    @default("14:00")
   /// 1 = Monday … 7 = Sunday.
-  parentDays          Int[]    @default([1, 2, 3, 4, 5, 6])
+  parentDays          Int[]     @default([1, 2, 3, 4, 5, 6])
   /// SHA-256 of the relay app's connection key; the key itself is shown once.
   relayKeyHash        String?
   relayKeyHint        String?
   relayKeyCreatedAt   DateTime?
   relayLastSeenAt     DateTime?
   relayAppVersion     String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   cameras CctvCamera[]
 }

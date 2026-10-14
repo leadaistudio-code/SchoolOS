@@ -63,3 +63,61 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261013190000_accounti
 ```
 
 Then revert the code. Take a database backup first (`npm run db:backup`).
+
+## Phase 3: Sundry creditors (accounts payable)
+
+Payables are on an **accrual basis**, unlike fees. Pages: `/accounts/vendors` and
+`/accounts/vendors/[id]` (Vendor 360). APIs: `/api/v1/accounting/vendors`,
+`purchase-vouchers`, `vendor-payments`, `debit-notes`, `vendor-adjustments`,
+`payables/reconciliation`. Reading needs `accounts.view`; every write needs
+`accounts.manage`. With the module switch off the APIs answer 403 `FEATURE_DISABLED` and
+the pages show a notice.
+
+Postings (all through the existing posting engine, one voucher each, idempotent):
+
+| Document | Debit | Credit |
+|---|---|---|
+| Purchase voucher | each line's expense or asset account (incl. GST) | Sundry Creditors (2101) |
+| Vendor payment | Sundry Creditors | Cash or Bank |
+| Debit note (on approval) | Sundry Creditors | the original lines' accounts |
+| Discount | Sundry Creditors | Discount Received (4010) |
+| Write-off | Sundry Creditors | Creditors Written Back (4011) |
+
+Cancelling a posted document posts a reversal; nothing is edited. The three accounts are
+created for a school the first time it uses payables.
+
+Figures on Vendor 360 (only POSTED vouchers and payments, APPROVED debit notes):
+
+- Total invoiced = Σ voucher totals
+- Total settled = Σ payments
+- Total debit notes = Σ approved debit notes
+- Net liability = invoiced − settled − debit notes − discounts and write-offs
+- Bill outstanding = bill total − payments allocated to it − its debit notes − its adjustments
+- On account = payments − allocations
+
+Σ bill outstanding − on account = net liability; the page warns if that ever fails, and
+`payables/reconciliation` compares the total with the Sundry Creditors ledger balance.
+
+Controls: one supplier invoice number per vendor (case and punctuation ignored); a debit
+note cannot return more than the remaining quantity or value of a line, nor more than the
+bill's outstanding less other pending notes; with approvals on, a debit note waits for a
+different user to approve it. Store items on purchase lines are a reference only and do
+not move stock.
+
+Migration `20261014010000_accounts_payable` adds eight new tables, four enums, CHECK
+constraints and four new `JournalSourceType` values. No foreign keys to existing tables.
+
+Rollback, after a backup:
+
+```sql
+DROP TABLE IF EXISTS "VendorAdjustment", "DebitNoteLine", "DebitNote",
+  "VendorPaymentAllocation", "VendorPayment", "PurchaseVoucherLine", "PurchaseVoucher",
+  "Vendor";
+DROP TYPE IF EXISTS "PurchaseVoucherStatus", "VendorDocumentStatus", "DebitNoteStatus",
+  "VendorAdjustmentType";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014010000_accounts_payable';
+```
+
+Postgres cannot drop enum values, so the four `JournalSourceType` values stay; they are
+harmless once unused. Journal entries already posted by payables must be reversed (or the
+school's books restored) before the tables are dropped.

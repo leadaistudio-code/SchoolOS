@@ -12,8 +12,13 @@ export type RawCapableClient = {
 export type DocumentKind =
   | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
   | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
+  | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT'
 
 const PREFIX: Record<DocumentKind, string> = {
+  PURCHASE_VOUCHER: 'PV',
+  VENDOR_PAYMENT: 'VP',
+  DEBIT_NOTE: 'DN',
+  VENDOR_ADJUSTMENT: 'VA',
   INVOICE: 'INV',
   RECEIPT: 'RCP',
   REFUND: 'REF',
@@ -27,6 +32,10 @@ const PREFIX: Record<DocumentKind, string> = {
 }
 
 const TABLE: Record<DocumentKind, string> = {
+  PURCHASE_VOUCHER: 'PurchaseVoucher',
+  VENDOR_PAYMENT: 'VendorPayment',
+  DEBIT_NOTE: 'DebitNote',
+  VENDOR_ADJUSTMENT: 'VendorAdjustment',
   INVOICE: 'FeeInvoice',
   RECEIPT: 'FeeReceipt',
   REFUND: 'FeeInvoice',

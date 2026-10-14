@@ -129,6 +129,10 @@ export const SOURCE_LABEL: Record<string, string> = {
   STORE_SALE: 'Store sale',
   STORE_PURCHASE: 'Store purchase',
   STORE_STOCK: 'Stock adjustment',
+  PURCHASE_VOUCHER: 'Purchase voucher',
+  VENDOR_PAYMENT: 'Vendor payment',
+  DEBIT_NOTE: 'Debit note',
+  VENDOR_ADJUSTMENT: 'Vendor discount / write-off',
 }
 
 export function sourceHref(sourceType: string, sourceId: string | null): string | null {

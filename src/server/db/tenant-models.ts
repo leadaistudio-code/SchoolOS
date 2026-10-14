@@ -191,6 +191,14 @@ export const TENANT_SCOPED_MODELS = [
   'AccountingFiscalYear',
   'AccountingAuditEvent',
   'AccountingSettings',
+  'Vendor',
+  'PurchaseVoucher',
+  'PurchaseVoucherLine',
+  'VendorPayment',
+  'VendorPaymentAllocation',
+  'DebitNote',
+  'DebitNoteLine',
+  'VendorAdjustment',
 
   // Daily operations
   'Substitution',
