@@ -121,3 +121,44 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014010000_accounts
 Postgres cannot drop enum values, so the four `JournalSourceType` values stay; they are
 harmless once unused. Journal entries already posted by payables must be reversed (or the
 school's books restored) before the tables are dropped.
+
+## Phase 4: Day Book (cash / bank register)
+
+Page `/accounts/day-book`; APIs under `/api/v1/accounting/day-book` (register,
+`reconciliation`, `repair`, `expenses`). Reading needs `accounts.view`, recording an expense
+`expenses.manage`, re-posting `accounts.manage`. Off with the module switch.
+
+The register is read from the journal, not from a second set of records: every entry that
+touches a cash or bank ledger (the CASH and BANK system accounts plus any account a payment
+mode is mapped to). Paid = credits to those ledgers, received = debits. Reversals are rows of
+their own, so Σ paid and Σ received always equal the journal lines. The head summary spreads
+each row's cash over the entry's other lines pro rata (payroll: only the net pay counts
+against salary), so heads add up exactly to the register.
+
+Reconciliation, per cash / bank ledger: opening balance + register in − register out must
+equal the ledger's own closing balance, and the register's period totals must equal the
+journal lines' totals. Expenses still post in the background as before; the page lists any
+expense whose entry is missing, has a different amount, date or cash ledger, or was not
+reversed after deletion, and "Re-post" re-runs the existing posting for them.
+
+Recording from the Day Book uses the existing expense module (Dr expense head, Cr cash or
+bank), checks the lock date, requires a reference for non-cash payments, posts immediately
+and is retry-safe through an idempotency key. Supplier bills paid later go through Phase 3
+purchase vouchers; advances and reimbursements use manual journals; all appear in the
+register. Approval status arrives with Phase 6.
+
+Migration `20261014120000_day_book` adds three nullable columns to `SchoolExpense`
+(`voucherNumber`, `idempotencyKey`, `cashAccountId`) with two unique indexes. No foreign
+keys, no data rewritten; older expenses keep NULL and show their journal number instead.
+
+Rollback, after a backup:
+
+```sql
+DROP INDEX IF EXISTS "SchoolExpense_tenantId_voucherNumber_key";
+DROP INDEX IF EXISTS "SchoolExpense_tenantId_idempotencyKey_key";
+ALTER TABLE "SchoolExpense" DROP COLUMN IF EXISTS "voucherNumber",
+  DROP COLUMN IF EXISTS "idempotencyKey", DROP COLUMN IF EXISTS "cashAccountId";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014120000_day_book';
+```
+
+Revert the code at the same time: the expense module reads these columns.

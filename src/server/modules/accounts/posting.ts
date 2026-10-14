@@ -284,6 +284,10 @@ async function desiredExpense(db: TenantClient, resolve: AccountResolver, expens
   if (expense.deletedAt || expense.amountMinor <= 0) return { expense, desired: null }
   const headAccount = expense.head?.account
   const expenseAccount = headAccount?.isActive ? headAccount.id : resolve.expense(expense.category)
+  const chosen = expense.cashAccountId
+    ? await db.ledgerAccount.findFirst({ where: { id: expense.cashAccountId, isActive: true }, select: { id: true } })
+    : null
+  const paidFrom = chosen?.id ?? resolve.mode(expense.paymentMode)
   const desired: Desired = {
     date: bookDay(expense.expenseDate),
     voucherType: 'PAYMENT',
@@ -291,7 +295,7 @@ async function desiredExpense(db: TenantClient, resolve: AccountResolver, expens
     reference: expense.referenceNo,
     lines: [
       { accountId: expenseAccount, debitMinor: expense.amountMinor, creditMinor: 0 },
-      { accountId: resolve.mode(expense.paymentMode), debitMinor: 0, creditMinor: expense.amountMinor },
+      { accountId: paidFrom, debitMinor: 0, creditMinor: expense.amountMinor },
     ],
   }
   return { expense, desired }

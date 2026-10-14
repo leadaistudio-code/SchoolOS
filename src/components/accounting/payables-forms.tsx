@@ -8,9 +8,9 @@ import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { parseMoneyToMinor } from '@/server/modules/accounting/money'
 
-type ApiResult = { ok: true; data: unknown } | { ok: false; message: string }
+export type ApiResult = { ok: true; data: unknown } | { ok: false; message: string }
 
-async function callApi(url: string, init: { method: string; body?: unknown; form?: FormData }): Promise<ApiResult> {
+export async function callApi(url: string, init: { method: string; body?: unknown; form?: FormData }): Promise<ApiResult> {
   try {
     const res = await fetch(url, {
       method: init.method,
@@ -36,7 +36,7 @@ function rupees(minor: number) {
 }
 
 /** Dialog shell: one idempotency key per opening, error display, submit lock. */
-function useSubmit(onDone: () => void) {
+export function useSubmit(onDone: () => void) {
   const router = useRouter()
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -56,7 +56,7 @@ function useSubmit(onDone: () => void) {
   return { busy, error, setError, run }
 }
 
-function FormDialog({
+export function FormDialog({
   trigger,
   title,
   description,
@@ -550,7 +550,7 @@ function ActionForm({ url, action, label, needsReason, onDone }: { url: string; 
   )
 }
 
-export function AttachmentUpload({ url, current }: { url: string; current?: string | null }) {
+export function AttachmentUpload({ url, current, downloadUrl }: { url: string; current?: string | null; downloadUrl?: string }) {
   const router = useRouter()
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -567,7 +567,7 @@ export function AttachmentUpload({ url, current }: { url: string; current?: stri
   }
   return (
     <span className="inline-flex items-center gap-2">
-      {current ? <a href={url} className="text-sm text-[var(--brand-600)] hover:underline">{current}</a> : null}
+      {current ? <a href={downloadUrl ?? url} className="text-sm text-[var(--brand-600)] hover:underline">{current}</a> : null}
       <input
         ref={inputRef}
         type="file"

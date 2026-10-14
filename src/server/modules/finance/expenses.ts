@@ -15,6 +15,8 @@ import {
   paymentModeLabel,
 } from '@/lib/finance/expense-options'
 import { ensureExpenseHeads } from './expense-heads'
+import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
+import { cashBankAccounts } from '@/server/modules/accounting/cash-bank'
 
 export { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_MODES, categoryLabel, paymentModeLabel }
 
@@ -50,9 +52,13 @@ export const expenseSchema = z.object({
   vendor: z.string().trim().max(120).optional(),
   referenceNo: z.string().trim().max(60).optional(),
   notes: z.string().trim().max(500).optional(),
+  /** Optional: a retried submission with the same key returns the first expense. */
+  idempotencyKey: z.string().trim().min(8).max(100).optional(),
+  /** Optional cash / bank ledger; otherwise the account mapped to the payment mode. */
+  cashAccountId: z.string().min(1).optional(),
 })
 
-export const expenseUpdateSchema = expenseSchema.extend({
+export const expenseUpdateSchema = expenseSchema.omit({ idempotencyKey: true }).extend({
   id: z.string().min(1),
 })
 
@@ -219,28 +225,60 @@ async function headFor(ctx: AppContext, headId: string) {
   return head
 }
 
+async function checkCashAccount(ctx: AppContext, cashAccountId: string | undefined) {
+  if (!cashAccountId) return null
+  const account = (await cashBankAccounts(ctx.db)).find((a) => a.id === cashAccountId)
+  if (!account || !account.isActive) throw badRequest('Choose an active cash or bank ledger')
+  return account.id
+}
+
 export async function createExpense(ctx: AppContext, input: z.infer<typeof expenseSchema>) {
   ctx.require('expenses.manage')
+  const replay = input.idempotencyKey
+    ? await ctx.db.schoolExpense.findFirst({ where: { idempotencyKey: input.idempotencyKey } })
+    : null
+  if (replay) return replay
   const head = await headFor(ctx, input.headId)
   if (!head.isActive) throw badRequest(`${head.name} is switched off; choose another head`)
+  const cashAccountId = await checkCashAccount(ctx, input.cashAccountId)
+  const expenseDate = attendanceDate(input.expenseDate)
 
-  const created = await ctx.db.schoolExpense.create({
-    data: {
-      tenantId: ctx.tenant.id,
-      title: input.title,
-      headId: head.id,
-      category: head.category,
-      nature: head.nature,
-      amountMinor: input.amount,
-      expenseDate: attendanceDate(input.expenseDate),
-      paymentMode: input.paymentMode,
-      vendor: input.vendor || null,
-      referenceNo: input.referenceNo || null,
-      notes: input.notes || null,
-      recordedById: ctx.user.userId,
-      recordedByLabel: `${ctx.user.firstName} ${ctx.user.lastName}`.trim(),
-    },
-  })
+  let created
+  try {
+    created = await ctx.db.$transaction(async (tx) => {
+      const voucherNumber = await nextDocumentNumber(tx, {
+        tenantId: ctx.tenant.id,
+        kind: 'EXPENSE_VOUCHER',
+        sessionLabel: financialYearLabel(expenseDate),
+      })
+      return tx.schoolExpense.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          title: input.title,
+          headId: head.id,
+          category: head.category,
+          nature: head.nature,
+          amountMinor: input.amount,
+          expenseDate,
+          paymentMode: input.paymentMode,
+          vendor: input.vendor || null,
+          referenceNo: input.referenceNo || null,
+          notes: input.notes || null,
+          recordedById: ctx.user.userId,
+          recordedByLabel: `${ctx.user.firstName} ${ctx.user.lastName}`.trim(),
+          voucherNumber,
+          idempotencyKey: input.idempotencyKey ?? null,
+          cashAccountId,
+        },
+      })
+    })
+  } catch (err) {
+    if (input.idempotencyKey && (err as { code?: string })?.code === 'P2002') {
+      const winner = await ctx.db.schoolExpense.findFirst({ where: { idempotencyKey: input.idempotencyKey } })
+      if (winner) return winner
+    }
+    throw err
+  }
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -274,6 +312,10 @@ export async function updateExpense(ctx: AppContext, input: z.infer<typeof expen
   if (!head.isActive && head.id !== before.headId) {
     throw badRequest(`${head.name} is switched off; choose another head`)
   }
+  // A ledger chosen for the old payment mode would be wrong for a new one.
+  const cashAccountId = data.cashAccountId
+    ? await checkCashAccount(ctx, data.cashAccountId)
+    : data.paymentMode === before.paymentMode ? before.cashAccountId : null
 
   const updated = await ctx.db.schoolExpense.update({
     where: { id },
@@ -288,6 +330,7 @@ export async function updateExpense(ctx: AppContext, input: z.infer<typeof expen
       vendor: data.vendor || null,
       referenceNo: data.referenceNo || null,
       notes: data.notes || null,
+      cashAccountId,
     },
   })
 

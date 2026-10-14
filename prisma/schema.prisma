@@ -2737,12 +2737,20 @@ model SchoolExpense {
   receiptKey      String?
   receiptName     String?
   receiptMime     String?
+  /// Day Book voucher number (EXP-2627-00001); null for expenses recorded before it existed.
+  voucherNumber   String?
+  /// Client-generated key so a retried or double-clicked submission saves once.
+  idempotencyKey  String?
+  /// Cash or bank ledger paid from; null = the account mapped to the payment mode.
+  cashAccountId   String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
 
   head ExpenseHead? @relation(fields: [headId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, voucherNumber])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, expenseDate])
   @@index([tenantId, category, expenseDate])
   @@index([tenantId, nature, expenseDate])

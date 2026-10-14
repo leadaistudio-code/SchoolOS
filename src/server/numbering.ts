@@ -12,9 +12,10 @@ export type RawCapableClient = {
 export type DocumentKind =
   | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
   | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
-  | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT'
+  | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT' | 'EXPENSE_VOUCHER'
 
 const PREFIX: Record<DocumentKind, string> = {
+  EXPENSE_VOUCHER: 'EXP',
   PURCHASE_VOUCHER: 'PV',
   VENDOR_PAYMENT: 'VP',
   DEBIT_NOTE: 'DN',
@@ -32,6 +33,7 @@ const PREFIX: Record<DocumentKind, string> = {
 }
 
 const TABLE: Record<DocumentKind, string> = {
+  EXPENSE_VOUCHER: 'SchoolExpense',
   PURCHASE_VOUCHER: 'PurchaseVoucher',
   VENDOR_PAYMENT: 'VendorPayment',
   DEBIT_NOTE: 'DebitNote',
@@ -73,7 +75,7 @@ export async function nextDocumentNumber(
 
   const table = TABLE[params.kind]
 
-  const column = params.kind === 'LEAD' ? 'reference' : 'number'
+  const column = params.kind === 'LEAD' ? 'reference' : params.kind === 'EXPENSE_VOUCHER' ? 'voucherNumber' : 'number'
 
   // A row lock cannot protect the very first number because no previous row
   // exists yet. The transaction-scoped advisory lock serializes the complete
