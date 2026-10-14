@@ -207,6 +207,9 @@ export const TENANT_SCOPED_MODELS = [
   'ExpenseApprovalStep',
   'LedgerMonthSummary',
   'LedgerSummaryState',
+  'WhatsAppReceiptConfig',
+  'WhatsAppConsent',
+  'WhatsAppOutbox',
 
   // Daily operations
   'Substitution',

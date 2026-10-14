@@ -182,7 +182,7 @@ async function settleAgainstInvoices(
   return { applied, unallocatedMinor }
 }
 
-/** Fire-and-forget: internal ledger always, Tally only for settled payments. */
+/** Fire-and-forget: internal ledger always; Tally and the WhatsApp receipt only for settled payments. */
 function afterPaymentChange(tenantId: string, paymentId: string, options: { tally?: boolean } = {}) {
   void import('@/server/modules/accounts/posting')
     .then(({ syncPaymentLedger }) => syncPaymentLedger(tenantId, paymentId))
@@ -191,6 +191,9 @@ function afterPaymentChange(tenantId: string, paymentId: string, options: { tall
     void import('@/server/modules/tally/receipts')
       .then(({ queueFeePaymentForTally }) => queueFeePaymentForTally(tenantId, paymentId))
       .catch((err) => console.error('[tally] enqueue failed', err))
+    void import('@/server/modules/whatsapp-receipts/service')
+      .then(({ queueFeeReceiptWhatsApp }) => queueFeeReceiptWhatsApp(tenantId, paymentId))
+      .catch((err) => console.error('[whatsapp-receipts] enqueue failed', err))
   }
 }
 

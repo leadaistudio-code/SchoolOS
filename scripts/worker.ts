@@ -11,10 +11,12 @@ import {
   recoverStaleNotificationJobs,
   succeedJob,
 } from '../src/server/worker/queue'
+import { sweepMissedReceipts } from '../src/server/modules/whatsapp-receipts/worker'
 
 const JOB_HANDLERS: Array<{ queue: string; name: string }> = [
   { queue: 'notifications', name: 'notification.send' },
   { queue: 'evaluation', name: 'evaluation.process' },
+  { queue: 'whatsapp', name: 'whatsapp.receipt' },
 ]
 
 const config = env()
@@ -83,16 +85,24 @@ async function processNext(): Promise<boolean> {
 }
 
 async function maintainQueue() {
-  const [recoveredNotifications, recoveredEvaluation, expired] = await Promise.all([
+  const [recoveredNotifications, recoveredEvaluation, recoveredWhatsApp, expired, sweptReceipts] = await Promise.all([
     recoverStaleNotificationJobs(staleAfterMs),
     recoverStaleNotificationJobs(staleAfterMs, 'evaluation', 'evaluation.process'),
+    // A recovered receipt job is not resent: the outbox parks it for review.
+    recoverStaleNotificationJobs(staleAfterMs, 'whatsapp', 'whatsapp.receipt'),
     expireOldNotificationJobs(maxAgeMs),
+    sweepMissedReceipts().catch((error) => {
+      log('whatsapp_receipts.sweep_failed', { error: error instanceof Error ? error.message : String(error) })
+      return 0
+    }),
   ])
-  if (recoveredNotifications > 0 || recoveredEvaluation > 0 || expired > 0) {
+  if (recoveredNotifications > 0 || recoveredEvaluation > 0 || recoveredWhatsApp > 0 || expired > 0 || sweptReceipts > 0) {
     log('queue.maintained', {
       recoveredNotifications,
       recoveredEvaluation,
+      recoveredWhatsApp,
       expired,
+      sweptReceipts,
     })
   }
 }

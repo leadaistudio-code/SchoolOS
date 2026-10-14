@@ -214,6 +214,11 @@ const serverSchema = z.object({
   ACCOUNTING_STUDENT_LEDGER_ENABLED: bool.default('false'),
   ACCOUNTING_APPROVALS_ENABLED: bool.default('false'),
   WHATSAPP_RECEIPTS_ENABLED: bool.default('false'),
+  /**
+   * Records WhatsApp receipts without calling the provider. Development and
+   * tests never send regardless; this keeps a production staging copy quiet too.
+   */
+  WHATSAPP_RECEIPTS_DRY_RUN: bool.default('false'),
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>

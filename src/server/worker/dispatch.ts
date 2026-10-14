@@ -2,9 +2,15 @@ import { z } from 'zod'
 import { deliverNotification, type NotificationDeliveryResult } from '@/server/notifications'
 import type { ClaimedJob } from '@/server/worker/queue'
 import { processEvaluationJob } from '@/server/modules/evaluation/service'
+import { processReceiptOutbox } from '@/server/modules/whatsapp-receipts/worker'
 
 const notificationPayloadSchema = z.object({
   notificationId: z.string().min(1),
+})
+
+const whatsappReceiptPayloadSchema = z.object({
+  outboxId: z.string().min(8),
+  tenantId: z.string().min(8),
 })
 
 const evaluationPayloadSchema = z.object({
@@ -56,6 +62,19 @@ export async function dispatchJob(
       throw new NonRetryableJobError('Evaluation job tenant mismatch')
     }
     return processEvaluationJob(parsed.data.evaluationJobId, parsed.data.tenantId)
+  }
+
+  if (job.queue === 'whatsapp' && job.name === 'whatsapp.receipt') {
+    const parsed = whatsappReceiptPayloadSchema.safeParse(job.payload)
+    if (!parsed.success) {
+      throw new NonRetryableJobError(`Invalid WhatsApp receipt job payload: ${parsed.error.message}`)
+    }
+    if (job.tenantId && job.tenantId !== parsed.data.tenantId) {
+      throw new NonRetryableJobError('WhatsApp receipt job tenant mismatch')
+    }
+    const outcome = await processReceiptOutbox(parsed.data.outboxId, parsed.data.tenantId)
+    if (outcome.status === 'retry') throw new RetryableJobError(outcome.error)
+    return outcome
   }
 
   throw new NonRetryableJobError(`Unsupported worker job: ${job.queue}/${job.name}`)

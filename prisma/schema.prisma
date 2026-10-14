@@ -6957,6 +6957,109 @@ model LedgerSummaryState {
   durationMs      Int       @default(0)
 }
 
+// ---------------------------------------------------------------------------
+// WhatsApp fee receipts (phase 8). Isolated tables: payments, receipts and
+// students are referenced by id only, so nothing here can block a fee posting.
+// ---------------------------------------------------------------------------
+
+enum WhatsAppReceiptProvider {
+  META_CLOUD
+  AISENSY
+}
+
+enum WhatsAppConsentStatus {
+  OPTED_IN
+  OPTED_OUT
+}
+
+enum WhatsAppOutboxStatus {
+  /// Waiting for the worker.
+  QUEUED
+  /// Handed to the provider; the result has not been recorded yet.
+  SENDING
+  /// Accepted by the provider.
+  SENT
+  DELIVERED
+  READ
+  /// Failed; another attempt is scheduled.
+  FAILED
+  /// Gave up. Staff can retry it by hand.
+  DEAD
+  /// Not sent: no consent, no phone, not configured or switched off.
+  SKIPPED
+}
+
+/// The school's own WhatsApp account for fee receipts. Secrets are encrypted.
+model WhatsAppReceiptConfig {
+  id                   String                  @id @default(cuid())
+  tenantId             String                  @unique
+  provider             WhatsAppReceiptProvider
+  /// Meta Cloud API: the sending phone number id and approved template.
+  phoneNumberId        String?
+  templateName         String?
+  templateLanguage     String                  @default("en")
+  /// AiSensy: the live API campaign that carries the approved template.
+  campaignName         String?
+  accessTokenEncrypted String?
+  appSecretEncrypted   String?
+  apiKeyEncrypted      String?
+  /// Secret in the status callback URL; looked up by hash.
+  webhookKeyHash       String                  @unique
+  webhookKeyEncrypted  String
+  updatedById          String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+}
+
+/// Whether a parent's WhatsApp number may receive receipts. One row per number.
+model WhatsAppConsent {
+  id           String                @id @default(cuid())
+  tenantId     String
+  /// Digits with country code, e.g. 919876543210.
+  phone        String
+  status       WhatsAppConsentStatus
+  /// How it was given or withdrawn: form, verbal, parent_request, reply_stop, reply_start.
+  source       String
+  note         String?
+  recordedById String?
+  optedInAt    DateTime?
+  optedOutAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, status])
+}
+
+/// One WhatsApp message per event (e.g. one per fee receipt), with its delivery state.
+model WhatsAppOutbox {
+  id                String                   @id @default(cuid())
+  tenantId          String
+  /// Idempotency key, e.g. fee_receipt:<receiptId>.
+  eventKey          String
+  paymentId         String?
+  receiptId         String?
+  studentId         String?
+  toPhone           String?
+  provider          WhatsAppReceiptProvider?
+  status            WhatsAppOutboxStatus     @default(QUEUED)
+  /// Why it was skipped or the last error, without tokens or message content.
+  lastError         String?
+  attempts          Int                      @default(0)
+  providerMessageId String?
+  linkExpiresAt     DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([tenantId, eventKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, providerMessageId])
+}
+
 // ===========================================================================
 // DAILY OPERATIONS: SUBSTITUTIONS, GATE PASSES, PARENT WHATSAPP ASSISTANT
 // ===========================================================================

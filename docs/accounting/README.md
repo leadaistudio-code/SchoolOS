@@ -31,6 +31,7 @@ read, every feature reports off and pages render as before.
 | `ACCOUNTING_STUDENT_LEDGER_ENABLED` | Student 360 Fees drilldown (phase 2) |
 | `ACCOUNTING_APPROVALS_ENABLED` | Multi-tier expense approval (phase 6) |
 | `WHATSAPP_RECEIPTS_ENABLED` | WhatsApp receipt notifications (phase 8) |
+| `WHATSAPP_RECEIPTS_DRY_RUN` | Production only: record WhatsApp receipts without sending (phase 8) |
 
 ## Phase 1 database changes
 
@@ -470,3 +471,150 @@ DROP TABLE IF EXISTS "LedgerSummaryState";
 DROP INDEX IF EXISTS "JournalEntry_tenantId_createdAt_idx";
 DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014180000_ledger_analytics';
 ```
+
+## Phase 8: WhatsApp fee receipts
+
+When a fee payment is settled, the student's primary guardian gets a WhatsApp message
+with the student's name, the amount, the receipt number, the payment date and a
+"View receipt" link. If the primary guardian has no usable number, the first guardian
+with one is used. A message is sent only if that number has recorded consent.
+
+`/accounts/whatsapp-receipts` (needs `accounts.view` and the accounting module) has three
+views:
+
+- **Messages:** every queued, sent, failed and skipped message, with masked numbers.
+- **Parent consent:** record a guardian's consent or opt-out.
+- **Settings:** the school's provider, the delivery-status URL and the template to submit.
+
+| Action | Permission |
+| --- | --- |
+| Provider settings, delivery-status URL | `settings.integrations` |
+| Switch on or off, retry a message | `accounts.manage` |
+| Record consent or opt-out | `fees.collect` |
+
+The school switch can be turned on only when the deployment switch is on and the
+provider settings are complete.
+
+### Flow
+
+1. A payment settles: a counter payment other than a cheque, a settled online payment,
+   or a cleared cheque. After the payment commits, `afterPaymentChange` calls
+   `queueFeeReceiptWhatsApp`, which never throws, so WhatsApp cannot fail a collection.
+2. The service reads the payment from the database and requires it to be `SUCCESS` with
+   a receipt. It never uses a status from the browser.
+3. It writes one `WhatsAppOutbox` row, keyed `fee_receipt:<receiptId>`, and a `Job` in
+   the same transaction. The unique key means a receipt gets at most one message, even
+   when several callers queue it at once. If there is no consent, no usable number or no
+   complete settings, the row is written as `SKIPPED` with the reason and no job.
+4. The worker (`npm run worker`) claims the row and moves it from `QUEUED` to `SENDING`.
+   It then checks the switch, payment, recipient, consent and settings again before
+   calling the provider.
+5. The outcome depends on the provider's response:
+   - **Accepted:** the row becomes `SENT`, with the provider message id.
+   - **Throttling, outage or network error:** the row becomes `FAILED` and is retried
+     with the job queue's backoff. After 5 attempts it becomes `DEAD`.
+   - **Rejected** (for example an unknown template or a bad token): the row becomes
+     `DEAD` straight away.
+6. If a row is found still `SENDING`, an earlier attempt stopped mid-call and WhatsApp
+   may already have delivered it. It is marked `DEAD` with that explanation and is
+   **never resent automatically**.
+7. Staff can retry `FAILED`, `DEAD` and `SKIPPED` rows. Consent, the payment and the
+   settings are checked again, and a sent message can never be retried.
+
+The worker's maintenance pass also queues any receipt from the last 48 hours that has no
+outbox row, for example because the server stopped right after the payment committed. It
+only covers schools with the switch on, and only receipts issued after it was switched on.
+
+Fee code calls one function, so changing provider is a settings change. Provider code is
+in `src/server/modules/whatsapp-receipts/providers.ts`. The existing `WhatsAppProvider`
+used by Communication is unchanged.
+
+### No real messages outside production
+
+A message goes to a provider only when `NODE_ENV=production`, the code is not running
+under vitest, and `WHATSAPP_RECEIPTS_DRY_RUN` is off. Otherwise the dry-run provider
+records the message as sent with a `dryrun_` id, and the page shows "Dry run". Tests use
+mocked HTTP responses.
+
+### Consent
+
+Consent is recorded per phone number, with how it was given and when:
+
+- **Staff:** "Signed form", "Told the office" or "Parent asked".
+- **Replies:** a parent replying STOP (or unsubscribe or opt out) is opted out, and START
+  opts back in.
+
+Every change is audited with a masked number. An opt-out is checked again at send time,
+so it also stops messages that are already queued.
+
+### Receipt link
+
+The link is `https://<school>/r/<token>`. The token is an HMAC signed with a key derived
+from `AUTH_SECRET`, covering the school, the receipt and an expiry 7 days ahead. It needs
+no login. The page:
+
+- refuses tokens that are tampered, expired or from another school;
+- refuses links when the payment is no longer `SUCCESS` (reversed, refunded or a bounced
+  cheque), or the school has switched receipts off;
+- shows only what the printed receipt shows: no outstanding balance, staff or contacts;
+- is rate-limited per IP, marked `noindex`, and sends no referrer;
+- logs every open as `fee_receipt.link_opened`.
+
+Nothing is stored in object storage, so no storage URL is exposed.
+
+### Provider setup
+
+**Meta Cloud API.** You need the school's phone number id, a system-user access token
+with `whatsapp_business_messaging`, and the app secret.
+
+- **Template:** submit the template shown on the Settings page in the **Utility**
+  category. Meta decides the category when it reviews it. If it is approved as Marketing,
+  messages cost more and need marketing consent, so confirm the approved category before
+  switching on.
+- **Button:** a "Visit website" button with the dynamic URL `https://<school>/r/{{1}}`.
+- **Webhook:** in the Meta app, set the delivery-status URL from the Settings page as the
+  callback URL, and its last part as the verify token. Subscribe to `messages`. Every
+  callback must carry a valid `X-Hub-Signature-256` from the app secret, or it is
+  rejected with 403.
+
+**AiSensy.** You need the API key and the live API campaign name. The campaign's
+template takes the same four parameters plus a fifth, the full receipt link. Set the
+delivery-status URL as the project webhook. AiSensy does not sign its callbacks, so the
+secret in the URL is the proof. "New URL" replaces it at once.
+
+**AiSensy caveat:** AiSensy does not publish its status-callback format or the message id
+returned by the send API. The parser accepts Meta-style `statuses[]` and a flat
+`{ messageId, status }`, and ignores anything else, answering 200 without changing a
+row. Check this with a real AiSensy callback before going live.
+
+Secrets are stored encrypted with `encryptSecret`, are never sent back to the browser, and
+are never logged. Logs carry message ids and error codes only.
+
+### Database
+
+Migration `20261014200000_whatsapp_receipts` makes these changes:
+
+- **New tables:** `WhatsAppReceiptConfig` (one row per school), `WhatsAppConsent` (unique
+  per school and number) and `WhatsAppOutbox` (unique per school and event key). None has
+  a foreign key.
+- **New enums:** `WhatsAppReceiptProvider`, `WhatsAppConsentStatus` and
+  `WhatsAppOutboxStatus`.
+- **CHECK constraints:** consent timestamps match the status, attempts are non-negative,
+  and sent states carry a sent time.
+
+No existing column or row changes.
+
+Rollback:
+
+```sql
+DROP TABLE IF EXISTS "WhatsAppOutbox";
+DROP TABLE IF EXISTS "WhatsAppConsent";
+DROP TABLE IF EXISTS "WhatsAppReceiptConfig";
+DROP TYPE IF EXISTS "WhatsAppOutboxStatus";
+DROP TYPE IF EXISTS "WhatsAppConsentStatus";
+DROP TYPE IF EXISTS "WhatsAppReceiptProvider";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014200000_whatsapp_receipts';
+```
+
+Jobs left in the `whatsapp` queue can be deleted with
+`DELETE FROM "Job" WHERE "queue" = 'whatsapp';`.
