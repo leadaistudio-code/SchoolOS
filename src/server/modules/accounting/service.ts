@@ -175,6 +175,7 @@ export type AccountingSettingsInput = {
   approvalWorkflowEnabled?: boolean
   whatsappReceiptsEnabled?: boolean
   fiscalYearStartMonth?: number
+  depreciationFrequency?: 'MONTHLY' | 'YEARLY'
 }
 
 /** Saves a school's accounting switches and records who changed what. */
@@ -189,6 +190,9 @@ export async function saveAccountingSettings(ctx: AppContext, input: AccountingS
     ...(input.approvalWorkflowEnabled !== undefined ? { approvalWorkflowEnabled: input.approvalWorkflowEnabled } : {}),
     ...(input.whatsappReceiptsEnabled !== undefined ? { whatsappReceiptsEnabled: input.whatsappReceiptsEnabled } : {}),
     ...(month !== undefined ? { fiscalYearStartMonth: month } : {}),
+    ...(input.depreciationFrequency === 'MONTHLY' || input.depreciationFrequency === 'YEARLY'
+      ? { depreciationFrequency: input.depreciationFrequency }
+      : {}),
   }
   return ctx.db.$transaction(async (tx) => {
     const before = await tx.accountingSettings.findFirst()
@@ -212,5 +216,6 @@ function pickSettings(row: AccountingSettingsInput) {
     approvalWorkflowEnabled: row.approvalWorkflowEnabled,
     whatsappReceiptsEnabled: row.whatsappReceiptsEnabled,
     fiscalYearStartMonth: row.fiscalYearStartMonth,
+    depreciationFrequency: row.depreciationFrequency,
   }
 }

@@ -162,3 +162,105 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014120000_day_book
 ```
 
 Revert the code at the same time: the expense module reads these columns.
+
+## Phase 5: Fixed assets and WDV depreciation
+
+Pages `/accounts/fixed-assets` (register, totals, register-vs-ledger check),
+`/accounts/fixed-assets/[id]` (details, schedule, projection, rate history, journals) and
+`/accounts/fixed-assets/depreciation` (preview, post / approve, runs, reversal). APIs under
+`/api/v1/accounting/fixed-assets` (list / create, `[id]` get / edit / dispose / reverse
+disposal / cancel, `depreciation` preview / create, `depreciation/[id]` approve / reject /
+reverse, `reconciliation`, `settings`). Reading needs `accounts.view`, every change
+`accounts.manage`. Off with the module switch. The register is new (`FixedAsset`); an
+inventory item can be linked by id (no foreign key), and the inventory module is untouched.
+
+Ledgers created on first use: 1500 Fixed Assets (at cost), 1590 Accumulated Depreciation
+(asset, credit balance), 5020 Depreciation, 4013 Profit on Sale of Assets, 5021 Loss on
+Sale / Scrapping of Assets. An asset can sit in any other asset ledger.
+
+### Depreciation rule (written-down value)
+
+- The rate is annual. Each financial year's charge is that year's opening WDV × rate ×
+  days held in the year ÷ days in the year (365 or 366). A monthly run never applies the
+  annual rate to a month; it charges the year-to-date share of the annual charge by days,
+  so twelve monthly runs equal one yearly run to the paisa.
+- Days count from the depreciation start date (default: capitalisation date) and, on
+  disposal, include the disposal date.
+- Rounding: half-up to the paisa on the cumulative year-to-date charge, minus what is
+  already posted for that year, so partial periods never drift.
+- Floor: depreciation never takes the WDV below the residual value (default 5% of cost,
+  editable). With a useful life, the line ending on the last day of the life writes the WDV
+  down to exactly the residual value. Without one, depreciation continues until the floor.
+- Assets brought in mid-life carry depreciation brought forward; the first year starts from
+  cost minus that amount.
+- Rate changes are prospective: the new rate applies from the day after the last posted
+  period, is recorded with a reason in `FixedAssetRateChange`, and posted lines are never
+  recalculated. Residual value and useful life can also change; they only affect future
+  periods (a residual above the current WDV, or a life that has already ended, simply stops
+  further depreciation). Cost, dates and ledgers lock once anything is posted. Terms cannot
+  change while the asset is in a run awaiting approval.
+
+### Runs, duplicates and approvals
+
+The school chooses monthly or yearly runs (`AccountingSettings.depreciationFrequency`,
+default yearly). A run is for one period end (last day of a month or financial year), not
+in the future and not in a locked period. Each asset continues from the day after its last
+posted line, so a missed period is caught up and nothing is charged twice. Duplicates are
+also blocked by a unique period key per active run, one pending run at a time and an
+advisory lock. The preview shows every line before anything is posted.
+
+With approvals off a run posts at once. With approvals on it waits as submitted until a
+different manager approves it; approval recomputes the run and refuses if any asset has
+changed. A rejected run is kept for audit and the period can be run again.
+
+Posting per run: Dr Depreciation, Cr Accumulated Depreciation (one balanced journal,
+sourced `DEPRECIATION`). A posted run can be reversed (only the latest for its assets and
+none disposed since): the reversal is dated on the run's period end, so the register and
+ledgers agree at every date, and the period can then be run again.
+
+### Capitalisation and disposal
+
+"Already in the books" records the asset only; its cost (and any brought-forward
+depreciation) must already be in the ledgers through a purchase voucher, journal or
+opening balance, or the reconciliation shows the difference. "Post now" posts Dr asset
+ledger, Cr cash / bank / opening balance equity. An asset with no depreciation can be
+cancelled; a posted capitalisation is reversed.
+
+Disposal is one balanced entry: depreciation to the disposal date (Dr Depreciation,
+Cr Accumulated Depreciation), then Dr Accumulated Depreciation (all of it), Dr cash / bank
+(proceeds), Dr Loss or Cr Profit, Cr asset ledger at cost. It can be reversed. Disposal has
+no maker-checker step in this phase.
+
+### Reconciliation
+
+As at any date: cost of assets held per asset ledger = that ledger's balance, and
+brought-forward plus posted depreciation = the credit balance of Accumulated Depreciation.
+Anything else posted to those ledgers shows as a difference.
+
+### Database
+
+Migration `20261014140000_fixed_assets` adds four enums, two `JournalSourceType` values,
+`AccountingSettings.depreciationFrequency` (default `YEARLY`) and four new tables
+(`FixedAsset`, `FixedAssetRateChange`, `DepreciationRun`, `DepreciationLine`) with CHECK
+constraints on amounts, rates, dates and line arithmetic. Foreign keys only between the new
+tables; no existing table gains one and no data is rewritten.
+
+Rollback, after a backup and only if no fixed-asset journals need to stay (reverse them
+first, or keep the journals and only revert the code):
+
+```sql
+DROP TABLE IF EXISTS "DepreciationLine";
+DROP TABLE IF EXISTS "DepreciationRun";
+DROP TABLE IF EXISTS "FixedAssetRateChange";
+DROP TABLE IF EXISTS "FixedAsset";
+ALTER TABLE "AccountingSettings" DROP COLUMN IF EXISTS "depreciationFrequency";
+DROP TYPE IF EXISTS "DepreciationRunStatus";
+DROP TYPE IF EXISTS "DepreciationFrequency";
+DROP TYPE IF EXISTS "FixedAssetCapitalisation";
+DROP TYPE IF EXISTS "FixedAssetStatus";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014140000_fixed_assets';
+```
+
+Postgres cannot drop enum values, so `DEPRECIATION` and `FIXED_ASSET` stay in
+`JournalSourceType`; they are harmless if unused. The ledgers created on first use are
+ordinary accounts and can be deactivated.

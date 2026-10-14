@@ -511,7 +511,7 @@ export function DocumentAction({
   variant = 'ghost',
 }: {
   url: string
-  action: 'post' | 'cancel' | 'approve' | 'reject'
+  action: 'post' | 'cancel' | 'approve' | 'reject' | 'reverse' | 'reverse-disposal'
   label: string
   needsReason?: boolean
   variant?: 'ghost' | 'secondary' | 'danger' | 'primary'

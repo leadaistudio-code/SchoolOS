@@ -133,6 +133,8 @@ export const SOURCE_LABEL: Record<string, string> = {
   VENDOR_PAYMENT: 'Vendor payment',
   DEBIT_NOTE: 'Debit note',
   VENDOR_ADJUSTMENT: 'Vendor discount / write-off',
+  DEPRECIATION: 'Depreciation',
+  FIXED_ASSET: 'Fixed asset',
 }
 
 export function sourceHref(sourceType: string, sourceId: string | null): string | null {
@@ -140,6 +142,8 @@ export function sourceHref(sourceType: string, sourceId: string | null): string 
   if (sourceType === 'FEE_PAYMENT') return `/finance/payments/${sourceId}`
   if (sourceType === 'EXPENSE') return '/finance/expenses'
   if (sourceType === 'PAYROLL') return '/staff/payroll'
+  if (sourceType === 'FIXED_ASSET') return `/accounts/fixed-assets/${sourceId}`
+  if (sourceType === 'DEPRECIATION') return `/accounts/fixed-assets/depreciation?run=${sourceId}`
   return null
 }
 

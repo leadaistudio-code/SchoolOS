@@ -199,6 +199,10 @@ export const TENANT_SCOPED_MODELS = [
   'DebitNote',
   'DebitNoteLine',
   'VendorAdjustment',
+  'FixedAsset',
+  'FixedAssetRateChange',
+  'DepreciationRun',
+  'DepreciationLine',
 
   // Daily operations
   'Substitution',

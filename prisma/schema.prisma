@@ -6239,6 +6239,8 @@ enum JournalSourceType {
   VENDOR_PAYMENT
   DEBIT_NOTE
   VENDOR_ADJUSTMENT
+  DEPRECIATION
+  FIXED_ASSET
 }
 
 enum LedgerMapKind {
@@ -6404,19 +6406,21 @@ model AccountingAuditEvent {
 /// Per-school switches for the accounting expansion. A missing row means
 /// everything is off.
 model AccountingSettings {
-  id                      String   @id @default(cuid())
-  tenantId                String   @unique
+  id                      String                @id @default(cuid())
+  tenantId                String                @unique
   /// Fees card on Student 360 opens the statement of account.
-  studentLedgerEnabled    Boolean  @default(false)
+  studentLedgerEnabled    Boolean               @default(false)
   /// Multi-tier expense approval before posting.
-  approvalWorkflowEnabled Boolean  @default(false)
+  approvalWorkflowEnabled Boolean               @default(false)
   /// Queue WhatsApp receipt notifications after a fee receipt is posted.
-  whatsappReceiptsEnabled Boolean  @default(false)
+  whatsappReceiptsEnabled Boolean               @default(false)
   /// 1-12; Indian schools use 4 (April-March).
-  fiscalYearStartMonth    Int      @default(4)
+  fiscalYearStartMonth    Int                   @default(4)
+  /// How often depreciation runs are proposed (phase 5).
+  depreciationFrequency   DepreciationFrequency @default(YEARLY)
   updatedById             String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -6669,6 +6673,164 @@ model VendorAdjustment {
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, vendorId])
   @@index([tenantId, voucherId])
+}
+
+// ---------------------------------------------------------------------------
+// Accounting phase 5: fixed assets register and WDV depreciation. Separate from
+// the inventory Asset table, which it may reference by id (no foreign key).
+// ---------------------------------------------------------------------------
+
+enum FixedAssetStatus {
+  ACTIVE
+  DISPOSED
+  /// Entered by mistake; only possible before any depreciation is posted.
+  CANCELLED
+}
+
+enum FixedAssetCapitalisation {
+  /// Cost is already in the books (purchase voucher, journal or opening balance).
+  EXISTING
+  /// Capitalisation entry posted from the register: Dr asset ledger, Cr funding ledger.
+  POSTED
+}
+
+enum DepreciationFrequency {
+  MONTHLY
+  YEARLY
+}
+
+enum DepreciationRunStatus {
+  SUBMITTED
+  POSTED
+  REJECTED
+  REVERSED
+}
+
+model FixedAsset {
+  id                        String                   @id @default(cuid())
+  tenantId                  String
+  /// FA-2627-00001
+  code                      String
+  name                      String
+  category                  String
+  location                  String?
+  department                String?
+  /// Optional link to the inventory register (Asset.id); no foreign key.
+  inventoryAssetId          String?
+  capitalisedOn             DateTime                 @db.Date
+  costMinor                 Int
+  residualMinor             Int
+  usefulLifeMonths          Int?
+  /// Only WDV today; kept as text so further methods are additive.
+  method                    String                   @default("WDV")
+  /// Current annual rate in basis points of a percent (18.10% = 1810).
+  rateBp                    Int
+  depreciationStartOn       DateTime                 @db.Date
+  /// Depreciation charged before depreciationStartOn (brought-forward assets).
+  openingAccumulatedMinor   Int                      @default(0)
+  assetAccountId            String
+  capitalisation            FixedAssetCapitalisation @default(EXISTING)
+  fundingAccountId          String?
+  status                    FixedAssetStatus         @default(ACTIVE)
+  disposedOn                DateTime?                @db.Date
+  disposalProceedsMinor     Int?
+  disposalAccountId         String?
+  disposalReason            String?
+  disposalDepreciationMinor Int?
+  disposalGainLossMinor     Int?
+  cancelledAt               DateTime?
+  cancelReason              String?
+  notes                     String?
+  idempotencyKey            String?
+  createdById               String?
+  createdByLabel            String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  rateChanges FixedAssetRateChange[]
+  lines       DepreciationLine[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status])
+  @@index([tenantId, assetAccountId])
+}
+
+/// Rate history. Each change applies from `effectiveFrom`, never before the last posted line.
+model FixedAssetRateChange {
+  id             String   @id @default(cuid())
+  tenantId       String
+  assetId        String
+  effectiveFrom  DateTime @db.Date
+  previousRateBp Int
+  rateBp         Int
+  reason         String
+  changedById    String?
+  changedByLabel String?
+  createdAt      DateTime @default(now())
+
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, assetId, effectiveFrom])
+}
+
+model DepreciationRun {
+  id              String                @id @default(cuid())
+  tenantId        String
+  /// DEP-2627-00001
+  number          String
+  frequency       DepreciationFrequency
+  periodStart     DateTime              @db.Date
+  periodEnd       DateTime              @db.Date
+  /// periodEnd as YYYY-MM-DD while SUBMITTED or POSTED; suffixed when rejected or
+  /// reversed, so one active run per period end is enforced by the unique index.
+  periodKey       String
+  status          DepreciationRunStatus
+  totalMinor      Int
+  idempotencyKey  String?
+  createdById     String?
+  createdByLabel  String?
+  createdAt       DateTime              @default(now())
+  approvedById    String?
+  approvedByLabel String?
+  approvedAt      DateTime?
+  rejectedById    String?
+  rejectionReason String?
+  rejectedAt      DateTime?
+  postedAt        DateTime?
+  reversedById    String?
+  reversalReason  String?
+  reversedAt      DateTime?
+
+  lines DepreciationLine[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, periodKey])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, periodEnd])
+}
+
+model DepreciationLine {
+  id                String   @id @default(cuid())
+  tenantId          String
+  runId             String
+  assetId           String
+  fromDate          DateTime @db.Date
+  toDate            DateTime @db.Date
+  fiscalYearLabel   String
+  fyOpeningWdvMinor Int
+  chargeableDays    Int
+  rateBp            Int
+  openingWdvMinor   Int
+  amountMinor       Int
+  closingWdvMinor   Int
+  lifeEnd           Boolean  @default(false)
+
+  run   DepreciationRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  asset FixedAsset      @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, assetId, toDate])
+  @@index([tenantId, runId])
 }
 
 // ===========================================================================
