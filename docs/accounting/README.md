@@ -618,3 +618,76 @@ DELETE FROM "_prisma_migrations" WHERE migration_name = '20261014200000_whatsapp
 
 Jobs left in the `whatsapp` queue can be deleted with
 `DELETE FROM "Job" WHERE "queue" = 'whatsapp';`.
+
+## Phase 9: Release
+
+### Navigation
+
+The sidebar's Accounts & Ledger group gains Day Book, Vendors, Fixed assets, Expense
+approvals and Analytics. They need `accounts.view` and show only while the school's
+accounting module is on. WhatsApp receipts also needs `WHATSAPP_RECEIPTS_ENABLED`. When
+the switches cannot be read, the links are hidden, so a school without the module sees
+the sidebar it had before. Global search uses the same rules.
+
+The in-page tabs on the existing accounts pages are unchanged.
+
+### Integrity check
+
+```
+npx tsx scripts/accounting-integrity.ts            # every school
+npx tsx scripts/accounting-integrity.ts --verbose  # with sample rows
+```
+
+It is read-only. It checks that:
+
+- every voucher balances;
+- lines and sources belong to the voucher's school;
+- nothing was posted into a closed year or locked period after the lock;
+- each source document has at most one posting in force;
+- cancelled payments, unapproved expenses and unposted runs are not in the books;
+- every reversal mirrors exactly one reversed voucher;
+- the analytics summary equals the journal.
+
+It exits 1 if a rule fails. Opening balances that do not net to zero, and settled
+payments without a posting (automatic posting off, or not backfilled), are reported as
+information only. The rules live in `src/server/modules/accounting/integrity.ts`.
+
+### Deploying
+
+Migrations, in order. All are additive: new tables and enums, CHECK constraints, no
+foreign keys to existing tables, and no change to existing rows.
+
+1. `20261013190000_accounting_foundation`
+2. `20261014010000_accounts_payable`
+3. `20261014120000_day_book`
+4. `20261014140000_fixed_assets`
+5. `20261014160000_expense_approvals`
+6. `20261014180000_ledger_analytics`
+7. `20261014200000_whatsapp_receipts`
+
+Steps:
+
+1. Take a backup (`npm run db:backup`).
+2. Run `npx prisma migrate deploy` (never `migrate reset` or `db push`).
+3. Deploy the code with every switch off. Nothing changes for any school.
+4. Run the integrity check.
+5. Switch on `ACCOUNTING_MODULE_ENABLED`, then enable features per school in Settings.
+   The other switches are optional.
+6. For WhatsApp receipts, also run `npm run worker`. Leave `WHATSAPP_RECEIPTS_DRY_RUN` on
+   until the provider is verified.
+
+### Rolling back
+
+- **Switch off:** unset `ACCOUNTING_MODULE_ENABLED`. Every new page shows "not enabled",
+  the new links disappear, and existing pages, Student 360 and fee collection behave as
+  before. Posted vouchers stay in the books.
+- **Code:** `git revert` the phase commits, newest first.
+- **Database:** use the per-phase SQL above, newest phase first, after a backup. Drop
+  tables only when their data is no longer wanted.
+
+### Known limitations
+
+- The AiSensy callback format is unverified (see Phase 8).
+- Meta may not approve the template in the Utility category.
+- Custom roles without `accounts.view` do not see the new links.
+- Fee payments settled while automatic posting was off are not backfilled.

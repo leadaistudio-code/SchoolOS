@@ -47,6 +47,11 @@ export type NavItem = {
   portalOnly?: boolean
   /** Hidden from student/parent portal accounts (staff tools). */
   staffOnly?: boolean
+  /**
+   * Shown only while the school's accounting module is on; 'whatsapp' also
+   * needs the deployment to allow WhatsApp receipts. Hidden when unknown.
+   */
+  accounting?: 'module' | 'whatsapp'
 }
 
 /**
@@ -256,6 +261,12 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Trial balance', href: '/accounts/trial-balance', icon: 'Scale', permission: 'accounts.view' },
       { label: 'Profit & loss', href: '/accounts/profit-loss', icon: 'TrendingUp', permission: 'accounts.view' },
       { label: 'Balance sheet', href: '/accounts/balance-sheet', icon: 'Building2', permission: 'accounts.view' },
+      { label: 'Day Book', href: '/accounts/day-book', icon: 'NotebookTabs', permission: 'accounts.view', accounting: 'module' },
+      { label: 'Vendors', href: '/accounts/vendors', icon: 'Truck', permission: 'accounts.view', accounting: 'module' },
+      { label: 'Fixed assets', href: '/accounts/fixed-assets', icon: 'Boxes', permission: 'accounts.view', accounting: 'module' },
+      { label: 'Expense approvals', href: '/accounts/expense-approvals', icon: 'ClipboardCheck', permission: 'accounts.view', accounting: 'module' },
+      { label: 'Analytics', href: '/accounts/analytics', icon: 'ChartPie', permission: 'accounts.view', accounting: 'module' },
+      { label: 'WhatsApp receipts', href: '/accounts/whatsapp-receipts', icon: 'MessageCircle', permission: 'accounts.view', accounting: 'whatsapp' },
       { label: 'Posting rules', href: '/accounts/settings', icon: 'Settings2', permission: 'accounts.view' },
     ],
   },
@@ -512,6 +523,7 @@ export type NavPredicate = {
   hasFeature: (feature: FeatureKey) => boolean
   /** Student/parent portal accounts (no school-admin override). */
   isPortal?: boolean
+  accounting?: { module: boolean; whatsapp: boolean }
 }
 
 /** Filters the tree down to what this user may actually reach. */
@@ -523,6 +535,7 @@ export function visibleNavigation(items: NavItem[], p: NavPredicate): NavItem[] 
     if (item.anyPermission && !item.anyPermission.some((key) => p.can(key))) continue
     if (item.portalOnly && !p.isPortal) continue
     if (item.staffOnly && p.isPortal) continue
+    if (item.accounting && !p.accounting?.[item.accounting]) continue
     const children = item.children ? visibleNavigation(item.children, p) : undefined
     if (item.children && (!children || children.length === 0)) continue
     out.push({ ...item, children })

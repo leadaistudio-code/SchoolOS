@@ -10,6 +10,7 @@ import { assistantConfigured } from '@/server/assistant/agent'
 import { FEATURE } from '@/lib/features'
 import { PwaRegister } from '@/components/pwa-register'
 import { isPortalOnlyRole } from '@/server/scope'
+import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -29,12 +30,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login')
   }
 
-  const entitlements = await getEntitlements(ctx.tenant.id)
+  const [entitlements, accountingFlags] = await Promise.all([
+    getEntitlements(ctx.tenant.id),
+    getAccountingFlags(ctx.db),
+  ])
 
   const navigation = visibleNavigation(NAVIGATION, {
     can: ctx.can,
     hasFeature: (feature) => entitlements[feature]?.enabled ?? false,
     isPortal: isPortalOnlyRole(ctx.user.roleKeys),
+    accounting: {
+      module: accountingFlags.module,
+      whatsapp: accountingFlags.module && accountingEnvSwitches().whatsappReceipts,
+    },
   })
 
   const [unreadCount, unreadMessages, session] = await Promise.all([

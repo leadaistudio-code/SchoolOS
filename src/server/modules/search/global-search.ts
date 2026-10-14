@@ -3,6 +3,7 @@ import type { AppContext } from '@/server/context'
 import { getEntitlements } from '@/server/entitlements'
 import { NAVIGATION, visibleNavigation, type NavItem } from '@/lib/navigation'
 import { isPortalOnlyRole, studentScopeWhere } from '@/server/scope'
+import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
 
 export type SearchHit = { id: string; type: string; title: string; subtitle?: string; href: string }
 
@@ -103,11 +104,15 @@ export async function globalSearch(ctx: AppContext, q: string): Promise<SearchHi
   const query = q.trim().slice(0, 80)
   if (query.length < 2) return []
   const tokens = searchTokens(query)
-  const entitlements = await getEntitlements(ctx.tenant.id)
+  const [entitlements, accountingFlags] = await Promise.all([getEntitlements(ctx.tenant.id), getAccountingFlags(ctx.db)])
   const visible = visibleNavigation(NAVIGATION, {
     can: ctx.can,
     hasFeature: (feature) => entitlements[feature]?.enabled ?? false,
     isPortal: isPortalOnlyRole(ctx.user.roleKeys),
+    accounting: {
+      module: accountingFlags.module,
+      whatsapp: accountingFlags.module && accountingEnvSwitches().whatsappReceipts,
+    },
   })
   const hrefs = new Set(flattenWithTrail(visible).map(({ item }) => item.href))
   // A data source is searched only when its module is both permitted and on the school's plan.
