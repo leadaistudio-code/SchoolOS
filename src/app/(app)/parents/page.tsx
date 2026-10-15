@@ -52,6 +52,14 @@ export default async function ParentsPage({
         media={<ParentsBannerScene className="h-28 w-28" />}
       />
 
+      {ctx.can('parents.delete') ? (
+        <div className="flex justify-end">
+          <Link href="/parents/deleted" className="text-sm font-medium text-[var(--brand-600)] hover:underline">
+            Deleted parents
+          </Link>
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <ColorTile
           label="Parents"

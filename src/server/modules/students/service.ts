@@ -521,6 +521,98 @@ export async function archiveStudent(ctx: AppContext, id: string, reason?: strin
   return archived
 }
 
+/** Deleted (archived) students, newest first, for the restore list. */
+export async function listArchivedStudents(ctx: AppContext, q?: string) {
+  ctx.require('students.delete')
+  const scope = await studentScopeWhere(ctx)
+  return ctx.db.student.findMany({
+    where: {
+      ...scope,
+      deletedAt: { not: null },
+      ...(q
+        ? {
+            OR: [
+              { firstName: { contains: q, mode: 'insensitive' } },
+              { lastName: { contains: q, mode: 'insensitive' } },
+              { admissionNo: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { deletedAt: 'desc' },
+    take: 200,
+    select: {
+      id: true,
+      admissionNo: true,
+      firstName: true,
+      lastName: true,
+      photoUrl: true,
+      deletedAt: true,
+      enrollments: {
+        orderBy: { joinedOn: 'desc' },
+        take: 1,
+        select: { classLevel: { select: { name: true } }, section: { select: { name: true } }, session: { select: { name: true } } },
+      },
+    },
+  })
+}
+
+/**
+ * Undoes `archiveStudent`: the record, its status from before the archive,
+ * this session's enrolment and the portal login come back. Signed-out
+ * sessions stay signed out.
+ */
+export async function restoreStudent(ctx: AppContext, id: string) {
+  ctx.require('students.delete')
+
+  const before = await ctx.db.student.findFirst({ where: { id, deletedAt: { not: null } } })
+  if (!before) throw notFound('Deleted student')
+
+  const [archiveLog, session] = await Promise.all([
+    ctx.db.auditLog.findFirst({
+      where: { tenantId: ctx.tenant.id, entityType: 'Student', entityId: id, action: 'student.archive' },
+      orderBy: { createdAt: 'desc' },
+      select: { before: true },
+    }),
+    ctx.db.academicSession.findFirst({ where: { isCurrent: true }, select: { id: true } }),
+  ])
+  const STATUSES = ['ACTIVE', 'ALUMNI', 'TRANSFERRED', 'WITHDRAWN', 'SUSPENDED'] as const
+  const priorStatus = (archiveLog?.before as { status?: string } | null)?.status
+  const status = STATUSES.find((s) => s === priorStatus) ?? 'ACTIVE'
+
+  const restored = await ctx.db.$transaction(async (tx) => {
+    if (session) {
+      const enrolment = await tx.enrollment.findFirst({
+        where: { studentId: id, sessionId: session.id },
+        orderBy: { joinedOn: 'desc' },
+      })
+      const alreadyCurrent = await tx.enrollment.count({ where: { studentId: id, isCurrent: true } })
+      if (enrolment && !enrolment.isCurrent && alreadyCurrent === 0) {
+        await tx.enrollment.update({ where: { id: enrolment.id }, data: { isCurrent: true, leftOn: null } })
+      }
+    }
+    if (before.userId) {
+      await tx.user.updateMany({ where: { id: before.userId, status: 'DISABLED' }, data: { status: 'ACTIVE' } })
+    }
+    return tx.student.update({ where: { id }, data: { deletedAt: null, status } })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'student.restore',
+    module: 'students',
+    entityType: 'Student',
+    entityId: id,
+    summary: `Restored ${before.firstName} ${before.lastName}`,
+    before,
+    after: restored,
+  })
+
+  return restored
+}
+
 /** Options for the class/section pickers used across the module. */
 export async function getClassOptions(ctx: AppContext) {
   const session = await ctx.db.academicSession.findFirst({ where: { isCurrent: true } })

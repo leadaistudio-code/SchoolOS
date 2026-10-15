@@ -5,9 +5,12 @@ import { Card } from '@/components/ui/card'
 import { Notice } from '@/components/ui/states'
 import { LinkTabs } from '@/components/ui/tabs'
 import { defaultRange, profitAndLoss } from '@/server/modules/accounts/service'
+import { viewedPeriodOr } from '@/server/view-session'
 import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { provisionalProfitAndLoss } from '@/server/modules/accounting/expense-approval-service'
 import { STATUS_LABEL, stageNumber } from '@/server/modules/accounting/expense-approval'
+import { drillHref } from '@/server/drill/descriptor'
+import { DrillFigure } from '@/components/drill-figure'
 import { AccountsTabs, isoParam, Metric, moneyFmt, PeriodFilter } from '../ui'
 
 export const metadata = { title: 'Profit & loss' }
@@ -19,7 +22,7 @@ export default async function ProfitLossPage({
 }) {
   const ctx = await requireContext('accounts.view')
   const params = await searchParams
-  const def = defaultRange()
+  const def = await viewedPeriodOr(ctx, defaultRange())
   const from = isoParam(params.from, def.from)
   const to = isoParam(params.to, def.to)
   const flags = await getAccountingFlags(ctx.db)
@@ -32,6 +35,11 @@ export default async function ProfitLossPage({
   const surplus = pl.surplusMinor >= 0
   const pct = (part: number) => (pl.incomeMinor > 0 ? `${Math.round((part / pl.incomeMinor) * 100)}% of income` : undefined)
   const amount = (minor: number) => (minor < 0 ? `(${money(-minor)})` : money(minor))
+  const drill = {
+    group: (g: 'income' | 'direct' | 'indirect') => drillHref(ctx.tenant.id, { k: 'group', g, f: from, t: to }),
+    surplus: (l: 'gross' | 'net') => drillHref(ctx.tenant.id, { k: 'surplus', l, f: from, t: to }),
+    ledger: (a: string) => drillHref(ctx.tenant.id, { k: 'ledger', a, f: from, t: to, v: 'period' }),
+  }
 
   const Rows = ({ rows }: { rows: typeof pl.income }) =>
     rows.length === 0 ? (
@@ -43,7 +51,7 @@ export default async function ProfitLossPage({
             <Link href={`/accounts/ledger?account=${r.id}&from=${from}&to=${to}`} className="text-ink-muted hover:text-[var(--brand-600)]">
               {r.name}
             </Link>
-            <span className="tnum">{amount(r.amountMinor)}</span>
+            <DrillFigure href={drill.ledger(r.id)}>{amount(r.amountMinor)}</DrillFigure>
           </li>
         ))}
       </>
@@ -62,20 +70,20 @@ export default async function ProfitLossPage({
     ))
   }
 
-  const Heading = ({ label, total, tone }: { label: string; total: number; tone?: string }) => (
+  const Heading = ({ label, total, tone, href }: { label: string; total: number; tone?: string; href?: string }) => (
     <li className={`flex items-center justify-between bg-surface-2 px-4 py-2 text-sm font-semibold ${tone ?? ''}`}>
       <span>{label}</span>
-      <span className="tnum">{amount(total)}</span>
+      <DrillFigure href={href}>{amount(total)}</DrillFigure>
     </li>
   )
 
-  const Result = ({ label, total, hint }: { label: string; total: number; hint?: string }) => (
+  const Result = ({ label, total, hint, href }: { label: string; total: number; hint?: string; href?: string }) => (
     <li className="flex items-center justify-between border-y-2 border-line-strong px-4 py-2.5 text-sm font-semibold">
       <span>
         {label}
         {hint ? <span className="ml-2 text-xs font-normal text-ink-subtle">{hint}</span> : null}
       </span>
-      <span className={`tnum ${total < 0 ? 'text-[var(--danger)]' : 'text-success'}`}>{amount(total)}</span>
+      <DrillFigure href={href} className={total < 0 ? 'text-[var(--danger)]' : 'text-success'}>{amount(total)}</DrillFigure>
     </li>
   )
 
@@ -128,20 +136,22 @@ export default async function ProfitLossPage({
         </>
       ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Metric label="Total income" value={money(pl.incomeMinor)} />
-        <Metric label="Direct expenses" value={money(pl.directMinor)} hint={pct(pl.directMinor)} />
+        <Metric label="Total income" value={money(pl.incomeMinor)} href={drill.group('income')} />
+        <Metric label="Direct expenses" value={money(pl.directMinor)} hint={pct(pl.directMinor)} href={drill.group('direct')} />
         <Metric
           label="Gross surplus"
           value={money(pl.grossSurplusMinor)}
           tone={pl.grossSurplusMinor >= 0 ? 'success' : 'danger'}
           hint={pct(pl.grossSurplusMinor)}
+          href={drill.surplus('gross')}
         />
-        <Metric label="Indirect expenses" value={money(pl.indirectMinor)} hint={pct(pl.indirectMinor)} />
+        <Metric label="Indirect expenses" value={money(pl.indirectMinor)} hint={pct(pl.indirectMinor)} href={drill.group('indirect')} />
         <Metric
           label={surplus ? 'Net surplus' : 'Net deficit'}
           value={money(pl.surplusMinor)}
           tone={surplus ? 'success' : 'danger'}
           hint={pct(pl.surplusMinor)}
+          href={drill.surplus('net')}
         />
       </div>
       )}
@@ -149,7 +159,7 @@ export default async function ProfitLossPage({
       {projection ? (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-[var(--border)]">
-            <Heading label="Income" total={pl.incomeMinor} />
+            <Heading label="Income" total={pl.incomeMinor} href={drill.group('income')} />
             <Rows rows={pl.income} />
             <Heading label="Less: Direct expenses (actual + provisional)" total={projection.projectedDirectMinor} />
             <Rows rows={pl.directExpenses} />
@@ -158,7 +168,7 @@ export default async function ProfitLossPage({
             <Heading label="Less: Indirect expenses (actual + provisional)" total={projection.projectedIndirectMinor} />
             <Rows rows={pl.indirectExpenses} />
             <ProvisionalRows direct={false} />
-            <Result label={surplus ? 'Actual net surplus' : 'Actual net deficit'} total={pl.surplusMinor} hint="posted entries only" />
+            <Result label={surplus ? 'Actual net surplus' : 'Actual net deficit'} total={pl.surplusMinor} hint="posted entries only" href={drill.surplus('net')} />
             <Result
               label={projection.projectedSurplusMinor >= 0 ? 'Projected net surplus' : 'Projected net deficit'}
               total={projection.projectedSurplusMinor}
@@ -169,14 +179,14 @@ export default async function ProfitLossPage({
       ) : (
         <Card className="overflow-hidden">
           <ul className="divide-y divide-[var(--border)]">
-            <Heading label="Income" total={pl.incomeMinor} />
+            <Heading label="Income" total={pl.incomeMinor} href={drill.group('income')} />
             <Rows rows={pl.income} />
-            <Heading label="Less: Direct expenses" total={pl.directMinor} />
+            <Heading label="Less: Direct expenses" total={pl.directMinor} href={drill.group('direct')} />
             <Rows rows={pl.directExpenses} />
-            <Result label="Gross surplus" total={pl.grossSurplusMinor} hint="Income minus the cost of teaching delivery" />
-            <Heading label="Less: Indirect expenses" total={pl.indirectMinor} />
+            <Result label="Gross surplus" total={pl.grossSurplusMinor} hint="Income minus the cost of teaching delivery" href={drill.surplus('gross')} />
+            <Heading label="Less: Indirect expenses" total={pl.indirectMinor} href={drill.group('indirect')} />
             <Rows rows={pl.indirectExpenses} />
-            <Result label={surplus ? 'Net surplus' : 'Net deficit'} total={pl.surplusMinor} />
+            <Result label={surplus ? 'Net surplus' : 'Net deficit'} total={pl.surplusMinor} href={drill.surplus('net')} />
           </ul>
         </Card>
       )}

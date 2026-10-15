@@ -8,6 +8,7 @@ import type { NavItem, QuickAction } from '@/lib/navigation'
 import { navIconTone, seriesToneClass } from '@/lib/chart-tones'
 import { Sidebar } from './sidebar'
 import { Topbar, type TopbarUser } from './topbar'
+import type { SessionOption } from './session-switcher'
 import { Icon } from './icon'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/ui/toast'
@@ -45,6 +46,7 @@ export function AppShell({
   unreadCount,
   unreadMessages,
   sessionName,
+  sessionSwitch,
   assistant,
   quickActions,
   children,
@@ -56,6 +58,7 @@ export function AppShell({
   unreadCount: number
   unreadMessages: number
   sessionName: string | null
+  sessionSwitch?: { sessions: SessionOption[]; selectedId: string } | null
   assistant?: React.ReactNode
   quickActions?: QuickAction[]
   children: React.ReactNode
@@ -159,6 +162,7 @@ export function AppShell({
             unreadCount={unreadCount}
             unreadMessages={unreadMessages}
             sessionName={sessionName}
+            sessionSwitch={sessionSwitch}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onOpenMenu={() => setDrawerOpen(true)}

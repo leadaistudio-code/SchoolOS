@@ -15,7 +15,7 @@ import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { cashBankAccounts } from '@/server/modules/accounting/cash-bank'
 import { toIsoDay } from '@/server/modules/accounting/fiscal-year'
 import { canSeeApprovals, getExpenseRequest } from '@/server/modules/accounting/expense-approval-service'
-import { APPROVAL_STAGES, STATUS_LABEL, stageNumber, type ApprovalStatus } from '@/server/modules/accounting/expense-approval'
+import { APPROVAL_STAGES, STAGE_ROLE, STATUS_LABEL, stageNumber, type ApprovalStatus } from '@/server/modules/accounting/expense-approval'
 import { APPROVAL_TONE, AccountsTabs, moneyFmt } from '../../ui'
 
 export const metadata = { title: 'Expense approval' }
@@ -81,7 +81,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
   const tracker = [
     {
       stage: 1,
-      label: 'Prepared and submitted',
+      label: 'Creator (prepares and submits)',
       done: !!submitted && status !== 'RETURNED' && status !== 'DRAFT',
       by: submitted ? `${submitted.actorLabel ?? '—'} · ${formatDay(submitted.createdAt)}` : r.createdByLabel ?? '—',
     },
@@ -150,7 +150,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
       {data.stage && data.actions.length === 0 && r.createdById !== ctx.user.userId && ctx.can(data.stage.permission) ? (
         <Notice tone="warning">You have already signed an earlier stage of this submission. Another person with this stage&apos;s authority must sign it.</Notice>
       ) : null}
-      {!data.workflowOn && (status === 'DRAFT' || status === 'RETURNED') ? (
+      {data.mode === 'off' && (status === 'DRAFT' || status === 'RETURNED') ? (
         <Notice tone="warning" title="Approval workflow is off">This expense cannot be submitted while the workflow is switched off. Withdraw it and record the expense directly.</Notice>
       ) : null}
 
@@ -165,7 +165,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
                   key={t.stage}
                   className={`rounded-lg border p-3 text-sm ${t.done ? 'border-[color-mix(in_srgb,var(--success)_40%,transparent)] bg-success-bg' : isCurrent ? 'border-[var(--brand-600)]' : 'border-line'}`}
                 >
-                  <span className="block text-xs text-ink-subtle">Stage {t.stage}</span>
+                  <span className="block text-xs text-ink-subtle">Stage {t.stage} · {STAGE_ROLE[t.stage as 1 | 2 | 3 | 4 | 5]}</span>
                   <span className="block font-medium text-ink">{t.label}</span>
                   <span className="mt-1 block text-xs text-ink-muted">{t.done ? t.by : isCurrent ? 'Waiting here' : t.stage === 1 ? t.by : '—'}</span>
                 </li>

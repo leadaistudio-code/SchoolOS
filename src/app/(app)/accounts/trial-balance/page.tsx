@@ -5,6 +5,9 @@ import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/table'
 import { ACCOUNT_TYPES, defaultRange, trialBalance } from '@/server/modules/accounts/service'
+import { viewedPeriodOr } from '@/server/view-session'
+import { drillHref } from '@/server/drill/descriptor'
+import { DrillFigure } from '@/components/drill-figure'
 import { AccountsTabs, isoParam, Metric, moneyFmt, PeriodFilter } from '../ui'
 
 export const metadata = { title: 'Trial balance' }
@@ -16,11 +19,12 @@ export default async function TrialBalancePage({
 }) {
   const ctx = await requireContext('accounts.view')
   const params = await searchParams
-  const def = defaultRange()
+  const def = await viewedPeriodOr(ctx, defaultRange())
   const from = isoParam(params.from, def.from)
   const to = isoParam(params.to, def.to)
   const tb = await trialBalance(ctx, { from, to })
   const { money, drCr } = moneyFmt(ctx.tenant.currency || 'INR')
+  const closingDrill = (a: string) => drillHref(ctx.tenant.id, { k: 'ledger', a, f: from, t: to, v: 'closing' })
 
   return (
     <div className="space-y-4">
@@ -86,8 +90,12 @@ export default async function TrialBalancePage({
                       <TD align="right">{drCr(r.openingMinor)}</TD>
                       <TD align="right">{r.debitMinor ? money(r.debitMinor) : ''}</TD>
                       <TD align="right">{r.creditMinor ? money(r.creditMinor) : ''}</TD>
-                      <TD align="right">{r.closingMinor > 0 ? money(r.closingMinor) : ''}</TD>
-                      <TD align="right">{r.closingMinor < 0 ? money(r.closingMinor) : ''}</TD>
+                      <TD align="right">
+                        {r.closingMinor > 0 ? <DrillFigure href={closingDrill(r.id)}>{money(r.closingMinor)}</DrillFigure> : ''}
+                      </TD>
+                      <TD align="right">
+                        {r.closingMinor < 0 ? <DrillFigure href={closingDrill(r.id)}>{money(r.closingMinor)}</DrillFigure> : ''}
+                      </TD>
                     </TR>
                   )),
                 ])}

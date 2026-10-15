@@ -7,6 +7,7 @@ import { requireContext } from '@/server/context'
 import {
   archiveStudent,
   createStudent,
+  restoreStudent,
   suggestAdmissionNumber,
   updateStudent,
 } from '@/server/modules/students/service'
@@ -135,4 +136,30 @@ export async function archiveStudentAction(studentId: string, reason?: string) {
   await archiveStudent(ctx, studentId, reason)
   revalidatePath('/students')
   redirect('/students')
+}
+
+export type RecordActionResult = { ok: boolean; message?: string }
+
+export async function deleteStudentAction(studentId: string, reason?: string): Promise<RecordActionResult> {
+  try {
+    const ctx = await requireContext('students.delete')
+    await archiveStudent(ctx, studentId, reason?.trim() || undefined)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not delete the student' }
+  }
+  revalidatePath('/students')
+  revalidatePath('/students/deleted')
+  return { ok: true }
+}
+
+export async function restoreStudentAction(studentId: string): Promise<RecordActionResult> {
+  try {
+    const ctx = await requireContext('students.delete')
+    await restoreStudent(ctx, studentId)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not restore the student' }
+  }
+  revalidatePath('/students')
+  revalidatePath('/students/deleted')
+  return { ok: true }
 }

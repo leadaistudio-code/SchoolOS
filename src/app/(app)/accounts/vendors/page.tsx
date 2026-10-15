@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { Input, Select } from '@/components/ui/input'
 import { EmptyState, Notice } from '@/components/ui/states'
 import { Pagination } from '@/components/pagination'
@@ -37,7 +38,12 @@ export default async function VendorsPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Vendors"
         description={`${list.total} ${list.total === 1 ? 'vendor' : 'vendors'} · sundry creditors`}
-        actions={canManage ? <VendorDialog label="New vendor" /> : null}
+        actions={
+          <div className="flex gap-2">
+            <Link href="/accounts/payables" className={buttonVariants({ variant: 'secondary' })}>Bills payable &amp; ageing</Link>
+            {canManage ? <VendorDialog label="New vendor" /> : null}
+          </div>
+        }
       />
       <AccountsTabs active="/accounts/vendors" />
 

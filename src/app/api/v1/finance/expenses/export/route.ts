@@ -4,11 +4,15 @@ import { csvResponse } from '@/lib/csv'
 import { toDateInput } from '@/lib/dates'
 import { categoryLabel, natureLabel, paymentModeLabel } from '@/lib/finance/expense-options'
 import { expenseFilterSchema, exportExpenses } from '@/server/modules/finance/expenses'
+import { getViewSession, withSessionPeriod } from '@/server/view-session'
 
 /** GET /api/v1/finance/expenses/export — same filters as the expense page. */
 export const GET = route(
   async (req: NextRequest, ctx) => {
-    const filter = expenseFilterSchema.parse(Object.fromEntries(req.nextUrl.searchParams.entries()))
+    const filter = withSessionPeriod(
+      expenseFilterSchema.parse(Object.fromEntries(req.nextUrl.searchParams.entries())),
+      await getViewSession(ctx),
+    )
     const rows = await exportExpenses(ctx, filter)
     return csvResponse(
       `expenses-${toDateInput(new Date())}.csv`,

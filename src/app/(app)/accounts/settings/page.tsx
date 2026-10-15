@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox, Select } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { getPostingSetup } from '@/server/modules/accounts/service'
-import { saveLedgerSettingsAction, setMappingAction, syncBooksAction } from '../actions'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
+import { saveLedgerSettingsAction, saveStudentLedgerSettingAction, setMappingAction, syncBooksAction } from '../actions'
 import { AccountsTabs } from '../ui'
 
 export const metadata = { title: 'Posting rules' }
@@ -20,7 +21,7 @@ export default async function PostingRulesPage({
 }) {
   const ctx = await requireContext('accounts.view')
   const params = await searchParams
-  const setup = await getPostingSetup(ctx)
+  const [setup, flags] = await Promise.all([getPostingSetup(ctx), getAccountingFlags(ctx.db)])
   const canManage = ctx.can('accounts.manage')
 
   const MapTable = ({ title, description, rows, types }: { title: string; description: string; rows: MapRow[]; types: string[] }) => (
@@ -94,6 +95,23 @@ export default async function PostingRulesPage({
           {canManage ? <Button type="submit" size="sm">Save</Button> : null}
         </form>
       </Card>
+
+      {flags.module ? (
+        <Card className="p-4">
+          <h2 className="text-base font-semibold">Student fee ledger</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            A statement of account per student (fees charged, receipts, concessions, refunds) with a financial-year picker
+            and year-wise balances brought forward. Read-only: it is built from fee records and posts nothing.
+          </p>
+          <form action={saveStudentLedgerSettingAction} className="mt-3 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox name="studentLedgerEnabled" defaultChecked={flags.studentLedger} disabled={!canManage} />
+              Show the fee ledger on student profiles
+            </label>
+            {canManage ? <Button type="submit" size="sm">Save</Button> : null}
+          </form>
+        </Card>
+      ) : null}
 
       {canManage ? (
         <Card className="p-4">

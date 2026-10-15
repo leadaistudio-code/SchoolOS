@@ -1250,6 +1250,7 @@ export const invoiceFilterSchema = z.object({
   sectionId: z.string().optional(),
   studentId: z.string().optional(),
   overdueOnly: z.enum(['yes']).optional(),
+  sessionId: z.string().optional(),
 })
 
 export const INVOICE_SORT_FIELDS = ['dueOn', 'issuedOn', 'number', 'balanceMinor'] as const
@@ -1403,6 +1404,7 @@ export async function listInvoices(
     ...scope,
     ...(filter.status ? { status: filter.status } : {}),
     ...(filter.studentId ? { studentId: filter.studentId } : {}),
+    ...(filter.sessionId ? { sessionId: filter.sessionId } : {}),
     ...(filter.overdueOnly === 'yes'
       ? { balanceMinor: { gt: 0 }, dueOn: { lt: today }, status: { not: 'CANCELLED' } }
       : {}),

@@ -38,6 +38,7 @@ export const parentCreateSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(60),
   lastName: z.string().trim().max(60).default(''),
   phone,
+  secondaryPhone: phone,
   email,
   occupation: optional(80),
   annualIncome: optional(40),
@@ -215,11 +216,20 @@ export async function createParent(
 
   if (phone) {
     const clash = await ctx.db.parent.findFirst({
-      where: { phone: { in: phoneLookupCandidates(phone) }, deletedAt: null },
+      where: {
+        OR: [
+          { phone: { in: phoneLookupCandidates(phone) } },
+          { secondaryPhone: { in: phoneLookupCandidates(phone) } },
+        ],
+        deletedAt: null,
+      },
       select: { id: true },
     })
     if (clash) throw conflict(`A parent with this phone number already exists`)
   }
+
+  const secondaryPhone = storePhone(input.secondaryPhone)
+  if (secondaryPhone) await assertSecondaryPhoneAvailable(ctx, secondaryPhone, phone)
 
   const parent = await ctx.db.parent.create({
     data: {
@@ -227,6 +237,7 @@ export async function createParent(
       firstName: input.firstName,
       lastName: input.lastName,
       phone,
+      secondaryPhone,
       email: email ?? null,
       occupation: input.occupation,
       annualIncome: input.annualIncome,
@@ -411,10 +422,48 @@ async function assertPhoneAvailable(ctx: AppContext, phone: string, exceptUserId
   if (clash) throw conflict('Another account already uses this phone number')
 }
 
+/**
+ * A secondary number signs in to the parent's account, so it must point at
+ * nobody else: not the same parent's primary, not another parent's number,
+ * not another login.
+ */
+async function assertSecondaryPhoneAvailable(
+  ctx: AppContext,
+  secondary: string,
+  primary: string | null | undefined,
+  except?: { parentId: string; userId: string | null },
+) {
+  const candidates = phoneLookupCandidates(secondary)
+  if (primary && phoneLookupCandidates(primary).some((c) => candidates.includes(c))) {
+    throw conflict('The secondary number must be different from the primary number')
+  }
+  const parentClash = await ctx.db.parent.findFirst({
+    where: {
+      deletedAt: null,
+      OR: [{ phone: { in: candidates } }, { secondaryPhone: { in: candidates } }],
+      ...(except ? { id: { not: except.parentId } } : {}),
+    },
+    select: { id: true },
+  })
+  if (parentClash) throw conflict('Another parent already uses the secondary number')
+  const userClash = await ctx.db.user.findFirst({
+    where: {
+      tenantId: ctx.tenant.id,
+      deletedAt: null,
+      phone: { in: candidates },
+      ...(except?.userId ? { id: { not: except.userId } } : {}),
+    },
+    select: { id: true },
+  })
+  if (userClash) throw conflict('Another account already uses the secondary number')
+}
+
 export type ParentProfileUpdate = {
   firstName?: string
   lastName?: string
   phone?: string | null
+  /** Omit to leave unchanged; null clears it. */
+  secondaryPhone?: string | null
   email?: string | null
   occupation?: string | null
   annualIncome?: string | null
@@ -448,7 +497,10 @@ export async function updateParent(ctx: AppContext, id: string, input: ParentPro
   if (phone) {
     const clash = await ctx.db.parent.findFirst({
       where: {
-        phone: { in: phoneLookupCandidates(phone) },
+        OR: [
+          { phone: { in: phoneLookupCandidates(phone) } },
+          { secondaryPhone: { in: phoneLookupCandidates(phone) } },
+        ],
         deletedAt: null,
         id: { not: id },
       },
@@ -458,10 +510,19 @@ export async function updateParent(ctx: AppContext, id: string, input: ParentPro
     if (before.userId) await assertPhoneAvailable(ctx, phone, before.userId)
   }
 
+  const secondaryPhone =
+    input.secondaryPhone !== undefined ? storePhone(input.secondaryPhone ?? undefined) ?? null : undefined
+  const primaryAfter = phone !== undefined ? phone : before.phone
+  const secondaryAfter = secondaryPhone !== undefined ? secondaryPhone : before.secondaryPhone
+  if (secondaryAfter && (secondaryPhone !== undefined || phone !== undefined)) {
+    await assertSecondaryPhoneAvailable(ctx, secondaryAfter, primaryAfter, { parentId: id, userId: before.userId })
+  }
+
   const data: Prisma.ParentUpdateInput = {
     ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
     ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
     ...(phone !== undefined ? { phone } : {}),
+    ...(secondaryPhone !== undefined ? { secondaryPhone } : {}),
     ...(email !== undefined ? { email } : {}),
     ...(input.occupation !== undefined ? { occupation: input.occupation || null } : {}),
     ...(input.annualIncome !== undefined ? { annualIncome: input.annualIncome || null } : {}),
@@ -582,6 +643,200 @@ export async function unlinkChild(ctx: AppContext, parentId: string, studentId: 
     before: link,
   })
   return { ok: true }
+}
+
+type SavedGuardianLink = {
+  studentId: string
+  relation: 'FATHER' | 'MOTHER' | 'GUARDIAN' | 'OTHER'
+  isPrimary: boolean
+  canPickup: boolean
+  isEmergencyContact: boolean
+}
+
+/**
+ * Soft-deletes a parent: hidden from lists, portal login disabled and
+ * signed out. Guardian links are removed so the parent stops receiving
+ * notices, and kept in the audit entry so `restoreParent` can put them back.
+ * Refuses while the parent is the only guardian of a student on roll, the
+ * same rule as unlinking a child.
+ */
+export async function deleteParent(ctx: AppContext, id: string) {
+  ctx.require('parents.delete')
+
+  const before = await ctx.db.parent.findFirst({ where: { id, deletedAt: null } })
+  if (!before) throw notFound('Parent')
+
+  const links = await ctx.db.studentGuardian.findMany({
+    where: { parentId: id },
+    select: {
+      id: true,
+      studentId: true,
+      relation: true,
+      isPrimary: true,
+      canPickup: true,
+      isEmergencyContact: true,
+      student: { select: { firstName: true, lastName: true, deletedAt: true } },
+    },
+  })
+
+  const onRoll = links.filter((l) => !l.student.deletedAt)
+  const otherGuardians = await ctx.db.studentGuardian.groupBy({
+    by: ['studentId'],
+    where: { studentId: { in: onRoll.map((l) => l.studentId) }, parentId: { not: id } },
+    _count: { _all: true },
+  })
+  const covered = new Set(otherGuardians.filter((g) => g._count._all > 0).map((g) => g.studentId))
+  const sole = onRoll.filter((l) => !covered.has(l.studentId))
+  if (sole.length > 0) {
+    const names = sole.map((l) => `${l.student.firstName} ${l.student.lastName}`.trim()).join(', ')
+    throw conflict(
+      `This is the only guardian of ${names}. Link another guardian to the student, or delete the student first.`,
+    )
+  }
+
+  const saved: SavedGuardianLink[] = links.map((l) => ({
+    studentId: l.studentId,
+    relation: l.relation,
+    isPrimary: l.isPrimary,
+    canPickup: l.canPickup,
+    isEmergencyContact: l.isEmergencyContact,
+  }))
+
+  const deleted = await ctx.db.$transaction(async (tx) => {
+    await tx.studentGuardian.deleteMany({ where: { parentId: id } })
+    if (before.userId) {
+      await tx.user.update({ where: { id: before.userId }, data: { status: 'DISABLED' } })
+      await tx.session.updateMany({
+        where: { userId: before.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    }
+    return tx.parent.update({ where: { id }, data: { deletedAt: new Date() } })
+  })
+
+  const primaryOf = links.filter((l) => l.isPrimary && !l.student.deletedAt)
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'parent.delete',
+    module: 'parents',
+    entityType: 'Parent',
+    entityId: id,
+    summary: `Deleted parent ${before.firstName} ${before.lastName}${
+      primaryOf.length > 0
+        ? ` (was primary guardian of ${primaryOf.map((l) => l.student.firstName).join(', ')})`
+        : ''
+    }`,
+    before: { ...before, links: saved },
+    after: deleted,
+  })
+
+  return deleted
+}
+
+/** Deleted parents, newest first, for the restore list. */
+export async function listDeletedParents(ctx: AppContext, q?: string) {
+  ctx.require('parents.delete')
+  return ctx.db.parent.findMany({
+    where: {
+      deletedAt: { not: null },
+      ...(q
+        ? {
+            OR: [
+              { firstName: { contains: q, mode: 'insensitive' } },
+              { lastName: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { deletedAt: 'desc' },
+    take: 200,
+    select: { id: true, firstName: true, lastName: true, phone: true, email: true, userId: true, deletedAt: true },
+  })
+}
+
+/**
+ * Undoes `deleteParent`: the record, its portal login and the guardian links
+ * saved at deletion. A link is skipped when the student is gone or already
+ * linked, and is restored as non-primary when the student has a new primary.
+ */
+export async function restoreParent(ctx: AppContext, id: string) {
+  ctx.require('parents.delete')
+
+  const before = await ctx.db.parent.findFirst({ where: { id, deletedAt: { not: null } } })
+  if (!before) throw notFound('Deleted parent')
+
+  const ownNumbers = [before.phone, before.secondaryPhone].flatMap((p) => (p ? phoneLookupCandidates(p) : []))
+  if (ownNumbers.length > 0) {
+    const clash = await ctx.db.parent.findFirst({
+      where: {
+        OR: [{ phone: { in: ownNumbers } }, { secondaryPhone: { in: ownNumbers } }],
+        deletedAt: null,
+        id: { not: id },
+      },
+      select: { firstName: true, lastName: true },
+    })
+    if (clash) {
+      throw conflict(
+        `${clash.firstName} ${clash.lastName} now uses this phone number. Change one of the numbers before restoring.`,
+      )
+    }
+  }
+
+  const log = await ctx.db.auditLog.findFirst({
+    where: { tenantId: ctx.tenant.id, entityType: 'Parent', entityId: id, action: 'parent.delete' },
+    orderBy: { createdAt: 'desc' },
+    select: { before: true },
+  })
+  const saved = ((log?.before as { links?: SavedGuardianLink[] } | null)?.links ?? []).filter(
+    (l) => l && typeof l.studentId === 'string',
+  )
+
+  const relinked: string[] = []
+  const restored = await ctx.db.$transaction(async (tx) => {
+    for (const link of saved) {
+      const student = await tx.student.findFirst({ where: { id: link.studentId }, select: { id: true } })
+      if (!student) continue
+      const exists = await tx.studentGuardian.findFirst({ where: { parentId: id, studentId: link.studentId } })
+      if (exists) continue
+      const hasPrimary = link.isPrimary
+        ? (await tx.studentGuardian.count({ where: { studentId: link.studentId, isPrimary: true } })) > 0
+        : false
+      await tx.studentGuardian.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          parentId: id,
+          studentId: link.studentId,
+          relation: link.relation,
+          isPrimary: link.isPrimary && !hasPrimary,
+          canPickup: link.canPickup,
+          isEmergencyContact: link.isEmergencyContact,
+        },
+      })
+      relinked.push(link.studentId)
+    }
+    if (before.userId) {
+      await tx.user.updateMany({ where: { id: before.userId, status: 'DISABLED' }, data: { status: 'ACTIVE' } })
+    }
+    return tx.parent.update({ where: { id }, data: { deletedAt: null } })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'parent.restore',
+    module: 'parents',
+    entityType: 'Parent',
+    entityId: id,
+    summary: `Restored parent ${before.firstName} ${before.lastName} with ${relinked.length} child link(s)`,
+    before,
+    after: restored,
+  })
+
+  return restored
 }
 
 /* -------------------------------------------------------------------- staff */

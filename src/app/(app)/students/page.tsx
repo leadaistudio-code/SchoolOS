@@ -62,6 +62,11 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         media={<StudentsBannerScene className="h-28 w-28" />}
         actions={
           <>
+            {ctx.can('students.delete') ? (
+              <Link href="/students/deleted" className={colorBannerSecondaryBtn()}>
+                Deleted
+              </Link>
+            ) : null}
             {ctx.can('students.import') ? (
               <Link href="/students/import" className={colorBannerSecondaryBtn()}>
                 <Upload aria-hidden />

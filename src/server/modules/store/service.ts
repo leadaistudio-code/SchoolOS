@@ -59,6 +59,8 @@ export const storeItemUpdateSchema = z.object({ id: z.string().min(1), ...itemFi
 
 export const storePurchaseSchema = z.object({
   vendorName: z.string().trim().min(2, 'Enter the vendor / supplier').max(120),
+  /** Optional link to the vendor master; the receipt then shows on Vendor 360. */
+  vendorId: z.string().trim().max(40).optional().nullable().transform((v) => v || null),
   invoiceNo: optionalText(60),
   purchaseDate: isoDate,
   paymentMode: paymentModeEnum,
@@ -445,6 +447,9 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
   const input = storePurchaseSchema.parse(raw)
   const purchaseDate = attendanceDate(input.purchaseDate)
   if (input.purchaseDate > schoolToday()) throw badRequest('The receipt date cannot be in the future')
+  if (input.vendorId && !(await ctx.db.vendor.findFirst({ where: { id: input.vendorId }, select: { id: true } }))) {
+    throw badRequest('That vendor does not exist')
+  }
 
   const purchase = await ctx.db.$transaction(async (raw) => {
     const tx = raw as unknown as Prisma.TransactionClient
@@ -460,6 +465,7 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
         tenantId: ctx.tenant.id,
         number,
         vendorName: input.vendorName,
+        vendorId: input.vendorId,
         invoiceNo: input.invoiceNo,
         purchaseDate,
         paymentMode: input.paymentMode,

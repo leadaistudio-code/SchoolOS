@@ -29,6 +29,7 @@ type PaymentRow = {
   status: string
   providerPaymentId?: string | null
   failureReason?: string | null
+  collectedByName?: string | null
 }
 
 function isPendingCheque(p: PaymentRow) {
@@ -157,6 +158,9 @@ export function PaymentTable({
                   {payment.mode.toLowerCase().replace('_', ' ')}
                   {payment.provider && payment.provider !== 'manual' ? (
                     <span className="block text-xs text-ink-subtle">{payment.provider}</span>
+                  ) : null}
+                  {payment.collectedByName ? (
+                    <span className="block text-xs text-ink-subtle normal-case">by {payment.collectedByName}</span>
                   ) : null}
                 </TD>
                 <TD className="text-sm text-ink-muted">

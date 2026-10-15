@@ -72,12 +72,29 @@ export const expenseFilterSchema = z.object({
   headId: optional(z.string()),
   nature: optional(z.enum(['DIRECT', 'INDIRECT'])),
   paymentMode: optional(paymentModeEnum),
+  recordedById: optional(z.string()),
   preset: optional(z.string()),
   from: optional(isoDate),
   to: optional(isoDate),
 })
 
 export type ExpenseFilter = z.infer<typeof expenseFilterSchema>
+
+/** Staff who have recorded at least one live expense, for the "Recorded by" filter. */
+export async function expenseRecorderOptions(ctx: AppContext) {
+  ctx.require('expenses.view')
+  const grouped = await ctx.db.schoolExpense.groupBy({
+    by: ['recordedById', 'recordedByLabel'],
+    where: { deletedAt: null, recordedById: { not: null } },
+  })
+  const byId = new Map<string, string>()
+  for (const g of grouped) {
+    if (g.recordedById && !byId.has(g.recordedById)) byId.set(g.recordedById, g.recordedByLabel ?? 'Staff')
+  }
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
 
 export const EXPENSE_SORT_FIELDS = ['expenseDate', 'amountMinor', 'createdAt', 'title'] as const
 
@@ -91,6 +108,7 @@ function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
     ...(filter.headId ? { headId: filter.headId } : {}),
     ...(filter.nature ? { nature: filter.nature } : {}),
     ...(filter.paymentMode ? { paymentMode: filter.paymentMode } : {}),
+    ...(filter.recordedById ? { recordedById: filter.recordedById } : {}),
     ...(from || to
       ? {
           expenseDate: {

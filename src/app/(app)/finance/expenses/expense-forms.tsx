@@ -236,13 +236,26 @@ function fileProblem(file: File | null) {
   return null
 }
 
-export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOption[]; approvals?: boolean }) {
+export function NewExpenseButton({
+  heads,
+  approvals: mandatory = false,
+  canSendForApproval = false,
+  label,
+}: {
+  heads: HeadOption[]
+  approvals?: boolean
+  /** Approval is optional for this school: offer a per-expense "Send for approval" switch, off by default. */
+  canSendForApproval?: boolean
+  label?: string
+}) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const { form, setForm, set } = useExpenseForm(() => emptyForm(heads))
   const [file, setFile] = React.useState<File | null>(null)
+  const [sendForApproval, setSendForApproval] = React.useState(false)
+  const approvals = mandatory || (canSendForApproval && sendForApproval)
   // One key per dialog session: a repeated click or retry replays the first save.
   const idempotencyKey = React.useRef(newKey())
   const inFlight = React.useRef(false)
@@ -257,7 +270,11 @@ export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOpti
           toast.push({ tone: 'error', title: 'Receipt too large', description: problem })
           return
         }
-        const result = await createExpenseAction({ ...payloadOf(form), idempotencyKey: idempotencyKey.current })
+        const result = await createExpenseAction({
+          ...payloadOf(form),
+          idempotencyKey: idempotencyKey.current,
+          ...(approvals ? { sendForApproval: true } : {}),
+        })
         if (!result.ok) {
           toast.push({ tone: 'error', title: 'Could not save expense', description: result.message })
           return
@@ -271,6 +288,7 @@ export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOpti
         setOpen(false)
         setForm(emptyForm(heads))
         setFile(null)
+        setSendForApproval(false)
         router.refresh()
       } finally {
         inFlight.current = false
@@ -287,7 +305,7 @@ export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOpti
           setOpen(true)
         }}
       >
-        <Plus aria-hidden /> {approvals ? 'Submit expense' : 'Record expense'}
+        <Plus aria-hidden /> {label ?? (mandatory ? 'Submit expense' : 'Record expense')}
       </Button>
       <Dialog
         open={open}
@@ -312,6 +330,17 @@ export function NewExpenseButton({ heads, approvals = false }: { heads: HeadOpti
         }
       >
         <ExpenseFields idPrefix="new-expense" form={form} set={set} heads={heads} file={file} setFile={setFile} autoFocus />
+        {canSendForApproval && !mandatory ? (
+          <label className="mt-3 flex items-start gap-2 rounded-lg border border-line p-3 text-sm">
+            <input type="checkbox" className="mt-0.5" checked={sendForApproval} onChange={(e) => setSendForApproval(e.target.checked)} />
+            <span>
+              <span className="font-medium text-ink">Send for approval</span>
+              <span className="block text-xs text-ink-muted">
+                Off: the expense is recorded and posted now. On: it goes to the Validator and Approvers and reaches the books only at final approval.
+              </span>
+            </span>
+          </label>
+        ) : null}
       </Dialog>
     </>
   )
@@ -436,6 +465,55 @@ export function EditExpenseButton({ expense, heads }: { expense: ExpenseDraft; h
             </>
           )}
         </div>
+      </Dialog>
+    </>
+  )
+}
+
+/** Row-level delete with a confirmation; the books are corrected by reversal. */
+export function DeleteExpenseButton({ expense }: { expense: { id: string; title: string; amountLabel: string } }) {
+  const router = useRouter()
+  const toast = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [pending, startTransition] = React.useTransition()
+
+  const remove = () =>
+    startTransition(async () => {
+      const result = await deleteExpenseAction(expense.id)
+      if (!result.ok) {
+        toast.push({ tone: 'error', title: 'Could not delete', description: result.message })
+        return
+      }
+      toast.push({ tone: 'success', title: 'Expense deleted', description: result.message })
+      setOpen(false)
+      router.refresh()
+    })
+
+  return (
+    <>
+      <IconButton label={`Delete ${expense.title}`} onClick={() => setOpen(true)}>
+        <Trash2 className="size-3.5" aria-hidden />
+      </IconButton>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Delete this expense?"
+        footer={
+          <>
+            <Button variant="danger" loading={pending} onClick={remove}>
+              Delete expense
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Keep
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-muted">
+          <span className="font-medium text-ink">{expense.title}</span> · {expense.amountLabel}. It disappears from the
+          expense list and reports, and the accounts are corrected with a reversal entry. The deletion is recorded in
+          the audit log.
+        </p>
       </Dialog>
     </>
   )

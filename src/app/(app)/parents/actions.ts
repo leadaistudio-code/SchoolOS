@@ -7,8 +7,10 @@ import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import { ApiException } from '@/server/api/response'
 import {
+  deleteParent,
   issueParentPortalLogin,
   parentUpdateSchema,
+  restoreParent,
   updateParent,
 } from '@/server/modules/people/service'
 import type { FormState } from '@/lib/form-state'
@@ -63,11 +65,13 @@ export async function updateParentAction(
     }
 
     const phoneRaw = text('phone')
+    const secondaryRaw = text('secondaryPhone')
     const emailRaw = text('email')
     const parsed = parentUpdateSchema.parse({
       firstName: text('firstName'),
       lastName: text('lastName'),
       ...(phoneRaw ? { phone: phoneRaw } : {}),
+      ...(secondaryRaw ? { secondaryPhone: secondaryRaw } : {}),
       ...(emailRaw ? { email: emailRaw } : {}),
     })
 
@@ -75,6 +79,7 @@ export async function updateParentAction(
       firstName: parsed.firstName,
       lastName: parsed.lastName ?? '',
       phone: phoneRaw ? parsed.phone : null,
+      ...(formData.has('secondaryPhone') ? { secondaryPhone: secondaryRaw ? parsed.secondaryPhone : null } : {}),
       email: emailRaw ? parsed.email : null,
       occupation: optionalText('occupation'),
       annualIncome: optionalText('annualIncome'),
@@ -96,4 +101,30 @@ export async function updateParentAction(
   revalidatePath('/parents')
   revalidatePath(`/parents/${id}`)
   redirect(`/parents/${id}`)
+}
+
+type RecordActionResult = { ok: boolean; message?: string }
+
+export async function deleteParentAction(id: string): Promise<RecordActionResult> {
+  try {
+    const ctx = await requireContext('parents.delete')
+    await deleteParent(ctx, id)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not delete the parent' }
+  }
+  revalidatePath('/parents')
+  revalidatePath('/parents/deleted')
+  return { ok: true }
+}
+
+export async function restoreParentAction(id: string): Promise<RecordActionResult> {
+  try {
+    const ctx = await requireContext('parents.delete')
+    await restoreParent(ctx, id)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not restore the parent' }
+  }
+  revalidatePath('/parents')
+  revalidatePath('/parents/deleted')
+  return { ok: true }
 }

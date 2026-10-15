@@ -18,6 +18,8 @@ import {
 import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { getAnalyticsDashboard, getDrilldown, type DrillResult } from '@/server/modules/accounting/analytics-service'
 import { drillParam, monthLabel, parseDrill, sliceColor as paletteAt, type Drill } from '@/server/modules/accounting/analytics'
+import { getKpiStrip } from '@/server/modules/accounting/analytics-kpis'
+import { drillHref, type Drill as LedgerDrill } from '@/server/drill/descriptor'
 import { AccountsTabs, Metric, moneyFmt } from '../ui'
 import { AuditPane, stamp } from './audit-pane'
 
@@ -46,6 +48,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const params = await searchParams
   const data = await getAnalyticsDashboard(ctx, { from: params.from, to: params.to })
   const { period } = data
+  const kpis = await getKpiStrip(ctx, period)
+  const ledgerDrill = (d: LedgerDrill) => drillHref(ctx.tenant.id, d)
+  const kpiTo = period.to
   const currency = ctx.tenant.currency || 'INR'
   const { money } = moneyFmt(currency)
   const signed = (minor: number) => (minor < 0 ? `(${money(minor)})` : money(minor))
@@ -107,6 +112,30 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         {freshness.outcome.monthsRefreshed ? `, ${freshness.outcome.monthsRefreshed} month${freshness.outcome.monthsRefreshed === 1 ? '' : 's'}` : ''}
         {freshness.outcome.mode !== 'none' ? ` in ${freshness.outcome.durationMs} ms` : ''}). Dues and asset values were read from their registers at{' '}
         {stamp(data.generatedAt)}. Entries posted after that show on the next load.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Metric label="Income" value={money(kpis.incomeMinor)} href={ledgerDrill({ k: 'group', g: 'income', f: period.from, t: kpiTo })} />
+        <Metric label="Direct expenses" value={money(kpis.directMinor)} href={ledgerDrill({ k: 'group', g: 'direct', f: period.from, t: kpiTo })} />
+        <Metric label="Indirect expenses" value={money(kpis.indirectMinor)} href={ledgerDrill({ k: 'group', g: 'indirect', f: period.from, t: kpiTo })} />
+        <Metric
+          label="Net surplus"
+          value={signed(kpis.surplusMinor)}
+          tone={kpis.surplusMinor >= 0 ? 'success' : 'danger'}
+          hint={`Gross ${signed(kpis.grossSurplusMinor)}`}
+          href={ledgerDrill({ k: 'surplus', l: 'net', f: period.from, t: kpiTo })}
+        />
+        <Metric
+          label="Payables (Sundry Creditors)"
+          value={kpis.payablesMinor === null ? '—' : signed(kpis.payablesMinor)}
+          hint={`at ${kpiTo}`}
+          href={kpis.payablesAccountId ? ledgerDrill({ k: 'ledger', a: kpis.payablesAccountId, t: kpiTo, v: 'closing' }) : undefined}
+        />
+      </div>
+      <p className="text-xs text-ink-subtle">
+        Headline figures from the monthly ledger summary
+        {kpis.measured.cached ? ' (cached, under a minute old)' : ` (${kpis.measured.queries} queries, ${kpis.measured.ms} ms)`}.
+        Click one to see the ledgers and vouchers behind it.
       </p>
 
       {auditError ? <Notice tone="danger" title="Cannot open this breakdown">{auditError}</Notice> : null}

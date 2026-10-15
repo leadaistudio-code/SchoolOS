@@ -7,7 +7,8 @@ import { parseListQuery } from '@/lib/query'
 import { PageHeader } from '@/components/page-header'
 import { BackButton } from '@/components/back-button'
 import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/ui/states'
+import { EmptyState, Notice } from '@/components/ui/states'
+import { getViewSession } from '@/server/view-session'
 import { SearchBar } from '@/components/search-bar'
 import { Metric, MetricRow } from '@/components/ui/metric'
 import { formatMoney } from '@/lib/utils'
@@ -25,7 +26,9 @@ export default async function InvoicesPage({
   const ctx = await requireContext('fees.view')
   const params = await searchParams
   const query = parseListQuery(params)
-  const filter = invoiceFilterSchema.parse(params)
+  const session = await getViewSession(ctx)
+  const pastSession = session && !session.isCurrent ? session : null
+  const filter = invoiceFilterSchema.parse({ ...params, sessionId: pastSession?.id })
 
   const [{ rows, total, totals }, classes, generationOptions, openStudents] = await Promise.all([
     listInvoices(ctx, query, filter),
@@ -36,6 +39,7 @@ export default async function InvoicesPage({
       where: {
         status: { notIn: ['CANCELLED', 'DRAFT'] },
         balanceMinor: { gt: 0 },
+        ...(pastSession ? { sessionId: pastSession.id } : {}),
       },
     }),
   ])
@@ -67,6 +71,12 @@ export default async function InvoicesPage({
           </>
         }
       />
+
+      {pastSession ? (
+        <Notice tone="info" title={`Showing session ${pastSession.name}`}>
+          Only invoices billed for {pastSession.name} are listed. Switch the session in the header to see the current year.
+        </Notice>
+      ) : null}
 
       <MetricRow columns={4}>
         <Metric

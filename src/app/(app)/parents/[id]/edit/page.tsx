@@ -32,6 +32,7 @@ export default async function EditParentPage({ params }: { params: Promise<{ id:
           firstName: parent.firstName,
           lastName: parent.lastName,
           phone: parent.phone ?? undefined,
+          secondaryPhone: parent.secondaryPhone ?? undefined,
           email: parent.email ?? undefined,
           occupation: parent.occupation ?? undefined,
           annualIncome: parent.annualIncome ?? undefined,

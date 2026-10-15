@@ -2,7 +2,14 @@ import Link from 'next/link'
 import { Building, Filter, Paperclip, Target, Wallet } from 'lucide-react'
 import { ACCENT, StatCard } from '@/components/ui/stat-card'
 import { requireContext } from '@/server/context'
-import { expenseFilterSchema, expenseOverview, listExpenses } from '@/server/modules/finance/expenses'
+import {
+  expenseFilterSchema,
+  expenseOverview,
+  expenseRecorderOptions,
+  listExpenses,
+} from '@/server/modules/finance/expenses'
+import { getViewSession, withSessionPeriod } from '@/server/view-session'
+import { financialYearRange } from '@/lib/periods'
 import { expenseHeadOptions } from '@/server/modules/finance/expense-heads'
 import { natureLabel, paymentModeLabel } from '@/lib/finance/expense-options'
 import { parseListQuery } from '@/lib/query'
@@ -11,19 +18,20 @@ import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState, Notice } from '@/components/ui/states'
-import { getAccountingFlags } from '@/server/modules/accounting/service'
+import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
+import { approvalMode } from '@/server/modules/accounting/flags'
 import { SearchBar } from '@/components/search-bar'
 import { Pagination } from '@/components/pagination'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney } from '@/lib/utils'
-import { EditExpenseButton, NewExpenseButton } from './expense-forms'
+import { DeleteExpenseButton, EditExpenseButton, NewExpenseButton } from './expense-forms'
 import { ExpenseFilters } from './filters'
 import { ExpenseChart } from './expense-chart'
 
 export const metadata = { title: 'Expenses' }
 
-const FILTER_KEYS = ['q', 'headId', 'nature', 'paymentMode', 'preset', 'from', 'to', 'category'] as const
+const FILTER_KEYS = ['q', 'headId', 'nature', 'paymentMode', 'recordedById', 'preset', 'from', 'to', 'category'] as const
 
 export default async function ExpensesPage({
   searchParams,
@@ -33,11 +41,19 @@ export default async function ExpensesPage({
   const ctx = await requireContext('expenses.view')
   const params = await searchParams
   const query = parseListQuery(params)
-  const filter = expenseFilterSchema.parse(params)
+  const session = await getViewSession(ctx)
+  const filter = withSessionPeriod(expenseFilterSchema.parse(params), session)
+  const fyStart = session ? Number(financialYearRange(session.startsOn).from.slice(0, 4)) : undefined
 
   const heads = await expenseHeadOptions(ctx)
-  const [list, overview, flags] = await Promise.all([listExpenses(ctx, query, filter), expenseOverview(ctx), getAccountingFlags(ctx.db)])
+  const [list, overview, flags, recorders] = await Promise.all([
+    listExpenses(ctx, query, filter),
+    expenseOverview(ctx, fyStart),
+    getAccountingFlags(ctx.db),
+    expenseRecorderOptions(ctx),
+  ])
   const approvals = flags.approvals
+  const optional = approvalMode(flags, accountingEnvSwitches().approvals) === 'optional'
   const { rows, total, totalMinor } = list
   const canManage = ctx.can('expenses.manage')
   const currency = ctx.tenant.currency
@@ -70,12 +86,15 @@ export default async function ExpensesPage({
                 Profit &amp; Loss
               </Link>
             ) : null}
-            {approvals ? (
+            <Link href="/finance/expenses/book" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Expense Book
+            </Link>
+            {approvals || optional ? (
               <Link href="/accounts/expense-approvals" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 Approvals
               </Link>
             ) : null}
-            {canManage ? <NewExpenseButton heads={heads} approvals={approvals} /> : null}
+            {canManage ? <NewExpenseButton heads={heads} approvals={approvals} canSendForApproval={optional} /> : null}
           </>
         }
       />
@@ -112,7 +131,7 @@ export default async function ExpensesPage({
           href="?nature=INDIRECT&preset=fy"
         />
         <StatCard
-          label={filtered ? 'Filtered total' : 'All-time total'}
+          label={filtered ? 'Filtered total' : session ? `Session ${session.name} total` : 'All-time total'}
           value={formatMoney(totalMinor, currency)}
           hint={`${total} entries · direct ${formatMoney(list.directMinor, currency)} · indirect ${formatMoney(list.indirectMinor, currency)}`}
           icon={Filter}
@@ -167,7 +186,7 @@ export default async function ExpensesPage({
 
       <Card className="overflow-hidden">
         <SearchBar placeholder="Search title, vendor, bill number or notes">
-          <ExpenseFilters heads={heads} />
+          <ExpenseFilters heads={heads} recorders={recorders} sessionName={session?.name ?? null} />
         </SearchBar>
 
         {rows.length === 0 ? (
@@ -178,7 +197,7 @@ export default async function ExpensesPage({
                 ? 'Record school spends like salaries, electricity, rent, stationery, repairs and event costs.'
                 : 'Expenses recorded by accounts or front office will appear here.'
             }
-            action={canManage ? <NewExpenseButton heads={heads} approvals={approvals} /> : undefined}
+            action={canManage ? <NewExpenseButton heads={heads} approvals={approvals} canSendForApproval={optional} /> : undefined}
           />
         ) : (
           <>
@@ -224,6 +243,7 @@ export default async function ExpensesPage({
                         </TD>
                         {canManage ? (
                           <TD align="right">
+                            <div className="flex items-center justify-end gap-1">
                             <EditExpenseButton
                               heads={heads}
                               expense={{
@@ -240,6 +260,10 @@ export default async function ExpensesPage({
                                 receiptUrl,
                               }}
                             />
+                            <DeleteExpenseButton
+                              expense={{ id: row.id, title: row.title, amountLabel: formatMoney(row.amountMinor, currency) }}
+                            />
+                            </div>
                           </TD>
                         ) : null}
                       </TR>

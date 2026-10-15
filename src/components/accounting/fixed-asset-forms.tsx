@@ -30,6 +30,7 @@ export function FixedAssetDialog({
   categories,
   defaultAssetLedgerId,
   today,
+  prefill,
 }: {
   assetLedgers: LedgerOption[]
   funding: LedgerOption[]
@@ -37,12 +38,15 @@ export function FixedAssetDialog({
   categories: string[]
   defaultAssetLedgerId: string | null
   today: string
+  /** Capitalising an inventory register item: opens the dialog with its details filled in. */
+  prefill?: FixedAssetPrefill
 }) {
   return (
     <FormDialog
       title="Add fixed asset"
       description="Depreciated by written-down value at an annual rate. Cost already in the books (purchase voucher, journal or opening balance) is not posted again."
       trigger={(open) => <Button size="sm" onClick={open}>Add asset</Button>}
+      defaultOpen={!!prefill}
     >
       {(close, key) => (
         <FixedAssetForm
@@ -54,10 +58,19 @@ export function FixedAssetDialog({
           today={today}
           idempotencyKey={key}
           onDone={close}
+          prefill={prefill}
         />
       )}
     </FormDialog>
   )
+}
+
+export type FixedAssetPrefill = {
+  inventoryAssetId: string
+  name: string
+  location: string | null
+  capitalisedOn: string | null
+  costMinor: number | null
 }
 
 function FixedAssetForm({
@@ -69,6 +82,7 @@ function FixedAssetForm({
   today,
   idempotencyKey,
   onDone,
+  prefill,
 }: {
   assetLedgers: LedgerOption[]
   funding: LedgerOption[]
@@ -78,9 +92,10 @@ function FixedAssetForm({
   today: string
   idempotencyKey: string
   onDone: () => void
+  prefill?: FixedAssetPrefill
 }) {
   const { busy, error, setError, run } = useSubmit(onDone)
-  const [cost, setCost] = React.useState('')
+  const [cost, setCost] = React.useState(prefill?.costMinor ? (prefill.costMinor / 100).toFixed(2) : '')
   const [residual, setResidual] = React.useState('')
   const [lifeYears, setLifeYears] = React.useState('')
   const [rate, setRate] = React.useState('')
@@ -139,14 +154,14 @@ function FixedAssetForm({
     <form onSubmit={submit} className="space-y-3">
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Asset name" required htmlFor="fa-name"><Input id="fa-name" name="name" required minLength={2} maxLength={160} /></Field>
+        <Field label="Asset name" required htmlFor="fa-name"><Input id="fa-name" name="name" required minLength={2} maxLength={160} defaultValue={prefill?.name} /></Field>
         <Field label="Category" required htmlFor="fa-category">
           <Input id="fa-category" name="category" required minLength={2} maxLength={80} list="fa-categories" placeholder="Furniture, Computers, Vehicles…" />
           <datalist id="fa-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
         </Field>
-        <Field label="Location" htmlFor="fa-location"><Input id="fa-location" name="location" maxLength={120} /></Field>
+        <Field label="Location" htmlFor="fa-location"><Input id="fa-location" name="location" maxLength={120} defaultValue={prefill?.location ?? undefined} /></Field>
         <Field label="Department" htmlFor="fa-dept"><Input id="fa-dept" name="department" maxLength={120} /></Field>
-        <Field label="Capitalised on" required htmlFor="fa-cap"><Input id="fa-cap" name="capitalisedOn" type="date" required defaultValue={today} /></Field>
+        <Field label="Capitalised on" required htmlFor="fa-cap"><Input id="fa-cap" name="capitalisedOn" type="date" required defaultValue={prefill?.capitalisedOn ?? today} /></Field>
         <Field label="Depreciation starts" hint="Defaults to the capitalisation date (put to use)" htmlFor="fa-start"><Input id="fa-start" name="depreciationStartOn" type="date" /></Field>
         <Field label="Cost (₹)" required htmlFor="fa-cost"><Input id="fa-cost" inputMode="decimal" required value={cost} onChange={(e) => setCost(e.target.value)} /></Field>
         <Field label="Residual value (₹)" hint={defaultResidual !== null ? `Leave blank for 5% of cost: ${rupees(defaultResidual)}` : '5% of cost if left blank'} htmlFor="fa-residual">
@@ -171,7 +186,7 @@ function FixedAssetForm({
         </Field>
         {inventory.length ? (
           <Field label="Inventory item" hint="Optional link to the inventory register" htmlFor="fa-inv" className="sm:col-span-2">
-            <Select id="fa-inv" name="inventoryAssetId" defaultValue="">
+            <Select id="fa-inv" name="inventoryAssetId" defaultValue={prefill?.inventoryAssetId ?? ''}>
               <option value="">Not linked</option>
               {inventory.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
             </Select>

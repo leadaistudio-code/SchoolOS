@@ -6,11 +6,15 @@ import { assertStudentAccess } from '@/server/scope'
 import { schoolToday } from '@/lib/periods'
 import { getAccountingFlags } from './service'
 import { fiscalYearStartingIn, recentFiscalYears, type FiscalYearSpan } from './fiscal-year'
+import { toSafeCsv } from '@/lib/csv'
+import { printablePage } from '@/server/modules/finance/student-fee-report-export'
 import {
   LEDGER_ENTRY_KINDS,
+  balanceSide,
   buildStudentLedgerEntries,
   reconcileStudentLedger,
   viewStudentLedger,
+  yearWiseLedger,
   type StudentFeeSnapshot,
 } from './student-ledger'
 
@@ -199,6 +203,73 @@ export async function getStudentLedger(ctx: AppContext, studentId: string, query
     },
     reconciliation: diagnostics ? reconciliation : null,
   }
+}
+
+/**
+ * Year-wise outstanding for the statement page: the current financial year
+ * and the three before it, each opening on the previous closing, with any
+ * older balance brought forward into the oldest year.
+ */
+export async function getStudentLedgerYearWise(ctx: AppContext, studentId: string) {
+  const { flags } = await authorise(ctx, studentId)
+  const years = recentFiscalYears(schoolToday(), LEDGER_FISCAL_YEAR_COUNT, flags.fiscalYearStartMonth)
+  const entries = buildStudentLedgerEntries(await loadStudentFeeSnapshot(ctx.db, studentId))
+  return yearWiseLedger(entries, years)
+}
+
+export const studentLedgerExportSchema = z.object({
+  fy: studentLedgerQuerySchema.shape.fy,
+  format: z.enum(['csv', 'pdf']).default('csv'),
+})
+
+/** The full statement for one financial year (or all years) as CSV or a printable page. */
+export async function exportStudentLedger(ctx: AppContext, studentId: string, raw: unknown) {
+  const query = studentLedgerExportSchema.parse(raw)
+  const { flags, student } = await authorise(ctx, studentId)
+  const fiscalYear = resolveFiscalYear(query.fy, flags.fiscalYearStartMonth)
+  const entries = buildStudentLedgerEntries(await loadStudentFeeSnapshot(ctx.db, studentId))
+  const view = viewStudentLedger(entries, { fiscalYear, page: 1, pageSize: 200 })
+  // viewStudentLedger caps a page at 200; walk the pages so the file is complete.
+  const rows = [...view.rows]
+  for (let page = 2; rows.length < view.totalRows; page++) {
+    rows.push(...viewStudentLedger(entries, { fiscalYear, page, pageSize: 200 }).rows)
+  }
+  const rupees = (minor: number) => (minor / 100).toFixed(2)
+  const name = `${student.firstName} ${student.lastName}`.trim()
+  const period = fiscalYear ? `FY ${fiscalYear.label}` : 'All years'
+  const headers = ['Date', 'Particulars', 'Voucher type', 'Voucher no', 'Debit', 'Credit', 'Balance', 'Dr/Cr']
+  const table: string[][] = [
+    ['', 'Opening balance (brought forward)', '', '', '', '', rupees(Math.abs(view.openingMinor)), balanceSide(view.openingMinor)],
+    ...rows.map((r) => [
+      r.date,
+      r.particulars,
+      r.voucherType,
+      r.voucherNo,
+      r.debitMinor ? rupees(r.debitMinor) : '',
+      r.creditMinor ? rupees(r.creditMinor) : '',
+      rupees(Math.abs(r.balanceMinor)),
+      r.side,
+    ]),
+    ['', 'Closing balance', '', '', rupees(view.totals.debitMinor), rupees(view.totals.creditMinor), rupees(Math.abs(view.closingMinor)), view.closingSide],
+  ]
+  const base = `fee-ledger-${student.admissionNo}-${fiscalYear ? fiscalYear.label : 'all-years'}`.replace(/[^\w.-]+/g, '-')
+  if (query.format === 'csv') {
+    return { filename: `${base}.csv`, contentType: 'text/csv; charset=utf-8', body: `\uFEFF${toSafeCsv(headers, table)}\r\n` }
+  }
+  const body = printablePage(
+    `Fee ledger · ${name}`,
+    `${student.admissionNo} · ${period} · printed ${schoolToday()}`,
+    [
+      ['Opening B/F', `${rupees(Math.abs(view.openingMinor))} ${balanceSide(view.openingMinor)}`],
+      ['Debits', rupees(view.totals.debitMinor)],
+      ['Credits', rupees(view.totals.creditMinor)],
+      ['Closing', `${rupees(Math.abs(view.closingMinor))} ${view.closingSide}`],
+    ],
+    headers,
+    new Set([4, 5, 6]),
+    table,
+  )
+  return { filename: `${base}.html`, contentType: 'text/html; charset=utf-8', body }
 }
 
 export async function getStudentLedgerReconciliation(ctx: AppContext, studentId: string) {

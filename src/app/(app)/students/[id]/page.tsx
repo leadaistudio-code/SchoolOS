@@ -25,6 +25,8 @@ import { EditableAvatar } from '@/components/ui/editable-avatar'
 import { StudentDocumentsCard } from './student-documents-card'
 import { Student360 } from './student-360'
 import { uploadStudentPhotoAction, removeStudentPhotoAction } from './photo-actions'
+import { DeleteRecordButton } from '@/components/record-actions'
+import { deleteStudentAction } from '../actions'
 
 export const metadata = { title: 'Student profile' }
 
@@ -92,6 +94,22 @@ export default async function StudentDetailPage({
                 <Pencil aria-hidden />
                 Edit
               </Link>
+            ) : null}
+            {ctx.can('students.delete') ? (
+              <DeleteRecordButton
+                label="Delete student"
+                title={`Delete ${fullName(student)}?`}
+                action={deleteStudentAction.bind(null, student.id)}
+                askReason
+                redirectTo="/students"
+                doneMessage="Student deleted"
+              >
+                <p>
+                  The student leaves the roll and every list, and their portal login is switched off. Fees,
+                  receipts, attendance and results are kept.
+                </p>
+                <p>You can restore them from Students → Deleted students.</p>
+              </DeleteRecordButton>
             ) : null}
           </>
         }

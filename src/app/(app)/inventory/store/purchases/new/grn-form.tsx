@@ -22,7 +22,19 @@ export type GrnItem = {
 
 type Line = { key: number; itemId: string; quantity: string; unitCost: string }
 
-export function GrnForm({ items, today, currency, preselect }: { items: GrnItem[]; today: string; currency: string; preselect?: string }) {
+export function GrnForm({
+  items,
+  today,
+  currency,
+  preselect,
+  vendors = [],
+}: {
+  items: GrnItem[]
+  today: string
+  currency: string
+  preselect?: string
+  vendors?: { id: string; code: string; name: string }[]
+}) {
   const router = useRouter()
   const { push } = useToast()
   const byId = React.useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
@@ -33,6 +45,7 @@ export function GrnForm({ items, today, currency, preselect }: { items: GrnItem[
   }
   const [lines, setLines] = React.useState<Line[]>(() => [lineFor(preselect && byId.has(preselect) ? preselect : '')])
   const [vendorName, setVendorName] = React.useState('')
+  const [vendorId, setVendorId] = React.useState('')
   const [invoiceNo, setInvoiceNo] = React.useState('')
   const [purchaseDate, setPurchaseDate] = React.useState(today)
   const [paymentMode, setPaymentMode] = React.useState('BANK_TRANSFER')
@@ -61,6 +74,7 @@ export function GrnForm({ items, today, currency, preselect }: { items: GrnItem[
     setSaving(true)
     const res = await createStorePurchaseAction({
       vendorName,
+      vendorId: vendorId || null,
       invoiceNo,
       purchaseDate,
       paymentMode,
@@ -78,6 +92,24 @@ export function GrnForm({ items, today, currency, preselect }: { items: GrnItem[
         <Field label="Vendor / supplier" htmlFor="grn-vendor" required className="lg:col-span-2">
           <Input id="grn-vendor" autoFocus value={vendorName} onChange={(e) => setVendorName(e.target.value)} placeholder="e.g. Sharma Uniforms, City Book Depot" />
         </Field>
+        {vendors.length > 0 ? (
+          <Field label="Vendor master (optional)" htmlFor="grn-vendor-id" hint="Shows this receipt on the vendor's 360 page" className="lg:col-span-2">
+            <Select
+              id="grn-vendor-id"
+              value={vendorId}
+              onChange={(e) => {
+                setVendorId(e.target.value)
+                const v = vendors.find((x) => x.id === e.target.value)
+                if (v && !vendorName.trim()) setVendorName(v.name)
+              }}
+            >
+              <option value="">Not linked</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>{v.name} · {v.code}</option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
         <Field label="Vendor bill no." htmlFor="grn-inv">
           <Input id="grn-inv" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
         </Field>

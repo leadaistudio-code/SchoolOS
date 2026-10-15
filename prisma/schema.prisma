@@ -1519,6 +1519,9 @@ model Parent {
   firstName    String
   lastName     String
   phone        String?
+  /// Optional second mobile. Signs in and receives reset codes like `phone`;
+  /// school messages still go to `phone` only.
+  secondaryPhone String?
   email        String?
   occupation   String?
   annualIncome String?
@@ -1541,6 +1544,7 @@ model Parent {
 
   @@index([tenantId, lastName, firstName])
   @@index([tenantId, phone])
+  @@index([tenantId, secondaryPhone])
 }
 
 enum GuardianRelation {
@@ -3856,6 +3860,8 @@ model StorePurchase {
   tenantId       String
   number         String
   vendorName     String
+  /// Optional link to the vendor master (Vendor 360). The free-text name stays the record of who supplied.
+  vendorId       String?
   invoiceNo      String?
   purchaseDate   DateTime @db.Date
   paymentMode    String   @default("CASH")
@@ -3866,10 +3872,12 @@ model StorePurchase {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  lines StorePurchaseLine[]
+  lines  StorePurchaseLine[]
+  vendor Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, number])
   @@index([tenantId, purchaseDate])
+  @@index([tenantId, vendorId])
 }
 
 model StorePurchaseLine {
@@ -6454,6 +6462,7 @@ model Vendor {
   payments         VendorPayment[]
   debitNotes       DebitNote[]
   adjustments      VendorAdjustment[]
+  storePurchases   StorePurchase[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])

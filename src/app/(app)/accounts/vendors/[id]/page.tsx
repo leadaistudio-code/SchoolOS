@@ -18,7 +18,10 @@ import {
 } from '@/components/accounting/payables-forms'
 import { formatDay } from '@/lib/dates'
 import { getAccountingFlags } from '@/server/modules/accounting/service'
-import { getVendor360 } from '@/server/modules/accounting/payables-service'
+import { getVendor360, vendorLedgerFrom } from '@/server/modules/accounting/payables-service'
+import { ageBills, PAYABLE_AGEING_BUCKETS } from '@/server/modules/accounting/payables'
+import { toIsoDay } from '@/server/modules/accounting/fiscal-year'
+import { schoolToday } from '@/lib/periods'
 import { moneyFmt } from '../../ui'
 
 export const metadata = { title: 'Vendor 360' }
@@ -50,6 +53,16 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
   })
   const { vendor, summary, vouchers, payments, debitNotes, adjustments } = vendor360
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
+  const ageing = ageBills(summary.bills, schoolToday())
+  const ledger = vendorLedgerFrom(vendor360)
+  const storePurchases = ctx.can('store.view')
+    ? await ctx.db.storePurchase.findMany({
+        where: { vendorId: vendor.id },
+        orderBy: [{ purchaseDate: 'desc' }, { number: 'desc' }],
+        take: 50,
+        include: { lines: { include: { item: { select: { name: true } } } } },
+      })
+    : []
   const canManage = ctx.can('accounts.manage')
   const me = ctx.user.userId
 
@@ -100,6 +113,12 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
           sub={summary.totalAdjustmentsMinor ? `after ${money(summary.totalAdjustmentsMinor)} discounts / write-offs` : summary.netLiabilityMinor < 0 ? 'advance with vendor' : 'payable now'}
           emphasis={summary.bills.some((b) => b.overdue) ? 'warning' : undefined}
         />
+      </MetricRow>
+
+      <MetricRow columns={4}>
+        {PAYABLE_AGEING_BUCKETS.map((b) => (
+          <Metric key={b.key} label={`Bills ${b.label}`} value={money(ageing[b.key])} sub="by bill date" emphasis={b.key === 'd90_plus' && ageing[b.key] > 0 ? 'danger' : undefined} />
+        ))}
       </MetricRow>
 
       <Card className="overflow-hidden">
@@ -172,6 +191,88 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
           )}
         </CardContent>
       </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Ledger vouchers</CardTitle>
+          <span className="text-xs text-ink-subtle">Sundry Creditors · {vendor.name} · with bill-wise references</span>
+        </CardHeader>
+        <CardContent className="p-0">
+          {ledger.length === 0 ? (
+            <EmptyState title="No posted vouchers" />
+          ) : (
+            <TableWrap>
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Date</TH>
+                    <TH>Voucher</TH>
+                    <TH>Bill-wise details</TH>
+                    <TH align="right">Debit</TH>
+                    <TH align="right">Credit</TH>
+                    <TH align="right">Balance</TH>
+                  </tr>
+                </THead>
+                <TBody>
+                  {ledger.map((r) => (
+                    <TR key={`${r.voucherType}:${r.id}`}>
+                      <TD className="whitespace-nowrap tnum">{r.date}</TD>
+                      <TD className="whitespace-nowrap">
+                        <span className="block font-medium text-ink">{r.voucherNo}</span>
+                        <span className="block text-xs text-ink-subtle">{r.voucherType}</span>
+                      </TD>
+                      <TD className="text-sm">
+                        {r.refs.map((ref, i) => (
+                          <span key={i} className="block">
+                            <span className="font-medium">{ref.type}</span>
+                            {ref.bill ? ` · ${ref.bill}` : ''} · {money(ref.amountMinor)}
+                          </span>
+                        ))}
+                      </TD>
+                      <TD align="right" className="tnum">{r.debitMinor ? money(r.debitMinor) : ''}</TD>
+                      <TD align="right" className="tnum">{r.creditMinor ? money(r.creditMinor) : ''}</TD>
+                      <TD align="right" className="tnum">
+                        {r.balanceMinor === 0 ? '—' : `${money(r.balanceMinor)} ${r.balanceMinor > 0 ? 'Cr' : 'Dr'}`}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </TableWrap>
+          )}
+        </CardContent>
+      </Card>
+
+      {storePurchases.length > 0 ? (
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Store purchases (goods receipts)</CardTitle>
+            <span className="text-xs text-ink-subtle">Paid at receipt; not on this vendor&apos;s account</span>
+          </CardHeader>
+          <CardContent className="p-0">
+            <TableWrap>
+              <Table>
+                <THead><tr><TH>Date</TH><TH>Items</TH><TH align="right">Amount</TH></tr></THead>
+                <TBody>
+                  {storePurchases.map((p) => (
+                    <TR key={p.id}>
+                      <TD className="whitespace-nowrap tnum">
+                        {toIsoDay(p.purchaseDate)}
+                        <span className="block text-xs text-ink-subtle">{p.number}</span>
+                      </TD>
+                      <TD className="text-sm">
+                        {p.lines.map((l) => <span key={l.id} className="block">{l.quantity} × {l.item.name}</span>)}
+                        {p.invoiceNo ? <span className="block text-xs text-ink-subtle">Bill {p.invoiceNo} · {p.paymentMode.toLowerCase()}</span> : null}
+                      </TD>
+                      <TD align="right" className="tnum">{money(p.totalMinor)}</TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </TableWrap>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         <CardHeader><CardTitle>Purchase vouchers</CardTitle></CardHeader>

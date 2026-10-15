@@ -11,6 +11,7 @@ import { schoolToday } from '@/lib/periods'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
 import { accountingEnvSwitches, assertPostingAllowed, getAccountingFlags, saveAccountingSettings } from './service'
 import { cashBankAccounts } from './cash-bank'
+import { approvalMode, type ApprovalMode } from './flags'
 import { toIsoDay } from './fiscal-year'
 import { expenseSchema } from '@/server/modules/finance/expenses'
 import { loadResolver } from '@/server/modules/accounts/chart'
@@ -53,10 +54,21 @@ async function requireModule(ctx: AppContext) {
   return flags
 }
 
-/** New requests need the workflow switched on; requests already in it can always be finished. */
-async function requireWorkflow(ctx: AppContext) {
+/** Whether approval is mandatory, optional per expense, or unavailable for this school. */
+export async function expenseApprovalMode(ctx: AppContext): Promise<ApprovalMode> {
+  return approvalMode(await getAccountingFlags(ctx.db), accountingEnvSwitches().approvals)
+}
+
+/**
+ * New requests need the workflow switched on, or, where approval is optional,
+ * the preparer's explicit "Send for approval". Requests already in it can always be finished.
+ */
+async function requireWorkflow(ctx: AppContext, sentForApproval: boolean) {
   const flags = await requireModule(ctx)
-  if (!flags.approvals) throw new ApiException(403, 'FEATURE_DISABLED', 'Expense approval is not switched on for this school')
+  const mode = approvalMode(flags, accountingEnvSwitches().approvals)
+  if (mode === 'off' || (mode === 'optional' && !sentForApproval)) {
+    throw new ApiException(403, 'FEATURE_DISABLED', 'Expense approval is not switched on for this school')
+  }
   return flags
 }
 
@@ -110,7 +122,7 @@ export const expenseRequestUpdateSchema = expenseSchema.omit({ idempotencyKey: t
 /** Stage 1: the creator prepares an expense (and optionally submits it at once). */
 export async function createExpenseRequest(ctx: AppContext, raw: unknown) {
   ctx.require('expenses.manage')
-  const flags = await requireWorkflow(ctx)
+  const flags = await requireWorkflow(ctx, (raw as { sendForApproval?: unknown } | null)?.sendForApproval === true)
   const input = expenseRequestSchema.parse(raw)
   if (input.idempotencyKey) {
     const replay = await ctx.db.expenseApprovalRequest.findFirst({ where: { idempotencyKey: input.idempotencyKey } })
@@ -221,7 +233,7 @@ export const transitionSchema = z.object({
 export async function transitionExpenseRequest(ctx: AppContext, id: string, raw: unknown) {
   const flags = await requireModule(ctx)
   const input = transitionSchema.parse(raw)
-  if (input.action === 'submit' && !flags.approvals) {
+  if (input.action === 'submit' && approvalMode(flags, accountingEnvSwitches().approvals) === 'off') {
     throw new ApiException(403, 'FEATURE_DISABLED', 'Expense approval is not switched on for this school')
   }
   const actor = who(ctx)
@@ -426,7 +438,84 @@ export async function listExpenseRequests(ctx: AppContext, raw: unknown) {
     awaitingMe,
     byStatus: Object.fromEntries(counts.map((c) => [c.status, { count: c._count._all, amountMinor: c._sum.amountMinor ?? 0 }])) as Partial<Record<ApprovalStatus, { count: number; amountMinor: number }>>,
     workflowOn: flags.approvals,
+    mode: approvalMode(flags, accountingEnvSwitches().approvals),
   }
+}
+
+export const BOARD_COLUMNS = [
+  { key: 'creator', role: 'Creator', statuses: ['DRAFT', 'RETURNED'] },
+  { key: 'validator', role: 'Validator', statuses: ['SUBMITTED'] },
+  { key: 'l1', role: 'Approver (department head)', statuses: ['PENDING_L1'] },
+  { key: 'l2', role: 'Approver (finance officer)', statuses: ['PENDING_L2'] },
+  { key: 'final', role: 'Final Approver', statuses: ['PENDING_FINAL'] },
+  { key: 'posted', role: 'Posted (latest)', statuses: ['POSTED'] },
+] as const satisfies readonly { key: string; role: string; statuses: readonly ExpenseApprovalStatus[] }[]
+
+const BOARD_LIMIT = 100
+
+/** Kanban board: every open request by stage, plus the latest posted ones. Same visibility as the list. */
+export async function expenseApprovalBoard(ctx: AppContext) {
+  if (!canSeeApprovals(ctx)) throw forbidden()
+  await requireModule(ctx)
+  const mine = { createdById: ctx.user.userId }
+  const ownOnly = !ctx.can('accounts.view') && stagesFor(ctx).length === 0
+  const myStages = new Set(stagesFor(ctx))
+  const select = { id: true, number: true, title: true, amountMinor: true, expenseDate: true, status: true, createdById: true, createdByLabel: true, updatedAt: true } as const
+  const [open, posted] = await Promise.all([
+    ctx.db.expenseApprovalRequest.findMany({
+      where: { AND: [ownOnly ? mine : {}, { status: { in: ['DRAFT', 'RETURNED', ...IN_FLIGHT_STATUSES] as ExpenseApprovalStatus[] } }] },
+      orderBy: [{ updatedAt: 'asc' }],
+      take: BOARD_LIMIT,
+      select,
+    }),
+    ctx.db.expenseApprovalRequest.findMany({
+      where: { AND: [ownOnly ? mine : {}, { status: 'POSTED' }] },
+      orderBy: [{ postedAt: 'desc' }],
+      take: 10,
+      select,
+    }),
+  ])
+  const rows = [...open, ...posted].map((r) => ({
+    ...r,
+    actionable: r.createdById === ctx.user.userId ? r.status === 'DRAFT' || r.status === 'RETURNED' : myStages.has(r.status),
+  }))
+  return {
+    truncated: open.length === BOARD_LIMIT,
+    columns: BOARD_COLUMNS.map((c) => {
+      const items = rows.filter((r) => (c.statuses as readonly string[]).includes(r.status))
+      return { ...c, items, totalMinor: items.reduce((s, r) => s + r.amountMinor, 0) }
+    }),
+  }
+}
+
+/** "My pending actions": requests waiting on this user, as creator (returned/draft) or as the stage holder. */
+export async function myPendingApprovalActions(ctx: AppContext) {
+  if (!canSeeApprovals(ctx)) return null
+  const flags = await getAccountingFlags(ctx.db)
+  if (!flags.module) return null
+  const stages = stagesFor(ctx)
+  const mine = { createdById: ctx.user.userId }
+  const [awaiting, returned] = await Promise.all([
+    stages.length
+      ? ctx.db.expenseApprovalRequest.findMany({
+          where: { status: { in: stages }, NOT: mine },
+          orderBy: [{ updatedAt: 'asc' }],
+          take: 5,
+          select: { id: true, number: true, title: true, amountMinor: true, status: true },
+        })
+      : Promise.resolve([]),
+    ctx.db.expenseApprovalRequest.findMany({
+      where: { ...mine, status: { in: ['DRAFT', 'RETURNED'] } },
+      orderBy: [{ updatedAt: 'asc' }],
+      take: 5,
+      select: { id: true, number: true, title: true, amountMinor: true, status: true },
+    }),
+  ])
+  const [awaitingCount, returnedCount] = await Promise.all([
+    stages.length ? ctx.db.expenseApprovalRequest.count({ where: { status: { in: stages }, NOT: mine } }) : Promise.resolve(0),
+    ctx.db.expenseApprovalRequest.count({ where: { ...mine, status: { in: ['DRAFT', 'RETURNED'] } } }),
+  ])
+  return { awaiting, returned, awaitingCount, returnedCount }
 }
 
 export async function getExpenseRequest(ctx: AppContext, id: string) {
@@ -452,9 +541,12 @@ export async function getExpenseRequest(ctx: AppContext, id: string) {
     { status: request.status, cycle: request.cycle, createdById: request.createdById },
     steps.filter((s) => s.cycle === request.cycle),
     actorOf(ctx),
-  ).filter((a) => a !== 'submit' || flags.approvals)
+  ).filter((a) => a !== 'submit' || approvalMode(flags, accountingEnvSwitches().approvals) !== 'off')
   const canEdit = (request.status === 'DRAFT' || request.status === 'RETURNED') && request.createdById === ctx.user.userId && ctx.can('expenses.manage')
-  return { request, steps, head, cash, entries, actions, canEdit, stage: stageOf(request.status), workflowOn: flags.approvals }
+  return {
+    request, steps, head, cash, entries, actions, canEdit, stage: stageOf(request.status), workflowOn: flags.approvals,
+    mode: approvalMode(flags, accountingEnvSwitches().approvals),
+  }
 }
 
 // ------------------------------------------------------------------ settings

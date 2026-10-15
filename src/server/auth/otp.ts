@@ -6,7 +6,8 @@ import { hmacSha256, randomToken, sha256, timingSafeEqual } from '@/server/crypt
 import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
 import { smsProvider, whatsappProvider } from '@/server/providers'
 import { createPasswordResetTicket } from '@/server/modules/platform/support'
-import { maskPhone, normalizePhone } from './phone'
+import { maskPhone, normalizePhone, phoneLookupCandidates } from './phone'
+import { parentUserIdBySecondaryPhone } from './secondary-phone'
 import { requestMeta } from './session'
 import { issueToken } from './tokens'
 import type { TenantRef } from './reset'
@@ -108,10 +109,22 @@ export async function requestWhatsappOtp(
     }
   }
 
-  const user = await prisma.user.findFirst({
+  const select = { id: true, firstName: true, lastName: true } as const
+  let user = await prisma.user.findFirst({
     where: { tenantId: tenant.id, phone, deletedAt: null, status: 'ACTIVE' },
-    select: { id: true, firstName: true, lastName: true },
+    select,
   })
+  if (!user) {
+    // A parent's secondary number: the code goes to the number typed, which
+    // is the number being proved.
+    const parentUserId = await parentUserIdBySecondaryPhone(tenant.id, phoneLookupCandidates(phone))
+    if (parentUserId) {
+      user = await prisma.user.findFirst({
+        where: { id: parentUserId, tenantId: tenant.id, deletedAt: null, status: 'ACTIVE' },
+        select,
+      })
+    }
+  }
 
   if (!user) {
     return { ok: true, challengeToken: randomToken(32), maskedPhone: masked }

@@ -1706,12 +1706,39 @@ export const paymentFilterSchema = z.object({
   /** Office counter vs online / app payments. */
   channel: z.enum(['office', 'online']).optional().or(z.literal('').transform(() => undefined)),
   mode: z.string().optional(),
+  /** The staff member who recorded the payment at the counter. */
+  collectedById: z.string().trim().max(40).optional().or(z.literal('').transform(() => undefined)),
   preset: z.string().optional(),
   from: optionalDate,
   to: optionalDate,
 })
 
 export type PaymentFilter = z.infer<typeof paymentFilterSchema>
+
+/** Everyone who has recorded a payment, for the "Collected by" filter. */
+export async function paymentCollectorOptions(ctx: AppContext) {
+  ctx.require('fees.view')
+  const ids = await ctx.db.feePayment.groupBy({ by: ['collectedById'], where: { collectedById: { not: null } } })
+  const userIds = ids.map((r) => r.collectedById).filter((id): id is string => !!id)
+  if (userIds.length === 0) return []
+  const users = await ctx.db.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, firstName: true, lastName: true, displayName: true },
+  })
+  return users
+    .map((u) => ({ id: u.id, name: u.displayName || `${u.firstName} ${u.lastName}`.trim() }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function collectorNames(ctx: AppContext, ids: (string | null)[]) {
+  const unique = [...new Set(ids.filter((id): id is string => !!id))]
+  if (unique.length === 0) return new Map<string, string>()
+  const users = await ctx.db.user.findMany({
+    where: { id: { in: unique } },
+    select: { id: true, firstName: true, lastName: true, displayName: true },
+  })
+  return new Map(users.map((u) => [u.id, u.displayName || `${u.firstName} ${u.lastName}`.trim()]))
+}
 
 const RECEIVED_STATUSES = ['SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'] as const
 const DIGITAL_MODES = ['UPI', 'ONLINE', 'NET_BANKING', 'CARD', 'WALLET', 'BANK_TRANSFER'] as const
@@ -1748,6 +1775,7 @@ async function paymentWhere(
           ? { OR: [{ provider: { not: 'manual' } }, { provider: null }] }
           : {},
       filter.mode ? { mode: filter.mode as never } : {},
+      filter.collectedById ? { collectedById: filter.collectedById } : {},
       from || to
         ? {
             paidAt: {
@@ -1809,7 +1837,7 @@ export async function paymentSummary(ctx: AppContext, q: string | undefined, fil
 export async function exportPayments(ctx: AppContext, q: string | undefined, filter: PaymentFilter) {
   ctx.require('fees.export')
   const where = await paymentWhere(ctx, q, filter)
-  return ctx.db.feePayment.findMany({
+  const rows = await ctx.db.feePayment.findMany({
     where,
     orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
     take: 20_000,
@@ -1824,6 +1852,7 @@ export async function exportPayments(ctx: AppContext, q: string | undefined, fil
       createdAt: true,
       provider: true,
       failureReason: true,
+      collectedById: true,
       receipt: { select: { number: true } },
       refunds: { select: { amountMinor: true, status: true } },
       student: {
@@ -1840,6 +1869,8 @@ export async function exportPayments(ctx: AppContext, q: string | undefined, fil
       },
     },
   })
+  const names = await collectorNames(ctx, rows.map((p) => p.collectedById))
+  return rows.map((p) => ({ ...p, collectedByName: p.collectedById ? (names.get(p.collectedById) ?? '') : '' }))
 }
 
 export async function listPayments(
@@ -1869,6 +1900,7 @@ export async function listPayments(
         provider: true,
         providerPaymentId: true,
         failureReason: true,
+        collectedById: true,
         receipt: { select: { number: true } },
         refunds: { select: { amountMinor: true, status: true } },
         student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },
@@ -1881,11 +1913,14 @@ export async function listPayments(
     }),
   ])
 
+  const names = await collectorNames(ctx, rows.map((p) => p.collectedById))
+
   return {
     total,
     collectedMinor: agg._sum.amountMinor ?? 0,
     rows: rows.map((p) => ({
       id: p.id,
+      collectedByName: p.collectedById ? (names.get(p.collectedById) ?? null) : null,
       amountMinor: p.amountMinor,
       mode: p.mode,
       status: p.status,

@@ -6,7 +6,15 @@ import { PERIOD_PRESETS } from '@/lib/periods'
 import { Field, Select, Input } from '@/components/ui/input'
 import type { HeadOption } from './expense-forms'
 
-export function ExpenseFilters({ heads }: { heads: HeadOption[] }) {
+export function ExpenseFilters({
+  heads,
+  recorders = [],
+  sessionName = null,
+}: {
+  heads: HeadOption[]
+  recorders?: { id: string; name: string }[]
+  sessionName?: string | null
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -56,13 +64,30 @@ export function ExpenseFilters({ heads }: { heads: HeadOption[] }) {
           ))}
         </Select>
       </Field>
+      {recorders.length > 0 ? (
+        <Field label="Recorded by" htmlFor="exp-recorder">
+          <Select
+            id="exp-recorder"
+            value={searchParams.get('recordedById') ?? ''}
+            onChange={(e) => setParams({ recordedById: e.target.value })}
+          >
+            <option value="">Any accountant</option>
+            {recorders.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
       <Field label="Period" htmlFor="exp-preset">
         <Select
           id="exp-preset"
           value={searchParams.get('preset') ?? ''}
           onChange={(e) => setParams({ preset: e.target.value, from: '', to: '' })}
         >
-          <option value="">Any time</option>
+          <option value="">{sessionName ? `Session ${sessionName}` : 'Any time'}</option>
+          {sessionName ? <option value="all">All dates</option> : null}
           {PERIOD_PRESETS.map((p) => (
             <option key={p.key} value={p.key}>
               {p.label}

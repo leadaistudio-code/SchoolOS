@@ -14,8 +14,10 @@ import { schoolToday } from '@/lib/periods'
 import { assertPostingAllowed, getAccountingFlags, recordAccountingEvent } from './service'
 import { isIsoDate, toIsoDay } from './fiscal-year'
 import {
+  ageBills,
   allocateVendorPayment,
   billReducible,
+  vendorLedger,
   cancelledInvoiceKey,
   checkVendorTaxIds,
   computePurchaseLine,
@@ -1049,6 +1051,59 @@ export async function readPayablesDocument(ctx: AppContext, kind: PayablesDocume
     mimeType: row.attachmentMime ?? 'application/octet-stream',
     fileName: row.attachmentName ?? 'document',
   }
+}
+
+// ------------------------------------------------------------------ payables report
+
+/**
+ * Bills Payable: every vendor with an open balance, aged by bill date. Net
+ * liability = bill-wise outstanding − money held on account, so the report
+ * total equals the Sundry Creditors subledger.
+ */
+export async function payablesReport(ctx: AppContext, asOf = schoolToday()) {
+  await requirePayables(ctx, 'accounts.view')
+  const vendors = await ctx.db.vendor.findMany({ orderBy: [{ name: 'asc' }], select: { id: true, code: true, name: true, isActive: true } })
+  const facts = await loadVendorFacts(ctx.db, vendors.map((v) => v.id))
+  const rows = vendors
+    .map((v) => {
+      const s = summariseVendor(facts.get(v.id)!, asOf)
+      return {
+        vendor: v,
+        ageing: ageBills(s.bills, asOf),
+        overdueMinor: s.bills.filter((b) => b.overdue).reduce((t, b) => t + b.outstandingMinor, 0),
+        onAccountMinor: s.onAccountMinor,
+        netLiabilityMinor: s.netLiabilityMinor,
+        openBills: s.bills.filter((b) => b.outstandingMinor > 0).length,
+      }
+    })
+    .filter((r) => r.netLiabilityMinor !== 0 || r.ageing.totalMinor !== 0 || r.onAccountMinor !== 0)
+  const sum = (pick: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + pick(r), 0)
+  const creditors = await ctx.db.ledgerAccount.findFirst({ where: { systemKey: 'SUNDRY_CREDITORS' }, select: { id: true } })
+  return {
+    asOf,
+    creditorsAccountId: creditors?.id ?? null,
+    rows,
+    totals: {
+      d0_30: sum((r) => r.ageing.d0_30),
+      d31_60: sum((r) => r.ageing.d31_60),
+      d61_90: sum((r) => r.ageing.d61_90),
+      d90_plus: sum((r) => r.ageing.d90_plus),
+      billsMinor: sum((r) => r.ageing.totalMinor),
+      overdueMinor: sum((r) => r.overdueMinor),
+      onAccountMinor: sum((r) => r.onAccountMinor),
+      netLiabilityMinor: sum((r) => r.netLiabilityMinor),
+    },
+  }
+}
+
+/** Vendor ledger vouchers with bill-wise references, from the Vendor 360 documents. */
+export function vendorLedgerFrom(v360: Awaited<ReturnType<typeof getVendor360>>) {
+  return vendorLedger({
+    vouchers: v360.vouchers.map((v) => ({ ...v, invoiceDate: toIsoDay(v.invoiceDate) })),
+    payments: v360.payments.map((p) => ({ ...p, paidOn: toIsoDay(p.paidOn) })),
+    debitNotes: v360.debitNotes.map((n) => ({ ...n, noteDate: toIsoDay(n.noteDate) })),
+    adjustments: v360.adjustments.map((a) => ({ ...a, adjustedOn: toIsoDay(a.adjustedOn) })),
+  })
 }
 
 // ------------------------------------------------------------------ reconciliation

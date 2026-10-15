@@ -61,15 +61,17 @@ export function FormDialog({
   title,
   description,
   size = 'lg',
+  defaultOpen = false,
   children,
 }: {
   trigger: (open: () => void) => React.ReactNode
   title: string
   description?: string
   size?: 'sm' | 'md' | 'lg'
+  defaultOpen?: boolean
   children: (close: () => void, key: string) => React.ReactNode
 }) {
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = React.useState(defaultOpen)
   const [key, setKey] = React.useState(newKey)
   const show = () => {
     setKey(newKey())

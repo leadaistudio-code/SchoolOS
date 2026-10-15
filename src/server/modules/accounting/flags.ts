@@ -49,3 +49,14 @@ export function resolveAccountingFlags(env: AccountingEnvSwitches, row: Accounti
     fiscalYearStartMonth: month,
   }
 }
+
+/**
+ * Expense approval: mandatory for every expense when the school has switched it
+ * on; otherwise a preparer may send one expense for approval, but only where
+ * the deployment allows approvals at all.
+ */
+export type ApprovalMode = 'mandatory' | 'optional' | 'off'
+export function approvalMode(flags: AccountingFlags, deploymentAllowsApprovals: boolean): ApprovalMode {
+  if (flags.approvals) return 'mandatory'
+  return flags.module && deploymentAllowsApprovals ? 'optional' : 'off'
+}

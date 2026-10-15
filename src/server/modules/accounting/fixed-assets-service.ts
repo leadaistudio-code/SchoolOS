@@ -700,6 +700,29 @@ export async function listFixedAssets(ctx: AppContext, raw: unknown) {
   return { rows: withValues, total, page: filter.page, pageSize, filter, categories: categories.map((c) => c.category), totals }
 }
 
+/** Fixed assets capitalised from one inventory register item, with cost and written-down value; null when not visible. */
+export async function fixedAssetsForInventoryItem(ctx: AppContext, inventoryAssetId: string) {
+  if (!ctx.can('accounts.view')) return null
+  const flags = await getAccountingFlags(ctx.db)
+  if (!flags.module) return null
+  const assets = await ctx.db.fixedAsset.findMany({
+    where: { inventoryAssetId },
+    orderBy: { capitalisedOn: 'asc' },
+    select: { id: true, code: true, name: true, status: true, costMinor: true, openingAccumulatedMinor: true, disposalDepreciationMinor: true, method: true, rateBp: true },
+  })
+  if (!assets.length) return []
+  const sums = await ctx.db.depreciationLine.groupBy({
+    by: ['assetId'],
+    where: { assetId: { in: assets.map((a) => a.id) }, run: { status: 'POSTED' } },
+    _sum: { amountMinor: true },
+  })
+  const postedBy = new Map(sums.map((s) => [s.assetId, s._sum.amountMinor ?? 0]))
+  return assets.map((a) => {
+    const accumulatedMinor = accumulatedOf(a, postedBy.get(a.id) ?? 0)
+    return { ...a, accumulatedMinor, wdvMinor: a.status === 'ACTIVE' ? a.costMinor - accumulatedMinor : 0 }
+  })
+}
+
 export async function getFixedAsset(ctx: AppContext, id: string) {
   const flags = await requireFixedAssets(ctx, 'accounts.view')
   const asset = await ctx.db.fixedAsset.findFirst({ where: { id } })

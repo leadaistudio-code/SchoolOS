@@ -18,6 +18,7 @@ import {
 import { GlobalSearch } from './global-search'
 import { NotificationMenu } from './notification-menu'
 import { QuickActions } from './quick-actions'
+import { SessionSwitcher, type SessionOption } from './session-switcher'
 import type { QuickAction } from '@/lib/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar } from '@/components/ui/identity'
@@ -43,15 +44,17 @@ const ICON_BUTTON =
  * where am I, find something, what happened, and who am I signed in as.
  * Breadcrumbs stay in PageHeader where they can name the record being viewed.
  *
- * The academic session is shown, not offered as a selector: the product has
- * one current session at a time and switching it is a Settings decision, so a
- * dropdown here would be a control that cannot do anything.
+ * People who work with fees, expenses or accounts get a session dropdown that
+ * changes which session those pages show. It is a viewing choice only: the
+ * school's current session is still switched in Settings. Everyone else sees
+ * the current session as a label.
  */
 export function Topbar({
   user,
   unreadCount,
   unreadMessages,
   sessionName,
+  sessionSwitch,
   collapsed,
   onToggleCollapse,
   onOpenMenu,
@@ -62,6 +65,7 @@ export function Topbar({
   unreadCount: number
   unreadMessages: number
   sessionName: string | null
+  sessionSwitch?: { sessions: SessionOption[]; selectedId: string } | null
   collapsed: boolean
   onToggleCollapse: () => void
   onOpenMenu: () => void
@@ -134,7 +138,9 @@ export function Topbar({
         <QuickActions actions={quickActions ?? []} />
 
         <div className="ml-auto flex items-center gap-1">
-          {sessionName ? (
+          {sessionSwitch ? (
+            <SessionSwitcher sessions={sessionSwitch.sessions} selectedId={sessionSwitch.selectedId} />
+          ) : sessionName ? (
             <span
               className="hidden items-center gap-1.5 rounded-[10px] border border-line px-2.5 py-1.5 text-xs font-medium text-ink-muted xl:inline-flex"
               title="Current academic session"

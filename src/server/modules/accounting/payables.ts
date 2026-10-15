@@ -321,6 +321,112 @@ export type VendorSummary = {
   reconciled: boolean
 }
 
+// ------------------------------------------------------------ ageing
+
+/** Bills-payable ageing by bill date, as in Tally's ageing analysis. */
+export const PAYABLE_AGEING_BUCKETS = [
+  { key: 'd0_30', label: '0–30 days', min: 0, max: 30 },
+  { key: 'd31_60', label: '31–60 days', min: 31, max: 60 },
+  { key: 'd61_90', label: '61–90 days', min: 61, max: 90 },
+  { key: 'd90_plus', label: 'Over 90 days', min: 91, max: Number.POSITIVE_INFINITY },
+] as const
+export type PayableAgeingKey = (typeof PAYABLE_AGEING_BUCKETS)[number]['key']
+export type PayableAgeing = Record<PayableAgeingKey, number> & { totalMinor: number }
+
+function daysBetween(fromIso: string, toIso: string) {
+  return Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86_400_000)
+}
+
+export function ageingBucketOf(billDate: string, today: string): PayableAgeingKey {
+  const days = Math.max(0, daysBetween(billDate, today))
+  return PAYABLE_AGEING_BUCKETS.find((b) => days >= b.min && days <= b.max)!.key
+}
+
+/** Outstanding on open bills, split by age. Buckets always sum to `totalMinor`. */
+export function ageBills(bills: Pick<BillLine, 'invoiceDate' | 'outstandingMinor'>[], today: string): PayableAgeing {
+  const out: PayableAgeing = { d0_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, totalMinor: 0 }
+  for (const b of bills) {
+    if (b.outstandingMinor <= 0) continue
+    out[ageingBucketOf(b.invoiceDate, today)] += b.outstandingMinor
+    out.totalMinor += b.outstandingMinor
+  }
+  return out
+}
+
+// ------------------------------------------------------- ledger vouchers
+
+/** Tally bill-wise reference types. */
+export type BillRefType = 'New Ref' | 'Agst Ref' | 'Advance' | 'On Account'
+
+export type VendorLedgerInput = {
+  vouchers: { id: string; number: string; supplierInvoiceNo: string; invoiceDate: string; status: string; totalMinor: number }[]
+  payments: { id: string; number: string; paidOn: string; mode: string; status: string; amountMinor: number; allocations: { voucherId: string; amountMinor: number }[] }[]
+  debitNotes: { id: string; number: string; noteDate: string; voucherId: string; status: string; totalMinor: number }[]
+  adjustments: { id: string; number: string; adjustedOn: string; voucherId: string; type: string; status: string; amountMinor: number }[]
+}
+
+export type VendorLedgerRow = {
+  id: string
+  date: string
+  voucherType: 'Purchase' | 'Payment' | 'Debit Note' | 'Discount Received' | 'Creditor Written Back'
+  voucherNo: string
+  /** Bill-wise breakup: reference type, bill and amount. */
+  refs: { type: BillRefType; bill: string | null; amountMinor: number }[]
+  debitMinor: number
+  creditMinor: number
+  /** Credit (payable) positive. */
+  balanceMinor: number
+}
+
+/**
+ * The vendor's ledger in date order, each voucher with its bill-wise breakup.
+ * A purchase raises a New Ref; a payment, debit note or adjustment settles
+ * bills Agst Ref; money paid beyond the bills is On Account, or an Advance
+ * when no posted bill was dated on or before the payment. Only posted /
+ * approved documents count, so the closing equals the vendor's net liability.
+ */
+export function vendorLedger(input: VendorLedgerInput): VendorLedgerRow[] {
+  const bills = input.vouchers.filter((v) => v.status === 'POSTED')
+  const billNo = new Map(bills.map((v) => [v.id, v.number]))
+  const firstBillDate = bills.reduce<string | null>((min, v) => (min === null || v.invoiceDate < min ? v.invoiceDate : min), null)
+  const rows: Omit<VendorLedgerRow, 'balanceMinor'>[] = []
+  for (const v of bills) {
+    rows.push({
+      id: v.id, date: v.invoiceDate, voucherType: 'Purchase', voucherNo: v.number,
+      refs: [{ type: 'New Ref', bill: `${v.number} (bill ${v.supplierInvoiceNo})`, amountMinor: v.totalMinor }],
+      debitMinor: 0, creditMinor: v.totalMinor,
+    })
+  }
+  for (const p of input.payments.filter((x) => x.status === 'POSTED')) {
+    const applied = p.allocations.reduce((s, a) => s + a.amountMinor, 0)
+    const rest = p.amountMinor - applied
+    const refs: VendorLedgerRow['refs'] = p.allocations.map((a) => ({ type: 'Agst Ref', bill: billNo.get(a.voucherId) ?? null, amountMinor: a.amountMinor }))
+    if (rest > 0) refs.push({ type: firstBillDate === null || p.paidOn < firstBillDate ? 'Advance' : 'On Account', bill: null, amountMinor: rest })
+    rows.push({ id: p.id, date: p.paidOn, voucherType: 'Payment', voucherNo: p.number, refs, debitMinor: p.amountMinor, creditMinor: 0 })
+  }
+  for (const n of input.debitNotes.filter((x) => x.status === 'APPROVED')) {
+    rows.push({
+      id: n.id, date: n.noteDate, voucherType: 'Debit Note', voucherNo: n.number,
+      refs: [{ type: 'Agst Ref', bill: billNo.get(n.voucherId) ?? null, amountMinor: n.totalMinor }],
+      debitMinor: n.totalMinor, creditMinor: 0,
+    })
+  }
+  for (const a of input.adjustments.filter((x) => x.status === 'POSTED')) {
+    rows.push({
+      id: a.id, date: a.adjustedOn, voucherType: a.type === 'DISCOUNT' ? 'Discount Received' : 'Creditor Written Back', voucherNo: a.number,
+      refs: [{ type: 'Agst Ref', bill: billNo.get(a.voucherId) ?? null, amountMinor: a.amountMinor }],
+      debitMinor: a.amountMinor, creditMinor: 0,
+    })
+  }
+  const order: Record<VendorLedgerRow['voucherType'], number> = { Purchase: 0, Payment: 1, 'Debit Note': 2, 'Discount Received': 3, 'Creditor Written Back': 3 }
+  rows.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? -1 : 1) : order[a.voucherType] - order[b.voucherType] || a.voucherNo.localeCompare(b.voucherNo)))
+  let balance = 0
+  return rows.map((r) => {
+    balance += r.creditMinor - r.debitMinor
+    return { ...r, balanceMinor: balance }
+  })
+}
+
 export function summariseVendor(facts: VendorFacts, today: string): VendorSummary {
   const posted = facts.vouchers.filter((v) => v.status === 'POSTED')
   const postedIds = new Set(posted.map((v) => v.id))

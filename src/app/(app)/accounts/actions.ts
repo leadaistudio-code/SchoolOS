@@ -20,6 +20,7 @@ import {
   updateAccount,
   updateLedgerSettings,
 } from '@/server/modules/accounts/service'
+import { saveAccountingSettings } from '@/server/modules/accounting/service'
 
 export type ActionResult<T = unknown> =
   | { ok: true; message: string; data?: T }
@@ -90,6 +91,13 @@ export async function saveLedgerSettingsAction(formData: FormData) {
     autoPostStore: formData.get('autoPostStore') === 'on',
   }))
   revalidatePath('/accounts/settings')
+}
+
+export async function saveStudentLedgerSettingAction(formData: FormData) {
+  const ctx = await requireContext('accounts.manage')
+  await saveAccountingSettings(ctx, { studentLedgerEnabled: formData.get('studentLedgerEnabled') === 'on' })
+  revalidatePath('/accounts/settings')
+  revalidatePath('/students', 'layout')
 }
 
 export async function syncBooksAction(formData: FormData) {

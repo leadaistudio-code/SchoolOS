@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/table'
 import { formatDay } from '@/lib/dates'
 import { accountOptions, defaultRange, generalLedger } from '@/server/modules/accounts/service'
+import { viewedPeriodOr } from '@/server/view-session'
 import { AccountsTabs, isoParam, Metric, moneyFmt, PeriodFilter, SOURCE_LABEL, sourceHref } from '../ui'
 
 export const metadata = { title: 'General ledger' }
@@ -26,7 +27,7 @@ export default async function GeneralLedgerPage({
 }) {
   const ctx = await requireContext('accounts.view')
   const params = await searchParams
-  const def = defaultRange()
+  const def = await viewedPeriodOr(ctx, defaultRange())
   const from = isoParam(params.from, def.from)
   const to = isoParam(params.to, def.to)
   const accounts = await accountOptions(ctx, { includeInactive: true })

@@ -11,6 +11,7 @@ import { FEATURE } from '@/lib/features'
 import { PwaRegister } from '@/components/pwa-register'
 import { isPortalOnlyRole } from '@/server/scope'
 import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
+import { getViewSession, listViewSessions } from '@/server/view-session'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -45,14 +46,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     },
   })
 
-  const [unreadCount, unreadMessages, session] = await Promise.all([
+  const financeUser = ctx.canAny('fees.view', 'fees.report', 'expenses.view', 'accounts.view')
+  const [unreadCount, unreadMessages, session, sessions, viewSession] = await Promise.all([
     ctx.db.notification.count({ where: { userId: ctx.user.userId, readAt: null } }),
     unreadThreadCount(ctx),
     // Read directly rather than through currentSession(): a school still
     // being set up has no session yet, and the shell must not throw over a
     // chip in the header.
     ctx.db.academicSession.findFirst({ where: { isCurrent: true }, select: { name: true } }),
+    financeUser ? listViewSessions(ctx) : Promise.resolve([]),
+    financeUser ? getViewSession(ctx) : Promise.resolve(null),
   ])
+  const sessionSwitch = viewSession && sessions.length > 0
+    ? { sessions: sessions.map((s) => ({ id: s.id, name: s.name, isCurrent: s.isCurrent })), selectedId: viewSession.id }
+    : null
 
   const primaryRole = ctx.user.roleKeys[0]
   const roleLabel = primaryRole
@@ -67,6 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       unreadCount={unreadCount}
       unreadMessages={unreadMessages}
       sessionName={session?.name ?? null}
+      sessionSwitch={sessionSwitch}
       quickActions={isPortalOnlyRole(ctx.user.roleKeys) ? [] : visibleQuickActions(navigation)}
       // Three gates, all server-side: the deployment has a model configured,
       // the school's plan includes the module, and this user's role allows it.

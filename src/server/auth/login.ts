@@ -1,6 +1,7 @@
 import { prisma } from '@/server/db/prisma'
 import { verifyPassword } from './password'
 import { phoneLookupCandidates } from './phone'
+import { parentUserIdBySecondaryPhone } from './secondary-phone'
 import { createSession, requestMeta } from './session'
 import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
 import { audit } from '@/server/audit'
@@ -167,13 +168,18 @@ async function findUserByPhone(tenantId: string | null, rawPhone: string) {
   const candidates = phoneLookupCandidates(rawPhone)
   if (candidates.length === 0) return null
 
-  return prisma.user.findFirst({
+  const user = await prisma.user.findFirst({
     where: {
       tenantId,
       deletedAt: null,
       phone: { in: candidates },
     },
   })
+  if (user || !tenantId) return user
+
+  const parentUserId = await parentUserIdBySecondaryPhone(tenantId, candidates)
+  if (!parentUserId) return null
+  return prisma.user.findFirst({ where: { id: parentUserId, tenantId, deletedAt: null } })
 }
 
 async function recordAttempt(

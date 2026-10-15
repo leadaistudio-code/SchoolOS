@@ -192,6 +192,12 @@ function StudentLedgerDrawer({
             <p className="text-sm text-ink-muted mt-0.5 truncate">
               {data ? `${data.student.name} · ${data.student.admissionNo}` : 'Statement of account'}
             </p>
+            <a
+              href={`/students/${encodeURIComponent(studentId)}/fee-ledger?fy=${encodeURIComponent(fy)}`}
+              className="mt-1 inline-block text-xs font-medium text-[var(--brand-600)] hover:underline"
+            >
+              Open full ledger, year-wise and export
+            </a>
           </div>
           <button
             type="button"

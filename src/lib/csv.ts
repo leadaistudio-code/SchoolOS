@@ -118,9 +118,14 @@ function safeCell(value: Cell): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
+/** CSV text, formula-injection guarded, without the BOM. */
+export function toSafeCsv(headers: string[], rows: Cell[][]): string {
+  return [headers, ...rows].map((r) => r.map(safeCell).join(',')).join('\r\n')
+}
+
 /** CSV file response (Excel-friendly BOM, formula-injection guarded). */
 export function csvResponse(filename: string, headers: string[], rows: Cell[][]): Response {
-  const body = [headers, ...rows].map((r) => r.map(safeCell).join(',')).join('\r\n')
+  const body = toSafeCsv(headers, rows)
   return new Response(`\uFEFF${body}\r\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',

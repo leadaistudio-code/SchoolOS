@@ -9,18 +9,25 @@ import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/tabl
 import { formatDay } from '@/lib/dates'
 import { accountBalances, defaultRange, getPostingSetup, listJournals } from '@/server/modules/accounts/service'
 import { naturalBalance } from '@/server/modules/accounts/math'
+import { viewedPeriodOr } from '@/server/view-session'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
+import { myPendingApprovalActions } from '@/server/modules/accounting/expense-approval-service'
+import { STATUS_LABEL } from '@/server/modules/accounting/expense-approval'
 import { syncBooksAction } from './actions'
+import { drillHref, type Drill } from '@/server/drill/descriptor'
 import { AccountsTabs, Metric, moneyFmt, SOURCE_LABEL } from './ui'
 
 export const metadata = { title: 'Accounts & Ledger' }
 
 export default async function AccountsOverviewPage() {
   const ctx = await requireContext('accounts.view')
-  const range = defaultRange()
-  const [balances, setup, recent] = await Promise.all([
+  const range = await viewedPeriodOr(ctx, defaultRange())
+  const [balances, setup, recent, flags, pendingActions] = await Promise.all([
     accountBalances(ctx, range),
     getPostingSetup(ctx),
     listJournals(ctx, {}, 1, 10),
+    getAccountingFlags(ctx.db),
+    myPendingApprovalActions(ctx),
   ])
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
   const sumOf = (pred: (r: (typeof balances)[number]) => boolean, f: (r: (typeof balances)[number]) => number) =>
@@ -37,6 +44,9 @@ export default async function AccountsOverviewPage() {
   const expense = sumOf((r) => r.type === 'EXPENSE', (r) => naturalBalance('EXPENSE', r.debitMinor - r.creditMinor))
   const advance = sumOf((r) => r.systemKey === 'ADVANCE_FEES', (r) => -r.closingMinor)
   const canManage = ctx.can('accounts.manage')
+  const cashAccounts = balances.filter((r) => r.systemKey === 'CASH')
+  const cashAccount = cashAccounts.length === 1 ? cashAccounts[0] : undefined
+  const drill = (d: Drill) => drillHref(ctx.tenant.id, d)
 
   return (
     <div className="space-y-4">
@@ -80,17 +90,51 @@ export default async function AccountsOverviewPage() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Metric label="Cash in hand" value={money(cash)} hint={cash < 0 ? 'Credit balance — check entries' : undefined} />
-        <Metric label="Bank balance" value={money(bank)} />
-        <Metric label="Income (this FY)" value={money(income)} />
-        <Metric label="Expenses (this FY)" value={money(expense)} />
+        <Metric
+          label="Cash in hand"
+          value={money(cash)}
+          hint={cash < 0 ? 'Credit balance — check entries' : undefined}
+          href={cashAccount ? drill({ k: 'ledger', a: cashAccount.id, f: range.from, t: range.to, v: 'closing' }) : undefined}
+        />
+        <Metric label="Bank balance" value={money(bank)} href={flags.module ? `/accounts/bank-book?from=${range.from}&to=${range.to}` : undefined} />
+        <Metric label="Income (this FY)" value={money(income)} href={drill({ k: 'group', g: 'income', f: range.from, t: range.to })} />
+        <Metric label="Expenses (this FY)" value={money(expense)} href={drill({ k: 'group', g: 'expenses', f: range.from, t: range.to })} />
         <Metric
           label="Surplus (this FY)"
           value={`${income - expense < 0 ? '−' : ''}${money(income - expense)}`}
           tone={income - expense >= 0 ? 'success' : 'danger'}
           hint={advance > 0 ? `${money(advance)} held as advance fees` : undefined}
+          href={drill({ k: 'surplus', l: 'net', f: range.from, t: range.to })}
         />
       </div>
+
+      {pendingActions && pendingActions.awaitingCount + pendingActions.returnedCount > 0 ? (
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+            <h2 className="text-base font-semibold">My pending actions</h2>
+            <Link href="/accounts/expense-approvals?view=board" className="text-sm font-medium text-[var(--brand-600)] hover:underline">
+              Approval board
+            </Link>
+          </div>
+          <ul className="divide-y divide-[var(--border)]">
+            {[...pendingActions.awaiting, ...pendingActions.returned].map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <Link href={`/accounts/expense-approvals/${p.id}`} className="font-medium text-[var(--brand-600)] hover:underline">
+                  {p.title}
+                  <span className="ml-2 text-xs font-normal text-ink-subtle">{p.number}</span>
+                </Link>
+                <span className="flex items-center gap-3">
+                  <Badge tone={p.status === 'RETURNED' || p.status === 'DRAFT' ? 'info' : 'warning'}>{STATUS_LABEL[p.status]}</Badge>
+                  <span className="tnum">{money(p.amountMinor)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="border-t border-[var(--border)] px-4 py-2 text-xs text-ink-subtle">
+            {pendingActions.awaitingCount} awaiting your sign-off · {pendingActions.returnedCount} draft or returned to you
+          </p>
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">

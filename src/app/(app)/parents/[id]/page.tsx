@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { EmptyState, Notice } from '@/components/ui/states'
 import { Avatar, PersonCell } from '@/components/ui/identity'
-import { issueParentPortalLoginAction } from '../actions'
+import { DeleteRecordButton } from '@/components/record-actions'
+import { deleteParentAction, issueParentPortalLoginAction } from '../actions'
 
 export const metadata = { title: 'Parent profile' }
 
@@ -62,6 +63,24 @@ export default async function ParentDetailPage({
                 </Button>
               </form>
             ) : null}
+            {ctx.can('parents.delete') ? (
+              <DeleteRecordButton
+                label="Delete parent"
+                title={`Delete ${parent.firstName} ${parent.lastName}?`}
+                action={deleteParentAction.bind(null, id)}
+                redirectTo="/parents"
+                doneMessage="Parent deleted"
+              >
+                <p>
+                  The parent is hidden from lists, their portal login is switched off and they stop receiving
+                  messages. They are unlinked from {parent.children.length === 1 ? 'their child' : 'their children'};
+                  nothing else is erased.
+                </p>
+                <p>
+                  You can restore them from Parents → Deleted parents, and the child links come back with them.
+                </p>
+              </DeleteRecordButton>
+            ) : null}
           </div>
         }
       />
@@ -104,7 +123,10 @@ export default async function ParentDetailPage({
             </div>
 
             <DescriptionList className="mt-4">
-              <DescriptionItem label="Phone">{parent.phone ?? '—'}</DescriptionItem>
+              <DescriptionItem label="Primary phone">{parent.phone ?? '—'}</DescriptionItem>
+              {parent.secondaryPhone ? (
+                <DescriptionItem label="Secondary phone">{parent.secondaryPhone}</DescriptionItem>
+              ) : null}
               <DescriptionItem label="Email">{parent.email ?? '—'}</DescriptionItem>
               <DescriptionItem label="Occupation">{parent.occupation ?? '—'}</DescriptionItem>
               <DescriptionItem label="Annual income">{parent.annualIncome ?? '—'}</DescriptionItem>

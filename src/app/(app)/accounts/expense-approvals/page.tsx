@@ -15,7 +15,7 @@ import { NewExpenseButton } from '@/app/(app)/finance/expenses/expense-forms'
 import { formatDay } from '@/lib/dates'
 import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
 import { expenseHeadOptions } from '@/server/modules/finance/expense-heads'
-import { canSeeApprovals, listExpenseRequests } from '@/server/modules/accounting/expense-approval-service'
+import { canSeeApprovals, expenseApprovalBoard, listExpenseRequests } from '@/server/modules/accounting/expense-approval-service'
 import { APPROVAL_STAGES, PROVISIONAL_STATUSES, STATUS_LABEL, stageNumber } from '@/server/modules/accounting/expense-approval'
 import { APPROVAL_TONE, AccountsTabs, Metric, moneyFmt } from '../ui'
 
@@ -27,6 +27,7 @@ const VIEWS = [
   { key: 'in_progress', label: 'Open' },
   { key: 'closed', label: 'Closed' },
   { key: 'all', label: 'All' },
+  { key: 'board', label: 'Board' },
 ] as const
 
 export default async function ExpenseApprovalsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -45,9 +46,13 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
   }
   const params = await searchParams
   const signsAStage = APPROVAL_STAGES.some((s) => ctx.can(s.permission))
-  const list = await listExpenseRequests(ctx, { ...params, view: params.view ?? (signsAStage ? 'awaiting' : 'mine') })
+  const showBoard = params.view === 'board'
+  const [list, board] = await Promise.all([
+    listExpenseRequests(ctx, { ...params, view: showBoard ? 'all' : (params.view ?? (signsAStage ? 'awaiting' : 'mine')) }),
+    showBoard ? expenseApprovalBoard(ctx) : Promise.resolve(null),
+  ])
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
-  const canCreate = flags.approvals && ctx.can('expenses.manage') && ctx.can('expenses.view')
+  const canCreate = list.mode !== 'off' && ctx.can('expenses.manage') && ctx.can('expenses.view')
   const heads = canCreate ? await expenseHeadOptions(ctx) : []
   const pending = { count: 0, amountMinor: 0 }
   for (const s of PROVISIONAL_STATUSES) {
@@ -65,7 +70,11 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
       />
       {showTabs ? <AccountsTabs active="/accounts/expense-approvals" /> : null}
 
-      {!flags.approvals ? (
+      {list.mode === 'optional' ? (
+        <Notice tone="info" title="Approval is optional">
+          Expenses are recorded and posted directly unless the preparer ticks &ldquo;Send for approval&rdquo;. Those, and any created here, go through the Validator and Approvers before reaching the books.
+        </Notice>
+      ) : !flags.approvals ? (
         <Notice tone="info" title="Approval workflow is off">
           Expenses are recorded and posted directly. {pending.count ? 'Expenses already in approval can still be finished here.' : ''}
         </Notice>
@@ -78,8 +87,43 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
         <Metric label="Approved and posted" value={String(list.byStatus.POSTED?.count ?? 0)} tone="success" hint={money(list.byStatus.POSTED?.amountMinor ?? 0)} />
       </div>
 
-      <LinkTabs label="Views" items={VIEWS.map((v) => ({ href: viewHref(v.key), label: v.label, active: list.filter.view === v.key }))} />
+      <LinkTabs label="Views" items={VIEWS.map((v) => ({ href: viewHref(v.key), label: v.label, active: showBoard ? v.key === 'board' : list.filter.view === v.key }))} />
 
+      {board ? (
+        <div className="space-y-2">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            {board.columns.map((c) => (
+              <div key={c.key} className="flex min-h-40 flex-col rounded-xl border border-line bg-surface-2">
+                <div className="border-b border-line px-3 py-2">
+                  <p className="text-sm font-semibold text-ink">{c.role}</p>
+                  <p className="text-xs text-ink-subtle">{c.items.length} · {money(c.totalMinor)}</p>
+                </div>
+                <ul className="flex-1 space-y-2 p-2">
+                  {c.items.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        href={`/accounts/expense-approvals/${r.id}`}
+                        className={`block rounded-lg border bg-surface p-2 text-sm hover:border-[var(--brand-600)] ${r.actionable ? 'border-[var(--brand-600)]' : 'border-line'}`}
+                      >
+                        <span className="block font-medium text-ink">{r.title}</span>
+                        <span className="block text-xs text-ink-subtle">{r.number} · {formatDay(r.expenseDate)}</span>
+                        <span className="mt-1 flex items-center justify-between gap-2">
+                          <span className="tnum font-medium">{money(r.amountMinor)}</span>
+                          {r.status === 'RETURNED' ? <Badge tone="info">Returned</Badge> : r.actionable ? <Badge tone="warning">Your turn</Badge> : null}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          {board.truncated ? <p className="text-xs text-ink-subtle">Showing the 100 oldest open expenses. Use the list views to see the rest.</p> : null}
+        </div>
+      ) : null}
+
+      {board ? null : (
+      <>
       <Card className="no-print p-4">
         <form method="get" className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="view" value={list.filter.view} />
@@ -138,13 +182,15 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
           <Pagination total={list.total} page={list.page} pageSize={list.pageSize} label="expenses" />
         </CardContent>
       </Card>
+      </>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Who signs what</CardTitle></CardHeader>
           <CardContent>
             <ol className="space-y-1 text-sm">
-              <li><span className="text-ink-muted">Stage 1 ·</span> Prepared and submitted by anyone who manages expenses</li>
+              <li><span className="text-ink-muted">Stage 1 ·</span> Creator: anyone who manages expenses prepares and submits it</li>
               {APPROVAL_STAGES.map((s) => (
                 <li key={s.stage}>
                   <span className="text-ink-muted">Stage {s.stage} ·</span> {s.label}

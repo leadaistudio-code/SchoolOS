@@ -13,6 +13,7 @@ export type ParentFormValues = {
   firstName?: string
   lastName?: string
   phone?: string
+  secondaryPhone?: string
   email?: string
   occupation?: string
   annualIncome?: string
@@ -77,11 +78,25 @@ export function ParentForm({
           </FormSection>
 
           <FormSection title="Contact" description="Phone is also the portal username when login is issued.">
-            <Field label="Phone" htmlFor="phone" error={err('phone')}>
+            <Field label="Primary phone" htmlFor="phone" hint="Receives all school messages" error={err('phone')}>
               <Input
                 id="phone"
                 name="phone"
                 defaultValue={values?.phone}
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </Field>
+            <Field
+              label="Secondary phone"
+              htmlFor="secondaryPhone"
+              hint="Optional. Can also sign in and get password reset codes"
+              error={err('secondaryPhone')}
+            >
+              <Input
+                id="secondaryPhone"
+                name="secondaryPhone"
+                defaultValue={values?.secondaryPhone}
                 inputMode="tel"
                 autoComplete="tel"
               />

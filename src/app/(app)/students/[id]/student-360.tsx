@@ -149,6 +149,7 @@ export async function Student360({
           />
         ) : canSeeFeeStatus ? (
           <Metric
+            href={canSeeFeeAmounts ? `/students/${student.id}/fee-ledger` : undefined}
             label="Fees"
             value={
               canSeeFeeAmounts

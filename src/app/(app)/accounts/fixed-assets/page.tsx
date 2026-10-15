@@ -14,6 +14,7 @@ import { schoolToday } from '@/lib/periods'
 import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { fixedAssetFormOptions, fixedAssetReconciliation, listFixedAssets } from '@/server/modules/accounting/fixed-assets-service'
 import { formatRate } from '@/server/modules/accounting/fixed-assets'
+import { toIsoDay } from '@/server/modules/accounting/fiscal-year'
 import { AccountsTabs, Metric, moneyFmt } from '../ui'
 
 export const metadata = { title: 'Fixed assets' }
@@ -39,6 +40,21 @@ export default async function FixedAssetsPage({ searchParams }: { searchParams: 
     fixedAssetReconciliation(ctx, params.asOf),
     canManage ? fixedAssetFormOptions(ctx) : Promise.resolve(null),
   ])
+  const toCapitalise = options && params.capitalise
+    ? await ctx.db.asset.findFirst({
+        where: { id: params.capitalise, deletedAt: null },
+        select: { id: true, name: true, location: true, purchaseDate: true, purchasePriceMinor: true },
+      })
+    : null
+  const prefill = toCapitalise
+    ? {
+        inventoryAssetId: toCapitalise.id,
+        name: toCapitalise.name,
+        location: toCapitalise.location,
+        capitalisedOn: toCapitalise.purchaseDate ? toIsoDay(toCapitalise.purchaseDate) : null,
+        costMinor: toCapitalise.purchasePriceMinor,
+      }
+    : undefined
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
   const ledger = (id: string | null) => {
     const a = id ? rec.accounts[id] : null
@@ -62,6 +78,7 @@ export default async function FixedAssetsPage({ searchParams }: { searchParams: 
                 categories={list.categories}
                 defaultAssetLedgerId={options.assetLedgers.find((a) => a.systemKey === 'FIXED_ASSETS')?.id ?? options.assetLedgers[0]?.id ?? null}
                 today={schoolToday()}
+                prefill={prefill}
               />
             ) : null}
           </div>

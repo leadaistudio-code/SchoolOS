@@ -417,6 +417,53 @@ function emptyByKind(): LedgerTotals['byKind'] {
   ) as LedgerTotals['byKind']
 }
 
+export type YearWiseRow = {
+  label: string
+  startsOn: string | null
+  endsOn: string
+  /** Balance brought forward from earlier years (Dr positive). */
+  openingMinor: number
+  debitMinor: number
+  creditMinor: number
+  closingMinor: number
+  closingSide: 'Dr' | 'Cr' | ''
+}
+
+/**
+ * Year-wise outstanding: one row per financial year (oldest first), each
+ * opening on the previous year's closing. Anything dated before the oldest
+ * year listed is carried into its opening as "Earlier years" B/F, so the last
+ * closing always equals the cumulative balance up to its end date.
+ */
+export function yearWiseLedger(entries: LedgerEntry[], years: readonly FiscalYearSpan[]): YearWiseRow[] {
+  const spans = [...years].sort((a, b) => (a.startsOn < b.startsOn ? -1 : 1))
+  if (spans.length === 0) return []
+  let running = 0
+  for (const e of entries) if (e.date < spans[0]!.startsOn) running += e.debitMinor - e.creditMinor
+  return spans.map((span) => {
+    const opening = running
+    let debit = 0
+    let credit = 0
+    for (const e of entries) {
+      if (e.date >= span.startsOn && e.date <= span.endsOn) {
+        debit += e.debitMinor
+        credit += e.creditMinor
+      }
+    }
+    running = opening + debit - credit
+    return {
+      label: span.label,
+      startsOn: span.startsOn,
+      endsOn: span.endsOn,
+      openingMinor: opening,
+      debitMinor: debit,
+      creditMinor: credit,
+      closingMinor: running,
+      closingSide: balanceSide(running),
+    }
+  })
+}
+
 /**
  * One period of the statement. `fiscalYear` null means all years from the
  * first entry, opening at zero. Running balances are computed over the full

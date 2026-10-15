@@ -1,5 +1,6 @@
 import { requireContext } from '@/server/context'
-import { listPayments, paymentFilterSchema, paymentSummary } from '@/server/modules/finance/payments'
+import { listPayments, paymentCollectorOptions, paymentFilterSchema, paymentSummary } from '@/server/modules/finance/payments'
+import { getViewSession, withSessionPeriod } from '@/server/view-session'
 import { parseListQuery } from '@/lib/query'
 import { PageHeader } from '@/components/page-header'
 import { BackButton } from '@/components/back-button'
@@ -21,11 +22,13 @@ export default async function PaymentsPage({
   const ctx = await requireContext('fees.view')
   const params = await searchParams
   const query = parseListQuery(params)
-  const filter = paymentFilterSchema.parse(params)
+  const session = await getViewSession(ctx)
+  const filter = withSessionPeriod(paymentFilterSchema.parse(params), session)
 
-  const [{ rows, total }, summary] = await Promise.all([
+  const [{ rows, total }, summary, collectors] = await Promise.all([
     listPayments(ctx, query, filter),
     paymentSummary(ctx, query.q, filter),
+    paymentCollectorOptions(ctx),
   ])
   const currency = ctx.tenant.currency
   const exportQuery = new URLSearchParams(
@@ -56,7 +59,7 @@ export default async function PaymentsPage({
 
       <Card className="overflow-hidden">
         <SearchBar placeholder="Search receipt, bill book, cheque no., UTR, student or admission number">
-          <PaymentFilters />
+          <PaymentFilters collectors={collectors} sessionName={session?.name ?? null} />
         </SearchBar>
 
         {rows.length === 0 ? (

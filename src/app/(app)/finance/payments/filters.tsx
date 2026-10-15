@@ -4,7 +4,17 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Input, Select } from '@/components/ui/input'
 import { PERIOD_PRESETS } from '@/lib/periods'
 
-export function PaymentFilters({ hideChannel = false }: { hideChannel?: boolean }) {
+export function PaymentFilters({
+  hideChannel = false,
+  collectors,
+  sessionName = null,
+}: {
+  hideChannel?: boolean
+  /** Staff who have recorded payments; omitted hides the "Collected by" filter. */
+  collectors?: { id: string; name: string }[]
+  /** The session shown when no period is chosen; null means no date limit. */
+  sessionName?: string | null
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -31,7 +41,8 @@ export function PaymentFilters({ hideChannel = false }: { hideChannel?: boolean 
             ? update({ preset: '' })
             : update({ preset: e.target.value, from: '', to: '' })}
       >
-        <option value="">All dates</option>
+        <option value="">{sessionName ? `Session ${sessionName}` : 'All dates'}</option>
+        {sessionName ? <option value="all">All dates</option> : null}
         {PERIOD_PRESETS.map((p) => (
           <option key={p.key} value={p.key}>{p.label}</option>
         ))}
@@ -97,6 +108,20 @@ export function PaymentFilters({ hideChannel = false }: { hideChannel?: boolean 
         <option value="NET_BANKING">Net banking</option>
         <option value="BANK_TRANSFER">Bank transfer</option>
       </Select>
+
+      {collectors && collectors.length > 0 ? (
+        <Select
+          value={params.get('collectedById') ?? ''}
+          aria-label="Filter by who collected the fee"
+          className="w-44"
+          onChange={(e) => set('collectedById', e.target.value)}
+        >
+          <option value="">Collected by: anyone</option>
+          {collectors.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </Select>
+      ) : null}
     </>
   )
 }

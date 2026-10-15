@@ -45,14 +45,17 @@ export function Metric({
   value,
   hint,
   tone,
+  href,
 }: {
   label: string
   value: string
   hint?: string
   tone?: 'success' | 'danger'
+  /** Drill-down to the entries behind the figure. */
+  href?: string
 }) {
   const [icon, accent] = metricLook(label, tone)
-  return <StatCard label={label} value={value} hint={hint} tone={tone} icon={icon} accent={accent} />
+  return <StatCard label={label} value={value} hint={hint} tone={tone} icon={icon} accent={accent} href={href} />
 }
 
 const METRIC_LOOKS: [RegExp, LucideIcon, string][] = [

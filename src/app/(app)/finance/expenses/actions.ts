@@ -16,8 +16,7 @@ import {
   expenseHeadUpdateSchema,
   updateExpenseHead,
 } from '@/server/modules/finance/expense-heads'
-import { getAccountingFlags } from '@/server/modules/accounting/service'
-import { createExpenseRequest } from '@/server/modules/accounting/expense-approval-service'
+import { createExpenseRequest, expenseApprovalMode } from '@/server/modules/accounting/expense-approval-service'
 
 export type ActionResult =
   | { ok: true; message: string; id?: string; receiptUrl?: string }
@@ -39,7 +38,9 @@ function revalidateExpenses() {
 export async function createExpenseAction(payload: unknown): Promise<ActionResult> {
   const ctx = await requireContext('expenses.manage')
   try {
-    if ((await getAccountingFlags(ctx.db)).approvals) {
+    const mode = await expenseApprovalMode(ctx)
+    const optedIn = mode === 'optional' && (payload as { sendForApproval?: unknown } | null)?.sendForApproval === true
+    if (mode === 'mandatory' || optedIn) {
       const request = await createExpenseRequest(ctx, { ...(payload as object), submit: true })
       revalidatePath('/accounts/expense-approvals')
       return {
