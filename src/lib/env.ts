@@ -107,6 +107,14 @@ const serverSchema = z.object({
   WHATSAPP_OTP_TEMPLATE_LANG: z.string().default('en'),
   /** Authentication templates carry a copy-code button unless created without one. */
   WHATSAPP_OTP_COPY_BUTTON: bool.default('true'),
+  /**
+   * Meta Cloud only: an approved Utility template with two body variables
+   * ({{1}} heading, {{2}} details) that carries notices, alerts and daily
+   * summaries. Unset means they go as free-form text, which Meta only delivers
+   * within 24 hours of the recipient last writing to the number.
+   */
+  WHATSAPP_NOTIFY_TEMPLATE: z.string().optional(),
+  WHATSAPP_NOTIFY_TEMPLATE_LANG: z.string().default('en'),
 
   /**
    * Gupshup, a WhatsApp Business Solution Provider, reached over its own REST

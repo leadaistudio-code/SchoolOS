@@ -1,12 +1,15 @@
 import 'dotenv/config'
 import { env } from '../src/lib/env'
 import { whatsappProvider } from '../src/server/providers'
+import { sendParentMessage } from '../src/server/messaging/send'
 
 /**
  * Will a password-reset code actually reach a parent's phone?
  *
  *   npm run whatsapp:doctor                     report the configuration only
  *   npm run whatsapp:doctor -- +919876543210    also send a real code there
+ *   npm run whatsapp:doctor -- +919876543210 --notice
+ *                                               send a sample notice instead
  *
  * This exists because the failure is silent by design. `WHATSAPP_DRIVER`
  * defaults to `log`, and the log driver reports success - so the reset screen
@@ -42,7 +45,9 @@ function heading(text: string) {
 }
 
 async function main() {
-  const recipient = process.argv[2]
+  const args = process.argv.slice(2)
+  const notice = args.includes('--notice')
+  const recipient = args.find((a) => !a.startsWith('--'))
   const e = env()
 
   heading('Configuration')
@@ -51,6 +56,11 @@ async function main() {
   console.log(`  template            ${e.WHATSAPP_OTP_TEMPLATE}`)
   console.log(`  template language   ${e.WHATSAPP_OTP_TEMPLATE_LANG}`)
   console.log(`  copy-code button    ${e.WHATSAPP_OTP_COPY_BUTTON ? 'yes' : 'no'}`)
+  console.log(`  notice template     ${e.WHATSAPP_NOTIFY_TEMPLATE ? `${e.WHATSAPP_NOTIFY_TEMPLATE} (${e.WHATSAPP_NOTIFY_TEMPLATE_LANG})` : 'none'}`)
+  if (e.WHATSAPP_DRIVER === 'meta_cloud' && !e.WHATSAPP_NOTIFY_TEMPLATE) {
+    warn('No WHATSAPP_NOTIFY_TEMPLATE: notices, alerts and daily summaries go as free-form text,')
+    note('which Meta only delivers within 24 hours of the recipient last writing to the number.')
+  }
 
   if (e.WHATSAPP_DRIVER === 'log') {
     fail('WHATSAPP_DRIVER is "log" - codes are printed to the server log, never sent.')
@@ -116,7 +126,41 @@ async function main() {
     return
   }
 
-  await sendTest(recipient)
+  if (notice) await sendNoticeTest(recipient)
+  else await sendTest(recipient)
+}
+
+/** Sends a sample notice the way notices, alerts and daily summaries go out. */
+async function sendNoticeTest(recipient: string) {
+  heading('Delivery (sample notice)')
+
+  const e = env()
+  const template = e.WHATSAPP_DRIVER === 'meta_cloud' ? e.WHATSAPP_NOTIFY_TEMPLATE : undefined
+  console.log(`  to                  ${recipient}`)
+  console.log(`  as                  ${template ? `template ${template}` : 'free-form text'}`)
+  console.log('')
+
+  const result = await sendParentMessage({
+    to: recipient,
+    body: 'Test notice\n\nThis is a test notice from MyCampusView.\nIf you can read this, school notices will reach this number.',
+  })
+
+  if (result.ok) {
+    pass(`Accepted${result.channel ? ` by ${result.channel}` : ''}${result.providerMessageId ? ` - id ${result.providerMessageId}` : ''}`)
+    if (!template) note('Free-form text is accepted now and dropped later if the 24-hour window is closed.')
+    console.log('')
+    return
+  }
+
+  fail(result.error ?? 'Unknown error')
+  const detail = (result.error ?? '').toLowerCase()
+  if (detail.includes('template') && detail.includes('exist')) {
+    note(`No approved template called "${template}" in language "${e.WHATSAPP_NOTIFY_TEMPLATE_LANG}".`)
+  } else if (detail.includes('parameter') || detail.includes('component')) {
+    note('The template must have exactly two body variables, {{1}} and {{2}}, and no buttons.')
+  }
+  console.log('')
+  process.exit(1)
 }
 
 /**

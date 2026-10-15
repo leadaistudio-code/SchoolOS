@@ -278,7 +278,7 @@ function metaCloudWhatsApp(phoneNumberId: string, accessToken: string): WhatsApp
             type: 'template',
             template: {
               name: message.templateName,
-              language: { code: env().WHATSAPP_OTP_TEMPLATE_LANG },
+              language: { code: message.language ?? env().WHATSAPP_OTP_TEMPLATE_LANG },
               components: [
                 ...(ordered.length > 0
                   ? [{ type: 'body', parameters: ordered }]
@@ -286,7 +286,7 @@ function metaCloudWhatsApp(phoneNumberId: string, accessToken: string): WhatsApp
                 // An authentication template's copy-code button repeats the
                 // code as its own parameter; omitting it when the template has
                 // one makes Meta reject the whole send.
-                ...(env().WHATSAPP_OTP_COPY_BUTTON && ordered.length > 0
+                ...((message.copyCodeButton ?? env().WHATSAPP_OTP_COPY_BUTTON) && ordered.length > 0
                   ? [
                       {
                         type: 'button',

@@ -37,6 +37,10 @@ export type WhatsAppMessage = {
   body: string
   variables?: Record<string, string>
   mediaUrl?: string
+  /** Meta Cloud: template language; defaults to the OTP template's. */
+  language?: string
+  /** Meta Cloud: whether the template has a copy-code button; defaults to the OTP setting. */
+  copyCodeButton?: boolean
 }
 
 export interface WhatsAppProvider {

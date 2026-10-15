@@ -1,6 +1,7 @@
 import { env } from '@/lib/env'
 import { smsProvider, whatsappProvider } from '@/server/providers'
-import type { SendResult } from '@/server/providers/types'
+import type { SendResult, WhatsAppMessage } from '@/server/providers/types'
+import { notificationTemplateVariables } from './notify-template'
 
 export type ParentMessageInput = {
   to: string
@@ -15,6 +16,26 @@ export type ParentMessageResult = SendResult & {
 }
 
 /**
+ * Meta only delivers free-form text within 24 hours of the recipient writing
+ * in - and accepts it first, failing later - so on Meta Cloud a message without
+ * its own template goes through the notification template when one is set.
+ */
+export function whatsappMessageFor(input: ParentMessageInput, providerName: string): WhatsAppMessage {
+  const template = env().WHATSAPP_NOTIFY_TEMPLATE
+  if (input.templateName || providerName !== 'meta_cloud' || !template) {
+    return { to: input.to, body: input.body, templateName: input.templateName, variables: input.variables }
+  }
+  return {
+    to: input.to,
+    body: input.body,
+    templateName: template,
+    language: env().WHATSAPP_NOTIFY_TEMPLATE_LANG,
+    variables: notificationTemplateVariables(input.body),
+    copyCodeButton: false,
+  }
+}
+
+/**
  * Sends to a parent phone: WhatsApp first, SMS when enabled and WhatsApp fails.
  *
  * Used for notices, fee reminders, absence alerts, and OTP fallback so a
@@ -23,12 +44,7 @@ export type ParentMessageResult = SendResult & {
 export async function sendParentMessage(input: ParentMessageInput): Promise<ParentMessageResult> {
   const wa = whatsappProvider()
   if (wa.name !== 'log') {
-    const whatsapp = await wa.send({
-      to: input.to,
-      body: input.body,
-      templateName: input.templateName,
-      variables: input.variables,
-    })
+    const whatsapp = await wa.send(whatsappMessageFor(input, wa.name))
     if (whatsapp.ok) return { ...whatsapp, channel: 'whatsapp' }
 
     if (env().MESSAGING_WHATSAPP_FAILOVER_SMS) {
