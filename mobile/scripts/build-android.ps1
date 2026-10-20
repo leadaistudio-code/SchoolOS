@@ -26,14 +26,25 @@
 .PARAMETER Bundle
   Also produce the .aab for Google Play.
 
+.PARAMETER Arches
+  Explicit comma-separated CPU list, e.g. 'arm64-v8a,armeabi-v7a' (every real
+  phone, no emulators). Overrides -Phone and -All.
+
+.PARAMETER MaxWorkers
+  Cap on parallel Gradle tasks. The native compile otherwise saturates every
+  core; lower it on a machine that is unstable under sustained full load.
+
 .EXAMPLE
   .\mobile\scripts\build-android.ps1 -Phone
   .\mobile\scripts\build-android.ps1 -All -Bundle
+  .\mobile\scripts\build-android.ps1 -Arches 'arm64-v8a,armeabi-v7a' -MaxWorkers 2 -Bundle
 #>
 param(
     [switch]$Phone,
     [switch]$All,
-    [switch]$Bundle
+    [switch]$Bundle,
+    [string]$Arches,
+    [int]$MaxWorkers = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,12 +58,18 @@ $sdk      = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 if (-not (Test-Path $sdk)) { throw "Android SDK not found at $sdk" }
 if (-not $Phone -and -not $All) { $All = $true }
 
-$arches = if ($Phone) { 'arm64-v8a' } else { 'armeabi-v7a,arm64-v8a,x86,x86_64' }
+$version = (Get-Content (Join-Path $source 'app.json') -Raw | ConvertFrom-Json).expo.version
+$arches = if ($Arches) { $Arches } elseif ($Phone) { 'arm64-v8a' } else { 'armeabi-v7a,arm64-v8a,x86,x86_64' }
 Write-Host "Building for: $arches" -ForegroundColor Cyan
 
 # ---------------------------------------------------------------- 1. mirror
 Write-Host 'Copying to a path without spaces...' -ForegroundColor Cyan
-robocopy $source $work /MIR /XD 'android\build' 'android\.gradle' '.cxx' '.expo' 'dist' `
+# Absolute paths: a bare name such as 'dist' would also skip every package in
+# node_modules that ships its code in a dist/ folder. '.cxx' stays bare: it is
+# only ever a native build cache, and keeping it saves a full C++ rebuild.
+robocopy $source $work /MIR `
+    /XD (Join-Path $source 'android\build') (Join-Path $source 'android\.gradle') `
+        '.cxx' (Join-Path $source '.expo') (Join-Path $source 'dist') `
     /NFL /NDL /NJH /NJS /NP /MT:16 | Out-Null
 # robocopy uses 0-7 for success; 8+ is a real failure.
 if ($LASTEXITCODE -ge 8) { throw "Copy failed (robocopy code $LASTEXITCODE)" }
@@ -85,8 +102,22 @@ if ($gradle -match $pattern) {
     throw 'Could not patch android/app/build.gradle for release signing — layout changed after prebuild.'
 }
 
+# Third-party Android projects whose published build files no longer configure
+# under Gradle 9 / AGP 8. Patched in the mirror only; node_modules stays as installed.
+$voiceDir = Join-Path $work 'node_modules\@react-native-voice\voice\android'
+if (Test-Path $voiceDir) {
+    $voicePatch = Join-Path $PSScriptRoot 'patches\react-native-voice'
+    Copy-Item (Join-Path $voicePatch 'build.gradle') (Join-Path $voiceDir 'build.gradle') -Force
+    Copy-Item (Join-Path $voicePatch 'AndroidManifest.xml') (Join-Path $voiceDir 'src\main\AndroidManifest.xml') -Force
+    Write-Host 'Applied Gradle patch to @react-native-voice/voice' -ForegroundColor Cyan
+}
+
 # ------------------------------------------------------- 2. clear JS cache
+# The autolinking cache stores absolute library paths. One written by a build
+# in the original folder points Gradle back at the spaced path and unpatched
+# node_modules, and it is only invalidated when the lockfile changes.
 Remove-Item -Recurse -Force `
+    (Join-Path $work 'android\build\generated\autolinking'), `
     (Join-Path $work 'android\app\build\generated\assets\react'), `
     (Join-Path $work 'android\app\build\intermediates\assets') `
     -ErrorAction SilentlyContinue
@@ -107,7 +138,9 @@ try {
     # trustworthy signal is the exit code.
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    & .\gradlew.bat @tasks "-PreactNativeArchitectures=$arches" --no-daemon
+    $extra = @()
+    if ($MaxWorkers -gt 0) { $extra += "--max-workers=$MaxWorkers" }
+    & .\gradlew.bat @tasks "-PreactNativeArchitectures=$arches" --no-daemon @extra
     $code = $LASTEXITCODE
     $ErrorActionPreference = $previous
 
@@ -121,7 +154,7 @@ New-Item -ItemType Directory -Force -Path $releases | Out-Null
 $suffix = if ($Phone) { '-phone' } else { '' }
 
 $apk = Join-Path $work 'android\app\build\outputs\apk\release\app-release.apk'
-$out = Join-Path $releases "MyCampusView-v2.0.0$suffix.apk"
+$out = Join-Path $releases "MyCampusView-v$version$suffix.apk"
 Copy-Item $apk $out -Force
 Write-Host ("APK  {0}  {1:N1} MB" -f $out, ((Get-Item $out).Length / 1MB)) -ForegroundColor Green
 Write-Host ("     SHA-256 {0}" -f (Get-FileHash $out -Algorithm SHA256).Hash.ToLower())
@@ -140,7 +173,7 @@ if ($apksigner) {
 
 if ($Bundle) {
     $aab = Join-Path $work 'android\app\build\outputs\bundle\release\app-release.aab'
-    $outB = Join-Path $releases 'MyCampusView-v2.0.0.aab'
+    $outB = Join-Path $releases "MyCampusView-v$version.aab"
     Copy-Item $aab $outB -Force
     Write-Host ("AAB  {0}  {1:N1} MB" -f $outB, ((Get-Item $outB).Length / 1MB)) -ForegroundColor Green
     Write-Host '     Upload this .aab to Google Play Console.' -ForegroundColor DarkGray

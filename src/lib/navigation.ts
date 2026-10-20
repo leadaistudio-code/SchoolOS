@@ -141,6 +141,25 @@ export const NAVIGATION: NavItem[] = [
     mobile: true,
   },
   {
+    label: 'Tapasya Mode',
+    href: '/tapasya',
+    icon: 'Timer',
+    section: 'ACADEMICS' as const,
+    anyPermission: ['tapasya.use', 'tapasya.guardian', 'tapasya.teach', 'tapasya.manage'],
+    // School admins hold every school permission, so the student and guardian
+    // screens are limited to portal accounts that actually are one.
+    children: [
+      { label: 'Study Dashboard', href: '/tapasya', icon: 'Flame', permission: 'tapasya.use', portalOnly: true },
+      { label: 'Plan & Frogs', href: '/tapasya/plan', icon: 'ListChecks', permission: 'tapasya.use', portalOnly: true },
+      { label: 'Focus Room', href: '/tapasya/focus', icon: 'Timer', permission: 'tapasya.use', portalOnly: true },
+      { label: 'XP & Achievements', href: '/tapasya/xp', icon: 'Trophy', permission: 'tapasya.use', portalOnly: true },
+      { label: 'Leaderboard', href: '/tapasya/leaderboard', icon: 'Medal', anyPermission: ['tapasya.use', 'tapasya.guardian', 'tapasya.teach', 'tapasya.manage'] },
+      { label: 'Guardian Approvals', href: '/tapasya/guardian', icon: 'ShieldCheck', permission: 'tapasya.guardian', portalOnly: true },
+      { label: 'Class Progress', href: '/tapasya/teach', icon: 'Users', permission: 'tapasya.teach', staffOnly: true },
+      { label: 'Tapasya Settings', href: '/tapasya/settings', icon: 'Settings2', permission: 'tapasya.manage', staffOnly: true },
+    ],
+  },
+  {
     label: 'Knowledge Refresh',
     href: '/teacher/refresh',
     icon: 'BrainCircuit',

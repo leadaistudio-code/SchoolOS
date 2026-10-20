@@ -41,6 +41,9 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     { label: 'Plans', href: '/platform/plans', icon: 'plans' },
     { label: 'Billing', href: '/platform/billing', icon: 'billing' },
     { label: 'Support', href: '/platform/support', icon: 'support' },
+    ...(ctx.user.permissions.has('platform.tapasya')
+      ? ([{ label: 'Tapasya', href: '/platform/tapasya', icon: 'tapasya' }] satisfies PlatformNavItem[])
+      : []),
     { label: 'Health', href: '/platform/health', icon: 'health' },
   ]
   const canCapture = ctx.user.permissions.has('platform.crm_create')

@@ -218,6 +218,18 @@ export const TENANT_SCOPED_MODELS = [
   // CCTV
   'CctvSite',
   'CctvCamera',
+
+  // Tapasya Mode (study sessions, XP ledger, guardian exceptions)
+  'TapasyaSchoolPolicy',
+  'TapasyaPreset',
+  'TapasyaTask',
+  'TapasyaFocusSession',
+  'TapasyaFocusInterval',
+  'TapasyaSessionEvent',
+  'TapasyaDevice',
+  'TapasyaUnlockRequest',
+  'TapasyaXpEvent',
+  'TapasyaUserAchievement',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -294,6 +306,9 @@ export const PLATFORM_MODELS = new Set<string>([
   'SubscriptionInvoice',
   'TenantEntitlementOverride',
   'UsageMetric',
+  // Also in PLATFORM_ONLY_MODELS: the tenantId is server-side bookkeeping for
+  // consent and the school switch, and a school context must not read it.
+  'GlobalLeaderboardProfile',
 ])
 
 /**
@@ -322,6 +337,14 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'PlatformEmail',
   'PlatformEmailAttachment',
   'PlatformDocument',
+  // Tapasya global leaderboard: reached only through the constrained
+  // projection in src/server/modules/tapasya/leaderboard.ts.
+  'GlobalScoringConfig',
+  'GlobalLeaderboardSeason',
+  'GlobalLeaderboardProfile',
+  'GlobalLeaderboardEntry',
+  'GlobalLeaderboardSnapshot',
+  'GlobalTapasyaSetting',
 ])
 
 export function isPlatformOnly(model: string | undefined): boolean {

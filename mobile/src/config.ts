@@ -56,5 +56,14 @@ export const IS_PRODUCTION_API = API_BASE_URL.includes('mycampusview.com')
  */
 export const REQUEST_TIMEOUT_MS = 20_000
 
+/**
+ * Tapasya app shielding on iPhone.
+ *
+ * Off until a build carries Apple's Family Controls entitlement and the shield
+ * has been verified on a real device to leave MyCampusView itself usable. With
+ * it off, iPhones run the focus timer and say so; nothing claims a shield.
+ */
+export const IOS_APP_SHIELDING_ENABLED = process.env.EXPO_PUBLIC_TAPASYA_IOS_SHIELDING === '1'
+
 export const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
 export const ANDROID_VERSION_CODE = Constants.expoConfig?.android?.versionCode ?? 1

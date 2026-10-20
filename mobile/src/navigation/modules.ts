@@ -55,6 +55,7 @@ export const MODULES: Module[] = [
   { key: 'homework', title: 'Homework', blurb: 'Set work and review submissions', href: '/(app)/homework', icon: 'book-outline', permissions: ['homework.view'], group: 'Academics', tint: '#0EA5E9', ready: true },
   { key: 'timetable', title: 'Timetable', blurb: 'Today’s periods for you', href: '/(app)/timetable', icon: 'calendar-outline', permissions: ['timetable.view'], group: 'Academics', tint: '#8B5CF6', ready: true },
   { key: 'exams', title: 'Exams & results', blurb: 'Attendance desk and marks entry', href: '/(app)/exams', icon: 'school-outline', permissions: ['exams.view', 'results.view', 'exams.attendance', 'exams.marks'], group: 'Academics', tint: '#F43F5E', ready: true },
+  { key: 'tapasya', title: 'Tapasya Mode', blurb: 'Focus sessions, frogs and XP', href: '/(app)/tapasya', icon: 'timer-outline', permissions: ['tapasya.use', 'tapasya.guardian'], group: 'Academics', tint: '#EA580C', ready: true },
   { key: 'assessments', title: 'AI Evaluation', blurb: 'Review AI marks on answer sheets', href: '/(app)/evaluation', icon: 'scan-outline', permissions: ['assessments.evaluate'], group: 'Academics', tint: '#C026D3', ready: true },
 
   /* -------------------------------------------------------------- money */

@@ -1,0 +1,34 @@
+// Replaces node_modules/@react-native-voice/voice/android/build.gradle at build
+// time (scripts/build-android.ps1). The published file targets Gradle 4 era
+// tooling — jcenter(), no namespace, the pre-AndroidX support library — and
+// fails to configure under Gradle 9 / AGP 8, which stops the whole app build.
+apply plugin: 'com.android.library'
+
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+android {
+    namespace 'com.wenkesj.voice'
+    compileSdk safeExtGet('compileSdkVersion', 36)
+
+    defaultConfig {
+        minSdk safeExtGet('minSdkVersion', 24)
+        targetSdk safeExtGet('targetSdkVersion', 36)
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.facebook.react:react-native:+'
+    implementation 'androidx.annotation:annotation:1.9.1'
+}

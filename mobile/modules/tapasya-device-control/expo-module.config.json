@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["TapasyaDeviceControlModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.tapasyadevicecontrol.TapasyaDeviceControlModule"]
+  }
+}

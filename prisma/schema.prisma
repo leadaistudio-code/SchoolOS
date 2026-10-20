@@ -344,19 +344,20 @@ model User {
   tokens                VerificationToken[]
   loginEvents           LoginEvent[]
   notifications         Notification[]
-  markedExamAttendance  ExamAttendance[]    @relation("ExamAttendanceMarker")
+  markedExamAttendance  ExamAttendance[]          @relation("ExamAttendanceMarker")
   staff                 Staff?
   student               Student?
   parent                Parent?
-  sentMessages          Message[]           @relation("MessageSender")
+  sentMessages          Message[]                 @relation("MessageSender")
   pushSubscriptions     PushSubscription[]
-  crmSchoolsOwned       CrmSchool[]         @relation("CrmSchoolOwner")
-  crmSchoolsCreated     CrmSchool[]         @relation("CrmSchoolCreatedBy")
-  crmOpportunitiesOwned CrmOpportunity[]    @relation("CrmOpportunityOwner")
-  crmFollowUpsAssigned  CrmFollowUp[]       @relation("CrmFollowUpAssignee")
-  crmTasksOwned         CrmTask[]           @relation("CrmTaskOwner")
-  crmMeetingsCreated    CrmMeeting[]        @relation("CrmMeetingCreatedBy")
-  crmVisitsCreated      CrmVisit[]          @relation("CrmVisitCreatedBy")
+  crmSchoolsOwned       CrmSchool[]               @relation("CrmSchoolOwner")
+  crmSchoolsCreated     CrmSchool[]               @relation("CrmSchoolCreatedBy")
+  crmOpportunitiesOwned CrmOpportunity[]          @relation("CrmOpportunityOwner")
+  crmFollowUpsAssigned  CrmFollowUp[]             @relation("CrmFollowUpAssignee")
+  crmTasksOwned         CrmTask[]                 @relation("CrmTaskOwner")
+  crmMeetingsCreated    CrmMeeting[]              @relation("CrmMeetingCreatedBy")
+  crmVisitsCreated      CrmVisit[]                @relation("CrmVisitCreatedBy")
+  tapasyaGlobalProfile  GlobalLeaderboardProfile?
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1481,6 +1482,10 @@ model Student {
   receivedFeedback     TeacherStudentFeedback[]
   gatePasses           GatePass[]
   parentQueries        ParentQuery[]
+  tapasyaTasks         TapasyaTask[]
+  tapasyaSessions      TapasyaFocusSession[]
+  tapasyaUnlocks       TapasyaUnlockRequest[]
+  tapasyaXpEvents      TapasyaXpEvent[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])
@@ -1513,26 +1518,26 @@ model Enrollment {
 }
 
 model Parent {
-  id           String    @id @default(cuid())
-  tenantId     String
-  userId       String?   @unique
-  firstName    String
-  lastName     String
-  phone        String?
+  id             String    @id @default(cuid())
+  tenantId       String
+  userId         String?   @unique
+  firstName      String
+  lastName       String
+  phone          String?
   /// Optional second mobile. Signs in and receives reset codes like `phone`;
   /// school messages still go to `phone` only.
   secondaryPhone String?
-  email        String?
-  occupation   String?
-  annualIncome String?
-  photoUrl     String?
-  addressLine1 String?
-  city         String?
-  state        String?
-  postalCode   String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  email          String?
+  occupation     String?
+  annualIncome   String?
+  photoUrl       String?
+  addressLine1   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   children            StudentGuardian[]
@@ -3178,6 +3183,7 @@ model Homework {
   teacher      Staff                @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   attachments  Attachment[]
   submissions  HomeworkSubmission[]
+  tapasyaTasks TapasyaTask[]
 
   @@index([tenantId, sectionId, dueOn])
   @@index([tenantId, teacherId, assignedOn])
@@ -3873,7 +3879,7 @@ model StorePurchase {
   updatedAt      DateTime @updatedAt
 
   lines  StorePurchaseLine[]
-  vendor Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendor Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, number])
   @@index([tenantId, purchaseDate])
@@ -7259,4 +7265,458 @@ model CctvCamera {
   @@unique([tenantId, channel])
   @@index([tenantId, zone])
   @@index([tenantId, sectionId])
+}
+
+// ===========================================================================
+// TAPASYA MODE — deep-work study sessions, XP and the global leaderboard
+// See docs/tapasya/IMPLEMENTATION_PLAN.md for the trust model.
+// ===========================================================================
+
+enum TapasyaTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TapasyaTaskCategory {
+  HOMEWORK
+  CHAPTER
+  REVISION
+  PERSONAL
+  TEACHER_GOAL
+  OTHER
+}
+
+enum TapasyaSessionState {
+  READY
+  FOCUS_ACTIVE
+  FOCUS_PAUSED
+  BREAK_ACTIVE
+  COMPLETED
+  CANCELLED
+  INTERRUPTED
+  EXPIRED
+}
+
+/// The restriction the device actually confirmed for a session. Never inferred
+/// from the timer: a completed countdown on its own is TIMER_ONLY.
+enum TapasyaRestrictionLevel {
+  TIMER_ONLY
+  PARTIAL
+  APP_SHIELDING
+  MANAGED_KIOSK
+}
+
+enum TapasyaXpStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+enum TapasyaUnlockStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  DELIVERY_FAILED
+}
+
+enum GlobalProfileStatus {
+  /// Created by the student, waiting for a guardian's consent.
+  PENDING_GUARDIAN
+  ACTIVE
+  OPTED_OUT
+  /// The school switched global participation off.
+  SCHOOL_DISABLED
+  /// Removed by a platform moderator (offensive alias, abuse).
+  SUSPENDED
+}
+
+enum GlobalLeaderboardPeriod {
+  ALL_TIME
+  DAILY
+  WEEKLY
+  MONTHLY
+  SEASON
+}
+
+/// One per school. Ranges must sit inside the platform limits.
+model TapasyaSchoolPolicy {
+  id                       String   @id @default(cuid())
+  tenantId                 String   @unique
+  enabled                  Boolean  @default(true)
+  globalLeaderboardAllowed Boolean  @default(true)
+  schoolLeaderboardEnabled Boolean  @default(false)
+  minFocusMinutes          Int      @default(10)
+  maxFocusMinutes          Int      @default(90)
+  minBreakMinutes          Int      @default(2)
+  maxBreakMinutes          Int      @default(30)
+  allowPause               Boolean  @default(true)
+  allowSkipBreak           Boolean  @default(true)
+  /// Longest single guardian-approved exception, in minutes.
+  maxUnlockMinutes         Int      @default(15)
+  /// Exception requests a student may raise per day.
+  maxUnlockRequestsPerDay  Int      @default(5)
+  updatedById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+/// A student's own Pomodoro preset. A copy: administrator changes to the
+/// built-in defaults never rewrite it.
+model TapasyaPreset {
+  id                    String    @id @default(cuid())
+  tenantId              String
+  ownerUserId           String
+  name                  String
+  focusMinutes          Int
+  shortBreakMinutes     Int
+  longBreakMinutes      Int?
+  cyclesBeforeLongBreak Int       @default(4)
+  autoStartBreak        Boolean   @default(true)
+  autoStartFocus        Boolean   @default(false)
+  allowPause            Boolean   @default(true)
+  allowSkipBreak        Boolean   @default(true)
+  soundEnabled          Boolean   @default(true)
+  hapticsEnabled        Boolean   @default(true)
+  /// Built-in preset this was copied from (CLASSIC, EXTENDED, EXTENDED_PLUS).
+  sourceKey             String?
+  sourceVersion         Int?
+  isDefault             Boolean   @default(false)
+  archivedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  sessions TapasyaFocusSession[]
+
+  @@index([tenantId, ownerUserId, archivedAt])
+}
+
+model TapasyaTask {
+  id                   String              @id @default(cuid())
+  tenantId             String
+  studentId            String
+  title                String
+  description          String?
+  subject              String?
+  category             TapasyaTaskCategory @default(PERSONAL)
+  /// 1 (easy) to 5 (hardest).
+  difficulty           Int                 @default(3)
+  importance           Int                 @default(3)
+  urgency              Int                 @default(3)
+  estimatedMinutes     Int                 @default(25)
+  dueOn                DateTime?           @db.Date
+  createdByUserId      String
+  assignedByStaffId    String?
+  isTeacherAssigned    Boolean             @default(false)
+  /// A mandatory teacher task cannot be deleted or rescheduled by the student.
+  isMandatory          Boolean             @default(false)
+  teacherInstructions  String?
+  studentCanEdit       Boolean             @default(true)
+  /// Teacher-required focus length for sessions on this task.
+  requiredFocusMinutes Int?
+  requiredBreakMinutes Int?
+  homeworkId           String?
+  status               TapasyaTaskStatus   @default(TODO)
+  /// The day this task is a frog for, in the school's timezone.
+  frogOn               DateTime?           @db.Date
+  isPrimaryFrog        Boolean             @default(false)
+  actualMinutes        Int                 @default(0)
+  notes                String?
+  reflection           String?
+  completedAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deletedAt            DateTime?
+
+  student  Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  homework Homework?             @relation(fields: [homeworkId], references: [id], onDelete: SetNull)
+  sessions TapasyaFocusSession[]
+
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, studentId, frogOn])
+  @@index([tenantId, assignedByStaffId])
+}
+
+model TapasyaFocusSession {
+  id                String                  @id @default(cuid())
+  tenantId          String
+  studentId         String
+  userId            String
+  taskId            String?
+  presetId          String?
+  /// Settings frozen at start: later edits to the preset or policy do not move a running session.
+  settings          Json
+  /// BUILTIN | PERSONAL | TEACHER — which level of the hierarchy decided the durations.
+  policySource      String
+  state             TapasyaSessionState     @default(READY)
+  plannedCycles     Int                     @default(1)
+  completedCycles   Int                     @default(0)
+  /// 1-based cycle currently running or next to run.
+  currentCycle      Int                     @default(1)
+  phaseStartedAt    DateTime?
+  phaseEndsAt       DateTime?
+  pausedAt          DateTime?
+  /// Paused time inside the current focus phase.
+  phasePausedMs     Int                     @default(0)
+  phasePauseCount   Int                     @default(0)
+  totalFocusMs      Int                     @default(0)
+  /// Full engine state (src/lib/tapasya/engine.ts). The columns above are
+  /// projections of it for querying; this is what the server advances.
+  engine            Json?
+  startedAt         DateTime                @default(now())
+  endedAt           DateTime?
+  endReason         String?
+  /// Client-generated key so a retried or offline-synced start creates one session.
+  clientSessionKey  String
+  /// Equals userId while the session is live; null once it ends. Unique, so a
+  /// student cannot run two sessions at once on two devices.
+  activeLock        String?                 @unique
+  restrictionLevel  TapasyaRestrictionLevel @default(TIMER_ONLY)
+  restrictionDetail Json?
+  deviceId          String?
+  offlineSynced     Boolean                 @default(false)
+  version           Int                     @default(0)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  student   Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task      TapasyaTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  preset    TapasyaPreset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  intervals TapasyaFocusInterval[]
+  events    TapasyaSessionEvent[]
+
+  @@unique([tenantId, userId, clientSessionKey])
+  @@index([tenantId, studentId, startedAt])
+  @@index([tenantId, state])
+}
+
+model TapasyaFocusInterval {
+  id               String                  @id @default(cuid())
+  tenantId         String
+  sessionId        String
+  userId           String
+  cycleIndex       Int
+  plannedMinutes   Int
+  startedAt        DateTime
+  endedAt          DateTime
+  /// Focus time actually elapsed, excluding pauses.
+  focusMs          Int
+  pauseCount       Int                     @default(0)
+  /// COMPLETED | ABANDONED
+  outcome          String
+  restrictionLevel TapasyaRestrictionLevel @default(TIMER_ONLY)
+  offlineSynced    Boolean                 @default(false)
+  createdAt        DateTime                @default(now())
+
+  session TapasyaFocusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, cycleIndex])
+  @@index([tenantId, userId, startedAt])
+}
+
+model TapasyaSessionEvent {
+  id            String    @id @default(cuid())
+  tenantId      String
+  sessionId     String
+  type          String
+  /// Supplied by the client so a duplicated timer event is recorded once.
+  clientEventId String
+  serverAt      DateTime  @default(now())
+  clientAt      DateTime?
+  fromState     String?
+  toState       String?
+  detail        Json?
+
+  session TapasyaFocusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, clientEventId])
+  @@index([tenantId, sessionId, serverAt])
+}
+
+/// What a device last reported it can do. Reported, not trusted: it decides
+/// what the app may attempt, never XP.
+model TapasyaDevice {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  installationId  String
+  platform        String
+  osVersion       String?
+  appVersion      String?
+  capabilityState String
+  capabilities    Json
+  managed         Boolean  @default(false)
+  lastReportedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, userId, installationId])
+  @@index([tenantId, userId])
+}
+
+model TapasyaUnlockRequest {
+  id                String              @id @default(cuid())
+  tenantId          String
+  studentId         String
+  requestedByUserId String
+  sessionId         String?
+  deviceId          String?
+  /// OPEN_APPS | END_SESSION | BREAK_APPS — what the exception permits.
+  action            String
+  reason            String
+  requestedMinutes  Int
+  status            TapasyaUnlockStatus @default(PENDING)
+  /// HMAC of the one-time code; the code itself is never stored or logged.
+  codeHash          String?
+  attempts          Int                 @default(0)
+  expiresAt         DateTime
+  idempotencyKey    String
+  guardianUserIds   String[]            @default([])
+  deliveryChannel   String?
+  deliveryError     String?
+  decidedByUserId   String?
+  decidedVia        String?
+  decidedAt         DateTime?
+  grantStartsAt     DateTime?
+  grantEndsAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, requestedByUserId, idempotencyKey])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, status, expiresAt])
+}
+
+/// The XP ledger. Append-only: a correction is a new row pointing at the old one.
+model TapasyaXpEvent {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  userId           String
+  studentId        String
+  /// FOCUS_INTERVAL | ALL_CYCLES_BONUS | FROG_BONUS | ACHIEVEMENT | CORRECTION
+  eventType        String
+  sourceType       String?
+  sourceId         String?
+  points           Int
+  scoringVersion   Int
+  status           TapasyaXpStatus          @default(VALIDATED)
+  rejectionReason  String?
+  /// Restriction level of the qualifying session, kept for transparency only.
+  restrictionLevel TapasyaRestrictionLevel?
+  flags            String[]                 @default([])
+  idempotencyKey   String
+  correctsId       String?
+  correctionReason String?
+  actorUserId      String?
+  occurredAt       DateTime
+  createdAt        DateTime                 @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, userId, occurredAt])
+  @@index([tenantId, status, occurredAt])
+}
+
+model TapasyaUserAchievement {
+  id             String   @id @default(cuid())
+  tenantId       String
+  userId         String
+  achievementKey String
+  awardedAt      DateTime @default(now())
+
+  @@unique([tenantId, userId, achievementKey])
+  @@index([tenantId, userId])
+}
+
+// --- Platform-owned global leaderboard (no school can query these) ---------
+
+model GlobalScoringConfig {
+  id            String   @id @default(cuid())
+  version       Int      @unique
+  rules         Json
+  effectiveFrom DateTime
+  reason        String
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  @@index([effectiveFrom])
+}
+
+model GlobalLeaderboardSeason {
+  id          String   @id @default(cuid())
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([startsAt, endsAt])
+}
+
+/// A student's public identity on the global board. Holds no name, school,
+/// class or contact detail; `tenantId` is kept server-side only so a school's
+/// participation switch and the guardian check can be enforced.
+model GlobalLeaderboardProfile {
+  id              String              @id @default(cuid())
+  userId          String              @unique
+  tenantId        String
+  alias           String
+  aliasKey        String              @unique
+  avatarKey       String              @default("lotus")
+  showBadges      Boolean             @default(true)
+  /// Optional division, e.g. GRADES_6_8. Chosen by the student or guardian.
+  division        String?
+  status          GlobalProfileStatus @default(PENDING_GUARDIAN)
+  consentByUserId String?
+  consentAt       DateTime?
+  optedOutAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  user    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries GlobalLeaderboardEntry[]
+
+  @@index([tenantId, status])
+}
+
+model GlobalLeaderboardEntry {
+  id        String                  @id @default(cuid())
+  profileId String
+  period    GlobalLeaderboardPeriod
+  periodKey String
+  xp        Int                     @default(0)
+  intervals Int                     @default(0)
+  /// When the profile last gained XP in this period — the tie-breaker.
+  reachedAt DateTime
+  updatedAt DateTime                @updatedAt
+
+  profile GlobalLeaderboardProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, period, periodKey])
+  @@index([period, periodKey, xp(sort: Desc), reachedAt])
+}
+
+model GlobalLeaderboardSnapshot {
+  id        String                  @id @default(cuid())
+  profileId String
+  period    GlobalLeaderboardPeriod
+  periodKey String
+  rank      Int
+  xp        Int
+  takenOn   DateTime                @db.Date
+
+  @@unique([profileId, period, periodKey, takenOn])
+  @@index([period, periodKey, takenOn])
+}
+
+model GlobalTapasyaSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
 }

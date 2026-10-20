@@ -17,6 +17,7 @@ import {
   Menu,
   Package,
   Sparkles,
+  Timer,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ const ICONS = {
   plans: Package,
   billing: CreditCard,
   support: LifeBuoy,
+  tapasya: Timer,
   health: Activity,
 } satisfies Record<string, LucideIcon>
 

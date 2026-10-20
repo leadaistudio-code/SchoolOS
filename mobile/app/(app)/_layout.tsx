@@ -115,6 +115,11 @@ export default function AppLayout() {
       <Tabs.Screen name="homework-detail" options={{ href: null }} />
       <Tabs.Screen name="evaluation" options={{ href: null }} />
       <Tabs.Screen name="evaluation-review" options={{ href: null }} />
+      <Tabs.Screen name="tapasya" options={{ href: null }} />
+      <Tabs.Screen name="tapasya-focus" options={{ href: null }} />
+      <Tabs.Screen name="tapasya-plan" options={{ href: null }} />
+      <Tabs.Screen name="tapasya-leaderboard" options={{ href: null }} />
+      <Tabs.Screen name="tapasya-device" options={{ href: null }} />
     </Tabs>
   )
 }

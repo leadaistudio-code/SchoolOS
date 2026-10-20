@@ -106,6 +106,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'teacher_refresh.view_school',
       'teacher_refresh.configure',
       'teacher_refresh.question_review',
+      'tapasya.teach',
+      'tapasya.manage',
       'library.view', 'inventory.view', 'store.view', 'frontoffice.view', 'frontoffice.gatepass',
       'cctv.view_all',
       'admissions.view', 'admissions.manage', 'admissions.convert',
@@ -178,6 +180,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'feedback.teacher_give_student',
       'teacher_refresh.view_self',
       'teacher_refresh.take',
+      'tapasya.teach',
       'assistant.use',
     ],
   },
@@ -300,6 +303,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'events.view',
       'transport.track',
       'documents.view',
+      'tapasya.use',
     ],
   },
   {
@@ -333,6 +337,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'transport.track',
       'documents.view',
       'cctv.view_child',
+      'tapasya.guardian',
     ],
   },
 ]

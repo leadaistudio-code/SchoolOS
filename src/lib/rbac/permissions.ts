@@ -270,6 +270,12 @@ export const PERMISSIONS: PermissionDef[] = [
     ['view', 'View support tickets'],
     ['create', 'Raise support tickets'],
   ]),
+  ...mod('tapasya', [
+    ['use', 'Plan study, run focus sessions and earn XP (students)'],
+    ['guardian', 'Approve leaderboard consent and focus exceptions for own children'],
+    ['teach', 'Assign study tasks and view progress for own classes'],
+    ['manage', 'Configure Tapasya for the school and view school summaries'],
+  ]),
   ...mod('users', [
     ...CRUD,
     ['roles', 'Assign roles'],
@@ -291,6 +297,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['crm_delete', 'Delete Growth CRM records'],
     ['crm_assign', 'Assign Growth CRM owners'],
     ['crm_comms', 'Send Growth CRM WhatsApp, SMS and email'],
+    ['tapasya', 'Configure global XP scoring, seasons and the global leaderboard'],
   ]),
 ]
 
