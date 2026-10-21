@@ -120,6 +120,7 @@ export default function AppLayout() {
       <Tabs.Screen name="tapasya-plan" options={{ href: null }} />
       <Tabs.Screen name="tapasya-leaderboard" options={{ href: null }} />
       <Tabs.Screen name="tapasya-device" options={{ href: null }} />
+      <Tabs.Screen name="tapasya-personal" options={{ href: null }} />
     </Tabs>
   )
 }

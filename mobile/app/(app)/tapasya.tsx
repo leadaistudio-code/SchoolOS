@@ -31,8 +31,8 @@ export default function TapasyaScreen() {
   const roles = useAuth((s) => s.session?.roles ?? [])
   const canUse = useAuth((s) => s.can('tapasya.use'))
   const canGuard = useAuth((s) => s.can('tapasya.guardian'))
-  if (roles.includes('STUDENT') && canUse) return <StudentHome />
-  if (roles.includes('PARENT') && canGuard) return <GuardianHome />
+  if (roles.includes('STUDENT') && canUse) return <StudentHome fallback={canGuard ? <GuardianHome /> : null} />
+  if (canGuard || roles.includes('PARENT')) return <GuardianHome />
   return (
     <Screen padded={false} header={<ScreenHeader title="Tapasya Mode" onBack={() => router.back()} />}>
       <EmptyState title="Open Tapasya on the web" body="Class progress, task assignment and school settings are on the MyCampusView website. The phone app is for students and parents." />
@@ -58,11 +58,14 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   )
 }
 
-function StudentHome() {
+function StudentHome({ fallback }: { fallback: React.ReactNode }) {
   const brand = useAuth((s) => s.session?.primaryHex) || colors.brand
   const { data, isLoading, error, refetch, isRefetching } = useTapasyaDashboard()
   const history = useSessionHistory()
 
+  // A family login can carry the student role without being linked to a
+  // student record; it is a parent's account, so show the parent view.
+  if (fallback && error instanceof ApiError && error.code === 'NOT_A_STUDENT') return <>{fallback}</>
   if (isLoading) return <Screen padded={false} header={<ScreenHeader title="Tapasya Mode" tint={brand} onBack={() => router.back()} />}><View style={{ padding: spacing.base }}><SkeletonList rows={4} /></View></Screen>
   if (error || !data) return <Screen padded={false} header={<ScreenHeader title="Tapasya Mode" tint={brand} onBack={() => router.back()} />}><ErrorState message={error instanceof ApiError ? error.message : 'Could not load Tapasya.'} onRetry={refetch} /></Screen>
 
@@ -168,15 +171,22 @@ function GuardianHome() {
     }
   }
 
-  const header = <ScreenHeader title="Tapasya Mode" subtitle="Your children’s focus time and requests" tint={brand} onBack={() => router.back()} />
-  if (isLoading) return <Screen padded={false} header={header}><View style={{ padding: spacing.base }}><SkeletonList rows={4} /></View></Screen>
-  if (error || !data) return <Screen padded={false} header={header}><ErrorState message={error instanceof ApiError ? error.message : 'Could not load.'} onRetry={refetch} /></Screen>
+  const header = <ScreenHeader title="Tapasya Mode" subtitle="Your focus time and your children’s" tint={brand} onBack={() => router.back()} />
+  const personal = (
+    <Card onPress={() => router.push('/(app)/tapasya-personal')} accessibilityLabel="Start my focus session" style={{ borderColor: `${brand}40` }}>
+      <Txt variant="bodyStrong">Start my focus session</Txt>
+      <Txt variant="small" color={colors.textMuted}>A Pomodoro timer for you, with Do Not Disturb on while you focus.</Txt>
+    </Card>
+  )
+  if (isLoading) return <Screen padded={false} header={header}><View style={{ padding: spacing.base }}>{personal}<SkeletonList rows={4} /></View></Screen>
+  if (error || !data) return <Screen padded={false} header={header}><View style={{ padding: spacing.base }}>{personal}</View><ErrorState message={error instanceof ApiError ? error.message : 'Could not load.'} onRetry={refetch} /></Screen>
 
   const open = data.unlocks.filter((u) => (u.status === 'PENDING' || u.status === 'DELIVERY_FAILED') && new Date(u.expiresAt).getTime() > Date.now())
 
   return (
     <Screen scroll padded={false} refreshing={isRefetching} onRefresh={refetch} header={header}>
       <View style={{ paddingHorizontal: spacing.base, paddingTop: spacing.md }}>
+        {personal}
         {data.children.length === 0 ? <EmptyState title="No linked children" body="Ask the school office to link your child to your account." /> : null}
 
         {open.length ? <SectionTitle tint={brand}>Waiting for you</SectionTitle> : null}
