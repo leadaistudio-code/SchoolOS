@@ -27,11 +27,11 @@ export function LoginForm({ next, showForgotPassword = false }: { next?: string;
       ) : null}
 
       <Field
-        label="Email or phone"
+        label="Phone, email or admission number"
         htmlFor="identifier"
         required
         error={state.fieldErrors.identifier}
-        hint="Parents and staff: use the mobile number on your school record"
+        hint="Parents and staff: your mobile number on the school record. Students: your admission number"
       >
         <Input
           id="identifier"
@@ -40,7 +40,7 @@ export function LoginForm({ next, showForgotPassword = false }: { next?: string;
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="Mobile number or email"
+          placeholder="Mobile number, email or admission no."
           required
           aria-invalid={!!state.fieldErrors.identifier}
         />

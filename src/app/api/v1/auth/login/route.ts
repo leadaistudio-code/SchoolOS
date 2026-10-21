@@ -14,7 +14,7 @@ import { env } from '@/lib/env'
 export const SESSION_TRANSPORT_HEADER = 'x-session-transport'
 
 const schema = z.object({
-  identifier: z.string().trim().min(3),
+  identifier: z.string().trim().min(1).max(200),
   password: z.string().min(1),
 })
 

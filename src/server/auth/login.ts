@@ -7,7 +7,7 @@ import { rateLimit, RATE_LIMITS } from '@/server/rate-limit'
 import { audit } from '@/server/audit'
 
 export type LoginInput = {
-  identifier: string // email or phone
+  identifier: string // email, phone, or a student's admission number
   password: string
   tenantId: string | null // null => platform login
 }
@@ -27,7 +27,7 @@ export type LoginOutcome =
   | { ok: false; reason: 'error'; message: string; retryAfterSeconds?: number }
   | { ok: false; reason: 'mfa'; challengeToken: string }
 
-const GENERIC_FAILURE = 'Phone number or password is incorrect'
+const GENERIC_FAILURE = 'Username or password is incorrect'
 const MAX_FAILED = 8
 const LOCK_MINUTES = 15
 
@@ -75,7 +75,8 @@ export async function login(input: LoginInput): Promise<LoginOutcome> {
           email: identifier,
         },
       })
-    : await findUserByPhone(input.tenantId, input.identifier.trim())
+    : ((await findUserByPhone(input.tenantId, input.identifier.trim())) ??
+      (await findStudentUserByAdmissionNo(input.tenantId, input.identifier)))
 
   if (!user || !user.passwordHash) {
     await recordAttempt(null, input.tenantId, identifier, false, 'no_such_user', meta)
@@ -180,6 +181,24 @@ async function findUserByPhone(tenantId: string | null, rawPhone: string) {
   const parentUserId = await parentUserIdBySecondaryPhone(tenantId, candidates)
   if (!parentUserId) return null
   return prisma.user.findFirst({ where: { id: parentUserId, tenantId, deletedAt: null } })
+}
+
+/** Students sign in with their admission number, unique within one school. */
+async function findStudentUserByAdmissionNo(tenantId: string | null, raw: string) {
+  const admissionNo = raw.trim()
+  if (!tenantId || !admissionNo) return null
+
+  const student = await prisma.student.findFirst({
+    where: {
+      tenantId,
+      deletedAt: null,
+      admissionNo: { equals: admissionNo, mode: 'insensitive' },
+      userId: { not: null },
+    },
+    select: { userId: true },
+  })
+  if (!student?.userId) return null
+  return prisma.user.findFirst({ where: { id: student.userId, tenantId, deletedAt: null } })
 }
 
 async function recordAttempt(

@@ -10,7 +10,7 @@ import { sanitizeLoginNext } from '@/server/auth/login-redirect'
 import type { FormState as LoginState } from '@/lib/form-state'
 
 const schema = z.object({
-  identifier: z.string().trim().min(3, 'Enter your email or phone number'),
+  identifier: z.string().trim().min(1, 'Enter your phone number, email or admission number'),
   password: z.string().min(1, 'Enter your password'),
   next: z.string().optional(),
 })

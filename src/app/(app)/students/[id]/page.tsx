@@ -27,6 +27,7 @@ import { Student360 } from './student-360'
 import { uploadStudentPhotoAction, removeStudentPhotoAction } from './photo-actions'
 import { DeleteRecordButton } from '@/components/record-actions'
 import { deleteStudentAction } from '../actions'
+import { StudentLoginButton } from './student-login-button'
 
 export const metadata = { title: 'Student profile' }
 
@@ -78,6 +79,9 @@ export default async function StudentDetailPage({
         }
         actions={
           <>
+            {(ctx.can('users.create') || ctx.can('students.edit')) && student.status === 'ACTIVE' ? (
+              <StudentLoginButton studentId={student.id} name={fullName(student)} hasLogin={!!student.userId} />
+            ) : null}
             {ctx.can('students.tc') && student.status === 'ACTIVE' ? (
               <Link
                 href={`/students/transfer-certificates/new?student=${student.id}`}

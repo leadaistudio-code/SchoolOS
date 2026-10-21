@@ -75,7 +75,7 @@ export default function LoginScreen() {
 
   async function submit() {
     if (!school) return
-    if (!identifier.trim()) { setError('Enter your email or phone number.'); return }
+    if (!identifier.trim()) { setError('Enter your phone number, email or admission number.'); return }
     if (!password) { setError('Enter your password.'); return }
 
     setBusy(true); setError(null)
@@ -147,11 +147,11 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
-                <Field label="Email or phone">
+                <Field label="Phone, email or admission number">
                   <Input
                     value={identifier}
                     onChangeText={(v) => { setIdentifier(v); setError(null) }}
-                    placeholder="Mobile number or email"
+                    placeholder="Students: your admission number"
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
