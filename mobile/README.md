@@ -337,7 +337,7 @@ are in the repository.
 Output: `android/app/build/outputs/bundle/release/app-release.aab`
 
 Package: `com.mycampusview.app` · current store version in `app.json`:
-**2.2.0** (`versionCode` **4**). Bump both — here and in
+**2.2.1** (`versionCode` **5**). Bump both — here and in
 `android/app/build.gradle`, which is what Gradle actually reads — before every
 new Play upload.
 

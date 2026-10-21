@@ -1,0 +1,116 @@
+name: Android release build
+
+# Builds the signed Play Store bundle (.aab) and an installable .apk.
+# Manual run: Actions → this workflow → Run workflow
+#
+# Required repository secrets:
+#   ANDROID_UPLOAD_KEYSTORE_BASE64  base64 of mobile/android/app/mycampusview-upload.keystore
+#   ANDROID_UPLOAD_STORE_PASSWORD
+#   ANDROID_UPLOAD_KEY_ALIAS
+#   ANDROID_UPLOAD_KEY_PASSWORD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  # Play App Signing upload certificate. A build signed with anything else is rejected by Play.
+  EXPECTED_UPLOAD_SHA1: E3:A5:55:E6:36:AB:24:14:BA:47:E0:03:89:AC:2D:22:DD:7C:D9:5F
+  ARCHES: arm64-v8a,armeabi-v7a
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Apply signing config and library patches
+        run: node scripts/prepare-android-ci.mjs
+
+      - name: Install the upload keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for v in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing secret for ${v}"
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/mycampusview-upload.keystore
+          {
+            echo "storeFile=app/mycampusview-upload.keystore"
+            echo "storePassword=${STORE_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASSWORD}"
+          } > android/keystore.properties
+
+      - name: Build APK and AAB
+        working-directory: mobile/android
+        env:
+          NODE_ENV: production
+        run: ./gradlew assembleRelease bundleRelease "-PreactNativeArchitectures=${ARCHES}" --no-daemon
+
+      - name: Verify upload signature and collect outputs
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./app.json').expo.version")"
+          mkdir -p ../out
+          cp android/app/build/outputs/apk/release/app-release.apk "../out/MyCampusView-v${version}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "../out/MyCampusView-v${version}.aab"
+
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)"
+          sha1="$("$apksigner" verify --print-certs "../out/MyCampusView-v${version}.apk" | sed -n 's/.*SHA-1 digest: //p' | head -n1 | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')"
+          echo "Signer SHA-1: ${sha1}"
+          if [ "$sha1" != "$EXPECTED_UPLOAD_SHA1" ]; then
+            echo "APK is not signed with the Play upload key (expected ${EXPECTED_UPLOAD_SHA1})"
+            exit 1
+          fi
+          jarsigner -verify ../out/*.aab > /dev/null
+          ls -lh ../out
+          sha256sum ../out/*
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/mycampusview-upload.keystore android/keystore.properties
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mycampusview-android
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
