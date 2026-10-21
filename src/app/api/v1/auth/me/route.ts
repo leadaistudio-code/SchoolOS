@@ -12,6 +12,7 @@ export const GET = route(async (_req, ctx) =>
       roles: ctx.user.roleKeys,
       permissions: [...ctx.user.permissions],
       impersonated: !!ctx.user.impersonatedById,
+      mustChangePassword: ctx.user.mustChangePassword,
     },
     tenant: {
       id: ctx.tenant.id,

@@ -11,7 +11,42 @@ export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'LEA
 
 /* -------------------------------------------------------------- dashboard */
 
-export type Dashboard = {
+/**
+ * `/dashboard` answers with a different shape per identity scope: school-wide
+ * figures for leadership, a teacher's own classes, or a portal user's children.
+ * Reading school fields off any other scope is a crash, so callers must narrow
+ * on `scope` first.
+ */
+export type Dashboard = SchoolDashboard | TeacherDashboard | SelfDashboard | RoleDashboard
+
+export type SelfDashboardStudent = {
+  id: string
+  admissionNo: string
+  firstName: string
+  lastName: string
+  photoUrl: string | null
+  className: string | null
+  sectionName: string | null
+  rollNumber: string | number | null
+}
+
+export type SelfDashboard = { scope: 'SELF'; students: SelfDashboardStudent[] }
+
+export type TeacherDashboard = {
+  scope: 'TEACHER'
+  studentCount: number
+  classCount: number
+  sectionCount: number
+  classes: { id: string; name: string }[]
+  subjects: string[]
+  paidCount: number
+  unpaidCount: number
+}
+
+export type RoleDashboard = { scope: 'ROLE'; roles: string[] }
+
+export type SchoolDashboard = {
+  scope: 'SCHOOL'
   people: { students: number; teachers: number; staff: number; parents: number }
   attendance: {
     present: number

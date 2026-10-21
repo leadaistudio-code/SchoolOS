@@ -1,5 +1,6 @@
 import React from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
+import { Redirect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api, ApiError } from '@/api/client'
 import { useAuth } from '@/auth/store'
@@ -17,6 +18,8 @@ import { colors, radius, spacing } from '@/theme'
 export default function ChangePasswordScreen() {
   const restore = useAuth((s) => s.restore)
   const signOut = useAuth((s) => s.signOut)
+  const status = useAuth((s) => s.status)
+  const mustChangePassword = useAuth((s) => s.session?.mustChangePassword ?? false)
 
   const [current, setCurrent] = React.useState('')
   const [next, setNext] = React.useState('')
@@ -24,13 +27,16 @@ export default function ChangePasswordScreen() {
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  if (status !== 'signedIn') return <Redirect href="/(auth)/login" />
+  if (!mustChangePassword) return <Redirect href="/(app)" />
+
   async function submit() {
     if (next !== confirm) { setError('The two new passwords do not match.'); return }
     if (next.length < 6) { setError('Use at least 6 characters.'); return }
 
     setBusy(true); setError(null)
     try {
-      await api.post('/auth/password/reset', { currentPassword: current, newPassword: next })
+      await api.post('/auth/password/change', { currentPassword: current, newPassword: next })
       // Re-reading the session clears mustChangePassword and lets the app in.
       await restore()
     } catch (err) {

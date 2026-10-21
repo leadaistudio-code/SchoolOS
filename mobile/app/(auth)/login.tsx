@@ -28,6 +28,7 @@ import { colors, radius, spacing } from '@/theme'
  */
 export default function LoginScreen() {
   const status = useAuth((s) => s.status)
+  const mustChangePassword = useAuth((s) => s.session?.mustChangePassword ?? false)
   const expiredMessage = useAuth((s) => s.expiredMessage)
   const lookupSchool = useAuth((s) => s.lookupSchool)
   const signIn = useAuth((s) => s.signIn)
@@ -46,7 +47,12 @@ export default function LoginScreen() {
     getLastSchoolSlug().then((last) => { if (last) setSlug(last) })
   }, [])
 
-  if (status === 'signedIn') return <Redirect href="/(app)" />
+  // A temporary password must go straight to change-password. Sending it to
+  // /(app) bounces it back here, and the two redirects loop until React aborts
+  // and the app closes.
+  if (status === 'signedIn') {
+    return <Redirect href={mustChangePassword ? '/(auth)/change-password' : '/(app)'} />
+  }
 
   async function findSchool() {
     const code = slug.trim().toLowerCase()

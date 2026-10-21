@@ -63,7 +63,15 @@ export const useAuth = create<AuthState>()((set, get) => ({
     // and take its answer for the permission set rather than the stale copy.
     try {
       const { data } = await api.get<{
-        user: { id: string; firstName: string; lastName: string; email: string | null; roles: string[]; permissions: string[] }
+        user: {
+          id: string
+          firstName: string
+          lastName: string
+          email: string | null
+          roles: string[]
+          permissions: string[]
+          mustChangePassword?: boolean
+        }
         tenant: { slug: string; name: string }
       }>('/auth/me')
 
@@ -77,6 +85,9 @@ export const useAuth = create<AuthState>()((set, get) => ({
         permissions: data.user.permissions,
         tenantSlug: data.tenant.slug,
         tenantName: data.tenant.name,
+        // Older servers omit the flag; keep the stored value rather than
+        // letting someone past a temporary password.
+        mustChangePassword: data.user.mustChangePassword ?? stored.mustChangePassword,
         // /auth/me has no branding, so keep what sign-in stored.
         primaryHex: stored.primaryHex ?? null,
       }
