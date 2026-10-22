@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
@@ -15,9 +16,13 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * Android focus controls for Tapasya Mode.
  *
- * Two mechanisms, reported separately and never conflated:
+ * Mechanisms, reported separately and never conflated:
  *  - Do Not Disturb (priority mode): needs the user to grant notification-policy
  *    access in Settings. Reduces interruptions; other apps can still be opened.
+ *  - App blocker (FocusBlockerService): needs Usage access and "Display over
+ *    other apps". Covers any other app with the focus panel.
+ *  - Screen pinning: Android's own user-confirmed pin. The user can unpin; with
+ *    "Ask for PIN before unpinning" on, unpinning locks the phone.
  *  - Managed Lock Task Mode: only when the device's DPC/EMM has allow-listed this
  *    package (DevicePolicyManager.isLockTaskPermitted). Without that allow-list,
  *    startLockTask() falls back to user-cancellable screen pinning, so this module
@@ -49,13 +54,64 @@ class TapasyaDeviceControlModule : Module() {
         "dndAccessGranted" to notifications.isNotificationPolicyAccessGranted,
         "interruptionFilter" to notifications.currentInterruptionFilter,
         "lockTaskPermitted" to devicePolicy.isLockTaskPermitted(context.packageName),
-        "lockTaskModeState" to lockTaskState()
+        "lockTaskModeState" to lockTaskState(),
+        "usageAccessGranted" to FocusBlockerService.hasUsageAccess(context),
+        "overlayGranted" to FocusBlockerService.canDrawOverlays(context)
       )
     }
 
     Function<Unit>("openDoNotDisturbSettings") {
       val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       context.startActivity(intent)
+    }
+
+    Function<Unit>("openUsageAccessSettings") {
+      context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    Function<Unit>("openOverlaySettings") {
+      val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(intent)
+    }
+
+    /** Where Android keeps "App pinning" and "Ask for PIN before unpinning". */
+    Function<Unit>("openPinningSettings") {
+      context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /**
+     * Asks Android to pin this app. On a personal phone Android shows its own
+     * confirmation and the user can unpin, so the caller must read the state
+     * afterwards rather than assume it worked.
+     */
+    AsyncFunction<String>("requestScreenPin") {
+      val activity = appContext.currentActivity ?: throw Exceptions.MissingActivity()
+      if (activities.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) activity.startLockTask()
+      lockTaskState()
+    }.runOnQueue(Queues.MAIN)
+
+    /** Returns true only when both permissions are in place and the service was started. */
+    Function("startAppBlocker") { untilMs: Double, allow: List<String> ->
+      if (!FocusBlockerService.hasUsageAccess(context) || !FocusBlockerService.canDrawOverlays(context)) {
+        false
+      } else {
+        FocusBlockerService.start(context, untilMs.toLong(), allow)
+        true
+      }
+    }
+
+    Function<Unit>("stopAppBlocker") {
+      FocusBlockerService.stop(context)
+    }
+
+    Function<Map<String, Any?>>("getAppBlockerState") {
+      mapOf(
+        "running" to FocusBlockerService.running,
+        "blockedCount" to FocusBlockerService.blockedCount,
+        "lastBlocked" to FocusBlockerService.lastBlocked,
+        "lostAccess" to FocusBlockerService.lostAccess
+      )
     }
 
     /** Returns true only when the OS reports the requested filter afterwards. */

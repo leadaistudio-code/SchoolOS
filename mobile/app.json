@@ -2,7 +2,7 @@
   "expo": {
     "name": "MyCampusView",
     "slug": "mycampusview",
-    "version": "2.2.1",
+    "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "mycampusview",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.mycampusview.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#002046",
         "foregroundImage": "./assets/android-icon-foreground.png",

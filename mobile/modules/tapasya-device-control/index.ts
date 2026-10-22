@@ -7,6 +7,17 @@ export type AndroidCapabilities = {
   interruptionFilter: number
   lockTaskPermitted: boolean
   lockTaskModeState: LockTaskState
+  /** Absent in builds before the app blocker was added. */
+  usageAccessGranted?: boolean
+  overlayGranted?: boolean
+}
+
+export type AppBlockerState = {
+  running: boolean
+  blockedCount: number
+  lastBlocked: string | null
+  /** A permission was revoked mid-session, so apps are no longer being blocked. */
+  lostAccess: boolean
 }
 
 export type IosCapabilities = {
@@ -26,6 +37,13 @@ type NativeTapasyaDeviceControl = {
   startManagedLockTask?(): Promise<LockTaskState | 'NOT_PERMITTED'>
   stopLockTask?(): Promise<LockTaskState>
   getLockTaskState?(): LockTaskState
+  openUsageAccessSettings?(): void
+  openOverlaySettings?(): void
+  openPinningSettings?(): void
+  requestScreenPin?(): Promise<LockTaskState>
+  startAppBlocker?(untilMs: number, allow: string[]): boolean
+  stopAppBlocker?(): void
+  getAppBlockerState?(): AppBlockerState
   // iOS
   requestScreenTimeAuthorization?(): Promise<IosCapabilities['screenTimeStatus'] | 'failed'>
   setShield?(enabled: boolean): Promise<boolean>

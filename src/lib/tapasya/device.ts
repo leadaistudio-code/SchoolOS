@@ -35,7 +35,7 @@ export const RESTRICTION_LABEL: Record<RestrictionLevel, string> = {
 export const RESTRICTION_EXPLANATION: Record<RestrictionLevel, string> = {
   TIMER_ONLY: 'Only the timer is running. Other apps are not blocked on this device.',
   PARTIAL: 'Some distractions are reduced (for example Do Not Disturb), but other apps can still be opened.',
-  APP_SHIELDING: 'Screen Time is shielding the app categories you chose. MyCampusView and essential functions stay available.',
+  APP_SHIELDING: 'Other apps are blocked during focus (Android app blocker or screen pinning, or iPhone Screen Time). MyCampusView, calls and essential functions stay available.',
   MANAGED_KIOSK: 'This school-managed device is locked to MyCampusView. Emergency calls remain available.',
 }
 

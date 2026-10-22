@@ -1,5 +1,5 @@
 import React from 'react'
-import { Alert, AppState, Pressable, View } from 'react-native'
+import { Alert, AppState, Platform, Pressable, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { ScreenHeader, SectionTitle } from '@/components/header'
@@ -9,7 +9,7 @@ import { useAuth } from '@/auth/store'
 import { colors, radius, spacing, type } from '@/theme'
 import { apply, EngineError, formatClock, isTerminal, view, type EngineEvent, type TimerView } from '@/tapasya/engine'
 import { RESTRICTION_EXPLANATION, RESTRICTION_LABEL, type RestrictionLevel } from '@/tapasya/device'
-import { engage, installationId, release, type Engagement } from '@/tapasya/device-control'
+import { appBlockerState, engage, installationId, release, releaseOrphaned, screenPinned, sessionCapMs, type Engagement } from '@/tapasya/device-control'
 import {
   clientKey,
   sendSessionEvent,
@@ -100,7 +100,10 @@ function Setup({ onStarted }: { onStarted: () => void }) {
     setStarting(true)
     let engagement: Engagement | null = null
     try {
-      engagement = await engage()
+      const chosen = all.find((p) => p.ref === ref)
+      const focusMinutes = Math.max(chosen?.focusMinutes ?? 25, task?.requiredFocusMinutes ?? 0)
+      const breakMinutes = Math.max(chosen?.shortBreakMinutes ?? 5, chosen?.longBreakMinutes ?? 0)
+      engagement = await engage({ untilMs: Date.now() + sessionCapMs(cycles, focusMinutes, breakMinutes) })
       const out = await start.mutateAsync({
         clientSessionKey: clientKey('session'),
         presetRef: ref,
@@ -149,7 +152,7 @@ function Setup({ onStarted }: { onStarted: () => void }) {
       </View>
 
       <Card style={{ marginTop: spacing.lg }}>
-        <Txt variant="small" color={colors.textMuted}>When you start, MyCampusView applies whatever focus controls this phone allows and shows exactly which ones are active. Emergency calls always stay available. Restriction level never changes your XP.</Txt>
+        <Txt variant="small" color={colors.textMuted}>When you start, MyCampusView blocks other apps if you have set up Phone controls, may ask Android to pin the app, and shows exactly which controls are active. Calls always stay available. Restriction level never changes your XP.</Txt>
       </Card>
       <Button label="Start session" onPress={() => void begin()} loading={starting} disabled={!ref} style={{ marginTop: spacing.md }} />
       <Button label="Phone controls" variant="ghost" onPress={() => router.push('/(app)/tapasya-device')} />
@@ -241,9 +244,29 @@ function ActiveSession({ initial, onClosed }: { initial: Session; onClosed: () =
     if (sessionEngagement) {
       void release(sessionEngagement)
       sessionEngagement = null
+    } else {
+      void releaseOrphaned()
     }
     void qc.invalidateQueries({ queryKey: ['tapasya'] })
   }, [ended, qc])
+
+  // If the student revokes the blocker's permissions or unpins, say so and report it.
+  const [blocked, setBlocked] = React.useState(0)
+  React.useEffect(() => {
+    if (ended || level !== 'APP_SHIELDING' || Platform.OS !== 'android') return
+    const check = () => {
+      const blocker = appBlockerState()
+      setBlocked(blocker?.blockedCount ?? 0)
+      const blocking = (!!blocker?.running && !blocker.lostAccess) || screenPinned()
+      if (!blocking) {
+        setLevel('TIMER_ONLY')
+        void send('SYNC', { level: 'TIMER_ONLY', detail: { reason: blocker?.lostAccess ? 'blocker-permission-revoked' : 'app-blocking-stopped' } })
+      }
+    }
+    const id = setInterval(check, 10_000)
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') check() })
+    return () => { clearInterval(id); sub.remove() }
+  }, [ended, level, send])
 
   const s = session.settings
   if (ended) {
@@ -290,6 +313,8 @@ function ActiveSession({ initial, onClosed }: { initial: Session; onClosed: () =
       <Card>
         <Txt variant="bodyStrong">{RESTRICTION_LABEL[level]}</Txt>
         <Txt variant="small" color={colors.textMuted}>{RESTRICTION_EXPLANATION[level]}</Txt>
+        {blocked > 0 ? <Txt variant="caption" color={colors.textSubtle} style={{ marginTop: spacing.xs }}>Blocked {blocked} attempt{blocked === 1 ? '' : 's'} to open another app this session.</Txt> : null}
+        {level === 'TIMER_ONLY' || level === 'PARTIAL' ? <Button label="Set up app blocking" variant="ghost" onPress={() => router.push('/(app)/tapasya-device')} /> : null}
       </Card>
 
       <UnlockPanel session={session} onGrant={async (granted) => {

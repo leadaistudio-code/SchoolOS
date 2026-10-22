@@ -1,6 +1,6 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
-import Native, { type AndroidCapabilities, type IosCapabilities } from '../../modules/tapasya-device-control'
+import Native, { type AndroidCapabilities, type AppBlockerState, type IosCapabilities } from '../../modules/tapasya-device-control'
 import { APP_VERSION, IOS_APP_SHIELDING_ENABLED } from '@/config'
 import type { CapabilityState, RestrictionLevel } from './device'
 
@@ -25,14 +25,24 @@ export type DeviceStatus = {
 
 export type SetupStep =
   | { kind: 'ANDROID_DND_ACCESS'; label: string }
+  | { kind: 'ANDROID_USAGE_ACCESS'; label: string }
+  | { kind: 'ANDROID_OVERLAY'; label: string }
+  | { kind: 'ANDROID_PIN_SETTINGS'; label: string }
   | { kind: 'IOS_SCREEN_TIME'; label: string }
   | { kind: 'INFO'; label: string }
 
 export type Engagement = {
   level: RestrictionLevel
   /** Restrictions this app applied and must undo. MDM-owned ones are never listed. */
-  applied: ('DND' | 'LOCK_TASK' | 'SHIELD' | 'SINGLE_APP')[]
+  applied: ('DND' | 'LOCK_TASK' | 'BLOCKER' | 'PIN' | 'SHIELD' | 'SINGLE_APP')[]
   failures: string[]
+}
+
+const DEFAULT_SESSION_MS = 4 * 60 * 60_000
+
+/** Longest a session can plausibly run, plus an hour for pauses and slow breaks. */
+export function sessionCapMs(cycles: number, focusMinutes: number, breakMinutes: number): number {
+  return (cycles * (focusMinutes + breakMinutes) + 60) * 60_000
 }
 
 const platform: DeviceStatus['platform'] = Platform.OS === 'android' ? 'android' : Platform.OS === 'ios' ? 'ios' : 'web'
@@ -56,12 +66,19 @@ export async function getDeviceStatus(): Promise<DeviceStatus> {
   if (platform === 'android') {
     const caps = (await Native.getCapabilities()) as AndroidCapabilities
     const setup: SetupStep[] = []
+    const blockerSupported = caps.usageAccessGranted !== undefined
+    const blockerReady = !!caps.usageAccessGranted && !!caps.overlayGranted
+    if (!caps.lockTaskPermitted && blockerSupported) {
+      if (!caps.usageAccessGranted) setup.push({ kind: 'ANDROID_USAGE_ACCESS', label: 'Block other apps during focus: turn on Usage access for MyCampusView' })
+      if (!caps.overlayGranted) setup.push({ kind: 'ANDROID_OVERLAY', label: 'Block other apps during focus: allow MyCampusView to display over other apps' })
+      setup.push({ kind: 'ANDROID_PIN_SETTINGS', label: 'Optional: turn on App pinning and "Ask for PIN before unpinning" so the phone stays on MyCampusView' })
+    }
     if (!caps.dndAccessGranted) setup.push({ kind: 'ANDROID_DND_ACCESS', label: 'Allow MyCampusView to turn on Do Not Disturb during focus' })
-    if (!caps.lockTaskPermitted) setup.push({ kind: 'INFO', label: 'Locking the phone to MyCampusView needs a school-managed device (Android Enterprise). It is not available on a personal phone.' })
-    const best: RestrictionLevel = caps.lockTaskPermitted ? 'MANAGED_KIOSK' : caps.dndAccessGranted ? 'PARTIAL' : 'TIMER_ONLY'
+    if (!caps.lockTaskPermitted) setup.push({ kind: 'INFO', label: 'A lock with no way out needs a school-managed device (Android Enterprise). On a personal phone the student can still revoke permissions in Settings; MyCampusView notices and reports it.' })
+    const best: RestrictionLevel = caps.lockTaskPermitted ? 'MANAGED_KIOSK' : blockerReady ? 'APP_SHIELDING' : caps.dndAccessGranted ? 'PARTIAL' : 'TIMER_ONLY'
     return {
       platform,
-      capabilityState: caps.lockTaskPermitted ? 'READY_FOR_MANAGED_KIOSK' : caps.dndAccessGranted ? 'READY_FOR_FOCUS' : 'PERMISSION_REQUIRED',
+      capabilityState: caps.lockTaskPermitted ? 'READY_FOR_MANAGED_KIOSK' : blockerReady || caps.dndAccessGranted ? 'READY_FOR_FOCUS' : 'PERMISSION_REQUIRED',
       bestLevel: best,
       setup,
       managed: caps.lockTaskPermitted,
@@ -88,14 +105,31 @@ export async function getDeviceStatus(): Promise<DeviceStatus> {
 export async function runSetupStep(step: SetupStep): Promise<void> {
   if (!Native) return
   if (step.kind === 'ANDROID_DND_ACCESS') Native.openDoNotDisturbSettings?.()
+  if (step.kind === 'ANDROID_USAGE_ACCESS') Native.openUsageAccessSettings?.()
+  if (step.kind === 'ANDROID_OVERLAY') Native.openOverlaySettings?.()
+  if (step.kind === 'ANDROID_PIN_SETTINGS') Native.openPinningSettings?.()
   if (step.kind === 'IOS_SCREEN_TIME') await Native.requestScreenTimeAuthorization?.()
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Android shows its own pin confirmation; wait briefly for the user's answer. */
+async function pinScreen(): Promise<boolean> {
+  if (!Native?.requestScreenPin) return false
+  let state = await Native.requestScreenPin()
+  for (let i = 0; i < 8 && state === 'NONE'; i++) {
+    await sleep(500)
+    state = Native.getLockTaskState?.() ?? 'NONE'
+  }
+  return state === 'PINNED' || state === 'LOCKED'
 }
 
 /**
  * Applies the strongest restriction the device supports and reports what the
  * OS confirmed. Never throws: a failure lowers the level and is listed.
+ * `untilMs` caps how long the app blocker can run if the app is killed.
  */
-export async function engage(): Promise<Engagement> {
+export async function engage(opts: { untilMs?: number } = {}): Promise<Engagement> {
   const out: Engagement = { level: 'TIMER_ONLY', applied: [], failures: [] }
   if (!Native || platform === 'web') return out
 
@@ -109,6 +143,21 @@ export async function engage(): Promise<Engagement> {
           out.level = 'MANAGED_KIOSK'
         } else {
           out.failures.push(`Managed lock task did not start (${state ?? 'unavailable'}).`)
+        }
+      } else {
+        if (caps.usageAccessGranted && caps.overlayGranted) {
+          if (Native.startAppBlocker?.(opts.untilMs ?? Date.now() + DEFAULT_SESSION_MS, [])) {
+            out.applied.push('BLOCKER')
+            out.level = 'APP_SHIELDING'
+          } else {
+            out.failures.push('The app blocker could not start.')
+          }
+        }
+        if (await pinScreen()) {
+          out.applied.push('PIN')
+          out.level = 'APP_SHIELDING'
+        } else if (!out.applied.includes('BLOCKER')) {
+          out.failures.push('Other apps are not blocked: screen pinning was not turned on, and the app blocker needs Usage access and "Display over other apps" (Phone controls).')
         }
       }
       if (caps.dndAccessGranted) {
@@ -157,7 +206,8 @@ export async function release(e: Engagement, opts: { keepManaged?: boolean } = {
         continue
       }
       if (r === 'DND') Native.setDoNotDisturb?.(false)
-      if (r === 'LOCK_TASK') await Native.stopLockTask?.()
+      if (r === 'LOCK_TASK' || r === 'PIN') await Native.stopLockTask?.()
+      if (r === 'BLOCKER') Native.stopAppBlocker?.()
       if (r === 'SHIELD') await Native.setShield?.(false)
       if (r === 'SINGLE_APP') await Native.requestSingleAppMode?.(false)
     } catch {
@@ -165,6 +215,35 @@ export async function release(e: Engagement, opts: { keepManaged?: boolean } = {
     }
   }
   return { level: keep.length ? 'MANAGED_KIOSK' : 'TIMER_ONLY', applied: keep, failures: [] }
+}
+
+/**
+ * Lifts the app blocker and screen pin when the record of what was applied
+ * is gone (the app was restarted mid-session). Managed kiosk is left alone.
+ */
+export async function releaseOrphaned(): Promise<void> {
+  if (!Native || platform !== 'android') return
+  try {
+    Native.stopAppBlocker?.()
+    if (Native.getLockTaskState?.() === 'PINNED') await Native.stopLockTask?.()
+  } catch {
+    // Nothing was running.
+  }
+}
+
+export function appBlockerState(): AppBlockerState | null {
+  if (!Native?.getAppBlockerState || platform !== 'android') return null
+  try {
+    return Native.getAppBlockerState()
+  } catch {
+    return null
+  }
+}
+
+/** True while Android still reports this app pinned or locked. */
+export function screenPinned(): boolean {
+  const state = Native?.getLockTaskState?.()
+  return state === 'PINNED' || state === 'LOCKED'
 }
 
 const INSTALLATION_KEY = 'mcv.tapasya.installation'

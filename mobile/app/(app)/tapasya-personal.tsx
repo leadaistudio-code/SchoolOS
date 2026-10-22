@@ -8,7 +8,7 @@ import { useAuth } from '@/auth/store'
 import { colors, radius, spacing } from '@/theme'
 import { advance, apply, EngineError, formatClock, initialState, isTerminal, view, type EngineEvent, type EngineState, type PomodoroSettings, type TimerView } from '@/tapasya/engine'
 import { RESTRICTION_EXPLANATION, RESTRICTION_LABEL } from '@/tapasya/device'
-import { engage, getDeviceStatus, release, runSetupStep, type DeviceStatus, type Engagement } from '@/tapasya/device-control'
+import { engage, getDeviceStatus, release, runSetupStep, sessionCapMs, type DeviceStatus, type Engagement } from '@/tapasya/device-control'
 
 /**
  * A parent's own focus session.
@@ -102,7 +102,7 @@ export default function TapasyaPersonalScreen() {
     setSummary(null)
     try {
       const settings = settingsFor(preset)
-      const engagement = await engage()
+      const engagement = await engage({ untilMs: Date.now() + sessionCapMs(settings.plannedCycles, settings.focusMinutes, settings.longBreakMinutes ?? settings.shortBreakMinutes) })
       const now = Date.now()
       const { state } = apply(settings, initialState(now), { type: 'START_FOCUS' }, now)
       const next = { settings, engine: state, engagement }
@@ -149,7 +149,7 @@ export default function TapasyaPersonalScreen() {
               <Card>
                 <Txt variant="h2">{summary.state === 'COMPLETED' ? 'Session complete' : 'Session ended'}</Txt>
                 <Txt variant="metric" style={{ marginTop: spacing.sm }}>{summary.cycles} of {summary.planned} cycles</Txt>
-                <Txt variant="small" color={colors.textMuted}>{summary.minutes} focused minutes. Do Not Disturb has been switched back off.</Txt>
+                <Txt variant="small" color={colors.textMuted}>{summary.minutes} focused minutes. Focus controls have been switched off.</Txt>
               </Card>
             ) : null}
 
@@ -246,7 +246,7 @@ function Running({
           <Button
             label="End session"
             variant="ghost"
-            onPress={() => Alert.alert('End this session?', 'Do Not Disturb will be switched back off.', [{ text: 'Keep going', style: 'cancel' }, { text: 'End', style: 'destructive', onPress: () => void onSend({ type: 'FINISH' }) }])}
+            onPress={() => Alert.alert('End this session?', 'Focus controls will be switched off.', [{ text: 'Keep going', style: 'cancel' }, { text: 'End', style: 'destructive', onPress: () => void onSend({ type: 'FINISH' }) }])}
           />
         </View>
       </Card>
