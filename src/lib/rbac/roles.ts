@@ -171,6 +171,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'exams.view',
       'exams.attendance',
       'exams.marks',
+      'exams.class_tests',
       'results.view',
       'notices.view',
       'messages.view',

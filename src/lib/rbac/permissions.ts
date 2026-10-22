@@ -156,6 +156,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['admit_cards', 'Generate admit cards'],
     ['admit_approve', 'Approve admit cards after fee check'],
     ['attendance', 'Scan and manage exam attendance'],
+    ['class_tests', 'Set class tests and tick who completed them'],
   ]),
   ...mod('results', [
     ['view', 'View results'],

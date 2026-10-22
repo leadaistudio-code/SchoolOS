@@ -109,6 +109,8 @@ export const TENANT_SCOPED_MODELS = [
   'TransferCertificate',
   'Homework',
   'HomeworkSubmission',
+  'ClassTest',
+  'ClassTestResult',
   'Classwork',
   'TimetablePeriod',
   'TimetableSlot',

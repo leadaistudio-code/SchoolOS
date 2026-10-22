@@ -275,7 +275,40 @@ export async function getHomework(ctx: AppContext, id: string) {
         })
       : []
 
-  return { homework, submissions, pending }
+  // The teacher's tick register: everyone in the class, done or not.
+  const doneIds = new Set(
+    submissions
+      .filter((s) => s.status === 'SUBMITTED' || s.status === 'LATE' || s.status === 'REVIEWED')
+      .map((s) => s.studentId),
+  )
+  const roster =
+    ownStudentIds === null
+      ? (
+          await ctx.db.enrollment.findMany({
+            where: {
+              classLevelId: homework.classLevelId,
+              ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
+              isCurrent: true,
+              student: { deletedAt: null },
+            },
+            select: {
+              rollNumber: true,
+              section: { select: { name: true } },
+              student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },
+            },
+            orderBy: [{ section: { name: 'asc' } }, { rollNumber: 'asc' }],
+          })
+        ).map((e) => ({
+          studentId: e.student.id,
+          name: `${e.student.firstName} ${e.student.lastName}`.trim(),
+          admissionNo: e.student.admissionNo,
+          rollNumber: e.rollNumber,
+          sectionName: e.section?.name ?? null,
+          done: doneIds.has(e.student.id),
+        }))
+      : []
+
+  return { homework, submissions, pending, roster }
 }
 
 /** Verifies the acting user teaches this subject, unless they are school-wide staff. */
@@ -635,6 +668,96 @@ export async function reviewSubmission(
   })
 
   return updated
+}
+
+export const completionSchema = z.object({
+  completedStudentIds: z.array(z.string().min(1)).max(500),
+})
+
+/**
+ * The teacher's tick list: who did the homework, recorded without the student
+ * touching the portal. A tick becomes a REVIEWED submission; an untick returns
+ * the row to PENDING, keeping any note or file the student did hand in.
+ */
+export async function setHomeworkCompletion(
+  ctx: AppContext,
+  homeworkId: string,
+  input: z.infer<typeof completionSchema>,
+) {
+  ctx.require('homework.review')
+
+  const homework = await ctx.db.homework.findFirst({
+    where: { id: homeworkId, deletedAt: null },
+    select: { id: true, title: true, teacherId: true, classLevelId: true, sectionId: true },
+  })
+  if (!homework) throw notFound('Homework')
+  await assertOwnHomework(ctx, homework.teacherId)
+
+  const roster = await ctx.db.enrollment.findMany({
+    where: {
+      classLevelId: homework.classLevelId,
+      ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
+      isCurrent: true,
+      student: { deletedAt: null },
+    },
+    select: { studentId: true },
+  })
+  const inClass = new Set(roster.map((r) => r.studentId))
+  const ticked = new Set(input.completedStudentIds)
+  for (const id of ticked) {
+    if (!inClass.has(id)) throw conflict('A ticked student is not in the class this homework was set for')
+  }
+
+  const existing = await ctx.db.homeworkSubmission.findMany({
+    where: { homeworkId },
+    select: { studentId: true, status: true },
+  })
+  const statusOf = new Map(existing.map((s) => [s.studentId, s.status]))
+  const DONE = new Set(['SUBMITTED', 'LATE', 'REVIEWED'])
+  const now = new Date()
+
+  const toTick = [...ticked].filter((id) => statusOf.get(id) !== 'REVIEWED')
+  const toUntick = existing
+    .filter((s) => DONE.has(s.status) && inClass.has(s.studentId) && !ticked.has(s.studentId))
+    .map((s) => s.studentId)
+
+  await ctx.db.$transaction([
+    ...toTick.map((studentId) =>
+      ctx.db.homeworkSubmission.upsert({
+        where: { tenantId_homeworkId_studentId: { tenantId: ctx.tenant.id, homeworkId, studentId } },
+        create: {
+          tenantId: ctx.tenant.id,
+          homeworkId,
+          studentId,
+          status: 'REVIEWED',
+          reviewedById: ctx.user.userId,
+          reviewedAt: now,
+        },
+        update: { status: 'REVIEWED', reviewedById: ctx.user.userId, reviewedAt: now },
+      }),
+    ),
+    ...(toUntick.length > 0
+      ? [
+          ctx.db.homeworkSubmission.updateMany({
+            where: { homeworkId, studentId: { in: toUntick } },
+            data: { status: 'PENDING', reviewedById: ctx.user.userId, reviewedAt: now },
+          }),
+        ]
+      : []),
+  ])
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'homework.completion',
+    module: 'homework',
+    entityType: 'Homework',
+    entityId: homeworkId,
+    summary: `Marked ${ticked.size} of ${inClass.size} as done on "${homework.title}"`,
+  })
+
+  return { completed: ticked.size, total: inClass.size }
 }
 
 /** Subjects the acting user may set homework for. */

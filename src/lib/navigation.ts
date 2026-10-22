@@ -228,6 +228,7 @@ export const NAVIGATION: NavItem[] = [
         portalOnly: true,
       },
       { label: 'Admit Cards', href: '/exams/admit-cards', icon: 'IdCard', permission: 'exams.admit_cards' },
+      { label: 'Class Tests', href: '/exams/class-tests', icon: 'ListChecks', permission: 'exams.class_tests' },
       { label: 'Exam Attendance', href: '/exams/attendance', icon: 'ClipboardCheck', permission: 'exams.attendance' },
       { label: 'Marks Management', href: '/exams/marks', icon: 'PencilRuler', permission: 'exams.marks' },
       { label: 'Grading Scales', href: '/exams/grades', icon: 'Scale', permission: 'exams.manage' },

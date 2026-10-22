@@ -546,6 +546,7 @@ model ClassLevel {
   examClasses           ExamClass[]
   timetableSlots        TimetableSlot[]
   homework              Homework[]
+  classTests            ClassTest[]
   classwork             Classwork[]
   noticeTargets         NoticeTarget[]
   assessmentAssignments AssessmentAssignment[]
@@ -569,6 +570,7 @@ model Section {
   enrollments           Enrollment[]
   timetableSlots        TimetableSlot[]
   homework              Homework[]
+  classTests            ClassTest[]
   classwork             Classwork[]
   assessments           Assessment[]
   assessmentAssignments AssessmentAssignment[]
@@ -613,6 +615,7 @@ model ClassSubject {
   teacher                   Staff?                     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   timetable                 TimetableSlot[]
   homework                  Homework[]
+  classTests                ClassTest[]
   classwork                 Classwork[]
   examSubjects              ExamSubject[]
   curricula                 Curriculum[]
@@ -1469,6 +1472,7 @@ model Student {
   transferCertificates TransferCertificate[]
   admitCards           AdmitCard[]
   homeworkSubmissions  HomeworkSubmission[]
+  classTestResults     ClassTestResult[]
   libraryLoans         LibraryLoan[]
   transport            TransportAssignment[]
   boardingLogs         TransportBoardingLog[]
@@ -1636,6 +1640,7 @@ model Staff {
   leaveRequests             LeaveRequest[]
   timetableSlots            TimetableSlot[]
   homework                  Homework[]
+  classTests                ClassTest[]
   classwork                 Classwork[]
   documents                 Document[]
   drivenBuses               Bus[]
@@ -3216,6 +3221,51 @@ model HomeworkSubmission {
 
   @@unique([tenantId, homeworkId, studentId])
   @@index([tenantId, studentId, status])
+}
+
+/// A short in-class test. Unlike an Exam there is no schedule, admit card or
+/// report-card weighting: the teacher sets it, then ticks who took it.
+model ClassTest {
+  id             String    @id @default(cuid())
+  tenantId       String
+  classLevelId   String
+  sectionId      String?
+  classSubjectId String
+  teacherId      String
+  title          String
+  syllabus       String?
+  heldOn         DateTime  @db.Date
+  maxMarks       Float?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  classLevel   ClassLevel        @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  section      Section?          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject      @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  teacher      Staff             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  results      ClassTestResult[]
+
+  @@index([tenantId, classLevelId, heldOn])
+  @@index([tenantId, teacherId, heldOn])
+}
+
+/// One student's line on a class test, recorded by the teacher.
+model ClassTestResult {
+  id          String    @id @default(cuid())
+  tenantId    String
+  classTestId String
+  studentId   String
+  completed   Boolean   @default(false)
+  marks       Float?
+  markedById  String?
+  markedAt    DateTime?
+
+  classTest ClassTest @relation(fields: [classTestId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, classTestId, studentId])
+  @@index([tenantId, studentId])
 }
 
 model Classwork {

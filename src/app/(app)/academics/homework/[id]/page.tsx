@@ -12,6 +12,8 @@ import { EmptyState } from '@/components/ui/states'
 import { SubmissionPanel } from './submission-panel'
 import { ReviewList } from './review-list'
 import { PublishToggle } from './publish-toggle'
+import { TickRegister } from '@/components/tick-register'
+import { saveHomeworkCompletionAction } from '../actions'
 
 export const metadata = { title: 'Homework' }
 
@@ -22,7 +24,7 @@ export default async function HomeworkDetailPage({
 }) {
   const { id } = await params
   const ctx = await requireContext('homework.view')
-  const { homework, submissions, pending } = await getHomework(ctx, id)
+  const { homework, submissions, pending, roster } = await getHomework(ctx, id)
 
   const portalView = isSelfScoped(ctx.user.roleKeys)
   const children = portalView ? await scopedStudents(ctx) : []
@@ -98,6 +100,26 @@ export default async function HomeworkDetailPage({
       ) : null}
 
       {canReview ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Completion register</CardTitle>
+              <p className="text-sm text-ink-muted mt-0.5">
+                Tick the students who did this homework. Students do not need to do anything on the portal.
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 px-0">
+            <TickRegister
+              rows={roster}
+              doneLabel="done"
+              onSave={saveHomeworkCompletionAction.bind(null, homework.id)}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canReview && submissions.some((s) => s.submittedAt) ? (
         <Card>
           <CardHeader>
             <div>

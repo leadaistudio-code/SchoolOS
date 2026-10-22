@@ -5,8 +5,10 @@ import { redirect } from 'next/navigation'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
+  completionSchema,
   createHomework,
   homeworkCreateSchema,
+  setHomeworkCompletion,
   reviewSchema,
   reviewSubmission,
   submitHomework,
@@ -95,6 +97,23 @@ export async function reviewSubmissionAction(
       ok: false,
       message: err instanceof Error ? err.message : 'The review could not be saved',
     }
+  }
+}
+
+/** The teacher's tick list of who did the homework. */
+export async function saveHomeworkCompletionAction(
+  homeworkId: string,
+  entries: { studentId: string; done: boolean }[],
+): Promise<ActionResult> {
+  const ctx = await requireContext('homework.review')
+  try {
+    const completedStudentIds = entries.filter((e) => e.done).map((e) => e.studentId)
+    const result = await setHomeworkCompletion(ctx, homeworkId, completionSchema.parse({ completedStudentIds }))
+    revalidatePath(`/academics/homework/${homeworkId}`)
+    revalidatePath('/academics/homework')
+    return { ok: true, message: `${result.completed} of ${result.total} marked as done.` }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not save the register' }
   }
 }
 
