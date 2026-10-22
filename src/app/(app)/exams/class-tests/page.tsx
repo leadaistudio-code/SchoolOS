@@ -20,7 +20,7 @@ export default async function ClassTestsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Class tests"
-        description="Quick tests taken in class. No admit cards or exam schedule. Set the test, then tick who took it."
+        description="Quick tests taken in class. No admit cards or exam schedule. Set the test, then record who took it and their marks."
         actions={
           <Link href="/exams/class-tests/new" className={buttonVariants({ size: 'sm' })}>
             <Plus aria-hidden />
@@ -44,6 +44,7 @@ export default async function ClassTestsPage() {
                   <TH>Class</TH>
                   <TH>Date</TH>
                   <TH>Completed</TH>
+                  <TH>Passed</TH>
                 </TR>
               </THead>
               <TBody>
@@ -56,6 +57,7 @@ export default async function ClassTestsPage() {
                       <p className="text-xs text-ink-subtle">
                         {t.subject} · {t.teacher}
                         {t.maxMarks ? ` · out of ${t.maxMarks}` : ''}
+                        {t.passingMarks !== null ? ` · pass ${t.passingMarks}` : ''}
                       </p>
                     </TD>
                     <TD className="text-sm">
@@ -67,6 +69,9 @@ export default async function ClassTestsPage() {
                       <Badge tone={t.expected > 0 && t.completed >= t.expected ? 'success' : t.completed > 0 ? 'info' : 'neutral'}>
                         {t.completed} / {t.expected}
                       </Badge>
+                    </TD>
+                    <TD className="text-sm tnum">
+                      {t.passed === null ? <span className="text-ink-subtle">—</span> : `${t.passed} of ${t.completed}`}
                     </TD>
                   </TR>
                 ))}

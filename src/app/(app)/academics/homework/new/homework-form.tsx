@@ -11,6 +11,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
 import { toDateInput } from '@/lib/dates'
+import { SectionPicker } from '@/components/section-picker'
 
 type SubjectOption = {
   id: string
@@ -63,19 +64,11 @@ export function HomeworkForm({ subjects }: { subjects: SubjectOption[] }) {
           </Field>
 
           <Field
-            label="Section"
-            htmlFor="sectionId"
-            hint="Leave as whole class to set it for every section"
-            error={err('sectionId')}
+            label="Sections"
+            hint="Pick one or more sections, or leave as whole class"
+            error={err('sectionIds') ?? err('sectionId')}
           >
-            <Select id="sectionId" name="sectionId" defaultValue="">
-              <option value="">Whole class</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  Section {s.name}
-                </option>
-              ))}
-            </Select>
+            <SectionPicker key={subjectId} sections={sections} />
           </Field>
 
           <Field label="Title" htmlFor="title" required error={err('title')}>

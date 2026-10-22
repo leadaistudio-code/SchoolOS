@@ -1283,6 +1283,54 @@ export type StudentDueRow = {
   invoiceCount: number
 }
 
+export const DUES_AGES = ['overdue', 'upcoming', '30', '60', '90'] as const
+
+export const duesFilterSchema = z.object({
+  classLevelId: z.string().optional(),
+  sectionId: z.string().optional(),
+  age: z.enum(DUES_AGES).optional(),
+  minAmount: z.coerce.number().positive().optional(),
+})
+
+export type DuesFilter = z.infer<typeof duesFilterSchema>
+
+/**
+ * The student condition behind the dues list and its totals, so the
+ * headline figures always describe the same students as the table.
+ */
+export function duesStudentFilter(filter: DuesFilter, q?: string): Prisma.StudentWhereInput {
+  const today = attendanceDate(new Date())
+  const open = { balanceMinor: { gt: 0 }, status: { notIn: ['CANCELLED' as const, 'DRAFT' as const] } }
+  const and: Prisma.StudentWhereInput[] = []
+  if (q) {
+    and.push({
+      OR: [
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { admissionNo: { contains: q, mode: 'insensitive' } },
+      ],
+    })
+  }
+  if (filter.classLevelId || filter.sectionId) {
+    and.push({
+      enrollments: {
+        some: {
+          isCurrent: true,
+          ...(filter.classLevelId ? { classLevelId: filter.classLevelId } : {}),
+          ...(filter.sectionId ? { sectionId: filter.sectionId } : {}),
+        },
+      },
+    })
+  }
+  if (filter.age === 'upcoming') {
+    and.push({ invoices: { none: { ...open, dueOn: { lt: today } } } })
+  } else if (filter.age) {
+    const days = filter.age === 'overdue' ? 0 : Number(filter.age)
+    and.push({ invoices: { some: { ...open, dueOn: { lt: new Date(today.getTime() - days * 86_400_000) } } } })
+  }
+  return and.length > 0 ? { AND: and } : {}
+}
+
 /**
  * One chase-list row per student, regardless of how many unpaid invoices they
  * have. The detailed fee account remains the source of the invoice/ledger
@@ -1291,39 +1339,35 @@ export type StudentDueRow = {
 export async function listStudentDues(
   ctx: AppContext,
   query: ListQuery,
+  filter: DuesFilter = {},
 ): Promise<{ rows: StudentDueRow[]; total: number }> {
   ctx.require('fees.accounts')
 
   const allowedStudentIds = await accessibleStudentIds(ctx)
   const today = attendanceDate(new Date())
+  const studentFilter = duesStudentFilter(filter, query.q)
+  const minMinor = filter.minAmount ? Math.round(filter.minAmount * 100) : null
   const openInvoiceWhere: Prisma.FeeInvoiceWhereInput = {
     balanceMinor: { gt: 0 },
     status: { notIn: ['CANCELLED', 'DRAFT'] },
     ...(allowedStudentIds === null ? {} : { studentId: { in: allowedStudentIds } }),
-    ...(query.q
-      ? {
-          student: {
-            OR: [
-              { firstName: { contains: query.q, mode: 'insensitive' } },
-              { lastName: { contains: query.q, mode: 'insensitive' } },
-              { admissionNo: { contains: query.q, mode: 'insensitive' } },
-            ],
-          },
-        }
-      : {}),
+    student: studentFilter,
+  }
+
+  if (minMinor !== null) {
+    // A student's total spans invoices, so the threshold needs the grouped sums.
+    const all = await ctx.db.feeInvoice.groupBy({
+      by: ['studentId'],
+      where: openInvoiceWhere,
+      _sum: { balanceMinor: true },
+      having: { balanceMinor: { _sum: { gte: minMinor } } },
+    })
+    openInvoiceWhere.studentId = { in: all.map((g) => g.studentId) }
   }
 
   const studentWhere: Prisma.StudentWhereInput = {
-    ...(allowedStudentIds === null ? {} : { id: { in: allowedStudentIds } }),
-    ...(query.q
-      ? {
-          OR: [
-            { firstName: { contains: query.q, mode: 'insensitive' } },
-            { lastName: { contains: query.q, mode: 'insensitive' } },
-            { admissionNo: { contains: query.q, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
+    ...studentFilter,
+    id: openInvoiceWhere.studentId as Prisma.StringFilter | undefined,
     invoices: {
       some: {
         balanceMinor: { gt: 0 },

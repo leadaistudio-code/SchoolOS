@@ -1,9 +1,10 @@
 import { requireContext } from '@/server/context'
 import { getClassTest } from '@/server/modules/class-tests/service'
 import { formatDay } from '@/lib/dates'
+import { CLASS_TEST_MARKABLE, CLASS_TEST_OPTIONS } from '@/lib/registers'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TickRegister } from '@/components/tick-register'
+import { StatusRegister } from '@/components/status-register'
 import { Button } from '@/components/ui/button'
 import { deleteClassTestAction, saveClassTestResultsAction } from '../actions'
 
@@ -15,12 +16,14 @@ export default async function ClassTestPage({ params }: { params: Promise<{ id: 
   const { test, roster } = await getClassTest(ctx, id)
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="max-w-4xl space-y-4">
       <PageHeader
         title={test.title}
         description={`${test.classSubject.subject.name} · ${test.classLevel.name}${
           test.section ? ` ${test.section.name}` : ' (all sections)'
-        } · ${formatDay(test.heldOn, 'd MMMM yyyy')}${test.maxMarks ? ` · out of ${test.maxMarks}` : ''}`}
+        } · ${formatDay(test.heldOn, 'd MMMM yyyy')}${test.maxMarks ? ` · out of ${test.maxMarks}` : ''}${
+          test.passingMarks !== null ? ` · pass mark ${test.passingMarks}` : ''
+        }`}
         actions={
           <form action={deleteClassTestAction.bind(null, test.id)}>
             <Button type="submit" size="sm" variant="ghost">Delete</Button>
@@ -39,18 +42,24 @@ export default async function ClassTestPage({ params }: { params: Promise<{ id: 
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Who completed it</CardTitle>
+            <CardTitle>Results</CardTitle>
             <p className="text-sm text-ink-muted mt-0.5">
-              Tick each student who took the test{test.maxMarks ? ', and enter marks if you have them' : ''}. Students do not
-              need to do anything on the portal.
+              Mark each student as completed, absent or not applicable
+              {test.maxMarks ? ', and enter marks for those who took it' : ''}
+              {test.passingMarks !== null ? '. Pass or fail is worked out from the passing marks' : ''}. Students do not need
+              to do anything on the portal.
             </p>
           </div>
         </CardHeader>
         <CardContent className="pt-0 px-0">
-          <TickRegister
+          <StatusRegister
             rows={roster}
+            options={CLASS_TEST_OPTIONS}
+            countAs={['COMPLETED']}
+            countLabel="completed"
             maxMarks={test.maxMarks}
-            doneLabel="completed"
+            passingMarks={test.passingMarks}
+            markable={CLASS_TEST_MARKABLE}
             onSave={saveClassTestResultsAction.bind(null, test.id)}
           />
         </CardContent>

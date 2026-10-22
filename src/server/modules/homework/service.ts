@@ -12,6 +12,7 @@ import {
 } from '@/server/scope'
 import { notify } from '@/server/notifications'
 import { orderByFrom, skipTake, type ListQuery } from '@/lib/query'
+import { HOMEWORK_DONE_MARKS, HOMEWORK_MARKS } from '@/lib/registers'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
 
@@ -19,6 +20,8 @@ export const homeworkCreateSchema = z
   .object({
     classSubjectId: z.string().min(1, 'Select a subject'),
     sectionId: z.string().optional(),
+    /** One homework is created per section; empty means the whole class. */
+    sectionIds: z.array(z.string().min(1)).max(50).optional(),
     title: z.string().trim().min(3, 'Give the homework a title').max(160),
     instructions: z.string().trim().max(4000).optional(),
     assignedOn: isoDate,
@@ -275,12 +278,8 @@ export async function getHomework(ctx: AppContext, id: string) {
         })
       : []
 
-  // The teacher's tick register: everyone in the class, done or not.
-  const doneIds = new Set(
-    submissions
-      .filter((s) => s.status === 'SUBMITTED' || s.status === 'LATE' || s.status === 'REVIEWED')
-      .map((s) => s.studentId),
-  )
+  // The teacher's completion register: everyone in the class, marked or not.
+  const submissionOf = new Map(submissions.map((s) => [s.studentId, s]))
   const roster =
     ownStudentIds === null
       ? (
@@ -304,7 +303,8 @@ export async function getHomework(ctx: AppContext, id: string) {
           admissionNo: e.student.admissionNo,
           rollNumber: e.rollNumber,
           sectionName: e.section?.name ?? null,
-          done: doneIds.has(e.student.id),
+          status: submissionOf.get(e.student.id)?.teacherMark ?? null,
+          hint: submissionOf.get(e.student.id)?.submittedAt ? 'Handed in on the portal' : null,
         }))
       : []
 
@@ -341,58 +341,72 @@ async function resolveTeacher(ctx: AppContext, classSubjectId: string) {
 }
 
 export async function createHomework(ctx: AppContext, input: HomeworkCreateInput) {
+  const [first] = await createHomeworkForSections(ctx, input)
+  return first!
+}
+
+/**
+ * Sets the homework for each chosen section (or once for the whole class),
+ * each with its own register, and returns every row created.
+ */
+export async function createHomeworkForSections(ctx: AppContext, input: HomeworkCreateInput) {
   ctx.require('homework.create')
 
   const { classSubject, teacherId } = await resolveTeacher(ctx, input.classSubjectId)
 
-  if (input.sectionId) {
-    const section = await ctx.db.section.findFirst({
-      where: { id: input.sectionId, classLevelId: classSubject.classLevelId },
-      select: { id: true },
+  const sectionIds = [...new Set(input.sectionIds?.length ? input.sectionIds : input.sectionId ? [input.sectionId] : [])]
+  if (sectionIds.length > 0) {
+    const found = await ctx.db.section.count({
+      where: { id: { in: sectionIds }, classLevelId: classSubject.classLevelId },
     })
-    if (!section) {
+    if (found !== sectionIds.length) {
       throw new ApiException(
         400,
         'BAD_REQUEST',
-        'That section does not belong to the subject class',
+        'A chosen section does not belong to the subject class',
       )
     }
   }
 
-  const created = await ctx.db.homework.create({
-    data: {
+  const created = await ctx.db.$transaction(
+    (sectionIds.length > 0 ? sectionIds : [null]).map((sectionId) =>
+      ctx.db.homework.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          classLevelId: classSubject.classLevelId,
+          sectionId,
+          classSubjectId: input.classSubjectId,
+          teacherId,
+          title: input.title,
+          instructions: input.instructions,
+          assignedOn: attendanceDate(input.assignedOn),
+          dueOn: attendanceDate(input.dueOn),
+          maxScore: input.maxScore,
+          isPublished: input.isPublished,
+        },
+        include: {
+          classLevel: { select: { name: true } },
+          section: { select: { name: true } },
+          classSubject: { select: { subject: { select: { name: true } } } },
+        },
+      }),
+    ),
+  )
+
+  for (const homework of created) {
+    await audit({
       tenantId: ctx.tenant.id,
-      classLevelId: classSubject.classLevelId,
-      sectionId: input.sectionId || null,
-      classSubjectId: input.classSubjectId,
-      teacherId,
-      title: input.title,
-      instructions: input.instructions,
-      assignedOn: attendanceDate(input.assignedOn),
-      dueOn: attendanceDate(input.dueOn),
-      maxScore: input.maxScore,
-      isPublished: input.isPublished,
-    },
-    include: {
-      classLevel: { select: { name: true } },
-      section: { select: { name: true } },
-      classSubject: { select: { subject: { select: { name: true } } } },
-    },
-  })
-
-  await audit({
-    tenantId: ctx.tenant.id,
-    actorId: ctx.user.userId,
-    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
-    action: 'homework.create',
-    module: 'homework',
-    entityType: 'Homework',
-    entityId: created.id,
-    summary: `Set "${created.title}" for ${created.classLevel.name}${created.section ? ` ${created.section.name}` : ''}, due ${input.dueOn}`,
-    after: created,
-  })
-
-  if (input.isPublished) await notifyClass(ctx, created.id)
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'homework.create',
+      module: 'homework',
+      entityType: 'Homework',
+      entityId: homework.id,
+      summary: `Set "${homework.title}" for ${homework.classLevel.name}${homework.section ? ` ${homework.section.name}` : ''}, due ${input.dueOn}`,
+      after: homework,
+    })
+    if (input.isPublished) await notifyClass(ctx, homework.id)
+  }
 
   return created
 }
@@ -670,19 +684,22 @@ export async function reviewSubmission(
   return updated
 }
 
-export const completionSchema = z.object({
-  completedStudentIds: z.array(z.string().min(1)).max(500),
+export const homeworkMarksSchema = z.object({
+  entries: z
+    .array(z.object({ studentId: z.string().min(1), mark: z.enum(HOMEWORK_MARKS).nullable() }))
+    .max(500),
 })
 
 /**
- * The teacher's tick list: who did the homework, recorded without the student
- * touching the portal. A tick becomes a REVIEWED submission; an untick returns
- * the row to PENDING, keeping any note or file the student did hand in.
+ * The teacher's completion register, recorded without the student touching
+ * the portal. Completed, partial and late work count as done (REVIEWED); the
+ * other marks leave the row PENDING. Clearing a mark only touches rows the
+ * register itself set, so a student's own hand-in and any review survive.
  */
-export async function setHomeworkCompletion(
+export async function setHomeworkMarks(
   ctx: AppContext,
   homeworkId: string,
-  input: z.infer<typeof completionSchema>,
+  input: z.infer<typeof homeworkMarksSchema>,
 ) {
   ctx.require('homework.review')
 
@@ -703,49 +720,43 @@ export async function setHomeworkCompletion(
     select: { studentId: true },
   })
   const inClass = new Set(roster.map((r) => r.studentId))
-  const ticked = new Set(input.completedStudentIds)
-  for (const id of ticked) {
-    if (!inClass.has(id)) throw conflict('A ticked student is not in the class this homework was set for')
+  for (const e of input.entries) {
+    if (!inClass.has(e.studentId)) throw conflict('A student in the list is not in the class this homework was set for')
   }
 
   const existing = await ctx.db.homeworkSubmission.findMany({
     where: { homeworkId },
-    select: { studentId: true, status: true },
+    select: { studentId: true, status: true, teacherMark: true, submittedAt: true },
   })
-  const statusOf = new Map(existing.map((s) => [s.studentId, s.status]))
-  const DONE = new Set(['SUBMITTED', 'LATE', 'REVIEWED'])
+  const rowOf = new Map(existing.map((s) => [s.studentId, s]))
   const now = new Date()
 
-  const toTick = [...ticked].filter((id) => statusOf.get(id) !== 'REVIEWED')
-  const toUntick = existing
-    .filter((s) => DONE.has(s.status) && inClass.has(s.studentId) && !ticked.has(s.studentId))
-    .map((s) => s.studentId)
-
-  await ctx.db.$transaction([
-    ...toTick.map((studentId) =>
+  const writes = input.entries.flatMap((e) => {
+    const row = rowOf.get(e.studentId)
+    if ((row?.teacherMark ?? null) === e.mark) return []
+    if (e.mark === null) {
+      if (!row) return []
+      return [
+        ctx.db.homeworkSubmission.update({
+          where: { tenantId_homeworkId_studentId: { tenantId: ctx.tenant.id, homeworkId, studentId: e.studentId } },
+          data: { teacherMark: null, status: row.submittedAt ? 'SUBMITTED' : 'PENDING', reviewedById: ctx.user.userId, reviewedAt: now },
+        }),
+      ]
+    }
+    const status = HOMEWORK_DONE_MARKS.includes(e.mark) ? ('REVIEWED' as const) : ('PENDING' as const)
+    const data = { teacherMark: e.mark, status, reviewedById: ctx.user.userId, reviewedAt: now }
+    return [
       ctx.db.homeworkSubmission.upsert({
-        where: { tenantId_homeworkId_studentId: { tenantId: ctx.tenant.id, homeworkId, studentId } },
-        create: {
-          tenantId: ctx.tenant.id,
-          homeworkId,
-          studentId,
-          status: 'REVIEWED',
-          reviewedById: ctx.user.userId,
-          reviewedAt: now,
-        },
-        update: { status: 'REVIEWED', reviewedById: ctx.user.userId, reviewedAt: now },
+        where: { tenantId_homeworkId_studentId: { tenantId: ctx.tenant.id, homeworkId, studentId: e.studentId } },
+        create: { tenantId: ctx.tenant.id, homeworkId, studentId: e.studentId, ...data },
+        update: data,
       }),
-    ),
-    ...(toUntick.length > 0
-      ? [
-          ctx.db.homeworkSubmission.updateMany({
-            where: { homeworkId, studentId: { in: toUntick } },
-            data: { status: 'PENDING', reviewedById: ctx.user.userId, reviewedAt: now },
-          }),
-        ]
-      : []),
-  ])
+    ]
+  })
+  if (writes.length > 0) await ctx.db.$transaction(writes)
 
+  const done = input.entries.filter((e) => e.mark !== null && HOMEWORK_DONE_MARKS.includes(e.mark)).length
+  const marked = input.entries.filter((e) => e.mark !== null).length
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
@@ -754,10 +765,10 @@ export async function setHomeworkCompletion(
     module: 'homework',
     entityType: 'Homework',
     entityId: homeworkId,
-    summary: `Marked ${ticked.size} of ${inClass.size} as done on "${homework.title}"`,
+    summary: `Marked ${marked} of ${inClass.size} on "${homework.title}" (${done} done)`,
   })
 
-  return { completed: ticked.size, total: inClass.size }
+  return { done, marked, total: inClass.size }
 }
 
 /** Subjects the acting user may set homework for. */

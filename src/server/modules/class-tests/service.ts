@@ -5,17 +5,30 @@ import { audit } from '@/server/audit'
 import { ApiException, conflict, notFound } from '@/server/api/response'
 import { attendanceDate } from '@/lib/dates'
 import { teachingClassSubjectIds } from '@/server/scope'
+import { CLASS_TEST_MARKABLE, CLASS_TEST_STATUSES, passFail } from '@/lib/registers'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date')
 
-export const classTestCreateSchema = z.object({
-  classSubjectId: z.string().min(1, 'Select a class and subject'),
-  sectionId: z.string().optional(),
-  title: z.string().trim().min(2, 'Give the test a name').max(160),
-  syllabus: z.string().trim().max(2000).optional(),
-  heldOn: isoDate,
-  maxMarks: z.coerce.number().positive('Must be more than 0').max(1000).optional(),
-})
+export const classTestCreateSchema = z
+  .object({
+    classSubjectId: z.string().min(1, 'Select a class and subject'),
+    sectionId: z.string().optional(),
+    /** One test is created per section; empty means the whole class. */
+    sectionIds: z.array(z.string().min(1)).max(50).optional(),
+    title: z.string().trim().min(2, 'Give the test a name').max(160),
+    syllabus: z.string().trim().max(2000).optional(),
+    heldOn: isoDate,
+    maxMarks: z.coerce.number().positive('Must be more than 0').max(1000).optional(),
+    passingMarks: z.coerce.number().min(0, 'Cannot be negative').max(1000).optional(),
+  })
+  .refine((v) => v.passingMarks === undefined || v.maxMarks !== undefined, {
+    path: ['passingMarks'],
+    message: 'Set the maximum marks first',
+  })
+  .refine((v) => v.passingMarks === undefined || v.maxMarks === undefined || v.passingMarks <= v.maxMarks, {
+    path: ['passingMarks'],
+    message: 'Passing marks cannot be more than the maximum',
+  })
 
 export const classTestFilterSchema = z.object({
   classLevelId: z.string().optional(),
@@ -27,7 +40,7 @@ export const classTestResultsSchema = z.object({
     .array(
       z.object({
         studentId: z.string().min(1),
-        done: z.boolean(),
+        status: z.enum(CLASS_TEST_STATUSES).nullable(),
         marks: z.number().min(0).max(1000).nullable(),
       }),
     )
@@ -82,13 +95,14 @@ export async function listClassTests(ctx: AppContext, filter: z.infer<typeof cla
       title: true,
       heldOn: true,
       maxMarks: true,
+      passingMarks: true,
       classLevelId: true,
       sectionId: true,
       classLevel: { select: { name: true } },
       section: { select: { name: true } },
       classSubject: { select: { subject: { select: { name: true } } } },
       teacher: { select: { firstName: true, lastName: true } },
-      _count: { select: { results: { where: { completed: true } } } },
+      results: { where: { completed: true }, select: { marks: true } },
     },
   })
 
@@ -114,15 +128,21 @@ export async function listClassTests(ctx: AppContext, filter: z.infer<typeof cla
     title: t.title,
     heldOn: t.heldOn,
     maxMarks: t.maxMarks,
+    passingMarks: t.passingMarks,
     subject: t.classSubject.subject.name,
     className: t.classLevel.name,
     sectionName: t.section?.name ?? null,
     teacher: `${t.teacher.firstName} ${t.teacher.lastName}`.trim(),
-    completed: t._count.results,
+    completed: t.results.length,
+    passed: t.passingMarks === null ? null : t.results.filter((r) => passFail(r.marks, t.passingMarks) === 'PASS').length,
     expected: (t.sectionId ? sectionSize.get(t.sectionId) : classSize.get(t.classLevelId)) ?? 0,
   }))
 }
 
+/**
+ * Creates the test for each chosen section (or once for the whole class) and
+ * returns every row created.
+ */
 export async function createClassTest(ctx: AppContext, input: z.infer<typeof classTestCreateSchema>) {
   ctx.require('exams.class_tests')
 
@@ -142,39 +162,46 @@ export async function createClassTest(ctx: AppContext, input: z.infer<typeof cla
   const teacherId = classSubject.teacherId ?? me
   if (!teacherId) throw conflict('This subject has no teacher assigned yet')
 
-  if (input.sectionId) {
-    const section = await ctx.db.section.findFirst({
-      where: { id: input.sectionId, classLevelId: classSubject.classLevelId, deletedAt: null },
-      select: { id: true },
+  const sectionIds = [...new Set(input.sectionIds?.length ? input.sectionIds : input.sectionId ? [input.sectionId] : [])]
+  if (sectionIds.length > 0) {
+    const found = await ctx.db.section.count({
+      where: { id: { in: sectionIds }, classLevelId: classSubject.classLevelId, deletedAt: null },
     })
-    if (!section) throw new ApiException(400, 'BAD_REQUEST', 'That section does not belong to the class')
+    if (found !== sectionIds.length) throw new ApiException(400, 'BAD_REQUEST', 'A chosen section does not belong to the class')
   }
 
-  const created = await ctx.db.classTest.create({
-    data: {
-      tenantId: ctx.tenant.id,
-      classLevelId: classSubject.classLevelId,
-      sectionId: input.sectionId || null,
-      classSubjectId: classSubject.id,
-      teacherId,
-      title: input.title,
-      syllabus: input.syllabus || null,
-      heldOn: attendanceDate(input.heldOn),
-      maxMarks: input.maxMarks ?? null,
-    },
-    include: { classLevel: { select: { name: true } }, section: { select: { name: true } } },
-  })
+  const created = await ctx.db.$transaction(
+    (sectionIds.length > 0 ? sectionIds : [null]).map((sectionId) =>
+      ctx.db.classTest.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          classLevelId: classSubject.classLevelId,
+          sectionId,
+          classSubjectId: classSubject.id,
+          teacherId,
+          title: input.title,
+          syllabus: input.syllabus || null,
+          heldOn: attendanceDate(input.heldOn),
+          maxMarks: input.maxMarks ?? null,
+          passingMarks: input.passingMarks ?? null,
+        },
+        include: { classLevel: { select: { name: true } }, section: { select: { name: true } } },
+      }),
+    ),
+  )
 
-  await audit({
-    tenantId: ctx.tenant.id,
-    actorId: ctx.user.userId,
-    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
-    action: 'class_test.create',
-    module: 'exams',
-    entityType: 'ClassTest',
-    entityId: created.id,
-    summary: `Set class test "${created.title}" for ${created.classLevel.name}${created.section ? ` ${created.section.name}` : ''} on ${input.heldOn}`,
-  })
+  for (const test of created) {
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'class_test.create',
+      module: 'exams',
+      entityType: 'ClassTest',
+      entityId: test.id,
+      summary: `Set class test "${test.title}" for ${test.classLevel.name}${test.section ? ` ${test.section.name}` : ''} on ${input.heldOn}`,
+    })
+  }
 
   return created
 }
@@ -189,7 +216,7 @@ export async function getClassTest(ctx: AppContext, id: string) {
       section: { select: { name: true } },
       classSubject: { select: { subject: { select: { name: true } } } },
       teacher: { select: { firstName: true, lastName: true } },
-      results: { select: { studentId: true, completed: true, marks: true } },
+      results: { select: { studentId: true, status: true, completed: true, marks: true } },
     },
   })
   if (!test) throw notFound('Class test')
@@ -214,13 +241,19 @@ export async function getClassTest(ctx: AppContext, id: string) {
       admissionNo: e.student.admissionNo,
       rollNumber: e.rollNumber,
       sectionName: e.section.name,
-      done: resultOf.get(e.student.id)?.completed ?? false,
+      status: (() => {
+        const r = resultOf.get(e.student.id)
+        return r?.status ?? (r?.completed ? 'COMPLETED' : null)
+      })(),
       marks: resultOf.get(e.student.id)?.marks ?? null,
     })),
   }
 }
 
-/** Saves the teacher's ticks (and optional marks) for the whole class at once. */
+/**
+ * Saves each student's status (and optional marks) for the whole class at
+ * once. Marks without a status imply the student took the test.
+ */
 export async function saveClassTestResults(
   ctx: AppContext,
   id: string,
@@ -237,37 +270,33 @@ export async function saveClassTestResults(
 
   const roster = await ctx.db.enrollment.findMany({ where: rosterWhere(test), select: { studentId: true } })
   const inClass = new Set(roster.map((r) => r.studentId))
-  for (const e of input.entries) {
+  const entries = input.entries.map((e) => ({ ...e, status: e.status ?? (e.marks !== null ? ('COMPLETED' as const) : null) }))
+  for (const e of entries) {
     if (!inClass.has(e.studentId)) throw conflict('A student in the list is not in this class')
     if (e.marks !== null) {
       if (test.maxMarks === null) throw new ApiException(400, 'BAD_REQUEST', 'This test has no maximum marks, so marks cannot be entered')
       if (e.marks > test.maxMarks) {
         throw new ApiException(400, 'BAD_REQUEST', `Marks cannot be more than the maximum of ${test.maxMarks}`)
       }
+      if (!CLASS_TEST_MARKABLE.includes(e.status!)) {
+        throw new ApiException(400, 'BAD_REQUEST', 'Marks can only be entered for students who completed the test')
+      }
     }
   }
 
   const now = new Date()
   await ctx.db.$transaction(
-    input.entries.map((e) => {
-      const completed = e.done || e.marks !== null
+    entries.map((e) => {
+      const data = { status: e.status, completed: e.status === 'COMPLETED', marks: e.marks, markedById: ctx.user.userId, markedAt: now }
       return ctx.db.classTestResult.upsert({
         where: { tenantId_classTestId_studentId: { tenantId: ctx.tenant.id, classTestId: id, studentId: e.studentId } },
-        create: {
-          tenantId: ctx.tenant.id,
-          classTestId: id,
-          studentId: e.studentId,
-          completed,
-          marks: e.marks,
-          markedById: ctx.user.userId,
-          markedAt: now,
-        },
-        update: { completed, marks: e.marks, markedById: ctx.user.userId, markedAt: now },
+        create: { tenantId: ctx.tenant.id, classTestId: id, studentId: e.studentId, ...data },
+        update: data,
       })
     }),
   )
 
-  const completed = input.entries.filter((e) => e.done || e.marks !== null).length
+  const completed = entries.filter((e) => e.status === 'COMPLETED').length
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,

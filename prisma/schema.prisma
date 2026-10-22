@@ -3202,12 +3202,24 @@ enum SubmissionStatus {
   REDO
 }
 
+/// What the teacher recorded for a student in the completion register.
+enum HomeworkMark {
+  COMPLETED
+  PARTIAL
+  NOT_COMPLETED
+  ABSENT
+  NOT_APPLICABLE
+  NO_NOTEBOOK
+  LATE_WORK
+}
+
 model HomeworkSubmission {
   id             String           @id @default(cuid())
   tenantId       String
   homeworkId     String
   studentId      String
   status         SubmissionStatus @default(PENDING)
+  teacherMark    HomeworkMark?
   submittedAt    DateTime?
   note           String?
   score          Float?
@@ -3236,6 +3248,7 @@ model ClassTest {
   syllabus       String?
   heldOn         DateTime  @db.Date
   maxMarks       Float?
+  passingMarks   Float?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -3250,13 +3263,21 @@ model ClassTest {
   @@index([tenantId, teacherId, heldOn])
 }
 
+enum ClassTestStatus {
+  COMPLETED
+  ABSENT
+  NOT_APPLICABLE
+}
+
 /// One student's line on a class test, recorded by the teacher.
+/// `completed` mirrors status == COMPLETED for older readers.
 model ClassTestResult {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   tenantId    String
   classTestId String
   studentId   String
-  completed   Boolean   @default(false)
+  status      ClassTestStatus?
+  completed   Boolean          @default(false)
   marks       Float?
   markedById  String?
   markedAt    DateTime?

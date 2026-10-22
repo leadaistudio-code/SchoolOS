@@ -12,7 +12,8 @@ import { EmptyState } from '@/components/ui/states'
 import { SubmissionPanel } from './submission-panel'
 import { ReviewList } from './review-list'
 import { PublishToggle } from './publish-toggle'
-import { TickRegister } from '@/components/tick-register'
+import { StatusRegister } from '@/components/status-register'
+import { HOMEWORK_DONE_MARKS, HOMEWORK_OPTIONS } from '@/lib/registers'
 import { saveHomeworkCompletionAction } from '../actions'
 
 export const metadata = { title: 'Homework' }
@@ -105,14 +106,17 @@ export default async function HomeworkDetailPage({
             <div>
               <CardTitle>Completion register</CardTitle>
               <p className="text-sm text-ink-muted mt-0.5">
-                Tick the students who did this homework. Students do not need to do anything on the portal.
+                Mark each student: completed, partially completed, not completed, absent, not applicable, did not bring
+                notebook, or late work. Students do not need to do anything on the portal.
               </p>
             </div>
           </CardHeader>
           <CardContent className="pt-0 px-0">
-            <TickRegister
+            <StatusRegister
               rows={roster}
-              doneLabel="done"
+              options={HOMEWORK_OPTIONS}
+              countAs={HOMEWORK_DONE_MARKS}
+              countLabel="done (completed, partial or late)"
               onSave={saveHomeworkCompletionAction.bind(null, homework.id)}
             />
           </CardContent>

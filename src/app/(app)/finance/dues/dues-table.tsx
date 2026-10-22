@@ -29,8 +29,9 @@ type DueRow = {
 }
 
 export function DuesTable({
-  rows, total, page, pageSize, currency, canCollect, canRemind, canExport,
+  rows, total, page, pageSize, currency, canCollect, canRemind, canExport, toolbar,
 }: {
+  toolbar?: React.ReactNode
   rows: DueRow[]
   total: number
   page: number
@@ -74,6 +75,10 @@ export function DuesTable({
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {toolbar}
+          {rows.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-ink-muted">No students with dues match these filters.</p>
+          ) : null}
           {canSelect ? (
             <BulkSelectionBar
               count={selection.selected.size}

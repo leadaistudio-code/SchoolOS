@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
+import { SectionPicker } from '@/components/section-picker'
 
 type SubjectOption = { id: string; label: string; sections: { id: string; name: string }[] }
 
@@ -42,13 +43,8 @@ export function ClassTestForm({ subjects }: { subjects: SubjectOption[] }) {
             </Select>
           </Field>
 
-          <Field label="Section" htmlFor="sectionId" hint="Leave as whole class to include every section" error={err('sectionId')}>
-            <Select id="sectionId" name="sectionId" defaultValue="" key={subjectId}>
-              <option value="">Whole class</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>Section {s.name}</option>
-              ))}
-            </Select>
+          <Field label="Sections" hint="Pick one or more sections, or leave as whole class" error={err('sectionIds') ?? err('sectionId')}>
+            <SectionPicker key={subjectId} sections={sections} />
           </Field>
 
           <Field label="Test name" htmlFor="title" required error={err('title')}>
@@ -59,12 +55,15 @@ export function ClassTestForm({ subjects }: { subjects: SubjectOption[] }) {
             <Textarea id="syllabus" name="syllabus" rows={3} placeholder="What the test covers" />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Test date" htmlFor="heldOn" required error={err('heldOn')}>
               <Input id="heldOn" name="heldOn" type="date" required defaultValue={toDateInput(new Date())} />
             </Field>
-            <Field label="Out of" htmlFor="maxMarks" hint="Optional. Leave blank to only tick completion" error={err('maxMarks')}>
-              <Input id="maxMarks" name="maxMarks" type="number" min={1} placeholder="20" />
+            <Field label="Maximum marks" htmlFor="maxMarks" hint="Optional. Leave blank to only record status" error={err('maxMarks')}>
+              <Input id="maxMarks" name="maxMarks" type="number" min={1} step="any" placeholder="20" />
+            </Field>
+            <Field label="Passing marks" htmlFor="passingMarks" hint="Optional. Shows pass or fail per student" error={err('passingMarks')}>
+              <Input id="passingMarks" name="passingMarks" type="number" min={0} step="any" placeholder="7" />
             </Field>
           </div>
 

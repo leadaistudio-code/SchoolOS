@@ -17,7 +17,7 @@ import { ApiException } from '../src/server/api/response'
 import { applySessionEvents, sessionHistory, startSession, syncOfflineSession } from '../src/server/modules/tapasya/sessions'
 import { createPreset } from '../src/server/modules/tapasya/presets'
 import { createOwnTask, deleteOwnTask, setFrogs, updateOwnTask, assignTasks, listTasks } from '../src/server/modules/tapasya/tasks'
-import { xpSummary } from '../src/server/modules/tapasya/dashboard'
+import { studentDashboard, xpSummary } from '../src/server/modules/tapasya/dashboard'
 import { saveOwnProfile, guardianDecide, optOutSelf } from '../src/server/modules/tapasya/profiles'
 import { getBoard, refreshProjection } from '../src/server/modules/tapasya/leaderboard'
 import { requestUnlock, redeemCode, guardianDecideUnlock } from '../src/server/modules/tapasya/unlock'
@@ -440,5 +440,14 @@ describe('guardian unlock', () => {
     } finally {
       sent.ok = true
     }
+  })
+})
+
+describe('student dashboard', () => {
+  it('loads for a signed-in student, including their own leaderboard profile', async () => {
+    const d = await studentDashboard(student, { id: studentId, userId: student.user.userId })
+    const own = await prisma.globalLeaderboardProfile.findUnique({ where: { userId: student.user.userId }, select: { alias: true } })
+    expect(d.globalProfile?.alias ?? null).toBe(own?.alias ?? null)
+    expect(d.summary.totalXp).toBeGreaterThanOrEqual(0)
   })
 })

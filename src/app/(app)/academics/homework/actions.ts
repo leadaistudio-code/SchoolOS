@@ -5,10 +5,10 @@ import { redirect } from 'next/navigation'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
-  completionSchema,
-  createHomework,
+  createHomeworkForSections,
   homeworkCreateSchema,
-  setHomeworkCompletion,
+  homeworkMarksSchema,
+  setHomeworkMarks,
   reviewSchema,
   reviewSubmission,
   submitHomework,
@@ -29,15 +29,16 @@ export async function createHomeworkAction(
 ): Promise<FormState> {
   const ctx = await requireContext('homework.create')
 
-  let id: string
+  let target: string
   try {
     const raw = Object.fromEntries(formData.entries()) as Record<string, unknown>
     raw.isPublished = formData.get('isPublished') === 'on'
     if (!raw.sectionId) delete raw.sectionId
     if (!raw.maxScore) delete raw.maxScore
+    raw.sectionIds = formData.getAll('sectionIds').map(String).filter(Boolean)
 
-    const homework = await createHomework(ctx, homeworkCreateSchema.parse(raw))
-    id = homework.id
+    const created = await createHomeworkForSections(ctx, homeworkCreateSchema.parse(raw))
+    target = created.length === 1 ? `/academics/homework/${created[0]!.id}` : '/academics/homework'
   } catch (err) {
     if (err instanceof ZodError) {
       return { error: 'Please correct the highlighted fields', fieldErrors: toFieldErrors(err) }
@@ -49,7 +50,7 @@ export async function createHomeworkAction(
   }
 
   revalidatePath('/academics/homework')
-  redirect(`/academics/homework/${id}`)
+  redirect(target)
 }
 
 export type ActionResult = { ok: boolean; message: string }
@@ -100,19 +101,20 @@ export async function reviewSubmissionAction(
   }
 }
 
-/** The teacher's tick list of who did the homework. */
+/** The teacher's completion register: one mark per student. */
 export async function saveHomeworkCompletionAction(
   homeworkId: string,
-  entries: { studentId: string; done: boolean }[],
+  entries: { studentId: string; status: string | null }[],
 ): Promise<ActionResult> {
   const ctx = await requireContext('homework.review')
   try {
-    const completedStudentIds = entries.filter((e) => e.done).map((e) => e.studentId)
-    const result = await setHomeworkCompletion(ctx, homeworkId, completionSchema.parse({ completedStudentIds }))
+    const input = homeworkMarksSchema.parse({ entries: entries.map((e) => ({ studentId: e.studentId, mark: e.status })) })
+    const result = await setHomeworkMarks(ctx, homeworkId, input)
     revalidatePath(`/academics/homework/${homeworkId}`)
     revalidatePath('/academics/homework')
-    return { ok: true, message: `${result.completed} of ${result.total} marked as done.` }
+    return { ok: true, message: `${result.marked} of ${result.total} marked, ${result.done} done.` }
   } catch (err) {
+    if (err instanceof ZodError) return { ok: false, message: err.issues[0]?.message ?? 'Invalid marks' }
     return { ok: false, message: err instanceof Error ? err.message : 'Could not save the register' }
   }
 }

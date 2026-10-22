@@ -16,12 +16,13 @@ import type { FormState } from '@/lib/form-state'
 export async function createClassTestAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireContext('exams.class_tests')
 
-  let id: string
+  let target: string
   try {
     const raw = Object.fromEntries(formData.entries()) as Record<string, unknown>
-    for (const key of ['sectionId', 'maxMarks', 'syllabus']) if (!raw[key]) delete raw[key]
-    const test = await createClassTest(ctx, classTestCreateSchema.parse(raw))
-    id = test.id
+    for (const key of ['sectionId', 'maxMarks', 'passingMarks', 'syllabus']) if (!raw[key]) delete raw[key]
+    raw.sectionIds = formData.getAll('sectionIds').map(String).filter(Boolean)
+    const created = await createClassTest(ctx, classTestCreateSchema.parse(raw))
+    target = created.length === 1 ? `/exams/class-tests/${created[0]!.id}` : '/exams/class-tests'
   } catch (err) {
     if (err instanceof ZodError) {
       const fieldErrors: Record<string, string> = {}
@@ -32,12 +33,12 @@ export async function createClassTestAction(_prev: FormState, formData: FormData
   }
 
   revalidatePath('/exams/class-tests')
-  redirect(`/exams/class-tests/${id}`)
+  redirect(target)
 }
 
 export async function saveClassTestResultsAction(
   id: string,
-  entries: { studentId: string; done: boolean; marks: number | null }[],
+  entries: { studentId: string; status: string | null; marks: number | null }[],
 ): Promise<{ ok: boolean; message: string }> {
   const ctx = await requireContext('exams.class_tests')
   try {

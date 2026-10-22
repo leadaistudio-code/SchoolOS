@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import type { z } from 'zod'
 import type { AppContext } from '@/server/context'
 import { badRequest } from '@/server/api/response'
+import { prisma } from '@/server/db/prisma'
 import { ACHIEVEMENTS, levelFor } from '@/lib/tapasya/achievements'
 import { CAPABILITY_STATES, type CapabilityState } from '@/lib/tapasya/device'
 import { localDate } from '@/lib/tapasya/periods'
@@ -67,7 +68,7 @@ export async function studentDashboard(ctx: AppContext, student: { id: string; u
     todayView(ctx, student.id),
     getActiveSession(ctx),
     getSchoolPolicy(ctx),
-    ctx.db.globalLeaderboardProfile.findFirst({ where: { userId: student.userId }, select: { alias: true, avatarKey: true, status: true } }),
+    prisma.globalLeaderboardProfile.findFirst({ where: { userId: student.userId, tenantId: ctx.tenant.id }, select: { alias: true, avatarKey: true, status: true } }),
   ])
   const settings = await getGlobalSettings()
   return {
