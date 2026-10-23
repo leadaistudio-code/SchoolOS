@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { env } from '@/lib/env'
 import { MODULE_COUNTS } from '@/content/site/modules'
+import { blogCoverUrl } from '@/lib/blog'
 
 /**
  * Structured data.
@@ -100,8 +101,10 @@ export function blogPostingJsonLd(post: {
   wordCount: number
   publishedAt: Date | null
   updatedAt: Date
+  coverImageKey?: string | null
 }) {
   const url = `${origin()}/blog/${post.slug}`
+  const cover = blogCoverUrl(post.slug, post.coverImageKey)
   const organisation = { '@type': 'Organization', name: 'MyCampusView', url: origin() }
   return (
     <JsonLd
@@ -112,7 +115,7 @@ export function blogPostingJsonLd(post: {
         description: post.description,
         url,
         mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-        image: `${url}/og`,
+        image: cover ? `${origin()}${cover}` : `${url}/og`,
         datePublished: post.publishedAt?.toISOString(),
         dateModified: post.updatedAt.toISOString(),
         articleSection: post.category,

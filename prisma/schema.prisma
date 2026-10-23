@@ -7820,6 +7820,9 @@ model BlogPost {
   /// The topic-bank entry it was written from, so the bank is not reused.
   topicKey        String?
   model           String?
+  /// Object storage key for the AI hero photo (platform/blog-covers/…).
+  coverImageKey   String?
+  coverImageAlt   String?
   publishedAt     DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

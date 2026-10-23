@@ -12,6 +12,8 @@ const CARD = {
   category: true,
   readingMinutes: true,
   publishedAt: true,
+  coverImageKey: true,
+  coverImageAlt: true,
 } as const
 
 export type BlogCard = {
@@ -21,6 +23,8 @@ export type BlogCard = {
   category: string
   readingMinutes: number
   publishedAt: Date | null
+  coverImageKey: string | null
+  coverImageAlt: string | null
 }
 
 export type BlogFaq = { question: string; answer: string }

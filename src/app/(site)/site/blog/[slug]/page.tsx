@@ -6,7 +6,7 @@ import { Container, Section } from '@/components/site/container'
 import { BlogCover, CategoryPill, PostCard, PostMeta } from '@/components/site/blog'
 import { ClosingCta } from '@/components/site/cta'
 import { blogPostingJsonLd, breadcrumbJsonLd, faqJsonLd } from '@/components/site/seo'
-import { blogCategory } from '@/lib/blog'
+import { blogCategory, blogCoverUrl } from '@/lib/blog'
 import { getPublishedPost, relatedPosts } from '@/server/modules/blog/queries'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +17,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPublishedPost((await params).slug)
   if (!post) return { title: 'Article not found', robots: { index: false } }
   const path = `/blog/${post.slug}`
+  const cover = blogCoverUrl(post.slug, post.coverImageKey)
+  const ogImage = cover ?? `${path}/og`
   return {
     title: { absolute: post.metaTitle },
     description: post.metaDescription,
@@ -31,13 +33,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       modifiedTime: post.updatedAt.toISOString(),
       section: blogCategory(post.category).label,
       tags: post.keywords,
-      images: [{ url: `${path}/og`, width: 1200, height: 630, alt: post.title }],
+      images: [{ url: ogImage, width: cover ? 1536 : 1200, height: cover ? 1024 : 630, alt: post.coverImageAlt ?? post.title }],
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
       description: post.metaDescription,
-      images: [`${path}/og`],
+      images: [ogImage],
     },
   }
 }
@@ -87,6 +89,7 @@ export default async function BlogPostPage({ params }: Props) {
         wordCount: post.wordCount,
         publishedAt: post.publishedAt,
         updatedAt: post.updatedAt,
+        coverImageKey: post.coverImageKey,
       })}
       {post.faq.length > 0 ? faqJsonLd(post.faq) : null}
 
@@ -111,7 +114,11 @@ export default async function BlogPostPage({ params }: Props) {
           </div>
           <BlogCover
             categoryKey={post.category}
+            slug={post.slug}
+            coverImageKey={post.coverImageKey}
+            alt={post.coverImageAlt}
             size="hero"
+            priority
             className="mx-auto aspect-[21/9] max-w-[64rem] rounded-t-2xl border border-b-0 border-[var(--rule)]"
           />
         </Container>

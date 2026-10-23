@@ -94,7 +94,15 @@ export async function BlogListing({ category, page }: { category?: BlogCategory;
 
           {featured ? (
             <article className="group relative grid overflow-hidden rounded-2xl border border-[var(--rule)] bg-white transition-[border-color,box-shadow] duration-200 hover:border-[var(--rule-strong)] hover:shadow-[0_24px_60px_-32px_rgba(10,16,36,0.4)] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-              <BlogCover categoryKey={featured.category} size="hero" className="aspect-[16/9] lg:aspect-auto lg:min-h-[340px]" />
+              <BlogCover
+                categoryKey={featured.category}
+                slug={featured.slug}
+                coverImageKey={featured.coverImageKey}
+                alt={featured.coverImageAlt}
+                size="hero"
+                priority
+                className="aspect-[16/9] lg:aspect-auto lg:min-h-[340px]"
+              />
               <div className="flex flex-col justify-center p-6 sm:p-10">
                 <div className="flex items-center gap-3">
                   <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[12px] font-semibold text-white">Latest</span>

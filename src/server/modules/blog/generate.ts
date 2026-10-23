@@ -4,6 +4,7 @@ import { prisma } from '@/server/db/prisma'
 import { assistantConfigured, blogModel } from '@/server/assistant/providers'
 import { zodToJsonSchema } from '@/server/assistant/json-schema'
 import { ALL_MODULES } from '@/content/site/modules'
+import { attachCoverToPost } from '@/server/modules/blog/cover-image'
 import {
   BLOG_CATEGORIES,
   BLOG_INTERNAL_LINKS,
@@ -310,8 +311,10 @@ export async function runDailyBlog(options: { force?: boolean } = {}): Promise<B
       topicKey: topic?.key ?? null,
       model: model.model,
     },
-    select: { id: true, slug: true, title: true },
+    select: { id: true, slug: true, title: true, excerpt: true, category: true },
   })
+
+  await attachCoverToPost(post)
 
   return publish
     ? { status: 'published', ...post }

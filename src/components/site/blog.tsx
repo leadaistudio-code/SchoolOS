@@ -1,4 +1,5 @@
 import * as React from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -16,7 +17,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { blogCategory, type BlogCategory } from '@/lib/blog'
+import { blogCategory, blogCoverUrl, type BlogCategory } from '@/lib/blog'
 import type { BlogCard } from '@/server/modules/blog/queries'
 import { cn } from '@/lib/utils'
 
@@ -50,24 +51,44 @@ export function formatPostDate(date: Date | null) {
 }
 
 /**
- * Cover art.
- *
- * Drawn rather than generated: an AI image per post would be slow, costly and
- * unpredictable, and a stock photo of smiling children says nothing. The
- * category's colour, a quiet grid and its icon give every post a recognisable
- * face, and the archive reads as a set.
+ * Cover art: AI hero photo when the post has one, otherwise category colour + icon.
  */
 export function BlogCover({
   categoryKey,
+  slug,
+  coverImageKey,
+  alt,
   size = 'card',
+  priority,
   className,
 }: {
   categoryKey: string
+  slug?: string
+  coverImageKey?: string | null
+  alt?: string | null
   size?: 'card' | 'hero'
+  priority?: boolean
   className?: string
 }) {
   const category = blogCategory(categoryKey)
   const hero = size === 'hero'
+  const photo = slug ? blogCoverUrl(slug, coverImageKey) : null
+
+  if (photo) {
+    return (
+      <div className={cn('relative isolate overflow-hidden bg-[var(--page)]', className)}>
+        <Image
+          src={photo}
+          alt={alt || category.label}
+          fill
+          priority={priority}
+          sizes={hero ? '(min-width: 1024px) 960px, 100vw' : '(min-width: 1024px) 400px, 100vw'}
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn('relative isolate overflow-hidden', className)}
@@ -147,7 +168,13 @@ export function PostCard({ post, headingLevel = 'h3' }: { post: BlogCard; headin
   const Heading = headingLevel
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-xl border border-[var(--rule)] bg-white transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--rule-strong)] hover:shadow-[0_18px_40px_-24px_rgba(10,16,36,0.35)]">
-      <BlogCover categoryKey={post.category} className="aspect-[16/9]" />
+      <BlogCover
+        categoryKey={post.category}
+        slug={post.slug}
+        coverImageKey={post.coverImageKey}
+        alt={post.coverImageAlt}
+        className="aspect-[16/9]"
+      />
       <div className="flex flex-1 flex-col p-5 sm:p-6">
         <CategoryPill categoryKey={post.category} />
         <Heading className="mt-3 text-[18px] font-semibold leading-[1.35] text-[var(--text)]">

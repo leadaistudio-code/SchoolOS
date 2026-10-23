@@ -1,13 +1,25 @@
 import { ImageResponse } from 'next/og'
-import { blogCategory } from '@/lib/blog'
+import { blogCategory, blogCoverUrl } from '@/lib/blog'
+import { readBlogCover } from '@/server/modules/blog/cover-image'
 import { getPublishedPost } from '@/server/modules/blog/queries'
 
 export const dynamic = 'force-dynamic'
 
-/** The social card for one article: 1200×630, drawn from its title and category. */
+/** Social preview: AI hero photo when present, otherwise a drawn card. */
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const post = await getPublishedPost((await params).slug)
   if (!post) return new Response('Not found', { status: 404 })
+
+  if (post.coverImageKey && blogCoverUrl(post.slug, post.coverImageKey)) {
+    const { body, mimeType } = await readBlogCover(post.coverImageKey)
+    return new Response(new Uint8Array(body), {
+      headers: {
+        'Content-Type': mimeType,
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+      },
+    })
+  }
+
   const category = blogCategory(post.category)
   const titleSize = post.title.length > 70 ? 54 : post.title.length > 48 ? 62 : 70
 

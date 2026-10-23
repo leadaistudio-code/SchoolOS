@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requirePlatformContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
+import { attachCoverToPost } from '@/server/modules/blog/cover-image'
 import { runDailyBlog } from '@/server/modules/blog/generate'
 
 export type BlogActionResult = { ok: boolean; message: string }
@@ -38,6 +39,20 @@ export async function setPostStatusAction(
   revalidatePath('/platform/blog')
   const label = status === 'PUBLISHED' ? 'Published' : status === 'ARCHIVED' ? 'Archived' : 'Moved to drafts'
   return { ok: true, message: label }
+}
+
+export async function regenerateCoverAction(id: string): Promise<BlogActionResult> {
+  await requirePlatformContext('platform.crm')
+  const post = await prisma.blogPost.findUnique({
+    where: { id },
+    select: { id: true, slug: true, title: true, category: true, excerpt: true },
+  })
+  if (!post) return { ok: false, message: 'Post not found' }
+  const key = await attachCoverToPost(post)
+  revalidatePath('/platform/blog')
+  return key
+    ? { ok: true, message: 'Cover photo generated.' }
+    : { ok: false, message: 'Cover generation failed — check WebApp logs and BLOG_IMAGE_MODEL.' }
 }
 
 export async function deletePostAction(id: string): Promise<BlogActionResult> {

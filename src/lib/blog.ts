@@ -56,6 +56,11 @@ export const BLOG_CATEGORIES: BlogCategory[] = [
   { key: 'staff', label: 'Staff & HR', blurb: 'Hiring, leave, payroll and supporting teachers.', icon: 'Briefcase', accent: '#7c2d12', tint: '#f9ede7' },
 ]
 
+/** Hero photo served from object storage when the post has `coverImageKey`. */
+export function blogCoverUrl(slug: string, coverImageKey: string | null | undefined) {
+  return coverImageKey ? `/blog/cover/${slug}` : null
+}
+
 export function blogCategory(key: string): BlogCategory {
   return BLOG_CATEGORIES.find((c) => c.key === key) ?? BLOG_CATEGORIES[0]!
 }

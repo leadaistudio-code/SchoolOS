@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast'
 import {
   deletePostAction,
   generatePostAction,
+  regenerateCoverAction,
   setPostStatusAction,
   type BlogActionResult,
 } from './actions'
@@ -43,6 +44,9 @@ export function PostControls({ id, status }: { id: string; status: 'DRAFT' | 'PU
   const [confirming, setConfirming] = useState(false)
   return (
     <div className="flex flex-wrap justify-end gap-1">
+      <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => regenerateCoverAction(id))}>
+        Cover photo
+      </Button>
       {status !== 'PUBLISHED' ? (
         <Button size="sm" variant="secondary" disabled={pending} onClick={() => run(() => setPostStatusAction(id, 'PUBLISHED'))}>
           Publish
