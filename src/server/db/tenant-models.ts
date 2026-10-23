@@ -347,6 +347,8 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'GlobalLeaderboardEntry',
   'GlobalLeaderboardSnapshot',
   'GlobalTapasyaSetting',
+  // Marketing-site articles: written by the platform, read by the website.
+  'BlogPost',
 ])
 
 export function isPlatformOnly(model: string | undefined): boolean {

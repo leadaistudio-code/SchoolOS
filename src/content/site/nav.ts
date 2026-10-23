@@ -143,6 +143,7 @@ export const MEGA_MENUS: MegaMenu[] = [
         heading: 'Resources',
         links: [
           { label: 'Customer stories', href: '/customers' },
+          { label: 'Blog', href: '/blog' },
           { label: 'All modules', href: '/modules' },
           { label: 'Integrations', href: '/integrations' },
           { label: 'Privacy & terms', href: '/privacy' },
@@ -192,6 +193,7 @@ export const FOOTER_COLUMNS: NavColumn[] = [
       { label: 'About', href: '/about' },
       { label: 'Implementation & support', href: '/services' },
       { label: 'Customer stories', href: '/customers' },
+      { label: 'Blog', href: '/blog' },
       { label: 'Contact', href: '/contact' },
     ],
   },

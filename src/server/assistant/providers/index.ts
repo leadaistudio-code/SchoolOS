@@ -57,7 +57,21 @@ function modelId(driver: AiDriver): string {
   return env().AI_MODEL?.trim() || DEFAULT_MODEL[driver]
 }
 
-export function assistantModel(): ModelAdapter {
+/** Writing-quality defaults for the marketing blog, used when BLOG_AI_MODEL is unset. */
+const BLOG_DEFAULT_MODEL: Record<AiDriver, string> = {
+  anthropic: 'claude-sonnet-4-5',
+  openai: 'gpt-4.1',
+  gemini: 'gemini-2.5-pro',
+}
+
+/** The adapter for the daily blog writer: same driver and key, its own model. */
+export function blogModel(): ModelAdapter {
+  const { AI_DRIVER, BLOG_AI_MODEL } = env()
+  const driver = AI_DRIVER as AiDriver
+  return assistantModel(BLOG_AI_MODEL?.trim() || BLOG_DEFAULT_MODEL[driver])
+}
+
+export function assistantModel(modelOverride?: string): ModelAdapter {
   const { AI_DRIVER, AI_API_KEY, AI_EFFORT, AI_BASE_URL } = env()
 
   if (!AI_API_KEY) {
@@ -68,20 +82,20 @@ export function assistantModel(): ModelAdapter {
     case 'anthropic':
       return anthropicAdapter({
         apiKey: AI_API_KEY,
-        model: modelId('anthropic'),
+        model: modelOverride ?? modelId('anthropic'),
         effort: AI_EFFORT,
         baseUrl: AI_BASE_URL,
       })
     case 'openai':
       return openaiAdapter({
         apiKey: AI_API_KEY,
-        model: modelId('openai'),
+        model: modelOverride ?? modelId('openai'),
         baseUrl: AI_BASE_URL,
       })
     case 'gemini':
       return geminiAdapter({
         apiKey: AI_API_KEY,
-        model: modelId('gemini'),
+        model: modelOverride ?? modelId('gemini'),
         baseUrl: AI_BASE_URL,
       })
     default:

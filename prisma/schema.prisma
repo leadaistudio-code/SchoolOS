@@ -7791,3 +7791,40 @@ model GlobalTapasyaSetting {
   updatedById String?
   updatedAt   DateTime @updatedAt
 }
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// A marketing-site article. Platform-owned, not tenant data. Written by the
+/// daily generator or by hand; `contentHtml` is sanitised before it is stored.
+model BlogPost {
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  title           String
+  metaTitle       String
+  metaDescription String
+  excerpt         String
+  category        String
+  keywords        String[]
+  contentHtml     String
+  faq             Json           @default("[]")
+  takeaways       String[]
+  wordCount       Int
+  readingMinutes  Int
+  status          BlogPostStatus @default(DRAFT)
+  /// Why the generator held this back instead of publishing it.
+  reviewNote      String?
+  /// The topic-bank entry it was written from, so the bank is not reused.
+  topicKey        String?
+  model           String?
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([category, status, publishedAt])
+  @@index([topicKey])
+}

@@ -90,6 +90,42 @@ export function breadcrumbJsonLd(trail: { name: string; path: string }[]) {
   )
 }
 
+/** A blog article. Authored by the organisation; there is no individual byline to invent. */
+export function blogPostingJsonLd(post: {
+  slug: string
+  title: string
+  description: string
+  category: string
+  keywords: string[]
+  wordCount: number
+  publishedAt: Date | null
+  updatedAt: Date
+}) {
+  const url = `${origin()}/blog/${post.slug}`
+  const organisation = { '@type': 'Organization', name: 'MyCampusView', url: origin() }
+  return (
+    <JsonLd
+      data={{
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: post.description,
+        url,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+        image: `${url}/og`,
+        datePublished: post.publishedAt?.toISOString(),
+        dateModified: post.updatedAt.toISOString(),
+        articleSection: post.category,
+        keywords: post.keywords.join(', '),
+        wordCount: post.wordCount,
+        inLanguage: 'en-IN',
+        author: organisation,
+        publisher: organisation,
+      }}
+    />
+  )
+}
+
 /** A frequently-asked-questions block, for pages that genuinely have one. */
 export function faqJsonLd(items: { question: string; answer: string }[]) {
   return (

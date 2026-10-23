@@ -15,6 +15,7 @@ import {
   LifeBuoy,
   Mail,
   Menu,
+  Newspaper,
   Package,
   Sparkles,
   Timer,
@@ -36,6 +37,7 @@ const ICONS = {
   billing: CreditCard,
   support: LifeBuoy,
   tapasya: Timer,
+  blog: Newspaper,
   health: Activity,
 } satisfies Record<string, LucideIcon>
 

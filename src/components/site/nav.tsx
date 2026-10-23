@@ -180,6 +180,12 @@ export function SiteNav() {
             >
               Implementation
             </Link>
+            <Link
+              href="/blog"
+              className="rounded-lg px-3 py-2 text-[15px] font-medium text-[var(--text-muted)] transition-colors duration-150 hover:text-[var(--text)]"
+            >
+              Blog
+            </Link>
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
@@ -348,6 +354,7 @@ function MobileDrawer({ onNavigate }: { onNavigate: () => void }) {
             {[
               { label: 'Customers', href: '/customers' },
               { label: 'Implementation & support', href: '/services' },
+              { label: 'Blog', href: '/blog' },
               { label: 'Contact', href: '/contact' },
               { label: 'Sign in', href: '/sign-in' },
             ].map((link) => (

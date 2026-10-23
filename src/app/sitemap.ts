@@ -1,5 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { env } from '@/lib/env'
+import { BLOG_CATEGORIES } from '@/lib/blog'
+import { publishedForFeeds } from '@/server/modules/blog/queries'
 
 /**
  * The public sitemap.
@@ -38,14 +40,42 @@ const PAGES: { path: string; priority: number; changeFrequency: MetadataRoute.Si
   { path: '/terms', priority: 0.3, changeFrequency: 'yearly' },
 ]
 
-export default function sitemap(): MetadataRoute.Sitemap {
+/** Rebuilt hourly so a new article is listed the day it is published. */
+export const revalidate = 3600
+
+async function blogEntries(base: string): Promise<MetadataRoute.Sitemap> {
+  // The build has no database; the static pages still deserve a sitemap.
+  try {
+    const posts = await publishedForFeeds()
+    const categories = new Set(posts.map((post) => post.category))
+    return [
+      { url: `${base}/blog`, lastModified: posts[0]?.updatedAt ?? new Date(), changeFrequency: 'daily', priority: 0.8 },
+      ...BLOG_CATEGORIES.filter((c) => categories.has(c.key)).map((c) => ({
+        url: `${base}/blog/category/${c.key}`,
+        changeFrequency: 'weekly' as const,
+        priority: 0.5,
+      })),
+      ...posts.map((post) => ({
+        url: `${base}/blog/${post.slug}`,
+        lastModified: post.updatedAt,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      })),
+    ]
+  } catch {
+    return [{ url: `${base}/blog`, changeFrequency: 'daily', priority: 0.8 }]
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = env().APP_URL.replace(/\/$/, '')
   const lastModified = new Date()
 
-  return PAGES.map((page) => ({
+  const pages: MetadataRoute.Sitemap = PAGES.map((page) => ({
     url: `${base}${page.path === '/' ? '' : page.path}`,
     lastModified,
     changeFrequency: page.changeFrequency,
     priority: page.priority,
   }))
+  return [...pages, ...(await blogEntries(base))]
 }

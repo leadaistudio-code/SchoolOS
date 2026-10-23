@@ -32,6 +32,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           { label: 'Capture', href: '/platform/growth/capture', icon: 'capture' },
           { label: 'Today', href: '/platform/growth/today', icon: 'today' },
           { label: 'Templates', href: '/platform/growth/templates', icon: 'templates' },
+          { label: 'Blog', href: '/platform/blog', icon: 'blog' },
         ] satisfies PlatformNavItem[])
       : []),
     ...(ctx.user.isSuperAdmin || ctx.user.permissions.has('platform.crm_comms')

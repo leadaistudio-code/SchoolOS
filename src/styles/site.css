@@ -639,3 +639,90 @@ html.lenis-smooth {
     animation: none;
   }
 }
+
+/* Blog article body. The HTML is stored sanitised, so only these tags occur. */
+.site .blog-prose {
+  max-width: var(--measure);
+  color: var(--text-muted);
+  font-size: 17.5px;
+  line-height: 1.78;
+}
+.site .blog-prose > * + * {
+  margin-top: 1.15em;
+}
+.site .blog-prose h2 {
+  margin-top: 2.2em;
+  scroll-margin-top: 6.5rem;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.site .blog-prose h3 {
+  margin-top: 1.8em;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.site .blog-prose h2 + *,
+.site .blog-prose h3 + * {
+  margin-top: 0.7em;
+}
+.site .blog-prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.site .blog-prose a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--blue) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.site .blog-prose a:hover {
+  text-decoration-color: var(--blue);
+}
+.site .blog-prose ul,
+.site .blog-prose ol {
+  padding-left: 1.4em;
+}
+.site .blog-prose ul {
+  list-style: disc;
+}
+.site .blog-prose ol {
+  list-style: decimal;
+}
+.site .blog-prose li + li {
+  margin-top: 0.5em;
+}
+.site .blog-prose li::marker {
+  color: var(--text-subtle);
+}
+.site .blog-prose blockquote {
+  border-left: 3px solid var(--blue);
+  background: var(--blue-tint);
+  border-radius: 0 10px 10px 0;
+  padding: 1em 1.25em;
+  color: var(--text);
+}
+.site .blog-prose table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.site .blog-prose th,
+.site .blog-prose td {
+  border: 1px solid var(--rule);
+  padding: 0.65em 0.9em;
+  text-align: left;
+  vertical-align: top;
+}
+.site .blog-prose th {
+  background: var(--page);
+  color: var(--text);
+  font-weight: 600;
+}
