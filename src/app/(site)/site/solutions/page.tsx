@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function SolutionsPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-solutions.jpg', alt: 'School building and courtyard on a clear morning' }}
+      <PageIntro image={{ src: '/images/site/intro-solutions.jpg', alt: 'Illustration of four different school buildings' }}
         eyebrow="Solutions"
         title="The same system, configured for how you actually run."
         lead="The differences between a preschool and a senior school are real but narrower than most vendors pretend. These pages describe what genuinely changes."

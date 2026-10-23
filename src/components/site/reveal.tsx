@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 /**
  * Scroll reveals.
@@ -19,8 +20,13 @@ import { useEffect } from 'react'
  * before hydration — would get a page of invisible sections, which is a far
  * worse failure than no animation. The CSS therefore does nothing until this
  * component is alive to undo it.
+ *
+ * The layout survives client-side navigation, so the observer is rebuilt for
+ * every pathname; otherwise the next page's sections stay at opacity 0.
  */
 export function Reveal() {
+  const pathname = usePathname()
+
   useEffect(() => {
     const root = document.documentElement
 
@@ -60,7 +66,7 @@ export function Reveal() {
       observer.disconnect()
       root.classList.remove('js-reveal')
     }
-  }, [])
+  }, [pathname])
 
   return null
 }

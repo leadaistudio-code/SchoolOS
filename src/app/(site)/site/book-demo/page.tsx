@@ -93,7 +93,7 @@ export default function BookDemoPage() {
             <div className="space-y-8">
               <DemoForm />
               <SitePhoto
-                image={{ src: '/images/site/r-handshake.jpg', alt: 'School director and consultant shaking hands after a demonstration' }}
+                image={{ src: '/images/site/r-handshake.jpg', alt: 'Illustration of a calendar with a booked day and a video-call icon' }}
                 sizes="(min-width: 1024px) 640px, 100vw"
                 className="hidden aspect-[16/9] lg:block"
               />

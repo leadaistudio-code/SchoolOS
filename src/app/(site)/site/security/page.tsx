@@ -12,14 +12,14 @@ export const metadata: Metadata = {
 export default function SecurityPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-security.jpg', alt: 'Data centre aisle with server racks' }}
+      <PageIntro image={{ src: '/images/site/intro-security.jpg', alt: 'Illustration of a shield with a keyhole beside server racks' }}
         eyebrow="Security"
         title="How your school's data is kept separate."
         lead="Written for the person at your school who has to ask the awkward questions. Everything here describes how the software is built; where we hold no certification, we say so."
       />
 
       <ProseSection>
-        <Prose title="One school cannot reach another" image={{ src: '/images/site/r-separate-boxes.jpg', alt: 'Separate locked record boxes on a shelf' }}>
+        <Prose title="One school cannot reach another" image={{ src: '/images/site/r-separate-boxes.jpg', alt: 'Illustration of three locked boxes kept apart' }}>
           <p>
             Every school is a separate tenant. Each query carries the school it belongs to, applied
             in the database layer rather than remembered by individual screens, so a request that
@@ -32,7 +32,7 @@ export default function SecurityPage() {
           </p>
         </Prose>
 
-        <Prose title="Inside a school, access follows the role" image={{ src: '/images/site/r-id-badges.jpg', alt: 'Staff ID cards in different role colours' }}>
+        <Prose title="Inside a school, access follows the role" image={{ src: '/images/site/r-id-badges.jpg', alt: 'Illustration of role badges each marked with a different symbol' }}>
           <p>
             Twelve roles are defined, each a set of specific permissions rather than a rank.
             Beyond that, some roles are restricted by row: a parent reaches their own children, a
@@ -41,7 +41,7 @@ export default function SecurityPage() {
           </p>
         </Prose>
 
-        <Prose title="A record of who did what" image={{ src: '/images/site/r-audit-log.jpg', alt: 'Administrator reviewing an activity log on a monitor' }}>
+        <Prose title="A record of who did what" image={{ src: '/images/site/r-audit-log.jpg', alt: 'Illustration of an activity timeline under a magnifying glass' }}>
           <p>
             Fee collection, refunds, result publication, permission changes and student record
             edits are written to an audit trail with the person, the time and the change. Sensitive
@@ -49,7 +49,7 @@ export default function SecurityPage() {
           </p>
         </Prose>
 
-        <Prose title="Accounts and sessions" image={{ src: '/images/site/r-otp-login.jpg', alt: 'Phone showing a one-time code sign-in screen' }}>
+        <Prose title="Accounts and sessions" image={{ src: '/images/site/r-otp-login.jpg', alt: 'Illustration of a phone code entry screen with a shield' }}>
           <p>
             Passwords are hashed with bcrypt. Sessions are cookie-based, marked secure in
             production, and bound to the school they were issued for — a valid session from one
@@ -61,7 +61,7 @@ export default function SecurityPage() {
           </p>
         </Prose>
 
-        <Prose title="What we do not claim" image={{ src: '/images/site/r-roadmap-board.jpg', alt: 'Planning board with sticky notes' }}>
+        <Prose title="What we do not claim" image={{ src: '/images/site/r-roadmap-board.jpg', alt: 'Illustration of a planning board with cards moving to done' }}>
           <p>
             MyCampusView holds no ISO, SOC 2 or similar certification, and we will not imply otherwise.
             Postgres row-level security ships with the product as an optional hardening layer and

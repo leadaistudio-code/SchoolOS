@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 export default function ErpPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-operations.jpg', alt: 'School front office staff at the counter' }}
+      <PageIntro image={{ src: '/images/site/intro-operations.jpg', alt: 'Illustration of a fee receipt, calculator, binder and bell' }}
         eyebrow="Operations"
         title="The office work, done where the records already are."
         lead="Fees, staff, leave and communication all depend on knowing who is enrolled in which class. When that lives in the same system, most of the administration disappears rather than moving."
       />
 
       <ProseSection>
-        <Prose id="fees" title="Fees" image={{ src: '/images/site/r-fees-counter.jpg', alt: 'Parent receiving a fee receipt at the school counter' }}>
+        <Prose id="fees" title="Fees" image={{ src: '/images/site/r-fees-counter.jpg', alt: 'Illustration of a fee receipt with rupee coins and a tick' }}>
           <p>
             A fee structure is defined once per class and session — tuition, transport, laboratory,
             whatever the school charges — and invoices are generated from it. Because the structure
@@ -37,7 +37,7 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose id="staff" title="Staff" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Teachers planning together in the staff room' }}>
+        <Prose id="staff" title="Staff" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Illustration of a timetable grid, a clock and a cup of tea' }}>
           <p>
             Staff records carry designation, department, contact details and joining date. Roles
             decide what each person can reach: eleven are defined for a school, from school
@@ -50,7 +50,7 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose id="communication" title="Communication" image={{ src: '/images/site/r-parent-phone.jpg', alt: 'Parent reading a school update on her phone at home' }}>
+        <Prose id="communication" title="Communication" image={{ src: '/images/site/r-parent-phone.jpg', alt: 'Illustration of a phone with school notifications' }}>
           <p>
             Notices go to an audience — everyone, a role, a class, a section — and appear in the
             portals of exactly those people. Internal mail runs between staff and families inside

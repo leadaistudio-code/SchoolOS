@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 export default function SisPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-sis.jpg', alt: 'Class teacher reviewing a student profile on a tablet' }}
+      <PageIntro image={{ src: '/images/site/intro-sis.jpg', alt: 'Illustration of a student record card linked to attendance, reports and home' }}
         eyebrow="Student records"
         title="Everything about a student, in one place, for as long as they are with you."
         lead="A student record is not a form. It is six years of attendance, marks, fees, documents and correspondence — and it should still make sense when the child leaves."
       />
 
       <ProseSection>
-        <Prose title="Profiles and families" image={{ src: '/images/site/r-family-gate.jpg', alt: 'Father walking his two children to the school gate' }}>
+        <Prose title="Profiles and families" image={{ src: '/images/site/r-family-gate.jpg', alt: 'Illustration of a path from a home to the school' }}>
           <p>
             Each student carries their admission number, class and section, guardians, contact
             details, medical notes and documents. Guardians are people, not fields: one parent can
@@ -32,7 +32,7 @@ export default function SisPage() {
           </p>
         </Prose>
 
-        <Prose title="Attendance that reflects the room" image={{ src: '/images/site/r-attendance.jpg', alt: 'Teacher marking attendance on a tablet in class' }}>
+        <Prose title="Attendance that reflects the room" image={{ src: '/images/site/r-attendance.jpg', alt: 'Illustration of an attendance grid of ticks on a tablet' }}>
           <p>
             Teachers mark a register per class, per day, on whatever device is to hand. Absence,
             late arrival, half day and approved leave are distinct states, because a school treats
@@ -44,7 +44,7 @@ export default function SisPage() {
           </p>
         </Prose>
 
-        <Prose title="Examinations and results" image={{ src: '/images/site/r-exam-hall.jpg', alt: 'Students writing an examination in a school hall' }}>
+        <Prose title="Examinations and results" image={{ src: '/images/site/r-exam-hall.jpg', alt: 'Illustration of an answer booklet, pencil and stopwatch' }}>
           <p>
             Marks are entered against a paper with a known maximum, so an impossible score is
             refused at the point of entry rather than found later. Grading scales are configured

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function TransportPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-transport.jpg', alt: 'School bus at the gate with an attendant checking the list' }}
+      <PageIntro image={{ src: '/images/site/intro-transport.jpg', alt: 'Illustration of a school bus on a dotted route with stops' }}
         eyebrow="Transport"
         title="Routes, buses and the children on them."
         lead="School transport is the part of the day parents worry about and the office has least visibility of. It is also the part most often run on a WhatsApp group and a driver's memory."
@@ -23,7 +23,7 @@ export default function TransportPage() {
       <TransportShowcase />
 
       <ProseSection>
-        <Prose title="The fleet" image={{ src: '/images/site/r-bus-fleet.jpg', alt: 'Row of school buses parked in the transport yard' }}>
+        <Prose title="The fleet" image={{ src: '/images/site/r-bus-fleet.jpg', alt: 'Illustration of three school buses with a wrench and gear' }}>
           <p>
             Each bus carries its registration, capacity, driver, attendant and the expiry dates of
             its insurance, fitness and pollution certificates. Papers about to lapse are surfaced
@@ -32,7 +32,7 @@ export default function TransportPage() {
           </p>
         </Prose>
 
-        <Prose title="Routes and children" image={{ src: '/images/site/r-bus-map.jpg', alt: 'Phone showing a bus route with numbered stops' }}>
+        <Prose title="Routes and children" image={{ src: '/images/site/r-bus-map.jpg', alt: 'Illustration of a phone map with a bus on a route between stops' }}>
           <p>
             A route is an ordered list of stops with pickup and drop times and an optional fare.
             Children are assigned to a stop, not to a bus, so changing the vehicle on a route does
@@ -41,7 +41,7 @@ export default function TransportPage() {
           </p>
         </Prose>
 
-        <Prose title="The trip" image={{ src: '/images/site/r-bus-inside.jpg', alt: 'Bus attendant checking children aboard on a tablet' }}>
+        <Prose title="The trip" image={{ src: '/images/site/r-bus-inside.jpg', alt: 'Illustration of a school bus next to a ticked boarding checklist' }}>
           <p>
             A driver starts the trip on a phone. Location sharing begins with the trip and ends
             with it — a bus that is not on a school run is not the school&rsquo;s to follow. The driver
@@ -54,7 +54,7 @@ export default function TransportPage() {
           </p>
         </Prose>
 
-        <Prose title="What parents see" image={{ src: '/images/site/r-bus-stop-parent.jpg', alt: 'Parent checking her phone at the bus stop as the bus arrives' }}>
+        <Prose title="What parents see" image={{ src: '/images/site/r-bus-stop-parent.jpg', alt: 'Illustration of a bus approaching a stop and a phone alert' }}>
           <p>
             Only their own child&rsquo;s bus: its position, the next stop, a rough arrival estimate, and
             the driver&rsquo;s name and phone number. When the bus is close to their stop they are told,

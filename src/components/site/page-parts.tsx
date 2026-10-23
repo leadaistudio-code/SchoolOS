@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-react'
 import { Container, Section } from './container'
 import { cn } from '@/lib/utils'
 
-/** A photograph from `public/images/site`. Every file there is 1024×768. */
+/** A line illustration from `public/images/site`. Every file there is 1024×768 on a #F6F7FA ground. */
 export type SiteImage = { src: string; alt: string }
 
 export function SitePhoto({
@@ -28,7 +28,7 @@ export function SitePhoto({
       sizes={sizes}
       priority={priority}
       className={cn(
-        'aspect-[4/3] w-full rounded-xl border border-[var(--rule)] object-cover shadow-[0_18px_40px_-24px_rgba(17,26,50,0.45)]',
+        'aspect-[4/3] w-full rounded-xl border border-[var(--rule)] bg-[var(--page)] object-cover',
         className,
       )}
     />

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-contact.jpg', alt: 'Product specialist on a video call' }}
+      <PageIntro image={{ src: '/images/site/intro-contact.jpg', alt: 'Illustration of speech bubbles, an envelope and a phone' }}
         eyebrow="Contact"
         title="Talk to someone who knows the product."
         lead="Enquiries reach the people who build and run MyCampusView, not a call centre."

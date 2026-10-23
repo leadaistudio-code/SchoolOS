@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-about.jpg', alt: 'Product team discussing a design at a whiteboard' }}
+      <PageIntro image={{ src: '/images/site/intro-about.jpg', alt: 'Illustration of a lightbulb, a school building and gears' }}
         eyebrow="About"
         title="Schools deserve better systems than the ones they have."
         lead="Most schools run something critical on a spreadsheet. Fee registers, admission enquiries, transport lists, sometimes attendance. It works until the person who maintains it is on leave."
       />
 
       <ProseSection>
-        <Prose title="Why this exists" image={{ src: '/images/site/r-paper-registers.jpg', alt: 'Desk piled with paper registers and printed spreadsheets' }}>
+        <Prose title="Why this exists" image={{ src: '/images/site/r-paper-registers.jpg', alt: 'Illustration of a messy pile of paper registers' }}>
           <p>
             The software schools are sold is usually a set of modules that were built separately
             and joined afterwards. Each holds its own copy of the student list, and keeping them
@@ -33,7 +33,7 @@ export default function AboutPage() {
           </p>
         </Prose>
 
-        <Prose title="What we believe about school software" image={{ src: '/images/site/r-classroom.jpg', alt: 'Teacher explaining a lesson at the chalkboard' }}>
+        <Prose title="What we believe about school software" image={{ src: '/images/site/r-classroom.jpg', alt: 'Illustration of a chalkboard, books and an apple' }}>
           <p>
             <strong className="font-semibold text-[var(--text)]">It should remove work, not move it.</strong>{' '}
             If a system needs someone to keep it updated, it has added a job rather than replaced
@@ -56,7 +56,7 @@ export default function AboutPage() {
           </p>
         </Prose>
 
-        <Prose title="How we build" image={{ src: '/images/site/r-developer.jpg', alt: 'Developer writing code at a desk' }}>
+        <Prose title="How we build" image={{ src: '/images/site/r-developer.jpg', alt: 'Illustration of a code window with gears and a connector' }}>
           <p>
             The product is written as one application over one database, with the tenant boundary
             enforced where data is read rather than remembered by each screen. Sensitive actions
@@ -69,7 +69,7 @@ export default function AboutPage() {
           </p>
         </Prose>
 
-        <Prose title="Who we build for" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Teachers planning together in the staff room' }}>
+        <Prose title="Who we build for" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Illustration of a timetable grid, a clock and a cup of tea' }}>
           <p>
             Private schools, international schools, preschools and multi-campus groups — the
             institutions large enough that spreadsheets have started to hurt, and small enough that

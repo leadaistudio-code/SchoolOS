@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function ProductPage() {
   return (
     <>
-      <PageIntro image={{ src: '/images/site/intro-product.jpg', alt: 'School administrator reviewing a dashboard in the school office' }}
+      <PageIntro image={{ src: '/images/site/intro-product.jpg', alt: 'Illustration of a laptop showing a school dashboard' }}
         eyebrow="Product"
         title="One database, not seven integrations."
         lead="Most school software is a set of products that talk to each other on a schedule. MyCampusView is one application over one database, which is why a child admitted this morning appears on this afternoon's register without anyone copying anything."
@@ -33,7 +33,7 @@ export default function ProductPage() {
       </Section>
 
       <ProseSection>
-        <Prose title="What integration usually means" image={{ src: '/images/site/r-paper-registers.jpg', alt: 'Desk piled with paper registers and printed spreadsheets' }}>
+        <Prose title="What integration usually means" image={{ src: '/images/site/r-paper-registers.jpg', alt: 'Illustration of a messy pile of paper registers' }}>
           <p>
             A school buys an admissions tool, a fee package and an attendance app. Each keeps its
             own copy of the student list. Somebody exports a spreadsheet on Friday to make them
@@ -46,7 +46,7 @@ export default function ProductPage() {
           </p>
         </Prose>
 
-        <Prose title="What MyCampusView does instead" image={{ src: '/images/site/r-principal.jpg', alt: 'Principal reviewing school figures on a laptop' }}>
+        <Prose title="What MyCampusView does instead" image={{ src: '/images/site/r-principal.jpg', alt: 'Illustration of a monitor showing a gauge, a trend line and KPI tiles' }}>
           <p>
             There is one student record. The fee module reads it, the register writes to it, the
             transport module points a bus stop at it, and the report card is generated from marks
@@ -58,7 +58,7 @@ export default function ProductPage() {
           </p>
         </Prose>
 
-        <Prose id="parents" title="Who sees what" image={{ src: '/images/site/r-parent-phone.jpg', alt: 'Parent reading a school update on her phone at home' }}>
+        <Prose id="parents" title="Who sees what" image={{ src: '/images/site/r-parent-phone.jpg', alt: 'Illustration of a phone with school notifications' }}>
           <p>
             Everyone signs into the same system and gets a different application. A parent reaches
             their own children. A teacher marks their own classes. An accountant sees the fee

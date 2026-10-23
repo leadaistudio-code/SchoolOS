@@ -29,14 +29,14 @@ export default function AdmissionCrmPage() {
     <>
       {breadcrumbJsonLd([{ name: 'Admission CRM', path: '/admission-crm' }])}
 
-      <PageIntro image={{ src: '/images/site/intro-admissions.jpg', alt: 'Admissions counsellor speaking with parents' }}
+      <PageIntro image={{ src: '/images/site/intro-admissions.jpg', alt: 'Illustration of enquiries flowing through a funnel into a folder' }}
         eyebrow="Admission CRM"
         title="Turn every admission enquiry into a record, not a note."
         lead="A school’s admission season runs on memory: a name on a pad, a follow-up somebody meant to make, a family who visited twice and was never called back. MyCampusView puts the enquiry on the system from the first call and turns an admitted child into a student record without retyping anything."
       />
 
       <ProseSection>
-        <Prose title="Where enquiries are lost" image={{ src: '/images/site/r-phone-notifications.jpg', alt: 'Phone full of missed calls and unread messages' }}>
+        <Prose title="Where enquiries are lost" image={{ src: '/images/site/r-phone-notifications.jpg', alt: 'Illustration of a phone overflowing with messages and missed calls' }}>
           <p>
             Almost nobody loses an enquiry deliberately. They are lost between people — the call
             that came in while the counsellor was on a school tour, the WhatsApp message answered
@@ -50,7 +50,7 @@ export default function AdmissionCrmPage() {
           </p>
         </Prose>
 
-        <Prose title="What happens today" image={{ src: '/images/site/r-enquiry-call.jpg', alt: 'Admissions counsellor recording a phone enquiry' }}>
+        <Prose title="What happens today" image={{ src: '/images/site/r-enquiry-call.jpg', alt: 'Illustration of a ringing phone, a notepad and a ticked calendar' }}>
           <p>
             An enquiry is recorded against the family, with the child, the class being asked about
             and where the enquiry came from. New enquiries appear on the administrator&rsquo;s
@@ -63,7 +63,7 @@ export default function AdmissionCrmPage() {
           </p>
         </Prose>
 
-        <Prose title="What is not built yet" image={{ src: '/images/site/r-roadmap-board.jpg', alt: 'Planning board with sticky notes' }}>
+        <Prose title="What is not built yet" image={{ src: '/images/site/r-roadmap-board.jpg', alt: 'Illustration of a planning board with cards moving to done' }}>
           <p>
             Stage-by-stage pipeline tracking, follow-up reminders with an owner and a date,
             counsellor assignment, online application forms with document collection, and conversion

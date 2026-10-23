@@ -27,7 +27,7 @@ export default function CustomersPage() {
     <>
       {breadcrumbJsonLd([{ name: 'Customer stories', path: '/customers' }])}
 
-      <PageIntro image={{ src: '/images/site/intro-customers.jpg', alt: 'Principal and vice principal reviewing records together' }}
+      <PageIntro image={{ src: '/images/site/intro-customers.jpg', alt: 'Illustration of a school with a rising arrow and a ticked calendar' }}
         eyebrow="Customers"
         title="What changes in a school’s first term on MyCampusView."
         lead="Every story here follows the same three questions: what was the problem, what did we actually do, and what changed afterwards. Schools are named only once they have agreed in writing to be."
@@ -148,7 +148,7 @@ export default function CustomersPage() {
       </Section>
 
       <ProseSection>
-        <Prose title="Would you speak to a school for us?" image={{ src: '/images/site/r-handshake.jpg', alt: 'School director and consultant shaking hands' }}>
+        <Prose title="Would you speak to a school for us?" image={{ src: '/images/site/r-handshake.jpg', alt: 'Illustration of a calendar with a booked day and a video-call icon' }}>
           <p>
             If you are already running MyCampusView and the first term went well, a written-up story
             helps the next school more than any page we could write ourselves. We will draft it, you
