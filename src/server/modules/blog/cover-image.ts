@@ -49,30 +49,46 @@ export function buildCoverImagePrompt(input: {
   ].join(' ')
 }
 
+function openAiImageClient() {
+  const { AI_API_KEY, BLOG_IMAGE_API_KEY, BLOG_IMAGE_BASE_URL } = env()
+  const apiKey = BLOG_IMAGE_API_KEY?.trim() || AI_API_KEY
+  if (!apiKey) throw new Error('Set BLOG_IMAGE_API_KEY or AI_API_KEY for blog covers')
+  // Chat gateways on AI_BASE_URL usually do not expose /images/generations.
+  const baseURL = BLOG_IMAGE_BASE_URL?.trim() || undefined
+  return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
+}
+
 export async function generateCoverImageBuffer(prompt: string): Promise<{ buffer: Buffer; mimeType: 'image/png' }> {
-  const { AI_API_KEY, AI_BASE_URL, BLOG_IMAGE_MODEL } = env()
-  if (!AI_API_KEY) throw new Error('AI_API_KEY is not configured')
+  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gpt-image-1', 'dall-e-3', 'dall-e-2'].filter(
+    (m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i,
+  )
+  const client = openAiImageClient()
+  let lastError: unknown
 
-  const model = BLOG_IMAGE_MODEL?.trim() || 'gpt-image-1'
-  const client = new OpenAI({
-    apiKey: AI_API_KEY,
-    ...(AI_BASE_URL ? { baseURL: AI_BASE_URL } : {}),
-  })
+  for (const model of models) {
+    try {
+      const size = model.startsWith('dall-e-2')
+        ? ('1024x1024' as const)
+        : model.startsWith('dall-e')
+          ? ('1792x1024' as const)
+          : ('1536x1024' as const)
+      const response = await client.images.generate({
+        model,
+        prompt,
+        size,
+        ...(model.startsWith('dall-e-3') ? { quality: 'standard' as const } : {}),
+        ...(model === 'gpt-image-1' ? { quality: 'medium' as const } : {}),
+        n: 1,
+      })
+      const b64 = response.data?.[0]?.b64_json
+      if (!b64) throw new Error('Image model returned no image data')
+      return { buffer: Buffer.from(b64, 'base64'), mimeType: 'image/png' }
+    } catch (error) {
+      lastError = error
+    }
+  }
 
-  const size = model.startsWith('dall-e') ? ('1792x1024' as const) : ('1536x1024' as const)
-  const quality = model.startsWith('dall-e') ? ('standard' as const) : ('medium' as const)
-
-  const response = await client.images.generate({
-    model,
-    prompt,
-    size,
-    quality,
-    n: 1,
-  })
-
-  const b64 = response.data?.[0]?.b64_json
-  if (!b64) throw new Error('Image model returned no image data')
-  return { buffer: Buffer.from(b64, 'base64'), mimeType: 'image/png' }
+  throw lastError instanceof Error ? lastError : new Error('Blog cover image generation failed')
 }
 
 export async function storeBlogCover(slug: string, buffer: Buffer, mimeType: string): Promise<string> {

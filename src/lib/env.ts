@@ -170,7 +170,11 @@ const serverSchema = z.object({
   // Long-form writing for the daily marketing blog. Falls back to a stronger
   // per-driver default than AI_MODEL, because a blog post is read by strangers.
   BLOG_AI_MODEL: z.string().optional(),
-  /** OpenAI image model for blog hero photos (e.g. gpt-image-1, dall-e-3). Uses AI_API_KEY. */
+  /** OpenAI key for blog hero photos when the chat key or gateway lacks /images. */
+  BLOG_IMAGE_API_KEY: z.string().optional(),
+  /** OpenAI-compatible images base URL (defaults to api.openai.com; not AI_BASE_URL). */
+  BLOG_IMAGE_BASE_URL: z.string().optional(),
+  /** Image model (e.g. gpt-image-1, dall-e-3). */
   BLOG_IMAGE_MODEL: z.string().optional(),
   // For Azure OpenAI, a gateway, Gemini proxy, or a self-hosted OpenAI-compatible endpoint.
   AI_BASE_URL: z.string().url().optional(),
