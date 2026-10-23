@@ -1,34 +1,79 @@
 import * as React from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { Container, Section } from './container'
 import { cn } from '@/lib/utils'
 
+/** A photograph from `public/images/site`. Every file there is 1024×768. */
+export type SiteImage = { src: string; alt: string }
+
+export function SitePhoto({
+  image,
+  sizes,
+  priority,
+  className,
+}: {
+  image: SiteImage
+  sizes: string
+  priority?: boolean
+  className?: string
+}) {
+  return (
+    <Image
+      src={image.src}
+      alt={image.alt}
+      width={1024}
+      height={768}
+      sizes={sizes}
+      priority={priority}
+      className={cn(
+        'aspect-[4/3] w-full rounded-xl border border-[var(--rule)] object-cover shadow-[0_18px_40px_-24px_rgba(17,26,50,0.45)]',
+        className,
+      )}
+    />
+  )
+}
+
 /**
  * Interior page opening.
  *
  * Quieter than the homepage hero on purpose: a visitor arriving here has
- * already decided to read, so the page starts with the sentence rather than
- * with a picture.
+ * already decided to read, so the sentence comes first and the photograph sits
+ * beside it rather than behind it.
  */
 export function PageIntro({
   eyebrow,
   title,
   lead,
+  image,
   children,
 }: {
   eyebrow: string
   title: string
   lead: string
+  image?: SiteImage
   children?: React.ReactNode
 }) {
+  const text = (
+    <div>
+      <p className="eyebrow">{eyebrow}</p>
+      <h1 className="display mt-3 max-w-3xl text-[clamp(2.25rem,5vw,3.6rem)]">{title}</h1>
+      <p className="muted mt-5 max-w-2xl text-[19px] leading-[1.55]">{lead}</p>
+      {children ? <div className="mt-8">{children}</div> : null}
+    </div>
+  )
   return (
     <div className="border-b border-[var(--rule)] bg-[var(--paper)] pb-14 pt-16 sm:pb-20 sm:pt-24">
       <Container>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="display mt-3 max-w-3xl text-[clamp(2.25rem,5vw,3.6rem)]">{title}</h1>
-        <p className="muted mt-5 max-w-2xl text-[19px] leading-[1.55]">{lead}</p>
-        {children ? <div className="mt-8">{children}</div> : null}
+        {image ? (
+          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-14">
+            {text}
+            <SitePhoto image={image} sizes="(min-width: 1024px) 520px, 100vw" priority />
+          </div>
+        ) : (
+          text
+        )}
       </Container>
     </div>
   )
@@ -41,18 +86,40 @@ export function PageIntro({
  * these directly — `/school-erp#fees`, for one — so a director following "fee
  * collection" from a menu lands on the paragraph about fees rather than at the
  * top of a long page to hunt for it.
+ *
+ * With an `image` the passage becomes a photo-and-text row; consecutive rows
+ * swap sides so a run of them reads as a zigzag rather than a column.
  */
 export function Prose({
   id,
   title,
   children,
   aside,
+  image,
 }: {
   id?: string
   title: string
   children: React.ReactNode
   aside?: React.ReactNode
+  image?: SiteImage
 }) {
+  if (image) {
+    return (
+      <div
+        id={id}
+        className="group grid scroll-mt-24 items-center gap-8 border-t border-[var(--rule)] py-12 md:grid-cols-2 md:gap-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:even:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
+      >
+        <SitePhoto image={image} sizes="(min-width: 1024px) 460px, (min-width: 768px) 50vw, 100vw" className="md:group-even:order-2" />
+        <div>
+          <h2 className="text-[24px] font-semibold leading-tight text-[var(--text)]">{title}</h2>
+          <div className="mt-4 max-w-[var(--measure)] space-y-4 text-[17px] leading-[1.65] text-[var(--text-muted)]">
+            {children}
+            {aside}
+          </div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div
       id={id}

@@ -45,7 +45,7 @@ export default function IntegrationsPage() {
       {breadcrumbJsonLd([{ name: 'Integrations', path: '/integrations' }])}
       {faqJsonLd(FAQ)}
 
-      <PageIntro
+      <PageIntro image={{ src: '/images/site/intro-integrations.jpg', alt: 'Laptop, phone and payment terminal connected on an office desk' }}
         eyebrow="Integrations"
         title="Connected to what your school already uses — through your own accounts."
         lead="MyCampusView reaches the outside world through provider interfaces, so a messaging vendor or a payment gateway can be changed by configuration rather than by rewriting a module. It also means the account is yours: your sender ID, your gateway, your bank."
@@ -85,7 +85,7 @@ export default function IntegrationsPage() {
       ))}
 
       <ProseSection>
-        <Prose title="Why the account is yours">
+        <Prose title="Why the account is yours" image={{ src: '/images/site/r-upi-phone.jpg', alt: 'Parent confirming an online fee payment on a phone' }}>
           <p>
             Some school software resells messaging: the school buys a bundle of SMS credits from the
             vendor, at the vendor&rsquo;s margin, and the sender ID belongs to the vendor too. When
@@ -98,7 +98,7 @@ export default function IntegrationsPage() {
           </p>
         </Prose>
 
-        <Prose title="Building against an interface">
+        <Prose title="Building against an interface" image={{ src: '/images/site/r-developer.jpg', alt: 'Developer writing code at a desk' }}>
           <p>
             Email, SMS, WhatsApp, payments, storage and maps each sit behind a contract in the code
             that business logic depends on instead of depending on a vendor. Switching provider is a
@@ -111,7 +111,7 @@ export default function IntegrationsPage() {
           </p>
         </Prose>
 
-        <Prose title="Questions we are asked">
+        <Prose title="Questions we are asked" image={{ src: '/images/site/r-support.jpg', alt: 'Support engineer on a call taking notes' }}>
           <dl className="space-y-6">
             {FAQ.map((item) => (
               <div key={item.question}>

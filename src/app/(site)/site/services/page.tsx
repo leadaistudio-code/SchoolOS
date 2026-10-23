@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <>
-      <PageIntro
+      <PageIntro image={{ src: '/images/site/intro-services.jpg', alt: 'Trainer teaching school staff in a computer lab' }}
         eyebrow="Services"
         title="Software is only useful when your school can actually use it."
         lead="Most failed school software was not bad software. It was installed, never populated properly, and abandoned by the third month."
       />
 
       <ProseSection>
-        <Prose title="Getting set up">
+        <Prose title="Getting set up" image={{ src: '/images/site/r-roadmap-board.jpg', alt: 'Planning board with sticky notes' }}>
           <p>
             Your academic session, classes, sections and subjects are configured first, because
             everything else hangs off them. Then roles: who marks registers, who collects fees, who
@@ -29,7 +29,7 @@ export default function ServicesPage() {
           </p>
         </Prose>
 
-        <Prose title="Bringing your data across">
+        <Prose title="Bringing your data across" image={{ src: '/images/site/r-data-entry.jpg', alt: 'Office assistant moving paper records onto a laptop' }}>
           <p>
             Students, guardians, staff and current fee balances are the four that matter. We take
             what you have — usually spreadsheets exported from whatever you run now — and load it,
@@ -41,7 +41,7 @@ export default function ServicesPage() {
           </p>
         </Prose>
 
-        <Prose title="Training the people who will use it">
+        <Prose title="Training the people who will use it" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Teachers planning together in the staff room' }}>
           <p>
             Separate sessions for the front office, the finance team, teachers and the transport
             desk. A teacher needs fifteen minutes on registers and homework, not an hour on the
@@ -49,7 +49,7 @@ export default function ServicesPage() {
           </p>
         </Prose>
 
-        <Prose title="Afterwards">
+        <Prose title="Afterwards" image={{ src: '/images/site/r-support.jpg', alt: 'Support engineer on a call taking notes' }}>
           <p>
             Configuration changes as the school year turns — new sessions, new fee structures, new
             staff. Support covers that as well as the occasional thing going wrong.

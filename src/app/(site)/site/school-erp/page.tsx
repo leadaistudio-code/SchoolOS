@@ -13,14 +13,14 @@ export const metadata: Metadata = {
 export default function ErpPage() {
   return (
     <>
-      <PageIntro
+      <PageIntro image={{ src: '/images/site/intro-operations.jpg', alt: 'School front office staff at the counter' }}
         eyebrow="Operations"
         title="The office work, done where the records already are."
         lead="Fees, staff, leave and communication all depend on knowing who is enrolled in which class. When that lives in the same system, most of the administration disappears rather than moving."
       />
 
       <ProseSection>
-        <Prose id="fees" title="Fees">
+        <Prose id="fees" title="Fees" image={{ src: '/images/site/r-fees-counter.jpg', alt: 'Parent receiving a fee receipt at the school counter' }}>
           <p>
             A fee structure is defined once per class and session — tuition, transport, laboratory,
             whatever the school charges — and invoices are generated from it. Because the structure
@@ -37,7 +37,7 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose id="staff" title="Staff">
+        <Prose id="staff" title="Staff" image={{ src: '/images/site/r-staff-room.jpg', alt: 'Teachers planning together in the staff room' }}>
           <p>
             Staff records carry designation, department, contact details and joining date. Roles
             decide what each person can reach: eleven are defined for a school, from school
@@ -50,7 +50,7 @@ export default function ErpPage() {
           </p>
         </Prose>
 
-        <Prose id="communication" title="Communication">
+        <Prose id="communication" title="Communication" image={{ src: '/images/site/r-parent-phone.jpg', alt: 'Parent reading a school update on her phone at home' }}>
           <p>
             Notices go to an audience — everyone, a role, a class, a section — and appear in the
             portals of exactly those people. Internal mail runs between staff and families inside

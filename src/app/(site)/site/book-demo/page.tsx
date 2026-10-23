@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Container } from '@/components/site/container'
 import { DemoForm } from '@/components/site/demo-form'
+import { SitePhoto } from '@/components/site/page-parts'
 import { MyCampusViewLogo } from '@/components/brand/logo'
 import { breadcrumbJsonLd } from '@/components/site/seo'
 import { MODULE_COUNTS } from '@/content/site/modules'
@@ -89,7 +90,14 @@ export default function BookDemoPage() {
               </div>
             </div>
 
-            <DemoForm />
+            <div className="space-y-8">
+              <DemoForm />
+              <SitePhoto
+                image={{ src: '/images/site/r-handshake.jpg', alt: 'School director and consultant shaking hands after a demonstration' }}
+                sizes="(min-width: 1024px) 640px, 100vw"
+                className="hidden aspect-[16/9] lg:block"
+              />
+            </div>
           </div>
         </Container>
       </div>

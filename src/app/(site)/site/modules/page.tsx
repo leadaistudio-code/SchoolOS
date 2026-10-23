@@ -31,7 +31,7 @@ export default function ModulesPage() {
     <>
       {breadcrumbJsonLd([{ name: 'Modules', path: '/modules' }])}
 
-      <PageIntro
+      <PageIntro image={{ src: '/images/site/intro-modules.jpg', alt: 'School office desk with laptop, attendance register, ID cards and fee receipts' }}
         eyebrow="Modules"
         title="Everything you need to run a school — and a straight answer on what is missing."
         lead="Eight categories, every module in the product, and a label on each one. Nothing on this page is a roadmap item dressed up as a feature; where something is not built, it says so."
