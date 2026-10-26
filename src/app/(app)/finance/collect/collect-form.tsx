@@ -123,6 +123,7 @@ export function CollectForm({
     const res = await fetch(`/api/v1/finance/invoices?studentId=${id}&pageSize=50`)
     const json = await res.json()
     const rows: Invoice[] = (json.data?.invoices ?? [])
+      .filter((i: Invoice) => i.status !== 'CANCELLED' && i.status !== 'DRAFT')
       .map((i: Invoice & { dueOn: string }) => ({
         id: i.id,
         number: i.number,
