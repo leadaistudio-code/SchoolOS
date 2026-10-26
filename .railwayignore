@@ -17,6 +17,7 @@ cloud/
 scroll-site-generator/
 tools/
 releases/
+.tmp-diag/
 docs/sales/
 Payment-Collection-Data-*
 docs/Payment-Collection-Data-*
