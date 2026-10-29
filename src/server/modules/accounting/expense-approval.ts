@@ -186,6 +186,22 @@ export function availableActions(request: RequestState, steps: StepRecord[], act
   })
 }
 
+/**
+ * Why `actor` holds the permission for the current stage but still cannot
+ * approve it (they prepared it, or already signed an earlier stage), so the
+ * page can say so instead of silently hiding the button.
+ */
+export function approveBlockedReason(request: RequestState, steps: StepRecord[], actor: ApprovalActor, departmentStage = false): string | null {
+  const stage = stageOf(request.status)
+  if (!stage || !actor.can(stage.permission)) return null
+  try {
+    planTransition({ request, steps, actor, action: 'approve', remarks: 'xxx', departmentStage })
+    return null
+  } catch (error) {
+    return error instanceof ApprovalRuleError && error.code === 'SEPARATION_OF_DUTIES' ? error.message : null
+  }
+}
+
 // ------------------------------------------------------------------ provisional P&L
 
 export type PlRow = { id: string; code: string; name: string; expenseNature: string | null; amountMinor: number }

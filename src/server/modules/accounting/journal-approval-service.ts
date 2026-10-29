@@ -196,7 +196,29 @@ export async function journalApprovalFor(ctx: AppContext, entry: { id: string; a
     actorOf(ctx),
     departmentStage,
   )
-  return { steps, actions, stage: stageOfStatus(entry.approvalStatus), departmentStage }
+  const stage = stageOfStatus(entry.approvalStatus)
+  const actor = actorOf(ctx)
+  let blockedReason: string | null = null
+  if (stage && actor.can(stage.permission) && !actions.includes('approve')) {
+    try {
+      planJournalAction({
+        entry: { status: entry.approvalStatus, cycle: entry.approvalCycle, createdById: entry.createdById },
+        steps: steps.filter((s) => s.cycle === entry.approvalCycle), actor, action: 'approve', remarks: 'xxx', departmentStage,
+      })
+    } catch (error) {
+      if (error instanceof JournalApprovalError && error.code === 'SEPARATION_OF_DUTIES') blockedReason = error.message
+    }
+  }
+  const excluded = new Set([entry.createdById, ...steps.filter((s) => s.cycle === entry.approvalCycle).map((s) => s.actorId)])
+  const otherSigners = blockedReason && stage
+    ? (await ctx.db.user.findMany({
+        where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { permissions: { some: { permission: { key: stage.permission } } } } } } },
+        select: { id: true, firstName: true, lastName: true },
+        orderBy: { firstName: 'asc' },
+        take: 25,
+      })).filter((u) => !excluded.has(u.id)).map((u) => `${u.firstName} ${u.lastName}`.trim())
+    : []
+  return { steps, actions, stage, departmentStage, blockedReason, otherSigners }
 }
 
 export async function setDepartmentStage(ctx: AppContext, enabled: boolean) {

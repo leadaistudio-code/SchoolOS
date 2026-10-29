@@ -147,8 +147,13 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
       {data.stage && r.createdById === ctx.user.userId ? (
         <Notice tone="info">You prepared this expense, so other people must sign each approval stage.</Notice>
       ) : null}
-      {data.stage && data.actions.length === 0 && r.createdById !== ctx.user.userId && ctx.can(data.stage.permission) ? (
-        <Notice tone="warning">You have already signed an earlier stage of this submission. Another person with this stage&apos;s authority must sign it.</Notice>
+      {data.blockedReason && r.createdById !== ctx.user.userId ? (
+        <Notice tone="warning" title="You cannot approve this stage">
+          You already signed an earlier stage of this submission, and one person cannot sign two stages of the same expense.{' '}
+          {data.otherSigners.length
+            ? `It can be approved by ${data.otherSigners.join(', ')}.`
+            : 'Nobody else in the school holds this stage’s authority yet: give another user that permission (Settings → Roles), or return it so a different person validates it.'}
+        </Notice>
       ) : null}
       {data.mode === 'off' && (status === 'DRAFT' || status === 'RETURNED') ? (
         <Notice tone="warning" title="Approval workflow is off">This expense cannot be submitted while the workflow is switched off. Withdraw it and record the expense directly.</Notice>

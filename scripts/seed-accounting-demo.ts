@@ -1,9 +1,11 @@
 /**
- * Fills one school's books with realistic accounting history (April 2024 to
- * today) so the accounting pages and analytics have something to show:
+ * Fills one school's books with realistic accounting history (April 2024, or
+ * the `--from` month, to today) so the accounting pages and analytics have
+ * something to show:
  *
  *   npx tsx scripts/seed-accounting-demo.ts --tenant demo            # local database
  *   npx tsx scripts/seed-accounting-demo.ts --tenant demo --confirm  # any other database
+ *   npx tsx scripts/seed-accounting-demo.ts --tenant demo --from 2023-04
  *
  * Everything goes through the application's own services (manual journals,
  * expenses, vendors, purchase vouchers, vendor payments, fixed assets,
@@ -20,13 +22,16 @@
  */
 import { PrismaClient } from '@prisma/client'
 
-const START_MONTH = '2024-04'
 const SEED_REF = 'DEMO'
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name)
   return i >= 0 ? process.argv[i + 1] : undefined
 }
+
+/** First month of the books, `--from 2023-04`; defaults to April 2024. */
+const START_MONTH = arg('--from') ?? '2024-04'
+if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(START_MONTH)) throw new Error('--from takes a month, e.g. 2023-04')
 
 // ------------------------------------------------------------------ helpers
 
@@ -165,7 +170,14 @@ async function main() {
       counts.journals++
     }
 
-    await journal(`${SEED_REF}-OPEN`, '2024-04-01', 'JOURNAL', 'Opening balances brought forward (bank and cash) as on 1 April 2024', [
+    // Extending the books backwards moves the opening balances to the new start.
+    const openOn = `${START_MONTH}-01`
+    const laterOpening = await db.journalEntry.deleteMany({
+      where: { reference: `${SEED_REF}-OPEN`, sourceType: 'MANUAL', isReversal: false, date: { gt: new Date(`${openOn}T00:00:00Z`) } },
+    })
+    if (laterOpening.count) console.log(`moved the opening balances back to ${openOn}`)
+    const openLabel = new Date(`${openOn}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+    await journal(`${SEED_REF}-OPEN`, openOn, 'JOURNAL', `Opening balances brought forward (bank and cash) as on ${openLabel}`, [
       { accountId: BANK, debit: 3500000, memo: 'Bank balance b/f' },
       { accountId: CASH, debit: 50000, memo: 'Cash in hand b/f' },
       { accountId: sys('OPENING_EQUITY'), credit: 3550000 },
@@ -246,7 +258,7 @@ async function main() {
       if (n === 9 || n === 3) await expense(k('exam'), day(month, 8), 'Exam & assessment expenses', n === 9 ? 'Half-yearly exam papers & printing' : 'Annual exam papers & printing', vary(28000), 'BANK_TRANSFER', 'Print Point')
       if (n === 12 || n === 1 || n === 2 || n === 3) await expense(k('ads'), day(month, 6), 'Advertising & admissions marketing', 'Admissions campaign — newspaper & social media', vary(52000, 0.25), 'BANK_TRANSFER', 'Local Media Agency')
       if (n === 9) await expense(k('audit'), day(month, 25), 'Professional & audit fees', 'Statutory audit fee', vary(75000, 0.03), 'BANK_TRANSFER', 'Gupta & Associates, Chartered Accountants')
-      if (n === 7 && month >= '2024-07') await expense(k('insurance'), day(month, 10), 'Insurance', 'School bus & building insurance premium', vary(62000, 0.05), 'CHEQUE', 'National Insurance Co.')
+      if (n === 7) await expense(k('insurance'), day(month, 10), 'Insurance', 'School bus & building insurance premium', vary(62000, 0.05), 'CHEQUE', 'National Insurance Co.')
     }
 
     // ------------------------------------------------- vendors and purchases

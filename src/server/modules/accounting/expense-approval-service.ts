@@ -21,6 +21,7 @@ import {
   APPROVAL_STAGES,
   ApprovalRuleError,
   IN_FLIGHT_STATUSES,
+  approveBlockedReason,
   PROVISIONAL_STATUSES,
   availableActions,
   planTransition,
@@ -547,8 +548,24 @@ export async function getExpenseRequest(ctx: AppContext, id: string) {
     departmentStage,
   ).filter((a) => a !== 'submit' || approvalMode(flags, accountingEnvSwitches().approvals) !== 'off')
   const canEdit = (request.status === 'DRAFT' || request.status === 'RETURNED') && request.createdById === ctx.user.userId && ctx.can('expenses.manage')
+  const blockedReason = approveBlockedReason(
+    { status: request.status, cycle: request.cycle, createdById: request.createdById },
+    steps.filter((s) => s.cycle === request.cycle),
+    actorOf(ctx),
+    departmentStage,
+  )
+  const stage = stageOf(request.status)
+  const excluded = new Set([request.createdById, ...steps.filter((s) => s.cycle === request.cycle && s.actorId).map((s) => s.actorId)])
+  const otherSigners = blockedReason && stage
+    ? (await ctx.db.user.findMany({
+        where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { permissions: { some: { permission: { key: stage.permission } } } } } } },
+        select: { id: true, firstName: true, lastName: true },
+        orderBy: { firstName: 'asc' },
+        take: 25,
+      })).filter((u) => !excluded.has(u.id)).map((u) => `${u.firstName} ${u.lastName}`.trim())
+    : []
   return {
-    request, steps, head, cash, entries, actions, canEdit, stage: stageOf(request.status), workflowOn: flags.approvals, departmentStage,
+    request, steps, head, cash, entries, actions, canEdit, blockedReason, otherSigners, stage: stageOf(request.status), workflowOn: flags.approvals, departmentStage,
     mode: approvalMode(flags, accountingEnvSwitches().approvals),
   }
 }

@@ -73,6 +73,14 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
           {entry.approvedAt ? ` on ${entry.approvedAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}` : ''}.
         </Notice>
       ) : null}
+      {approval.blockedReason ? (
+        <Notice tone="warning" title="You cannot approve this stage">
+          {approval.blockedReason}.{' '}
+          {approval.otherSigners.length
+            ? `It can be approved by ${approval.otherSigners.join(', ')}.`
+            : 'Nobody else in the school holds this stage’s authority yet: give another user that permission (Settings → Roles).'}
+        </Notice>
+      ) : null}
 
       {reversal ? (
         <Notice tone="warning" title="This voucher has been reversed">
