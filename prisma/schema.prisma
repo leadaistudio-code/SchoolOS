@@ -357,6 +357,7 @@ model User {
   crmTasksOwned         CrmTask[]                 @relation("CrmTaskOwner")
   crmMeetingsCreated    CrmMeeting[]              @relation("CrmMeetingCreatedBy")
   crmVisitsCreated      CrmVisit[]                @relation("CrmVisitCreatedBy")
+  crmReminderRecipients CrmReminderRecipient[]    @relation("CrmReminderRecipientUser")
   tapasyaGlobalProfile  GlobalLeaderboardProfile?
 
   @@unique([tenantId, email])
@@ -5539,6 +5540,26 @@ model CrmReminderSend {
 
   @@unique([kind, targetKey])
   @@index([sentAt])
+}
+
+/// A salesperson who gets the daily Growth CRM reminders. Platform-only.
+/// TEAM sees every open follow-up; MINE only those assigned to `userId`.
+model CrmReminderRecipient {
+  id        String   @id @default(cuid())
+  name      String
+  whatsapp  String?
+  email     String?
+  userId    String?
+  user      User?    @relation("CrmReminderRecipientUser", fields: [userId], references: [id], onDelete: SetNull)
+  scope     String   @default("TEAM")
+  morning   Boolean  @default(true)
+  evening   Boolean  @default(true)
+  meetings  Boolean  @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 /// Sales message templates. Platform-only — not tenant NotificationTemplate.

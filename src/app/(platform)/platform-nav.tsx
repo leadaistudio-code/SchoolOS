@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import {
   Activity,
   BarChart3,
+  BellRing,
   Building2,
   CalendarCheck,
   Camera,
@@ -31,6 +32,7 @@ const ICONS = {
   capture: Camera,
   today: CalendarCheck,
   templates: FileText,
+  reminders: BellRing,
   mail: Mail,
   schools: Building2,
   plans: Package,

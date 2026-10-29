@@ -32,6 +32,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           { label: 'Capture', href: '/platform/growth/capture', icon: 'capture' },
           { label: 'Today', href: '/platform/growth/today', icon: 'today' },
           { label: 'Templates', href: '/platform/growth/templates', icon: 'templates' },
+          { label: 'Reminders', href: '/platform/growth/reminders', icon: 'reminders' },
           { label: 'Blog', href: '/platform/blog', icon: 'blog' },
         ] satisfies PlatformNavItem[])
       : []),
