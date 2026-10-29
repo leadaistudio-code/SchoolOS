@@ -8,7 +8,7 @@ Sample values are what Meta asks for when you add variables.
 
 ---
 
-## 1. `mcv_sales_morning` (08:30 AM plan)
+## 1. `mcv_sales_morning_0830_am_plan` (08:30 AM plan)
 
 **Body**
 
@@ -40,7 +40,7 @@ Tap below to see the full list.
 
 ---
 
-## 2. `mcv_sales_wrapup` (6:00 PM wrap-up)
+## 2. `mcv_sales_wrapup_600_pm_wrapup` (6:00 PM wrap-up)
 
 **Body**
 
@@ -70,7 +70,7 @@ Please call, reschedule or close these before you end the day.
 
 ---
 
-## 3. `mcv_sales_meeting_soon` (30 minutes before a meeting)
+## 3. `mcv_sales_meeting_soon_30_minutes_before_a_meeting` (30 minutes before a meeting)
 
 **Body**
 

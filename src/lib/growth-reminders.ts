@@ -5,9 +5,9 @@ const IST_OFFSET_MS = 330 * 60_000
 
 /** Meta template names; they must match what is approved in WhatsApp Manager. */
 export const CRM_WA_TEMPLATES = {
-  morning: 'mcv_sales_morning',
-  evening: 'mcv_sales_wrapup',
-  meeting: 'mcv_sales_meeting_soon',
+  morning: 'mcv_sales_morning_0830_am_plan',
+  evening: 'mcv_sales_wrapup_600_pm_wrapup',
+  meeting: 'mcv_sales_meeting_soon_30_minutes_before_a_meeting',
 } as const
 
 export const CRM_WA_TEMPLATE_LANG = 'en'
