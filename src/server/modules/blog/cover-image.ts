@@ -109,7 +109,7 @@ async function generateCoverImageGemini(prompt: string): Promise<{ buffer: Buffe
 }
 
 async function generateCoverImageOpenAi(prompt: string): Promise<{ buffer: Buffer; mimeType: 'image/png' }> {
-  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gpt-image-1', 'dall-e-3', 'dall-e-2'].filter(
+  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gpt-image-2', 'gpt-image-1.5', 'gpt-image-1', 'dall-e-3'].filter(
     (m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i,
   )
   const client = openAiImageClient()
@@ -127,13 +127,14 @@ async function generateCoverImageOpenAi(prompt: string): Promise<{ buffer: Buffe
         prompt,
         size,
         ...(model.startsWith('dall-e-3') ? { quality: 'standard' as const } : {}),
-        ...(model === 'gpt-image-1' ? { quality: 'medium' as const } : {}),
+        ...(model.startsWith('gpt-image') ? { quality: 'medium' as const } : {}),
         n: 1,
       })
       const b64 = response.data?.[0]?.b64_json
       if (!b64) throw new Error('Image model returned no image data')
       return { buffer: Buffer.from(b64, 'base64'), mimeType: 'image/png' }
     } catch (error) {
+      console.warn(`[blog] openai ${model} failed:`, error instanceof Error ? error.message.slice(0, 300) : error)
       lastError = error
     }
   }
