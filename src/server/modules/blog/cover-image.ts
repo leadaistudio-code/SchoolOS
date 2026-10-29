@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { GoogleGenAI, Modality } from '@google/genai'
 import { env } from '@/lib/env'
 import { blogCategory, type BlogCategoryKey } from '@/lib/blog'
 import { prisma } from '@/server/db/prisma'
@@ -26,8 +27,8 @@ const SCENE: Record<BlogCategoryKey, string> = {
 /**
  * Photorealistic hero photos for the blog.
  *
- * OpenAI image models only; text generation may use another driver. Failures are
- * non-fatal — the vector cover art is the fallback.
+ * Uses Gemini image models when AI_DRIVER=gemini (same key as the blog writer),
+ * otherwise OpenAI Images. Failures are non-fatal — vector cover art is the fallback.
  */
 export function buildCoverImagePrompt(input: {
   title: string
@@ -37,7 +38,7 @@ export function buildCoverImagePrompt(input: {
   const category = blogCategory(input.categoryKey)
   const scene = SCENE[category.key as BlogCategoryKey] ?? SCENE.operations
   return [
-    'Professional editorial photograph for a school management blog, photorealistic, shot on a full-frame camera.',
+    'Create one photorealistic editorial photograph for a school management blog.',
     'Absolutely no people, no faces, no hands, no silhouettes, no human figures of any kind.',
     `Topic: ${input.title}.`,
     `Category: ${category.label}.`,
@@ -49,16 +50,64 @@ export function buildCoverImagePrompt(input: {
   ].join(' ')
 }
 
+function imageDriver(): 'gemini' | 'openai' {
+  const { AI_DRIVER, BLOG_IMAGE_DRIVER } = env()
+  if (BLOG_IMAGE_DRIVER) return BLOG_IMAGE_DRIVER
+  if (AI_DRIVER === 'gemini') return 'gemini'
+  if (AI_DRIVER === 'openai') return 'openai'
+  throw new Error('Blog covers need AI_DRIVER=gemini or openai, or set BLOG_IMAGE_DRIVER')
+}
+
+function geminiImageClient() {
+  const { AI_API_KEY, BLOG_IMAGE_API_KEY, AI_BASE_URL, BLOG_IMAGE_BASE_URL } = env()
+  const apiKey = BLOG_IMAGE_API_KEY?.trim() || AI_API_KEY
+  if (!apiKey) throw new Error('Set AI_API_KEY (Gemini) or BLOG_IMAGE_API_KEY for blog covers')
+  const baseUrl = (BLOG_IMAGE_BASE_URL ?? AI_BASE_URL)?.trim()
+  return new GoogleGenAI({
+    apiKey,
+    ...(baseUrl ? { httpOptions: { baseUrl, apiVersion: '' } } : {}),
+  })
+}
+
 function openAiImageClient() {
   const { AI_API_KEY, BLOG_IMAGE_API_KEY, BLOG_IMAGE_BASE_URL } = env()
   const apiKey = BLOG_IMAGE_API_KEY?.trim() || AI_API_KEY
   if (!apiKey) throw new Error('Set BLOG_IMAGE_API_KEY or AI_API_KEY for blog covers')
-  // Chat gateways on AI_BASE_URL usually do not expose /images/generations.
   const baseURL = BLOG_IMAGE_BASE_URL?.trim() || undefined
   return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
 }
 
-export async function generateCoverImageBuffer(prompt: string): Promise<{ buffer: Buffer; mimeType: 'image/png' }> {
+async function generateCoverImageGemini(prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'].filter(
+    (m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i,
+  )
+  const client = geminiImageClient()
+  let lastError: unknown
+
+  for (const model of models) {
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseModalities: [Modality.IMAGE],
+          imageConfig: { aspectRatio: '16:9' },
+        },
+      })
+      const parts = response.candidates?.[0]?.content?.parts ?? []
+      const inline = parts.find((part) => part.inlineData?.data)
+      if (!inline?.inlineData?.data) throw new Error('Gemini returned no image bytes')
+      const mimeType = inline.inlineData.mimeType || 'image/png'
+      return { buffer: Buffer.from(inline.inlineData.data, 'base64'), mimeType }
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gemini cover image generation failed')
+}
+
+async function generateCoverImageOpenAi(prompt: string): Promise<{ buffer: Buffer; mimeType: 'image/png' }> {
   const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gpt-image-1', 'dall-e-3', 'dall-e-2'].filter(
     (m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i,
   )
@@ -88,7 +137,11 @@ export async function generateCoverImageBuffer(prompt: string): Promise<{ buffer
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Blog cover image generation failed')
+  throw lastError instanceof Error ? lastError : new Error('OpenAI cover image generation failed')
+}
+
+export async function generateCoverImageBuffer(prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  return imageDriver() === 'gemini' ? generateCoverImageGemini(prompt) : generateCoverImageOpenAi(prompt)
 }
 
 export async function storeBlogCover(slug: string, buffer: Buffer, mimeType: string): Promise<string> {
