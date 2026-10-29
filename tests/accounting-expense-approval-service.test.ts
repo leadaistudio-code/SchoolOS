@@ -25,6 +25,7 @@ vi.mock('@/server/modules/accounting/service', async (importOriginal) => {
     accountingEnvSwitches: vi.fn(() => ({ module: true, studentLedger: false, approvals: state.envApprovals, whatsappReceipts: false })),
     assertPostingAllowed: mocks.assertPostingAllowed,
     saveAccountingSettings: mocks.saveAccountingSettings,
+    departmentStageOn: vi.fn(async () => true),
   }
 })
 vi.mock('@/server/audit', () => ({ audit: mocks.audit }))

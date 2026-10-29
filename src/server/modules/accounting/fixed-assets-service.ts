@@ -737,7 +737,7 @@ export async function getFixedAsset(ctx: AppContext, id: string) {
     depreciationFrequency(ctx.db),
     ctx.db.journalEntry.findMany({
       where: { sourceType: 'FIXED_ASSET', sourceId: id },
-      select: { id: true, number: true, date: true, narration: true, isReversal: true, reversedAt: true, totalMinor: true },
+      select: { id: true, number: true, date: true, narration: true, isReversal: true, reversedAt: true, totalMinor: true, approvalStatus: true },
       orderBy: { createdAt: 'asc' },
     }),
     ctx.db.depreciationLine.count({ where: { assetId: id, run: { status: 'SUBMITTED' } } }),
@@ -1076,7 +1076,7 @@ export async function fixedAssetReconciliation(ctx: AppContext, rawAsOf?: string
   const [opening, movement] = await Promise.all([
     ctx.db.ledgerAccount.findMany({ where: { id: { in: ledgerIds } }, select: { id: true, code: true, name: true, openingBalanceMinor: true } }),
     ledgerIds.length
-      ? ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ledgerIds }, entry: { date: { lte: day } } }, _sum: { debitMinor: true, creditMinor: true } })
+      ? ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ledgerIds }, entry: { approvalStatus: 'APPROVED', date: { lte: day } } }, _sum: { debitMinor: true, creditMinor: true } })
       : Promise.resolve([]),
   ])
   const balances = new Map<string, number>()

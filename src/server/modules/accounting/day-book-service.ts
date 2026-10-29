@@ -6,6 +6,7 @@ import { attendanceDate } from '@/lib/dates'
 import { schoolToday } from '@/lib/periods'
 import { createExpense, expenseSchema } from '@/server/modules/finance/expenses'
 import { syncExpenseLedger } from '@/server/modules/accounts/posting'
+import { COUNTED_ENTRY } from '@/server/modules/accounts/service'
 import { assertPostingAllowed, getAccountingFlags, recordAccountingEvent } from './service'
 import { isIsoDate, toIsoDay } from './fiscal-year'
 import { cashBankAccounts } from './cash-bank'
@@ -93,6 +94,7 @@ export async function getDayBook(ctx: AppContext, rawFilter: unknown) {
   const cashIds = new Set(selectedCash.map((a) => a.id))
 
   const where: Prisma.JournalEntryWhereInput = {
+    ...COUNTED_ENTRY,
     date: { gte: fromDay, lte: toDay },
     lines: { some: { accountId: { in: [...cashIds] } } },
     ...(isSourceType(filter.source) ? { sourceType: filter.source } : {}),
@@ -227,11 +229,11 @@ export async function getDayBookReconciliation(ctx: AppContext, rawFilter: unkno
 
   const [opening, before, period, through, entries] = await Promise.all([
     ctx.db.ledgerAccount.findMany({ where: { id: { in: ids } }, select: { id: true, openingBalanceMinor: true } }),
-    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { date: { lt: fromDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
-    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { date: { gte: fromDay, lte: toDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
-    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { date: { lte: toDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
+    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { ...COUNTED_ENTRY, date: { lt: fromDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
+    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { ...COUNTED_ENTRY, date: { gte: fromDay, lte: toDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
+    ctx.db.journalLine.groupBy({ by: ['accountId'], where: { accountId: { in: ids }, entry: { ...COUNTED_ENTRY, date: { lte: toDay } } }, _sum: { debitMinor: true, creditMinor: true } }),
     ctx.db.journalEntry.findMany({
-      where: { date: { gte: fromDay, lte: toDay }, lines: { some: { accountId: { in: ids } } } },
+      where: { ...COUNTED_ENTRY, date: { gte: fromDay, lte: toDay }, lines: { some: { accountId: { in: ids } } } },
       take: DAY_BOOK_ROW_LIMIT + 1,
       select: {
         id: true, number: true, date: true, voucherType: true, sourceType: true, sourceId: true,

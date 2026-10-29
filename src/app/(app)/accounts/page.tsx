@@ -12,6 +12,7 @@ import { naturalBalance } from '@/server/modules/accounts/math'
 import { viewedPeriodOr } from '@/server/view-session'
 import { getAccountingFlags } from '@/server/modules/accounting/service'
 import { myPendingApprovalActions } from '@/server/modules/accounting/expense-approval-service'
+import { myJournalApprovalCount } from '@/server/modules/accounting/journal-approval-service'
 import { STATUS_LABEL } from '@/server/modules/accounting/expense-approval'
 import { syncBooksAction } from './actions'
 import { drillHref, type Drill } from '@/server/drill/descriptor'
@@ -22,12 +23,13 @@ export const metadata = { title: 'Accounts & Ledger' }
 export default async function AccountsOverviewPage() {
   const ctx = await requireContext('accounts.view')
   const range = await viewedPeriodOr(ctx, defaultRange())
-  const [balances, setup, recent, flags, pendingActions] = await Promise.all([
+  const [balances, setup, recent, flags, pendingActions, entriesForMe] = await Promise.all([
     accountBalances(ctx, range),
     getPostingSetup(ctx),
     listJournals(ctx, {}, 1, 10),
     getAccountingFlags(ctx.db),
     myPendingApprovalActions(ctx),
+    myJournalApprovalCount(ctx),
   ])
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
   const sumOf = (pred: (r: (typeof balances)[number]) => boolean, f: (r: (typeof balances)[number]) => number) =>
@@ -107,6 +109,13 @@ export default async function AccountsOverviewPage() {
           href={drill({ k: 'surplus', l: 'net', f: range.from, t: range.to })}
         />
       </div>
+
+      {entriesForMe > 0 ? (
+        <Notice tone="warning" title={`${entriesForMe} ${entriesForMe === 1 ? 'entry is' : 'entries are'} waiting for your approval`}>
+          Bills, stock purchases, payroll and other cost entries stay out of Profit &amp; loss and the Balance sheet until approved.{' '}
+          <Link href="/accounts/approvals?view=mine" className="font-medium underline">Open entry approvals</Link>
+        </Notice>
+      ) : null}
 
       {pendingActions && pendingActions.awaitingCount + pendingActions.returnedCount > 0 ? (
         <Card className="overflow-hidden">

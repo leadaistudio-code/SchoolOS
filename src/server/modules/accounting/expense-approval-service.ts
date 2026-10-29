@@ -9,7 +9,7 @@ import { storageProvider } from '@/server/providers'
 import { attendanceDate } from '@/lib/dates'
 import { schoolToday } from '@/lib/periods'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
-import { accountingEnvSwitches, assertPostingAllowed, getAccountingFlags, saveAccountingSettings } from './service'
+import { accountingEnvSwitches, assertPostingAllowed, departmentStageOn, getAccountingFlags, saveAccountingSettings } from './service'
 import { cashBankAccounts } from './cash-bank'
 import { approvalMode, type ApprovalMode } from './flags'
 import { toIsoDay } from './fiscal-year'
@@ -247,6 +247,7 @@ export async function transitionExpenseRequest(ctx: AppContext, id: string, raw:
   }
   if (input.action === 'submit') await assertPostingAllowed(ctx.db, toIsoDay(preview.expenseDate), { startMonth: flags.fiscalYearStartMonth })
   const resolve = finalApproval ? await loadResolver(ctx.tenant.id, ctx.db) : null
+  const departmentStage = await departmentStageOn(ctx.db)
   const today = schoolToday()
 
   const result = await ctx.db.$transaction(async (tx) => {
@@ -261,6 +262,7 @@ export async function transitionExpenseRequest(ctx: AppContext, id: string, raw:
           action: input.action,
           remarks: input.remarks,
           expected: input.expectedStatus,
+          departmentStage,
         })
       } catch (error) {
         return ruleError(error)
@@ -525,7 +527,7 @@ export async function getExpenseRequest(ctx: AppContext, id: string) {
   if (!request) throw notFound('Expense request')
   const ownOnly = !ctx.can('accounts.view') && stagesFor(ctx).length === 0
   if (ownOnly && request.createdById !== ctx.user.userId) throw notFound('Expense request')
-  const [steps, head, cash, entries] = await Promise.all([
+  const [steps, head, cash, entries, departmentStage] = await Promise.all([
     ctx.db.expenseApprovalStep.findMany({ where: { requestId: id }, orderBy: { createdAt: 'asc' } }),
     ctx.db.expenseHead.findFirst({ where: { id: request.headId }, select: { id: true, name: true, nature: true, isActive: true } }),
     request.cashAccountId ? ctx.db.ledgerAccount.findFirst({ where: { id: request.cashAccountId }, select: { code: true, name: true } }) : null,
@@ -536,15 +538,17 @@ export async function getExpenseRequest(ctx: AppContext, id: string) {
           orderBy: { createdAt: 'asc' },
         })
       : Promise.resolve([]),
+    departmentStageOn(ctx.db),
   ])
   const actions = availableActions(
     { status: request.status, cycle: request.cycle, createdById: request.createdById },
     steps.filter((s) => s.cycle === request.cycle),
     actorOf(ctx),
+    departmentStage,
   ).filter((a) => a !== 'submit' || approvalMode(flags, accountingEnvSwitches().approvals) !== 'off')
   const canEdit = (request.status === 'DRAFT' || request.status === 'RETURNED') && request.createdById === ctx.user.userId && ctx.can('expenses.manage')
   return {
-    request, steps, head, cash, entries, actions, canEdit, stage: stageOf(request.status), workflowOn: flags.approvals,
+    request, steps, head, cash, entries, actions, canEdit, stage: stageOf(request.status), workflowOn: flags.approvals, departmentStage,
     mode: approvalMode(flags, accountingEnvSwitches().approvals),
   }
 }

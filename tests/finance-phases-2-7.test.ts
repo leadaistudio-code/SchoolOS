@@ -153,9 +153,9 @@ describe('Phase 6: approval mode and labels', () => {
     expect(approvalMode(ACCOUNTING_OFF, true)).toBe('off')
   })
 
-  it('names the stages Creator, Validator, Approver, Approver, Final Approver', () => {
-    expect(Object.values(STAGE_ROLE)).toEqual(['Creator', 'Validator', 'Approver', 'Approver', 'Final Approver'])
-    expect(APPROVAL_STAGES.map((s) => s.label.split(' (')[0])).toEqual(['Validator', 'Approver', 'Approver', 'Final Approver'])
+  it('names the stages Maker, Checker, Department head, Accountant, Owner', () => {
+    expect(Object.values(STAGE_ROLE)).toEqual(['Maker', 'Checker', 'Department head', 'Accountant', 'Owner'])
+    expect(APPROVAL_STAGES.map((s) => s.label.split(' (')[0])).toEqual(['Checker', 'Department head', 'Accountant', 'Owner'])
   })
 })
 

@@ -188,6 +188,7 @@ export const TENANT_SCOPED_MODELS = [
   'LedgerAccount',
   'JournalEntry',
   'JournalLine',
+  'JournalApprovalStep',
   'LedgerAccountMap',
   'LedgerSettings',
   'AccountingFiscalYear',

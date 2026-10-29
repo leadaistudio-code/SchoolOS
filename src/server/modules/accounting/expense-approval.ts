@@ -1,11 +1,13 @@
 /**
  * Multi-tier expense approval: the rules, with no database access.
  *
- *   Stage 1  DRAFT          creator prepares            -> submit        -> SUBMITTED
- *   Stage 2  SUBMITTED      validator / audit           -> validate      -> PENDING_L1
- *   Stage 3  PENDING_L1     approver L1 (dept. head)    -> approve       -> PENDING_L2
- *   Stage 4  PENDING_L2     approver L2 (finance)       -> approve       -> PENDING_FINAL
- *   Stage 5  PENDING_FINAL  final approver (principal)  -> approve+post  -> POSTED
+ *   Stage 1  DRAFT          maker prepares              -> submit        -> SUBMITTED
+ *   Stage 2  SUBMITTED      checker validates           -> validate      -> PENDING_L1 or PENDING_L2
+ *   Stage 3  PENDING_L1     department head (optional)  -> approve       -> PENDING_L2
+ *   Stage 4  PENDING_L2     accountant                  -> approve       -> PENDING_FINAL
+ *   Stage 5  PENDING_FINAL  owner (school admin)        -> approve+post  -> POSTED
+ *
+ * Stage 3 is used only when the school switches the department-head stage on.
  *
  * At stages 2-5 the stage's holder may also return it to the creator (RETURNED,
  * remarks required; resubmitting starts a new cycle at stage 2 and clears the
@@ -37,22 +39,27 @@ export type StageDef = {
 }
 
 export const APPROVAL_STAGES: StageDef[] = [
-  { stage: 2, status: 'SUBMITTED', label: 'Validator (audit)', permission: 'expense_approval.validate', signature: 'VALIDATE', next: 'PENDING_L1' },
-  { stage: 3, status: 'PENDING_L1', label: 'Approver (department head)', permission: 'expense_approval.approve_department', signature: 'APPROVE_L1', next: 'PENDING_L2' },
-  { stage: 4, status: 'PENDING_L2', label: 'Approver (finance officer)', permission: 'expense_approval.approve_finance', signature: 'APPROVE_L2', next: 'PENDING_FINAL' },
-  { stage: 5, status: 'PENDING_FINAL', label: 'Final Approver (principal)', permission: 'expense_approval.approve_final', signature: 'APPROVE_FINAL', next: 'POSTED' },
+  { stage: 2, status: 'SUBMITTED', label: 'Checker', permission: 'expense_approval.validate', signature: 'VALIDATE', next: 'PENDING_L1' },
+  { stage: 3, status: 'PENDING_L1', label: 'Department head (optional)', permission: 'expense_approval.approve_department', signature: 'APPROVE_L1', next: 'PENDING_L2' },
+  { stage: 4, status: 'PENDING_L2', label: 'Accountant', permission: 'expense_approval.approve_finance', signature: 'APPROVE_L2', next: 'PENDING_FINAL' },
+  { stage: 5, status: 'PENDING_FINAL', label: 'Owner (school admin)', permission: 'expense_approval.approve_final', signature: 'APPROVE_FINAL', next: 'POSTED' },
 ]
 
-/** Stage 1 is whoever prepares the expense. */
-export const CREATOR_STAGE_LABEL = 'Creator'
+/** The stages a school's chain runs through; stage 3 only when switched on. */
+export function stagesInUse(departmentStage: boolean): StageDef[] {
+  return APPROVAL_STAGES.filter((s) => s.stage !== 3 || departmentStage)
+}
 
-/** Short role names for the stepper and board: Creator, Validator, Approver, Approver, Final Approver. */
+/** Stage 1 is whoever prepares the expense. */
+export const CREATOR_STAGE_LABEL = 'Maker'
+
+/** Short role names for the stepper and board. */
 export const STAGE_ROLE: Record<1 | 2 | 3 | 4 | 5, string> = {
-  1: 'Creator',
-  2: 'Validator',
-  3: 'Approver',
-  4: 'Approver',
-  5: 'Final Approver',
+  1: 'Maker',
+  2: 'Checker',
+  3: 'Department head',
+  4: 'Accountant',
+  5: 'Owner',
 }
 
 export const SIGNATURES: StepAction[] = APPROVAL_STAGES.map((s) => s.signature)
@@ -65,10 +72,10 @@ export const IN_FLIGHT_STATUSES = PROVISIONAL_STATUSES
 
 export const STATUS_LABEL: Record<ApprovalStatus, string> = {
   DRAFT: 'Draft',
-  SUBMITTED: 'With Validator',
-  PENDING_L1: 'With Approver (department head)',
-  PENDING_L2: 'With Approver (finance officer)',
-  PENDING_FINAL: 'With Final Approver',
+  SUBMITTED: 'With Checker',
+  PENDING_L1: 'With Department head',
+  PENDING_L2: 'With Accountant',
+  PENDING_FINAL: 'With Owner',
   RETURNED: 'Returned for correction',
   REJECTED: 'Rejected',
   WITHDRAWN: 'Withdrawn',
@@ -110,6 +117,8 @@ export function planTransition(input: {
   action: ApprovalAction
   remarks?: string | null
   expected?: ApprovalStatus | null
+  /** The school's optional department-head stage (stage 3). */
+  departmentStage?: boolean
 }): Transition {
   const { request, actor, action } = input
   const remarks = (input.remarks ?? '').trim()
@@ -155,7 +164,8 @@ export function planTransition(input: {
           (s) => s.cycle === request.cycle && s.actorId === actor.id && (SIGNATURES as string[]).includes(s.action),
         )
         need(!signed, 'SEPARATION_OF_DUTIES', 'You have already signed an earlier stage of this expense; another authorised person must sign this one')
-        return withRemarks({ to: def.next, step: def.signature, posts: def.next === 'POSTED', newCycle: false })
+        const to = def.next === 'PENDING_L1' && !input.departmentStage ? 'PENDING_L2' : def.next
+        return withRemarks({ to, step: def.signature, posts: to === 'POSTED', newCycle: false })
       }
       if (action === 'return') return withRemarks({ to: 'RETURNED', step: 'RETURN', posts: false, newCycle: false, remarksRequired: true })
       return withRemarks({ to: 'REJECTED', step: 'REJECT', posts: false, newCycle: false, remarksRequired: true })
@@ -164,11 +174,11 @@ export function planTransition(input: {
 }
 
 /** The actions `actor` could take now; drives which buttons are shown. */
-export function availableActions(request: RequestState, steps: StepRecord[], actor: ApprovalActor): ApprovalAction[] {
+export function availableActions(request: RequestState, steps: StepRecord[], actor: ApprovalActor, departmentStage = false): ApprovalAction[] {
   const all: ApprovalAction[] = ['submit', 'approve', 'return', 'reject', 'withdraw', 'reverse']
   return all.filter((action) => {
     try {
-      planTransition({ request, steps, actor, action, remarks: 'xxx' })
+      planTransition({ request, steps, actor, action, remarks: 'xxx', departmentStage })
       return true
     } catch {
       return false

@@ -10,6 +10,7 @@ import { Pagination } from '@/components/pagination'
 import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/table'
 import { formatDay } from '@/lib/dates'
 import { journalFilterSchema, listJournals } from '@/server/modules/accounts/service'
+import { JOURNAL_STATUS_LABEL } from '@/server/modules/accounting/journal-approval'
 import { AccountsTabs, moneyFmt, SOURCE_LABEL, sourceHref } from '../ui'
 
 export const metadata = { title: 'Journal entries' }
@@ -108,6 +109,11 @@ export default async function JournalsPage({
                           {e.reference ? (href ? <> · <Link href={href} className="hover:underline">{e.reference}</Link></> : ` · ${e.reference}`) : null}
                         </span>
                         {e.reversedAt ? <Badge tone="warning">Reversed</Badge> : null}
+                        {e.approvalStatus === 'VOID' ? (
+                          <Badge tone="neutral">Withdrawn</Badge>
+                        ) : e.approvalStatus !== 'APPROVED' ? (
+                          <Badge tone={e.approvalStatus === 'RETURNED' ? 'info' : 'warning'}>{JOURNAL_STATUS_LABEL[e.approvalStatus]}</Badge>
+                        ) : null}
                       </TD>
                       <TD className="whitespace-nowrap">{formatDay(e.date)}</TD>
                       <TD>{TYPE_LABEL[e.voucherType]}</TD>

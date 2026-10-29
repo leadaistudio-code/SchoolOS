@@ -13,7 +13,8 @@ import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/tabl
 import { ApprovalWorkflowToggle } from '@/components/accounting/expense-approval-forms'
 import { NewExpenseButton } from '@/app/(app)/finance/expenses/expense-forms'
 import { formatDay } from '@/lib/dates'
-import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
+import { DepartmentStageToggle } from '@/components/accounting/journal-approval-forms'
+import { accountingEnvSwitches, departmentStageOn, getAccountingFlags } from '@/server/modules/accounting/service'
 import { expenseHeadOptions } from '@/server/modules/finance/expense-heads'
 import { canSeeApprovals, expenseApprovalBoard, listExpenseRequests } from '@/server/modules/accounting/expense-approval-service'
 import { APPROVAL_STAGES, PROVISIONAL_STATUSES, STATUS_LABEL, stageNumber } from '@/server/modules/accounting/expense-approval'
@@ -47,10 +48,18 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
   const params = await searchParams
   const signsAStage = APPROVAL_STAGES.some((s) => ctx.can(s.permission))
   const showBoard = params.view === 'board'
-  const [list, board] = await Promise.all([
+  const [list, board, departmentStage] = await Promise.all([
     listExpenseRequests(ctx, { ...params, view: showBoard ? 'all' : (params.view ?? (signsAStage ? 'awaiting' : 'mine')) }),
     showBoard ? expenseApprovalBoard(ctx) : Promise.resolve(null),
+    departmentStageOn(ctx.db),
   ])
+  const stages = APPROVAL_STAGES.filter((s) => s.stage !== 3 || departmentStage)
+  const stageOf = (status: Parameters<typeof stageNumber>[0]) => {
+    const n = stageNumber(status)
+    if (!n) return null
+    const position = n === 1 ? 1 : stages.findIndex((s) => s.stage === n) + 2
+    return position > 0 ? `Stage ${position} of ${stages.length + 1}` : null
+  }
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
   const canCreate = list.mode !== 'off' && ctx.can('expenses.manage') && ctx.can('expenses.view')
   const heads = canCreate ? await expenseHeadOptions(ctx) : []
@@ -65,7 +74,7 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
     <div className="space-y-4">
       <PageHeader
         title="Expense approvals"
-        description="Validation, two approval levels and final approval before an expense reaches the books"
+        description="Maker, Checker, Accountant and Owner sign before an expense reaches the books"
         actions={canCreate ? <NewExpenseButton heads={heads} approvals /> : null}
       />
       {showTabs ? <AccountsTabs active="/accounts/expense-approvals" /> : null}
@@ -157,7 +166,7 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
                 </THead>
                 <TBody>
                   {list.rows.map((r) => {
-                    const stage = stageNumber(r.status)
+                    const stage = stageOf(r.status)
                     return (
                       <TR key={r.id}>
                         <TD>
@@ -169,7 +178,7 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
                         <TD className="text-sm">{r.createdByLabel ?? '—'}</TD>
                         <TD>
                           <Badge tone={APPROVAL_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge>
-                          {stage ? <span className="block text-xs text-ink-subtle">Stage {stage} of 5</span> : null}
+                          {stage ? <span className="block text-xs text-ink-subtle">{stage}</span> : null}
                         </TD>
                         <TD align="right" className="text-ink font-medium">{money(r.amountMinor)}</TD>
                       </TR>
@@ -190,10 +199,10 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
           <CardHeader><CardTitle>Who signs what</CardTitle></CardHeader>
           <CardContent>
             <ol className="space-y-1 text-sm">
-              <li><span className="text-ink-muted">Stage 1 ·</span> Creator: anyone who manages expenses prepares and submits it</li>
-              {APPROVAL_STAGES.map((s) => (
+              <li><span className="text-ink-muted">Stage 1 ·</span> Maker: anyone who manages expenses prepares and submits it</li>
+              {stages.map((s, i) => (
                 <li key={s.stage}>
-                  <span className="text-ink-muted">Stage {s.stage} ·</span> {s.label}
+                  <span className="text-ink-muted">Stage {i + 2} ·</span> {s.label}
                   {ctx.can(s.permission) ? <Badge tone="success" className="ml-2">You</Badge> : null}
                 </li>
               ))}
@@ -214,6 +223,12 @@ export default async function ExpenseApprovalsPage({ searchParams }: { searchPar
                   : 'Off: expenses are recorded and posted straight away, as before.'}
               </p>
               <ApprovalWorkflowToggle enabled={flags.approvals} available={accountingEnvSwitches().approvals} />
+              <p className="pt-2 text-sm text-ink-muted">
+                The same switch holds vendor bills, stock purchases, payroll, fixed assets and expense journals for approval
+                on <Link href="/accounts/approvals" className="text-[var(--brand-600)] hover:underline">Entry approvals</Link>.
+                {departmentStage ? ' A Department head signs after the Checker.' : ' Entries go from the Checker straight to the Accountant.'}
+              </p>
+              <DepartmentStageToggle enabled={departmentStage} />
             </CardContent>
           </Card>
         ) : null}

@@ -6414,14 +6414,51 @@ model JournalEntry {
   createdById    String?
   createdByLabel String?
   createdAt      DateTime           @default(now())
+  /// Only APPROVED entries count in P&L, balance sheet, ledgers and books.
+  /// Cost entries wait at PENDING_* while the school's approval workflow is on.
+  approvalStatus JournalApprovalStatus @default(APPROVED)
+  approvalCycle  Int                   @default(1)
+  approvedAt     DateTime?
+  approvedById   String?
 
-  lines JournalLine[]
+  lines         JournalLine[]
+  approvalSteps JournalApprovalStep[]
 
   @@unique([tenantId, number])
   @@unique([tenantId, postingKey])
   @@index([tenantId, date])
   @@index([tenantId, sourceType, sourceId])
   @@index([tenantId, createdAt])
+  @@index([tenantId, approvalStatus])
+}
+
+enum JournalApprovalStatus {
+  APPROVED
+  PENDING_CHECK
+  PENDING_DEPARTMENT
+  PENDING_ACCOUNTANT
+  PENDING_OWNER
+  RETURNED
+  VOID
+}
+
+/// One sign-off, return or resubmission on a journal entry awaiting approval.
+model JournalApprovalStep {
+  id         String                @id @default(cuid())
+  tenantId   String
+  entryId    String
+  cycle      Int
+  action     String
+  fromStatus JournalApprovalStatus
+  toStatus   JournalApprovalStatus
+  actorId    String?
+  actorLabel String?
+  remarks    String?
+  createdAt  DateTime              @default(now())
+
+  entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entryId])
 }
 
 model JournalLine {
@@ -6533,6 +6570,8 @@ model AccountingSettings {
   studentLedgerEnabled    Boolean               @default(false)
   /// Multi-tier expense approval before posting.
   approvalWorkflowEnabled Boolean               @default(false)
+  /// Adds a department-head sign-off between Checker and Accountant.
+  departmentApprovalEnabled Boolean             @default(false)
   /// Queue WhatsApp receipt notifications after a fee receipt is posted.
   whatsappReceiptsEnabled Boolean               @default(false)
   /// 1-12; Indian schools use 4 (April-March).
@@ -6615,6 +6654,8 @@ model PurchaseVoucher {
   cancelledAt        DateTime?
   cancelledById      String?
   cancelReason       String?
+  /// Set when a store stock receipt on credit raised this bill; stock moved there.
+  storePurchaseId    String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
@@ -6627,6 +6668,7 @@ model PurchaseVoucher {
   @@unique([tenantId, number])
   @@unique([tenantId, vendorId, supplierInvoiceKey])
   @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, storePurchaseId])
   @@index([tenantId, vendorId, status])
   @@index([tenantId, dueDate])
 }

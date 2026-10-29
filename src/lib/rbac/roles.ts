@@ -94,7 +94,6 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'expenses.view',
       'accounts.view',
       'expense_approval.approve_department',
-      'expense_approval.approve_final',
       ...all('exams'),
       ...all('results'),
       ...all('certificates'),

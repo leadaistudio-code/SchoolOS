@@ -173,9 +173,16 @@ export async function lockBooksThrough(ctx: AppContext, through: string, reason:
 export type AccountingSettingsInput = {
   studentLedgerEnabled?: boolean
   approvalWorkflowEnabled?: boolean
+  departmentApprovalEnabled?: boolean
   whatsappReceiptsEnabled?: boolean
   fiscalYearStartMonth?: number
   depreciationFrequency?: 'MONTHLY' | 'YEARLY'
+}
+
+/** Whether the optional department-head sign-off is part of the approval chain. */
+export async function departmentStageOn(db: Pick<TenantClient, 'accountingSettings'>) {
+  const row = await db.accountingSettings.findFirst({ select: { departmentApprovalEnabled: true } })
+  return !!row?.departmentApprovalEnabled
 }
 
 /** Saves a school's accounting switches and records who changed what. */
@@ -188,6 +195,7 @@ export async function saveAccountingSettings(ctx: AppContext, input: AccountingS
   const data = {
     ...(input.studentLedgerEnabled !== undefined ? { studentLedgerEnabled: input.studentLedgerEnabled } : {}),
     ...(input.approvalWorkflowEnabled !== undefined ? { approvalWorkflowEnabled: input.approvalWorkflowEnabled } : {}),
+    ...(input.departmentApprovalEnabled !== undefined ? { departmentApprovalEnabled: input.departmentApprovalEnabled } : {}),
     ...(input.whatsappReceiptsEnabled !== undefined ? { whatsappReceiptsEnabled: input.whatsappReceiptsEnabled } : {}),
     ...(month !== undefined ? { fiscalYearStartMonth: month } : {}),
     ...(input.depreciationFrequency === 'MONTHLY' || input.depreciationFrequency === 'YEARLY'
@@ -214,6 +222,7 @@ function pickSettings(row: AccountingSettingsInput) {
   return {
     studentLedgerEnabled: row.studentLedgerEnabled,
     approvalWorkflowEnabled: row.approvalWorkflowEnabled,
+    departmentApprovalEnabled: row.departmentApprovalEnabled,
     whatsappReceiptsEnabled: row.whatsappReceiptsEnabled,
     fiscalYearStartMonth: row.fiscalYearStartMonth,
     depreciationFrequency: row.depreciationFrequency,

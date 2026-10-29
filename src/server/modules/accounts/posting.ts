@@ -1,4 +1,6 @@
-import { Prisma, type JournalSourceType, type JournalVoucherType } from '@prisma/client'
+import { Prisma, type JournalApprovalStatus, type JournalSourceType, type JournalVoucherType } from '@prisma/client'
+import { getAccountingFlags } from '@/server/modules/accounting/service'
+import { initialStatus } from '@/server/modules/accounting/journal-approval'
 import { tenantDb, type TenantClient } from '@/server/db/tenant-client'
 import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { attendanceDate } from '@/lib/dates'
@@ -28,26 +30,43 @@ type Desired = {
   lines: DraftLine[]
 }
 
-type WriteClient = Pick<TenantClient, 'journalEntry' | '$queryRawUnsafe'>
+type WriteClient = Pick<TenantClient, 'journalEntry' | '$queryRawUnsafe' | 'ledgerAccount' | 'accountingSettings'>
 
-export async function writeJournalEntry(
-  tx: WriteClient,
-  tenantId: string,
-  entry: Desired & {
-    sourceType: JournalSourceType
-    sourceId: string | null
-    postingKey: string | null
-    isReversal?: boolean
-    reversalOfId?: string | null
-    createdById?: string | null
-    createdByLabel?: string | null
-  },
-) {
+type EntryInput = Desired & {
+  sourceType: JournalSourceType
+  sourceId: string | null
+  postingKey: string | null
+  isReversal?: boolean
+  reversalOfId?: string | null
+  createdById?: string | null
+  createdByLabel?: string | null
+  /** Already signed off elsewhere (an expense that went through expense approval). */
+  preApproved?: boolean
+}
+
+async function approvalStatusFor(tx: WriteClient, entry: EntryInput, accountIds: string[]): Promise<JournalApprovalStatus> {
+  if (entry.isReversal && entry.reversalOfId) {
+    const original = await tx.journalEntry.findFirst({ where: { id: entry.reversalOfId }, select: { approvalStatus: true } })
+    const reversalOf = original?.approvalStatus ?? 'APPROVED'
+    if (reversalOf !== 'APPROVED' && reversalOf !== 'VOID') {
+      await tx.journalEntry.updateMany({ where: { id: entry.reversalOfId }, data: { approvalStatus: 'VOID' } })
+    }
+    return initialStatus({ workflowOn: false, sourceType: entry.sourceType, accountTypes: [], reversalOf })
+  }
+  if (entry.preApproved) return 'APPROVED'
+  const flags = await getAccountingFlags(tx)
+  if (!flags.approvals) return 'APPROVED'
+  const accounts = await tx.ledgerAccount.findMany({ where: { id: { in: accountIds } }, select: { type: true } })
+  return initialStatus({ workflowOn: true, sourceType: entry.sourceType, accountTypes: accounts.map((a) => a.type) })
+}
+
+export async function writeJournalEntry(tx: WriteClient, tenantId: string, entry: EntryInput) {
   const lines = normalizeLines(entry.lines)
   const sum = totals(lines)
   if (!sum.balanced || sum.debit <= 0 || lines.length < 2) {
     throw new Error('A journal entry needs at least two lines with equal debits and credits')
   }
+  const approvalStatus = await approvalStatusFor(tx, entry, [...new Set(lines.map((l) => l.accountId))])
   const number = await nextDocumentNumber(tx, {
     tenantId,
     kind: 'JOURNAL',
@@ -69,6 +88,8 @@ export async function writeJournalEntry(
       reversalOfId: entry.reversalOfId ?? null,
       createdById: entry.createdById ?? null,
       createdByLabel: entry.createdByLabel ?? 'System',
+      approvalStatus,
+      ...(approvalStatus === 'APPROVED' ? { approvedAt: new Date(), approvedById: entry.createdById ?? null } : {}),
       lines: {
         create: lines.map((l) => ({
           tenantId,
@@ -331,6 +352,8 @@ async function desiredStoreSale(db: TenantClient, resolve: AccountResolver, sale
 async function desiredStorePurchase(db: TenantClient, resolve: AccountResolver, purchaseId: string) {
   const purchase = await db.storePurchase.findFirst({ where: { id: purchaseId } })
   if (!purchase || purchase.totalMinor <= 0) return { purchase, desired: null }
+  // Bought on credit: the vendor bill raised with it debits store stock.
+  if (purchase.paymentMode === 'CREDIT') return { purchase, desired: null }
   const desired: Desired = {
     date: bookDay(purchase.purchaseDate),
     voucherType: 'PAYMENT',
@@ -471,6 +494,7 @@ export async function postExpenseInTransaction(
     postingKey: `EXPENSE:${expenseId}:v1`,
     createdById: actor.id,
     createdByLabel: actor.label,
+    preApproved: true,
   })
 }
 

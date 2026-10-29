@@ -23,7 +23,7 @@ export const STORE_PAYMENT_MODES = [
 ] as const
 
 export const storePaymentLabel = (value: string) =>
-  STORE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
+  value === 'CREDIT' ? 'On credit (vendor bill)' : STORE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const
 

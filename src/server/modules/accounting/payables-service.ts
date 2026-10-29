@@ -13,6 +13,7 @@ import { attendanceDate } from '@/lib/dates'
 import { schoolToday } from '@/lib/periods'
 import { assertPostingAllowed, getAccountingFlags, recordAccountingEvent } from './service'
 import { isIsoDate, toIsoDay } from './fiscal-year'
+import { PENDING_STATUSES } from './journal-approval'
 import {
   ageBills,
   allocateVendorPayment,
@@ -514,6 +515,91 @@ export async function createPurchaseVoucher(ctx: AppContext, raw: unknown) {
   }
 }
 
+/**
+ * The vendor bill behind a store stock receipt bought on credit, written in the
+ * receipt's own transaction: one entry moves stock and raises what the school
+ * owes the vendor. The bill debits Store Stock, so the receipt posts nothing itself.
+ */
+export async function createStoreBillTx(
+  tx: Tx,
+  ctx: AppContext,
+  input: {
+    storePurchaseId: string
+    storePurchaseNumber: string
+    vendorId: string
+    supplierInvoiceNo: string
+    invoiceDate: string
+    lines: { itemId: string; description: string; quantity: number; unitCostMinor: number }[]
+  },
+) {
+  const flags = await getAccountingFlags(tx)
+  if (!flags.module) throw new ApiException(403, 'FEATURE_DISABLED', 'Buying on credit needs the Accounts module')
+  const vendor = await tx.vendor.findFirst({ where: { id: input.vendorId }, select: { id: true, isActive: true, creditDays: true } })
+  if (!vendor) throw notFound('Vendor')
+  if (!vendor.isActive) throw conflict('This vendor is inactive; reactivate it before buying on credit')
+  const key = supplierInvoiceKey(input.supplierInvoiceNo)
+  if (!key) throw badRequest('The vendor bill number must contain letters or digits')
+  await lockVendor(tx, ctx.tenant.id, vendor.id)
+  const duplicate = await tx.purchaseVoucher.findFirst({ where: { vendorId: vendor.id, supplierInvoiceKey: key }, select: { number: true } })
+  if (duplicate) throw conflict(`Bill ${input.supplierInvoiceNo} from this vendor is already entered as ${duplicate.number}`)
+  const stock = await systemAccount(tx, 'STORE_STOCK')
+  const priced = input.lines.map((l) => ({
+    description: l.description,
+    storeItemId: l.itemId,
+    quantity: l.quantity,
+    unitCostMinor: l.unitCostMinor,
+    taxPercent: 0,
+    ...computePurchaseLine({ quantity: l.quantity, unitCostMinor: l.unitCostMinor, taxPercent: 0 }),
+  }))
+  const totals = sumPurchaseLines(priced)
+  if (totals.totalMinor <= 0) throw badRequest('A credit purchase must be for more than zero')
+  const actor = who(ctx)
+  const number = await nextDocumentNumber(tx, {
+    tenantId: ctx.tenant.id,
+    kind: 'PURCHASE_VOUCHER',
+    sessionLabel: financialYearLabel(attendanceDate(input.invoiceDate)),
+  })
+  const voucher = await tx.purchaseVoucher.create({
+    data: {
+      tenantId: ctx.tenant.id,
+      number,
+      vendorId: vendor.id,
+      supplierInvoiceNo: input.supplierInvoiceNo,
+      supplierInvoiceKey: key,
+      invoiceDate: attendanceDate(input.invoiceDate),
+      dueDate: attendanceDate(addDays(input.invoiceDate, vendor.creditDays)),
+      status: 'DRAFT',
+      ...totals,
+      narration: `Stock received on ${input.storePurchaseNumber}`,
+      storePurchaseId: input.storePurchaseId,
+      createdById: actor.id,
+      createdByLabel: actor.label,
+      lines: {
+        create: priced.map((l, i) => ({
+          tenantId: ctx.tenant.id,
+          sortOrder: i,
+          description: l.description,
+          accountId: stock,
+          storeItemId: l.storeItemId,
+          quantity: l.quantity,
+          unitCostMinor: l.unitCostMinor,
+          amountMinor: l.amountMinor,
+          taxPercent: 0,
+          taxMinor: l.taxMinor,
+          totalMinor: l.totalMinor,
+        })),
+      },
+    },
+  })
+  const posted = await postPurchaseVoucherTx(tx, ctx, voucher.id, flags.fiscalYearStartMonth)
+  await recordAccountingEvent(tx, ctx.tenant.id, {
+    entityType: 'PurchaseVoucher', entityId: voucher.id, action: 'purchase_voucher.create',
+    toStatus: posted.status, actorId: actor.id, actorLabel: actor.label,
+    data: { number, vendorId: vendor.id, supplierInvoiceNo: input.supplierInvoiceNo, totalMinor: totals.totalMinor, storePurchaseId: input.storePurchaseId },
+  })
+  return posted
+}
+
 export async function postPurchaseVoucher(ctx: AppContext, id: string) {
   const flags = await requirePayables(ctx, 'accounts.manage')
   const voucher = await ctx.db.purchaseVoucher.findFirst({ where: { id }, select: { vendorId: true } })
@@ -537,8 +623,11 @@ export async function cancelPurchaseVoucher(ctx: AppContext, id: string, reason:
   const flags = await requirePayables(ctx, 'accounts.manage')
   const why = reason.trim()
   if (!why) throw badRequest('Give a reason for cancelling')
-  const voucher = await ctx.db.purchaseVoucher.findFirst({ where: { id }, select: { vendorId: true } })
+  const voucher = await ctx.db.purchaseVoucher.findFirst({ where: { id }, select: { vendorId: true, storePurchaseId: true } })
   if (!voucher) throw notFound('Purchase voucher')
+  if (voucher.storePurchaseId) {
+    throw conflict('This bill came with a store stock receipt; record a return to vendor or a debit note instead of cancelling it')
+  }
   const actor = who(ctx)
   const today = schoolToday()
   return ctx.db.$transaction(async (tx) => {
@@ -573,6 +662,16 @@ export async function cancelPurchaseVoucher(ctx: AppContext, id: string, reason:
     })
     return cancelled
   })
+}
+
+/** Posted bills whose journal entry has not been approved by the Owner yet. */
+export async function billsAwaitingApproval(db: Pick<TenantClient, 'journalEntry'>, voucherIds: string[]) {
+  if (!voucherIds.length) return new Set<string>()
+  const rows = await db.journalEntry.findMany({
+    where: { sourceType: 'PURCHASE_VOUCHER', sourceId: { in: voucherIds }, isReversal: false, reversedAt: null, approvalStatus: { not: 'APPROVED' } },
+    select: { sourceId: true },
+  })
+  return new Set(rows.map((r) => r.sourceId as string))
 }
 
 /** Reducible balance of every posted bill of a vendor, read inside the caller's lock. */
@@ -610,9 +709,15 @@ export async function recordVendorPayment(ctx: AppContext, raw: unknown) {
       await lockVendor(tx, ctx.tenant.id, vendor.id)
       await assertPostingAllowed(tx, input.paidOn, { startMonth: flags.fiscalYearStartMonth })
       const bills = await openBills(tx, vendor.id)
+      const waiting = await billsAwaitingApproval(tx, bills.map((b) => b.voucherId))
+      if (input.allocations?.some((a) => waiting.has(a.voucherId))) {
+        throw conflict('A bill you chose is still waiting for approval; it can be paid once the Owner approves it')
+      }
       const split = allocateVendorPayment(
         input.amountMinor,
-        bills.filter((b) => b.reducibleMinor > 0).map((b) => ({ id: b.voucherId, number: b.number, dueDate: b.dueDate, reducibleMinor: b.reducibleMinor })),
+        bills
+          .filter((b) => b.reducibleMinor > 0 && !waiting.has(b.voucherId))
+          .map((b) => ({ id: b.voucherId, number: b.number, dueDate: b.dueDate, reducibleMinor: b.reducibleMinor })),
         input.allocations,
       )
       if (!split.ok) throw badRequest(split.message)
@@ -1119,14 +1224,20 @@ export async function payablesReconciliation(ctx: AppContext) {
     return { id: v.id, code: v.code, name: v.name, netLiabilityMinor: s.netLiabilityMinor, reconciled: s.reconciled }
   })
   const account = await ctx.db.ledgerAccount.findFirst({ where: { systemKey: 'SUNDRY_CREDITORS' }, select: { id: true } })
-  const ledger = account
-    ? await ctx.db.journalLine.aggregate({ where: { accountId: account.id }, _sum: { debitMinor: true, creditMinor: true } })
-    : null
+  // Vendor documents include bills still awaiting approval, so the ledger side does too.
+  const [ledger, pending] = account
+    ? await Promise.all([
+        ctx.db.journalLine.aggregate({ where: { accountId: account.id, entry: { approvalStatus: { in: ['APPROVED', ...PENDING_STATUSES] } } }, _sum: { debitMinor: true, creditMinor: true } }),
+        ctx.db.journalLine.aggregate({ where: { accountId: account.id, entry: { approvalStatus: { in: PENDING_STATUSES } } }, _sum: { debitMinor: true, creditMinor: true } }),
+      ])
+    : [null, null]
   const ledgerBalanceMinor = ledger ? (ledger._sum.creditMinor ?? 0) - (ledger._sum.debitMinor ?? 0) : 0
+  const pendingMinor = pending ? (pending._sum.creditMinor ?? 0) - (pending._sum.debitMinor ?? 0) : 0
   const subledgerMinor = perVendor.reduce((s, v) => s + v.netLiabilityMinor, 0)
   return {
     ok: ledgerBalanceMinor === subledgerMinor && perVendor.every((v) => v.reconciled),
     ledgerBalanceMinor,
+    pendingMinor,
     subledgerMinor,
     differenceMinor: ledgerBalanceMinor - subledgerMinor,
     vendors: perVendor,

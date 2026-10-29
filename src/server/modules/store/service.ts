@@ -57,18 +57,25 @@ export const storeItemSchema = z.object({
 
 export const storeItemUpdateSchema = z.object({ id: z.string().min(1), ...itemFields })
 
-export const storePurchaseSchema = z.object({
-  vendorName: z.string().trim().min(2, 'Enter the vendor / supplier').max(120),
-  /** Optional link to the vendor master; the receipt then shows on Vendor 360. */
-  vendorId: z.string().trim().max(40).optional().nullable().transform((v) => v || null),
-  invoiceNo: optionalText(60),
-  purchaseDate: isoDate,
-  paymentMode: paymentModeEnum,
-  notes: optionalText(500),
-  lines: z
-    .array(z.object({ itemId: z.string().min(1), quantity: qty, unitCost: rupees() }))
-    .min(1, 'Add at least one item'),
-})
+export const storePurchaseSchema = z
+  .object({
+    vendorName: z.string().trim().min(2, 'Enter the vendor / supplier').max(120),
+    /** Optional link to the vendor master; the receipt then shows on Vendor 360. */
+    vendorId: z.string().trim().max(40).optional().nullable().transform((v) => v || null),
+    invoiceNo: optionalText(60),
+    purchaseDate: isoDate,
+    /** CREDIT: not paid yet; the receipt raises the vendor's bill in Accounts. */
+    paymentMode: z.enum(['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT']),
+    notes: optionalText(500),
+    lines: z
+      .array(z.object({ itemId: z.string().min(1), quantity: qty, unitCost: rupees() }))
+      .min(1, 'Add at least one item'),
+  })
+  .superRefine((v, issue) => {
+    if (v.paymentMode !== 'CREDIT') return
+    if (!v.vendorId) issue.addIssue({ code: 'custom', path: ['vendorId'], message: 'Choose the vendor from the vendor master to buy on credit' })
+    if (!v.invoiceNo) issue.addIssue({ code: 'custom', path: ['invoiceNo'], message: 'Enter the vendor bill number to buy on credit' })
+  })
 
 export const storeSaleSchema = z
   .object({
@@ -450,6 +457,9 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
   if (input.vendorId && !(await ctx.db.vendor.findFirst({ where: { id: input.vendorId }, select: { id: true } }))) {
     throw badRequest('That vendor does not exist')
   }
+  const onCredit = input.paymentMode === 'CREDIT'
+  const payables = onCredit ? await import('@/server/modules/accounting/payables-service') : null
+  if (onCredit) await (await import('@/server/modules/accounts/chart')).ensureChart(ctx.tenant.id, ctx.db)
 
   const purchase = await ctx.db.$transaction(async (raw) => {
     const tx = raw as unknown as Prisma.TransactionClient
@@ -495,6 +505,21 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
         balanceAfter: balance,
         purchaseId: created.id,
         reason: `${number} from ${input.vendorName}`,
+      })
+    }
+    if (payables) {
+      await payables.createStoreBillTx(raw, ctx, {
+        storePurchaseId: created.id,
+        storePurchaseNumber: number,
+        vendorId: input.vendorId!,
+        supplierInvoiceNo: input.invoiceNo!,
+        invoiceDate: input.purchaseDate,
+        lines: input.lines.map((l) => ({
+          itemId: l.itemId,
+          description: itemLabel(items.get(l.itemId)!),
+          quantity: l.quantity,
+          unitCostMinor: l.unitCost,
+        })),
       })
     }
     return created

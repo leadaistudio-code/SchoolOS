@@ -13,7 +13,7 @@ import {
 const ALL = ['expense_approval.validate', 'expense_approval.approve_department', 'expense_approval.approve_finance', 'expense_approval.approve_final']
 const actor = (id: string, permissions: string[] = ALL) => ({ id, can: (p: string) => permissions.includes(p) })
 
-function plan(status: ApprovalStatus, action: ApprovalAction, opts: { by?: ReturnType<typeof actor>; steps?: StepRecord[]; remarks?: string; expected?: ApprovalStatus; cycle?: number } = {}) {
+function plan(status: ApprovalStatus, action: ApprovalAction, opts: { by?: ReturnType<typeof actor>; steps?: StepRecord[]; remarks?: string; expected?: ApprovalStatus; cycle?: number; departmentStage?: boolean } = {}) {
   return planTransition({
     request: { status, cycle: opts.cycle ?? 1, createdById: 'creator' },
     steps: opts.steps ?? [],
@@ -21,6 +21,7 @@ function plan(status: ApprovalStatus, action: ApprovalAction, opts: { by?: Retur
     action,
     remarks: opts.remarks,
     expected: opts.expected,
+    departmentStage: opts.departmentStage ?? true,
   })
 }
 
@@ -46,6 +47,10 @@ describe('expense approval: the happy path', () => {
     expect(l2).toMatchObject({ to: 'PENDING_FINAL', step: 'APPROVE_L2', posts: false })
     const fin = plan('PENDING_FINAL', 'approve', { by: actor('p') })
     expect(fin).toMatchObject({ to: 'POSTED', step: 'APPROVE_FINAL', posts: true })
+  })
+
+  it('skips the Department head stage when the school has not switched it on', () => {
+    expect(plan('SUBMITTED', 'approve', { by: actor('checker'), departmentStage: false })).toMatchObject({ to: 'PENDING_L2', step: 'VALIDATE' })
   })
 })
 

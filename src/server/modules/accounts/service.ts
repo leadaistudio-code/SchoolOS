@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ExpenseNature, LedgerAccountType, LedgerMapKind, Prisma } from '@prisma/client'
+import type { ExpenseNature, JournalApprovalStatus, LedgerAccountType, LedgerMapKind, Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
 import { audit } from '@/server/audit'
 import { badRequest, conflict, notFound } from '@/server/api/response'
@@ -12,7 +12,9 @@ import {
   defaultFeeHeadKey,
   defaultModeKey,
   ensureChart,
+  loadResolver,
 } from './chart'
+import { PENDING_STATUSES } from '@/server/modules/accounting/journal-approval'
 import { naturalBalance, reverseLines, totals } from './math'
 import { syncLedgerForTenant, writeJournalEntry } from './posting'
 import { applyAccountNature } from '@/server/modules/finance/expense-heads'
@@ -44,14 +46,21 @@ function actorLabel(ctx: AppContext) {
 
 type Movement = { debit: number; credit: number }
 
+/** Only owner-approved entries reach balances, statements and books. */
+export const COUNTED_ENTRY = { approvalStatus: 'APPROVED' } as const satisfies Prisma.JournalEntryWhereInput
+
 /** Debit and credit totals per account for entries dated within [from, to]. */
-async function movements(ctx: AppContext, range: { from?: string; to?: string }) {
+async function movements(
+  ctx: AppContext,
+  range: { from?: string; to?: string },
+  statuses: JournalApprovalStatus[] = ['APPROVED'],
+) {
   const date: Prisma.DateTimeFilter = {}
   if (range.from) date.gte = attendanceDate(range.from)
   if (range.to) date.lte = endOfDay(range.to)
   const rows = await ctx.db.journalLine.groupBy({
     by: ['accountId'],
-    where: range.from || range.to ? { entry: { date } } : {},
+    where: { entry: { approvalStatus: { in: statuses }, ...(range.from || range.to ? { date } : {}) } },
     _sum: { debitMinor: true, creditMinor: true },
   })
   return new Map<string, Movement>(
@@ -411,13 +420,13 @@ export async function generalLedger(ctx: AppContext, params: { accountId: string
   if (!account) throw notFound('Account')
   const [before, lines] = await Promise.all([
     ctx.db.journalLine.aggregate({
-      where: { accountId: account.id, entry: { date: { lt: attendanceDate(params.from) } } },
+      where: { accountId: account.id, entry: { ...COUNTED_ENTRY, date: { lt: attendanceDate(params.from) } } },
       _sum: { debitMinor: true, creditMinor: true },
     }),
     ctx.db.journalLine.findMany({
       where: {
         accountId: account.id,
-        entry: { date: { gte: attendanceDate(params.from), lte: endOfDay(params.to) } },
+        entry: { ...COUNTED_ENTRY, date: { gte: attendanceDate(params.from), lte: endOfDay(params.to) } },
       },
       include: {
         entry: {
@@ -466,20 +475,79 @@ export async function generalLedger(ctx: AppContext, params: { accountId: string
 
 /* --------------------------------------------------- financial statements */
 
+/**
+ * Expenses in the approval pipeline that have no journal entry yet, as the
+ * lines they will post: Dr the head's account, Cr the cash / bank paid from.
+ */
+async function pendingRequestMovements(ctx: AppContext, to: string) {
+  const out = new Map<string, Movement>()
+  const requests = await ctx.db.expenseApprovalRequest.findMany({
+    where: { status: { in: ['SUBMITTED', 'PENDING_L1', 'PENDING_L2', 'PENDING_FINAL'] }, expenseId: null, expenseDate: { lte: endOfDay(to) } },
+    select: { amountMinor: true, headId: true, cashAccountId: true, paymentMode: true },
+  })
+  if (!requests.length) return { movements: out, count: 0 }
+  const resolve = await loadResolver(ctx.tenant.id, ctx.db)
+  const heads = await ctx.db.expenseHead.findMany({
+    where: { id: { in: [...new Set(requests.map((r) => r.headId))] } },
+    select: { id: true, category: true, account: { select: { id: true, isActive: true } } },
+  })
+  const headOf = new Map(heads.map((h) => [h.id, h]))
+  const add = (accountId: string, debit: number, credit: number) => {
+    const m = out.get(accountId) ?? { debit: 0, credit: 0 }
+    out.set(accountId, { debit: m.debit + debit, credit: m.credit + credit })
+  }
+  for (const r of requests) {
+    const head = headOf.get(r.headId)
+    add(head?.account?.isActive ? head.account.id : resolve.expense(head?.category ?? 'OTHER'), r.amountMinor, 0)
+    add(r.cashAccountId ?? resolve.mode(r.paymentMode), 0, r.amountMinor)
+  }
+  return { movements: out, count: requests.length }
+}
+
+/**
+ * Approved balances, and beside them every cost still awaiting approval up to
+ * `to`: journal entries in the approval chain and expenses not yet posted.
+ * Pending figures never enter the P&L or balance sheet.
+ */
 export async function trialBalance(ctx: AppContext, params: { from: string; to: string }) {
-  const rows = (await accountBalances(ctx, params)).filter(
-    (r) => r.openingMinor !== 0 || r.debitMinor !== 0 || r.creditMinor !== 0 || r.closingMinor !== 0,
-  )
+  const [balances, pendingEntries, requests, pendingCount] = await Promise.all([
+    accountBalances(ctx, params),
+    movements(ctx, { to: params.to }, PENDING_STATUSES),
+    pendingRequestMovements(ctx, params.to),
+    ctx.db.journalEntry.count({ where: { approvalStatus: { in: PENDING_STATUSES }, date: { lte: endOfDay(params.to) } } }),
+  ])
+  const pendingOf = (id: string) => {
+    const a = pendingEntries.get(id) ?? { debit: 0, credit: 0 }
+    const b = requests.movements.get(id) ?? { debit: 0, credit: 0 }
+    return { debit: a.debit + b.debit, credit: a.credit + b.credit }
+  }
+  const rows = balances
+    .map((r) => {
+      const p = pendingOf(r.id)
+      return {
+        ...r,
+        pendingDebitMinor: p.debit,
+        pendingCreditMinor: p.credit,
+        closingWithPendingMinor: r.closingMinor + p.debit - p.credit,
+      }
+    })
+    .filter(
+      (r) => r.openingMinor !== 0 || r.debitMinor !== 0 || r.creditMinor !== 0 || r.closingMinor !== 0
+        || r.pendingDebitMinor !== 0 || r.pendingCreditMinor !== 0,
+    )
   const closingDr = rows.reduce((t, r) => t + Math.max(0, r.closingMinor), 0)
   const closingCr = rows.reduce((t, r) => t + Math.max(0, -r.closingMinor), 0)
   return {
     rows,
+    pending: { entries: pendingCount, expenseRequests: requests.count },
     totals: {
       debitMinor: rows.reduce((t, r) => t + r.debitMinor, 0),
       creditMinor: rows.reduce((t, r) => t + r.creditMinor, 0),
       closingDrMinor: closingDr,
       closingCrMinor: closingCr,
       differenceMinor: closingDr - closingCr,
+      pendingDebitMinor: rows.reduce((t, r) => t + r.pendingDebitMinor, 0),
+      pendingCreditMinor: rows.reduce((t, r) => t + r.pendingCreditMinor, 0),
     },
   }
 }

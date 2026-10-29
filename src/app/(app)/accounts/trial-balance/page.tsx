@@ -25,6 +25,8 @@ export default async function TrialBalancePage({
   const tb = await trialBalance(ctx, { from, to })
   const { money, drCr } = moneyFmt(ctx.tenant.currency || 'INR')
   const closingDrill = (a: string) => drillHref(ctx.tenant.id, { k: 'ledger', a, f: from, t: to, v: 'closing' })
+  const hasPending = tb.pending.entries > 0 || tb.pending.expenseRequests > 0
+  const cols = hasPending ? 9 : 6
 
   return (
     <div className="space-y-4">
@@ -59,6 +61,23 @@ export default async function TrialBalancePage({
         />
       </div>
 
+      {hasPending ? (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-[var(--warning)] p-4 text-sm">
+          <p className="text-ink">
+            <span className="font-semibold">Waiting for approval:</span>{' '}
+            {tb.pending.entries > 0 ? `${tb.pending.entries} journal ${tb.pending.entries === 1 ? 'entry' : 'entries'}` : null}
+            {tb.pending.entries > 0 && tb.pending.expenseRequests > 0 ? ' and ' : null}
+            {tb.pending.expenseRequests > 0 ? `${tb.pending.expenseRequests} expense ${tb.pending.expenseRequests === 1 ? 'request' : 'requests'}` : null}
+            {' '}({money(tb.totals.pendingDebitMinor)}). They show in the pending columns only and stay out of Profit &amp; loss
+            and the Balance sheet until the Owner gives final approval.
+          </p>
+          <div className="flex gap-3">
+            <Link href="/accounts/approvals" className="font-medium text-[var(--brand-600)] hover:underline">Entry approvals</Link>
+            <Link href="/accounts/expense-approvals" className="font-medium text-[var(--brand-600)] hover:underline">Expense approvals</Link>
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="overflow-hidden">
         {tb.rows.length === 0 ? (
           <EmptyState title="No balances yet" description="Post receipts, expenses or vouchers to see the trial balance." />
@@ -73,12 +92,19 @@ export default async function TrialBalancePage({
                   <TH align="right">Credit</TH>
                   <TH align="right">Closing Dr</TH>
                   <TH align="right">Closing Cr</TH>
+                  {hasPending ? (
+                    <>
+                      <TH align="right">Pending Dr</TH>
+                      <TH align="right">Pending Cr</TH>
+                      <TH align="right">Closing incl. pending</TH>
+                    </>
+                  ) : null}
                 </tr>
               </THead>
               <TBody>
                 {ACCOUNT_TYPES.filter((t) => tb.rows.some((r) => r.type === t.type)).flatMap((t) => [
                   <tr key={`g:${t.type}`} className="bg-surface-2">
-                    <td colSpan={6} className="px-3 py-2 text-sm font-semibold text-ink">{t.label}</td>
+                    <td colSpan={cols} className="px-3 py-2 text-sm font-semibold text-ink">{t.label}</td>
                   </tr>,
                   ...tb.rows.filter((r) => r.type === t.type).map((r) => (
                     <TR key={r.id}>
@@ -96,6 +122,15 @@ export default async function TrialBalancePage({
                       <TD align="right">
                         {r.closingMinor < 0 ? <DrillFigure href={closingDrill(r.id)}>{money(r.closingMinor)}</DrillFigure> : ''}
                       </TD>
+                      {hasPending ? (
+                        <>
+                          <TD align="right" className="text-[var(--warning)]">{r.pendingDebitMinor ? money(r.pendingDebitMinor) : ''}</TD>
+                          <TD align="right" className="text-[var(--warning)]">{r.pendingCreditMinor ? money(r.pendingCreditMinor) : ''}</TD>
+                          <TD align="right">
+                            {r.pendingDebitMinor || r.pendingCreditMinor ? drCr(r.closingWithPendingMinor) : ''}
+                          </TD>
+                        </>
+                      ) : null}
                     </TR>
                   )),
                 ])}
@@ -105,6 +140,13 @@ export default async function TrialBalancePage({
                   <td className="px-3 py-2 text-right tnum">{money(tb.totals.creditMinor)}</td>
                   <td className="px-3 py-2 text-right tnum">{money(tb.totals.closingDrMinor)}</td>
                   <td className="px-3 py-2 text-right tnum">{money(tb.totals.closingCrMinor)}</td>
+                  {hasPending ? (
+                    <>
+                      <td className="px-3 py-2 text-right tnum">{money(tb.totals.pendingDebitMinor)}</td>
+                      <td className="px-3 py-2 text-right tnum">{money(tb.totals.pendingCreditMinor)}</td>
+                      <td />
+                    </>
+                  ) : null}
                 </tr>
               </TBody>
             </Table>

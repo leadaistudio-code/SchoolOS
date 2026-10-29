@@ -8,6 +8,9 @@ import { Notice } from '@/components/ui/states'
 import { Table, TableWrap, THead, TH, TBody, TR, TD } from '@/components/ui/table'
 import { formatDay } from '@/lib/dates'
 import { getJournal } from '@/server/modules/accounts/service'
+import { journalApprovalFor } from '@/server/modules/accounting/journal-approval-service'
+import { JOURNAL_STATUS_LABEL, stagesInUse } from '@/server/modules/accounting/journal-approval'
+import { JournalActionButton } from '@/components/accounting/journal-approval-forms'
 import { AccountsTabs, moneyFmt, SOURCE_LABEL, sourceHref } from '../../ui'
 import { ReverseJournalDialog } from './reverse-dialog'
 
@@ -22,6 +25,11 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
   const { money } = moneyFmt(ctx.tenant.currency || 'INR')
   const href = sourceHref(entry.sourceType, entry.sourceId)
   const canReverse = ctx.can('accounts.manage') && entry.sourceType === 'MANUAL' && !entry.isReversal && !entry.reversedAt
+  const approval = await journalApprovalFor(ctx, entry)
+  const chain = stagesInUse(approval.departmentStage)
+  const stageAt = chain.findIndex((s) => s.status === entry.approvalStatus)
+  const isFinal = stageAt === chain.length - 1
+  const approved = entry.approvalStatus === 'APPROVED'
 
   return (
     <div className="space-y-4">
@@ -30,12 +38,41 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
         description={`${TYPE_LABEL[entry.voucherType]} · ${formatDay(entry.date, 'd MMMM yyyy')}`}
         actions={
           <div className="flex items-center gap-2">
+            {approval.actions.map((a) => (
+              <JournalActionButton
+                key={a}
+                entryId={entry.id}
+                action={a}
+                expectedStatus={entry.approvalStatus}
+                finalStage={isFinal}
+                variant={a === 'return' ? 'secondary' : 'primary'}
+                label={a === 'approve' ? (isFinal ? 'Owner approve' : stageAt === 0 ? 'Check and pass' : 'Approve') : a === 'return' ? 'Return to maker' : 'Resubmit'}
+              />
+            ))}
             {canReverse ? <ReverseJournalDialog id={entry.id} /> : null}
             <BackButton fallbackHref="/accounts/journals" />
           </div>
         }
       />
       <AccountsTabs active="/accounts/journals" />
+
+      {!approved ? (
+        <Notice
+          tone={entry.approvalStatus === 'VOID' ? 'info' : 'warning'}
+          title={entry.approvalStatus === 'VOID' ? 'Withdrawn before approval' : JOURNAL_STATUS_LABEL[entry.approvalStatus]}
+        >
+          {entry.approvalStatus === 'VOID'
+            ? 'The source was changed or cancelled before final approval, so this entry never counted in the books.'
+            : entry.approvalStatus === 'RETURNED'
+              ? 'Returned to the maker. It shows only in the Trial balance pending columns until it is resubmitted and approved.'
+              : `Waiting for approval (stage ${stageAt + 2} of ${chain.length + 1}). It shows in the Trial balance pending columns and stays out of Profit & loss and the Balance sheet until the Owner approves it.`}
+        </Notice>
+      ) : approval.steps.length ? (
+        <Notice tone="success" title="Approved">
+          Final approval by {approval.steps.findLast((s) => s.action === 'APPROVE_OWNER')?.actorLabel ?? '—'}
+          {entry.approvedAt ? ` on ${entry.approvedAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}` : ''}.
+        </Notice>
+      ) : null}
 
       {reversal ? (
         <Notice tone="warning" title="This voucher has been reversed">
@@ -107,6 +144,26 @@ export default async function JournalDetailPage({ params }: { params: Promise<{ 
         </TableWrap>
       </Card>
       {entry.isReversal ? <Badge tone="warning">Reversal entry</Badge> : null}
+
+      {approval.steps.length ? (
+        <Card className="overflow-hidden">
+          <TableWrap>
+            <Table>
+              <THead><tr><TH>When</TH><TH>Step</TH><TH>By</TH><TH>Remarks</TH></tr></THead>
+              <TBody>
+                {approval.steps.map((s) => (
+                  <TR key={s.id}>
+                    <TD className="whitespace-nowrap text-sm">{s.createdAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</TD>
+                    <TD className="text-sm">{JOURNAL_STATUS_LABEL[s.fromStatus]} → {JOURNAL_STATUS_LABEL[s.toStatus]}</TD>
+                    <TD className="text-sm">{s.actorLabel ?? '—'}</TD>
+                    <TD className="text-sm whitespace-pre-line">{s.remarks ?? '—'}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        </Card>
+      ) : null}
     </div>
   )
 }

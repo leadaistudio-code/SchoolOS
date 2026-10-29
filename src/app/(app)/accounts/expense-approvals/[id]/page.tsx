@@ -81,11 +81,11 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
   const tracker = [
     {
       stage: 1,
-      label: 'Creator (prepares and submits)',
+      label: 'Maker (prepares and submits)',
       done: !!submitted && status !== 'RETURNED' && status !== 'DRAFT',
       by: submitted ? `${submitted.actorLabel ?? '—'} · ${formatDay(submitted.createdAt)}` : r.createdByLabel ?? '—',
     },
-    ...APPROVAL_STAGES.map((s) => {
+    ...APPROVAL_STAGES.filter((s) => s.stage !== 3 || data.departmentStage || !!signer(s.signature) || status === 'PENDING_L1').map((s) => {
       const signed = signer(s.signature)
       return { stage: s.stage, label: s.label, done: !!signed, by: signed ? `${signed.actorLabel ?? '—'} · ${formatDay(signed.createdAt)}` : null }
     }),
@@ -124,7 +124,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
                 key={a}
                 requestId={r.id}
                 action={a}
-                label={a === 'approve' && current ? (current === 2 ? 'Validate' : current === 5 ? 'Final approve and post' : 'Approve') : ACTION_LABEL[a]}
+                label={a === 'approve' && current ? (current === 2 ? 'Check and pass' : current === 5 ? 'Owner approve and post' : 'Approve') : ACTION_LABEL[a]}
                 expectedStatus={r.status}
                 finalStage={current === 5}
                 variant={a === 'approve' || a === 'submit' ? 'primary' : a === 'reject' || a === 'reverse' ? 'danger' : 'secondary'}
@@ -138,7 +138,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
 
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={APPROVAL_TONE[status]}>{STATUS_LABEL[status]}</Badge>
-        {current ? <span className="text-sm text-ink-muted">Stage {current} of 5</span> : null}
+        {current ? <span className="text-sm text-ink-muted">{STAGE_ROLE[current as 1 | 2 | 3 | 4 | 5]} stage</span> : null}
       </div>
 
       {status === 'RETURNED' && r.createdById === ctx.user.userId ? (
@@ -157,7 +157,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
       <Card>
         <CardHeader><CardTitle>Approval stages</CardTitle></CardHeader>
         <CardContent>
-          <ol className="grid gap-3 sm:grid-cols-5">
+          <ol className={`grid gap-3 ${tracker.length === 5 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}>
             {tracker.map((t) => {
               const isCurrent = current === t.stage && !['POSTED', 'REVERSED', 'REJECTED', 'WITHDRAWN'].includes(status)
               return (
@@ -165,7 +165,7 @@ export default async function ExpenseApprovalPage({ params }: { params: Promise<
                   key={t.stage}
                   className={`rounded-lg border p-3 text-sm ${t.done ? 'border-[color-mix(in_srgb,var(--success)_40%,transparent)] bg-success-bg' : isCurrent ? 'border-[var(--brand-600)]' : 'border-line'}`}
                 >
-                  <span className="block text-xs text-ink-subtle">Stage {t.stage} · {STAGE_ROLE[t.stage as 1 | 2 | 3 | 4 | 5]}</span>
+                  <span className="block text-xs text-ink-subtle">{STAGE_ROLE[t.stage as 1 | 2 | 3 | 4 | 5]}</span>
                   <span className="block font-medium text-ink">{t.label}</span>
                   <span className="mt-1 block text-xs text-ink-muted">{t.done ? t.by : isCurrent ? 'Waiting here' : t.stage === 1 ? t.by : '—'}</span>
                 </li>

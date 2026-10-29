@@ -139,12 +139,13 @@ export const PERMISSIONS: PermissionDef[] = [
     ['manage', 'Record and edit school expenses'],
   ]),
 
-  // Stages of the multi-tier expense approval workflow (off unless the school switches it on).
+  // Stages of the cost approval workflow (off unless the school switches it on):
+  // expenses, vendor bills, stock purchases, payroll, fixed assets and expense journals.
   ...mod('expense_approval', [
-    ['validate', 'Validate / audit submitted expenses (stage 2)'],
-    ['approve_department', 'Approve expenses as department head (stage 3)'],
-    ['approve_finance', 'Approve expenses as finance officer (stage 4)'],
-    ['approve_final', 'Give final approval and post expenses (stage 5)'],
+    ['validate', 'Check cost entries as Checker'],
+    ['approve_department', 'Approve cost entries as Department head (optional stage)'],
+    ['approve_finance', 'Approve cost entries as Accountant'],
+    ['approve_final', 'Give Owner (final) approval so costs reach P&L and balance sheet'],
   ]),
 
   ...mod('exams', [

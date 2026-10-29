@@ -71,6 +71,9 @@ export function GrnForm({
   const save = async () => {
     const filled = lines.filter((l) => l.itemId)
     if (filled.length === 0) return push({ tone: 'error', title: 'Add at least one item' })
+    if (paymentMode === 'CREDIT' && (!vendorId || !invoiceNo.trim())) {
+      return push({ tone: 'error', title: 'To buy on credit, choose the vendor master and enter the vendor bill no.' })
+    }
     setSaving(true)
     const res = await createStorePurchaseAction({
       vendorName,
@@ -116,11 +119,17 @@ export function GrnForm({
         <Field label="Received on" htmlFor="grn-date" required>
           <Input id="grn-date" type="date" max={today} value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
         </Field>
-        <Field label="Paid by" htmlFor="grn-mode" required>
+        <Field
+          label="Paid by"
+          htmlFor="grn-mode"
+          required
+          hint={paymentMode === 'CREDIT' ? 'Raises the vendor bill in Accounts; pay it from Bills payable' : undefined}
+        >
           <Select id="grn-mode" value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
             {STORE_PAYMENT_MODES.map((m) => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
+            {vendors.length > 0 ? <option value="CREDIT">On credit (vendor bill)</option> : null}
           </Select>
         </Field>
         <Field label="Notes" htmlFor="grn-notes" className="sm:col-span-1 lg:col-span-3">
@@ -182,7 +191,10 @@ export function GrnForm({
       <div className="flex items-center gap-2">
         <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save & add to stock'}</Button>
         <Button variant="ghost" onClick={() => router.back()}>Cancel</Button>
-        <p className="text-xs text-ink-subtle">Saving increases stock and updates each item&apos;s average cost.</p>
+        <p className="text-xs text-ink-subtle">
+          Saving increases stock and updates each item&apos;s average cost
+          {paymentMode === 'CREDIT' ? ', and adds the bill to the vendor’s ledger.' : '.'}
+        </p>
       </div>
     </div>
   )

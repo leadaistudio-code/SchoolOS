@@ -44,7 +44,7 @@ const SUMMARY_INSERT = `
          COALESCE(SUM(l."debitMinor"), 0), COALESCE(SUM(l."creditMinor"), 0), COUNT(*)::int
   FROM "JournalEntry" e
   JOIN "JournalLine" l ON l."entryId" = e."id" AND l."tenantId" = e."tenantId"
-  WHERE e."tenantId" = $1`
+  WHERE e."tenantId" = $1 AND e."approvalStatus" = 'APPROVED'`
 const SUMMARY_GROUP = ` GROUP BY e."tenantId", date_trunc('month', e."date")::date, l."accountId", e."sourceType"`
 
 /**
@@ -351,6 +351,7 @@ export async function getDrilldown(ctx: AppContext, drill: Drill, raw: { from?: 
     const where: Prisma.JournalLineWhereInput = {
       accountId: { in: accountIds },
       entry: {
+        approvalStatus: 'APPROVED',
         date: { gte: attendanceDate(range.from), lte: attendanceDate(range.to) },
         ...(sources ? { sourceType: { in: sources } } : {}),
       },
@@ -393,7 +394,7 @@ export async function getDrilldown(ctx: AppContext, drill: Drill, raw: { from?: 
       const [opening, accounts, toDate] = await Promise.all([
         openingCash(ctx, period, accountIds),
         ctx.db.ledgerAccount.findMany({ where: { id: { in: accountIds } }, select: { openingBalanceMinor: true } }),
-        ctx.db.journalLine.aggregate({ where: { accountId: { in: accountIds }, entry: { date: { lte: attendanceDate(period.to) } } }, _sum: { debitMinor: true, creditMinor: true } }),
+        ctx.db.journalLine.aggregate({ where: { accountId: { in: accountIds }, entry: { approvalStatus: 'APPROVED', date: { lte: attendanceDate(period.to) } } }, _sum: { debitMinor: true, creditMinor: true } }),
       ])
       const ledgerClosing = accounts.reduce((s, a) => s + a.openingBalanceMinor, 0) + (toDate._sum.debitMinor ?? 0) - (toDate._sum.creditMinor ?? 0)
       reconciliation.push(
