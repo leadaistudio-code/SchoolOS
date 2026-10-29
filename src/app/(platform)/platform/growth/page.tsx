@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { formatIst } from '@/lib/ist-clock'
 import { requirePlatformContext } from '@/server/context'
 import { parseListQuery } from '@/lib/query'
 import { dashboard, listFollowUps, listSchools } from '@/server/modules/platform/growth/service'
@@ -316,7 +316,7 @@ function FollowUpCard({
                     {row.school.name}
                   </Link>
                   <p className="text-xs text-ink-subtle">
-                    {format(row.dueAt, 'd MMM, HH:mm')} · {row.type.replaceAll('_', ' ').toLowerCase()}
+                    {formatIst(row.dueAt, 'd MMM, HH:mm')} · {row.type.replaceAll('_', ' ').toLowerCase()}
                     {row.note ? ` · ${row.note}` : ''}
                   </p>
                   {row.contact?.mobile ? (

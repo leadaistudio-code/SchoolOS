@@ -6,6 +6,7 @@ import { ZodError } from 'zod'
 import { requirePlatformContext } from '@/server/context'
 import { ApiException } from '@/server/api/response'
 import { emptyFormState, type FormState } from '@/lib/form-state'
+import { istClock, shiftIso } from '@/lib/ist-clock'
 import {
   addSchoolPhotos,
   captureFieldLead,
@@ -27,6 +28,7 @@ import {
   sendCrmMessage,
   setTaskStatus,
   setTemplateActive,
+  snoozeFollowUp,
   updateSchool,
 } from '@/server/modules/platform/growth/service'
 import {
@@ -288,13 +290,18 @@ export async function completeFollowUpAction(id: string, schoolId?: string) {
   if (schoolId) revalidatePath(`/platform/growth/schools/${schoolId}`)
 }
 
+export async function snoozeFollowUpAction(id: string, days: number, schoolId?: string) {
+  const ctx = await requirePlatformContext('platform.crm_edit')
+  await snoozeFollowUp(ctx, id, days)
+  revalidatePath('/platform/growth')
+  revalidatePath('/platform/growth/today')
+  if (schoolId) revalidatePath(`/platform/growth/schools/${schoolId}`)
+}
+
 export async function quickFollowUpAction(schoolId: string, days: number, type: string) {
   const ctx = await requirePlatformContext('platform.crm_edit')
-  const due = new Date()
-  due.setDate(due.getDate() + days)
-  due.setHours(10, 0, 0, 0)
   await createFollowUp(ctx, schoolId, followUpCreateSchema.parse({
-    dueAt: due.toISOString(),
+    dueAt: shiftIso(istClock().iso, days),
     type,
     priority: 'NORMAL',
   }))

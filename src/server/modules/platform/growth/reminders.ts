@@ -28,6 +28,7 @@ export const recipientSchema = z.object({
   morning: checkbox,
   evening: checkbox,
   meetings: checkbox,
+  weekly: checkbox,
 })
 
 export type RecipientInput = z.infer<typeof recipientSchema>

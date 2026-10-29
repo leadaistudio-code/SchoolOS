@@ -11,7 +11,7 @@ import { tenantUrl } from '@/server/tenant'
 import { attendanceDate } from '@/lib/dates'
 import { istClock } from '@/lib/ist-clock'
 import { phoneKey } from '@/lib/phone'
-import { crmInboundReply } from '@/server/modules/platform/growth/jobs'
+import { crmInboundReply } from '@/server/modules/platform/growth/whatsapp-sales'
 import {
   NOT_REGISTERED,
   OFFICE_PROMPT,
@@ -307,7 +307,7 @@ export async function handleInbound(msg: InboundMessage): Promise<string | null>
   const key = phoneKey(msg.from)
   if (!key || !msg.text) return null
 
-  const salesReply = await crmInboundReply(msg.from)
+  const salesReply = await crmInboundReply(msg.from, msg.text)
   if (salesReply) {
     const r = await whatsappProvider().send({ to: msg.from.replace(/^whatsapp:/, ''), body: salesReply })
     if (!r.ok) console.warn('[whatsapp-bot] sales reply failed', r.error)

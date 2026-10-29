@@ -1,3 +1,5 @@
+import { format } from 'date-fns'
+
 const IST_OFFSET_MS = 330 * 60_000
 
 export type IstClock = {
@@ -17,6 +19,11 @@ export function istClock(now: Date = new Date()): IstClock {
     minutes: ist.getUTCHours() * 60 + ist.getUTCMinutes(),
     weekday: day === 0 ? 7 : day,
   }
+}
+
+/** UTC instant of 00:00 IST on a YYYY-MM-DD calendar date. */
+export function istDayStart(iso: string): Date {
+  return new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00.000Z`) - IST_OFFSET_MS)
 }
 
 /** Weekday (1 = Monday … 7 = Sunday) of a YYYY-MM-DD calendar date. */
@@ -44,6 +51,31 @@ export function shiftIso(iso: string, days: number): string {
 /** Monday of the week containing `iso`. */
 export function weekStartIso(iso: string): string {
   return shiftIso(iso, 1 - weekdayOf(iso))
+}
+
+/**
+ * Form input → instant, reading wall-clock values as India time whatever the
+ * server zone is. Accepts "2026-10-29", "2026-10-29T11:00" (datetime-local) or
+ * a full ISO string with its own zone, which is kept as is. A date alone gets
+ * `defaultTime`. Returns null when unparseable.
+ */
+export function istDateTime(date: string, time?: string | null, defaultTime = '10:00'): Date | null {
+  const value = date.trim()
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(value) && value.includes('T')) {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const [day, inlineTime] = value.split('T')
+  const hhmm = (time?.trim() || inlineTime?.slice(0, 5) || defaultTime).slice(0, 5)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day ?? '') || minutesOf(hhmm) === null) return null
+  const d = new Date(`${day}T${hhmm.padStart(5, '0')}:00.000+05:30`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/** date-fns `format`, but always in India time (server runs in UTC). */
+export function formatIst(at: Date | string | number, pattern: string): string {
+  const d = new Date(at)
+  return format(new Date(d.getTime() + IST_OFFSET_MS + d.getTimezoneOffset() * 60_000), pattern)
 }
 
 /** "Sat, 3 Oct" for messages. */

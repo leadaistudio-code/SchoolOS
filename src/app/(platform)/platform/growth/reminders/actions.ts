@@ -12,8 +12,10 @@ import {
   setRecipientActive,
   updateRecipient,
 } from '@/server/modules/platform/growth/reminders'
-import { sendTestReminder } from '@/server/modules/platform/growth/jobs'
-import type { ReminderSlot } from '@/lib/growth-reminders'
+import { sendTestReminder, type TestKind } from '@/server/modules/platform/growth/jobs'
+import { saveStageCadence } from '@/server/modules/platform/growth/service'
+import { CADENCE_STAGES } from '@/lib/growth-cadence'
+import { FOLLOW_UP_TYPES } from '@/lib/growth-crm'
 
 const PATH = '/platform/growth/reminders'
 
@@ -53,10 +55,32 @@ export async function deleteRecipientAction(id: string) {
   revalidatePath(PATH)
 }
 
-export async function sendTestReminderAction(id: string, slot: ReminderSlot): Promise<{ ok: boolean; message: string }> {
+export async function saveCadenceAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requirePlatformContext('platform.crm_comms')
+  try {
+    const rows = CADENCE_STAGES.map((stage) => {
+      const days = Number(formData.get(`days-${stage}`))
+      const type = String(formData.get(`type-${stage}`) ?? 'CALL')
+      if (!Number.isInteger(days) || days < 1 || days > 60) throw new Error('Days must be between 1 and 60')
+      return {
+        stage,
+        days,
+        followUpType: (FOLLOW_UP_TYPES as readonly string[]).includes(type) ? type : 'CALL',
+        enabled: formData.get(`on-${stage}`) === 'on',
+      }
+    })
+    await saveStageCadence(ctx, rows)
+    revalidatePath(PATH)
+    return { ...emptyFormState, ok: true, message: 'Follow-up rules saved' }
+  } catch (error) {
+    return fail(error, 'Could not save the rules')
+  }
+}
+
+export async function sendTestReminderAction(id: string, kind: TestKind): Promise<{ ok: boolean; message: string }> {
   await requirePlatformContext('platform.crm_comms')
   try {
-    const message = await sendTestReminder(id, slot)
+    const message = await sendTestReminder(id, kind)
     return { ok: !message.includes('failed'), message }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Could not send' }

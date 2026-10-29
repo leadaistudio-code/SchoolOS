@@ -5555,11 +5555,25 @@ model CrmReminderRecipient {
   morning   Boolean  @default(true)
   evening   Boolean  @default(true)
   meetings  Boolean  @default(true)
+  weekly    Boolean  @default(true)
   isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  /// Follow-up ids behind the numbers in the last WhatsApp list, so "done 2" resolves.
+  lastListIds String[]  @default([])
+  lastListAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([isActive])
+}
+
+/// Follow-up booked automatically when a lead enters `stage`. Platform-only.
+/// Stages without a row use the defaults in src/lib/growth-cadence.ts.
+model CrmStageCadence {
+  stage        String   @id
+  days         Int
+  followUpType String   @default("CALL")
+  enabled      Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
 }
 
 /// Sales message templates. Platform-only — not tenant NotificationTemplate.

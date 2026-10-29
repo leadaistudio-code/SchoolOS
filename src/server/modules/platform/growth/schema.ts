@@ -14,6 +14,7 @@ import {
   TASK_STATUSES,
   TEMPERATURES,
 } from '@/lib/growth-crm'
+import { istDateTime } from '@/lib/ist-clock'
 
 const empty = z
   .string()
@@ -57,6 +58,9 @@ const optionalDate = z
   .transform((v) => {
     const t = v?.trim()
     if (!t) return undefined
+    // Date-only values stay UTC midnight (they land in @db.Date columns);
+    // datetime-local values are India wall-clock times.
+    if (t.includes('T')) return istDateTime(t) ?? undefined
     const d = new Date(t)
     return Number.isNaN(d.getTime()) ? undefined : d
   })
@@ -133,6 +137,8 @@ export const activityCreateSchema = z.object({
   summary: z.string().trim().min(2).max(400),
   body: empty,
   contactId: optionalCuid,
+  nextFollowUpOn: empty,
+  nextFollowUpType: z.enum(FOLLOW_UP_TYPES).optional().or(z.literal('')).transform((v) => v || undefined),
 })
 export type ActivityCreateInput = z.infer<typeof activityCreateSchema>
 

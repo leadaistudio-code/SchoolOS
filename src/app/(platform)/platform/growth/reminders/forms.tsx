@@ -2,9 +2,17 @@
 
 import { useActionState, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { deleteRecipientAction, saveRecipientAction, sendTestReminderAction, toggleRecipientAction } from './actions'
+import {
+  deleteRecipientAction,
+  saveCadenceAction,
+  saveRecipientAction,
+  sendTestReminderAction,
+  toggleRecipientAction,
+} from './actions'
 import { emptyFormState, type FormState } from '@/lib/form-state'
-import type { ReminderSlot } from '@/lib/growth-reminders'
+import type { TestKind } from '@/server/modules/platform/growth/jobs'
+import type { StageCadence } from '@/lib/growth-cadence'
+import { FOLLOW_UP_TYPES, FOLLOW_UP_TYPE_LABELS, STAGE_LABELS } from '@/lib/growth-crm'
 import { Button } from '@/components/ui/button'
 import { Checkbox, Field, Input, Select } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
@@ -19,6 +27,7 @@ export type RecipientRow = {
   morning: boolean
   evening: boolean
   meetings: boolean
+  weekly: boolean
 }
 
 export type OperatorOption = { id: string; label: string }
@@ -79,10 +88,52 @@ export function RecipientForm({
         <Toggle name="morning" label="Morning plan, 08:30 AM" defaultChecked={recipient?.morning ?? true} />
         <Toggle name="evening" label="Evening wrap-up, 6:00 PM" defaultChecked={recipient?.evening ?? true} />
         <Toggle name="meetings" label="30 minutes before each meeting" defaultChecked={recipient?.meetings ?? true} />
+        <Toggle name="weekly" label="Weekly scorecard, Monday 9:00 AM" defaultChecked={recipient?.weekly ?? true} />
       </fieldset>
       <Button type="submit" loading={pending} size="sm">
         {recipient ? 'Save' : 'Add salesperson'}
       </Button>
+    </form>
+  )
+}
+
+export function CadenceForm({ rules, canEdit }: { rules: StageCadence[]; canEdit: boolean }) {
+  const [state, action, pending] = useActionState(saveCadenceAction, emptyFormState)
+  return (
+    <form action={action} className="space-y-3">
+      {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
+      {state.ok ? <Notice tone="success">{state.message}</Notice> : null}
+      <div className="divide-y divide-[var(--border)]">
+        {rules.map((r) => (
+          <div key={r.stage} className="grid grid-cols-[minmax(0,1fr)_4.5rem_8.5rem] items-center gap-2 py-2">
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <Checkbox name={`on-${r.stage}`} defaultChecked={r.enabled} disabled={!canEdit} />
+              {STAGE_LABELS[r.stage]}
+            </label>
+            <Input
+              aria-label={`Days after ${STAGE_LABELS[r.stage]}`}
+              name={`days-${r.stage}`}
+              type="number"
+              min={1}
+              max={60}
+              defaultValue={r.days}
+              disabled={!canEdit}
+            />
+            <Select aria-label={`Follow-up type for ${STAGE_LABELS[r.stage]}`} name={`type-${r.stage}`} defaultValue={r.followUpType} disabled={!canEdit}>
+              {FOLLOW_UP_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {FOLLOW_UP_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ))}
+      </div>
+      {canEdit ? (
+        <Button type="submit" loading={pending} size="sm">
+          Save rules
+        </Button>
+      ) : null}
     </form>
   )
 }
@@ -116,9 +167,9 @@ export function RecipientActions({
       router.refresh()
     })
 
-  const test = (slot: ReminderSlot) =>
+  const test = (kind: TestKind) =>
     startTransition(async () => {
-      setResult(await sendTestReminderAction(recipient.id, slot))
+      setResult(await sendTestReminderAction(recipient.id, kind))
     })
 
   return (
@@ -129,6 +180,9 @@ export function RecipientActions({
         </Button>
         <Button size="sm" variant="secondary" loading={pending} onClick={() => test('evening')}>
           Send test: wrap-up
+        </Button>
+        <Button size="sm" variant="secondary" loading={pending} onClick={() => test('weekly')}>
+          Send test: scorecard
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setEditing((v) => !v)}>
           {editing ? 'Close' : 'Edit'}

@@ -4,7 +4,7 @@ import {
   istDayStart,
   meetingVariables,
   morningVariables,
-  pendingListText,
+  pendingList,
   reminderSlot,
   scopeBoard,
   splitByDay,
@@ -12,7 +12,17 @@ import {
   type Board,
   type BoardFollowUp,
   type BoardMeeting,
+  isEscalated,
+  isWeeklySlot,
+  lastWeek,
+  scorecardFocus,
+  scorecardVariables,
 } from '../src/lib/growth-reminders'
+import { isForwardMove, resolveCadence } from '../src/lib/growth-cadence'
+import { formatIst, istDateTime } from '../src/lib/ist-clock'
+import { parseSalesCommand } from '../src/lib/growth-commands'
+
+const lead = (id: string, schoolName: string, ownerId: string) => ({ id, schoolName, ownerId, lastActivityAt: null })
 
 const ISO = '2026-10-26'
 /** 26 Oct 2026, HH:mm IST as a UTC instant. */
@@ -91,6 +101,8 @@ describe('digest content', () => {
       { assignedToId: 'u1', completedById: 'u1' },
       { assignedToId: 'u2', completedById: 'u2' },
     ],
+    needsNextStep: [lead('n1', 'Quiet School', 'u1'), lead('n2', 'Other School', 'u2')],
+    goingCold: [lead('c1', 'Cold School', 'u2')],
   }
 
   it('splits overdue, today and tomorrow on IST days, urgent first', () => {
@@ -135,7 +147,7 @@ describe('digest content', () => {
   })
 
   it('says all clear when nothing is pending', () => {
-    const empty: Board = { followUps: [], meetings: [], doneToday: [] }
+    const empty: Board = { followUps: [], meetings: [], doneToday: [], needsNextStep: [], goingCold: [] }
     expect(eveningVariables('Aryen', ISO, splitByDay(empty, ISO), 0)['6']).toBe('All clear for today.')
   })
 
@@ -149,12 +161,127 @@ describe('digest content', () => {
     })
   })
 
-  it('numbers the pending list overdue first', () => {
-    const text = pendingListText('Aryen', ISO, splitByDay(board, ISO), 'https://x/today')
+  it('numbers the pending list overdue first and remembers the ids behind the numbers', () => {
+    const { text, ids } = pendingList('Aryen', ISO, board, 'https://x/today')
     const lines = text.split('\n')
     expect(lines.find((l) => l.startsWith('1.'))).toContain('Old Lead')
+    expect(ids).toHaveLength(4)
+    expect(ids[0]).toBe(board.followUps[0]!.id)
     expect(text).toContain('*Meetings today*')
     expect(text).not.toContain('Tomorrow School')
+    expect(text).toContain('No next step booked* (2)')
+    expect(text).toContain('Cold School')
     expect(text).toContain('https://x/today')
+  })
+
+  it('flags follow-ups more than 2 days overdue', () => {
+    const late: Board = { ...board, followUps: [follow({ dueAt: ist('10:00', -3), schoolName: 'Very Late' })] }
+    expect(pendingList('Aryen', ISO, late, 'u').text).toContain('1. 🔴 Very Late')
+    expect(pendingList('Aryen', ISO, board, 'u').text).not.toContain('🔴')
+    expect(isEscalated(ist('10:00', -3), ISO)).toBe(true)
+    expect(isEscalated(ist('10:00', -2), ISO)).toBe(false)
+  })
+
+  it('MINE only lists their own leads without a next step', () => {
+    const mine = scopeBoard(board, { scope: 'MINE', userId: 'u1' })
+    expect(mine.needsNextStep.map((l) => l.schoolName)).toEqual(['Quiet School'])
+    expect(mine.goingCold).toHaveLength(0)
+  })
+
+  it('caps the list and says how many more', () => {
+    const many: Board = {
+      ...board,
+      followUps: Array.from({ length: 20 }, (_, i) => follow({ dueAt: ist('11:00'), schoolName: `S${i}` })),
+    }
+    const { text, ids } = pendingList('Aryen', ISO, many, 'u')
+    expect(ids).toHaveLength(15)
+    expect(text).toContain('…and 5 more')
+  })
+})
+
+describe('weekly scorecard', () => {
+  it('covers Monday to Sunday of the previous week', () => {
+    const week = lastWeek('2026-10-26')
+    expect(week.key).toBe('2026-10-19')
+    expect(week.from.toISOString()).toBe('2026-10-18T18:30:00.000Z')
+    expect(week.to.toISOString()).toBe('2026-10-25T18:30:00.000Z')
+    expect(week.label).toBe('19 Oct to 25 Oct')
+    expect(lastWeek('2026-10-28').key).toBe('2026-10-19')
+  })
+
+  it('only fires on Monday morning', () => {
+    expect(isWeeklySlot({ iso: '2026-10-26', minutes: 9 * 60, weekday: 1 })).toBe(true)
+    expect(isWeeklySlot({ iso: '2026-10-26', minutes: 12 * 60, weekday: 1 })).toBe(false)
+    expect(isWeeklySlot({ iso: '2026-10-27', minutes: 9 * 60, weekday: 2 })).toBe(false)
+  })
+
+  it('fills the template and suggests a focus', () => {
+    const card = { completed: 12, missed: 3, meetingsBooked: 2, movedForward: 1, newLeads: 5, overdueNow: 4, needsNextStep: 1 }
+    const vars = scorecardVariables('Shubham Kumar', '19 Oct to 25 Oct', card)
+    expect(vars).toMatchObject({ '1': 'Shubham', '3': '12', '4': '3', '5': '2', '6': '1', '7': '5' })
+    expect(vars['8']).toBe('Clear 4 overdue follow-ups and book a next step for 1 lead.')
+    expect(scorecardFocus({ ...card, overdueNow: 0, needsNextStep: 0 })).toBe('Keep every lead booked with a next step.')
+  })
+
+  it('counts only moves towards a deal as forward', () => {
+    expect(isForwardMove('CONTACTED', 'DEMO_COMPLETED')).toBe(true)
+    expect(isForwardMove('NEGOTIATION', 'WON')).toBe(true)
+    expect(isForwardMove('PROPOSAL_SENT', 'LOST')).toBe(false)
+    expect(isForwardMove('DEMO_COMPLETED', 'FOLLOW_UP')).toBe(false)
+    expect(isForwardMove(undefined, 'WON')).toBe(false)
+  })
+})
+
+describe('stage cadence', () => {
+  it('uses defaults and lets saved rows override them', () => {
+    const rules = resolveCadence([{ stage: 'PROPOSAL_SENT', days: 5, followUpType: 'CALL', enabled: false }])
+    expect(rules.find((r) => r.stage === 'DEMO_COMPLETED')).toMatchObject({ days: 2, enabled: true })
+    expect(rules.find((r) => r.stage === 'PROPOSAL_SENT')).toMatchObject({ days: 5, enabled: false })
+    expect(rules.find((r) => r.stage === 'MEETING_SCHEDULED')?.enabled).toBe(false)
+  })
+})
+
+describe('IST parsing and display', () => {
+  it('reads form values as India time', () => {
+    expect(istDateTime('2026-10-29', '11:00')?.toISOString()).toBe('2026-10-29T05:30:00.000Z')
+    expect(istDateTime('2026-10-29T11:00')?.toISOString()).toBe('2026-10-29T05:30:00.000Z')
+    expect(istDateTime('2026-10-29')?.toISOString()).toBe('2026-10-29T04:30:00.000Z')
+    expect(istDateTime('2026-10-29T05:30:00.000Z')?.toISOString()).toBe('2026-10-29T05:30:00.000Z')
+    expect(istDateTime('not a date')).toBeNull()
+    expect(istDateTime('2026-10-29', '25:00')).toBeNull()
+  })
+
+  it('formats in India time whatever the machine zone', () => {
+    expect(formatIst(new Date('2026-10-29T05:30:00.000Z'), 'd MMM, HH:mm')).toBe('29 Oct, 11:00')
+    expect(formatIst(new Date('2026-10-29T20:00:00.000Z'), 'd MMM')).toBe('30 Oct')
+  })
+})
+
+describe('WhatsApp replies', () => {
+  it.each([
+    ['Show my list', { kind: 'list' }],
+    ['list', { kind: 'list' }],
+    ['Hi', { kind: 'list' }],
+    ['help', { kind: 'help' }],
+    ['done 1', { kind: 'done', items: [1] }],
+    ['Done 1, 3', { kind: 'done', items: [1, 3] }],
+    ['done 2 4', { kind: 'done', items: [2, 4] }],
+    ['tomorrow 2', { kind: 'snooze', items: [2], days: 1 }],
+    ['week 3', { kind: 'snooze', items: [3], days: 7 }],
+    ['next week 3', { kind: 'snooze', items: [3], days: 7 }],
+    ['snooze 2', { kind: 'snooze', items: [2], days: 1 }],
+    ['snooze 2 3', { kind: 'snooze', items: [2], days: 3 }],
+    ['snooze 2,4 3 days', { kind: 'snooze', items: [2, 4], days: 3 }],
+    ['book 1 3', { kind: 'book', item: 1, days: 3 }],
+    ['book 1', { kind: 'book', item: 1, days: 2 }],
+    ['note 1 Asked for revised quote', { kind: 'note', item: 1, text: 'Asked for revised quote' }],
+    ['what is this', { kind: 'unknown' }],
+    ['done', { kind: 'unknown' }],
+  ])('%s', (text, expected) => {
+    expect(parseSalesCommand(text)).toEqual(expected)
+  })
+
+  it('keeps snooze within 60 days', () => {
+    expect(parseSalesCommand('snooze 1 99')).toEqual({ kind: 'snooze', items: [1], days: 60 })
   })
 })

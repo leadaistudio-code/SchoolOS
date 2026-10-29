@@ -33,6 +33,15 @@ import {
   type CrmMessageChannel,
   type CrmStage,
 } from '@/lib/growth-crm'
+import { formatIst, istClock, istDateTime, istDayStart, shiftIso } from '@/lib/ist-clock'
+import {
+  NEXT_STEP_STAGES,
+  STALE_ALERT_DAYS,
+  TOUCH_ACTIVITY_TYPES,
+  resolveCadence,
+  type StageCadence,
+} from '@/lib/growth-cadence'
+import { followUpCreateSchema } from './schema'
 import type {
   ActivityCreateInput,
   ContactCreateInput,
@@ -782,13 +791,57 @@ export async function moveStage(ctx: PlatformContext, schoolId: string, input: S
     meta: { from: school.stage, to: input.stage, lostReason: input.lostReason ?? null },
   })
 
+  if (input.stage !== school.stage) await applyStageCadence(ctx, schoolId, input.stage)
+
   return getSchool(ctx, schoolId)
+}
+
+export async function listStageCadence(ctx: PlatformContext) {
+  return resolveCadence(await ctx.db.crmStageCadence.findMany())
+}
+
+export async function saveStageCadence(ctx: PlatformContext, rows: StageCadence[]) {
+  assertPerm(ctx, 'platform.crm_comms')
+  for (const row of rows) {
+    const data = { days: row.days, followUpType: row.followUpType, enabled: row.enabled }
+    await ctx.db.crmStageCadence.upsert({ where: { stage: row.stage }, create: { stage: row.stage, ...data }, update: data })
+  }
+  await audit({
+    tenantId: null,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'crm.cadence.update',
+    module: 'growth',
+    entityType: 'CrmStageCadence',
+    summary: 'Updated automatic follow-up rules',
+  })
+}
+
+/** Entering a stage books its follow-up, unless the lead already has one open. */
+async function applyStageCadence(ctx: PlatformContext, schoolId: string, stage: CrmStage) {
+  const rule = (await listStageCadence(ctx)).find((c) => c.stage === stage)
+  if (!rule?.enabled) return
+  const open = await ctx.db.crmFollowUp.findFirst({ where: { schoolId, status: 'PENDING' }, select: { id: true } })
+  if (open) return
+  await createFollowUp(
+    ctx,
+    schoolId,
+    followUpCreateSchema.parse({
+      dueAt: shiftIso(istClock().iso, rule.days),
+      type: rule.followUpType,
+      note: `Auto: ${STAGE_LABELS[stage]}, follow up in ${rule.days} day${rule.days === 1 ? '' : 's'}`,
+    }),
+  )
 }
 
 export async function logActivity(ctx: PlatformContext, schoolId: string, input: ActivityCreateInput) {
   assertPerm(ctx, 'platform.crm_edit')
   const school = await ctx.db.crmSchool.findFirst({ where: { id: schoolId, deletedAt: null } })
   if (!school) throw notFound('School not found')
+
+  const touch = (TOUCH_ACTIVITY_TYPES as readonly string[]).includes(input.type)
+  if (touch && !input.nextFollowUpOn) await requireNextStep(ctx, school)
+
   await writeActivity(ctx, {
     schoolId,
     type: input.type,
@@ -796,6 +849,32 @@ export async function logActivity(ctx: PlatformContext, schoolId: string, input:
     body: input.body,
     contactId: input.contactId,
   })
+
+  if (input.nextFollowUpOn) {
+    await createFollowUp(ctx, schoolId, {
+      dueAt: input.nextFollowUpOn,
+      type: input.nextFollowUpType ?? 'CALL',
+      priority: 'NORMAL',
+      contactId: input.contactId,
+      note: `After: ${input.summary}`.slice(0, 200),
+    })
+  }
+}
+
+/** A pending follow-up or a scheduled meeting still ahead of us. */
+export async function hasNextStep(ctx: PlatformContext, schoolId: string, now = new Date()) {
+  const [followUp, meeting] = await Promise.all([
+    ctx.db.crmFollowUp.findFirst({ where: { schoolId, status: 'PENDING', dueAt: { gte: now } }, select: { id: true } }),
+    ctx.db.crmMeeting.findFirst({ where: { schoolId, status: 'SCHEDULED', startsAt: { gte: now } }, select: { id: true } }),
+  ])
+  return Boolean(followUp || meeting)
+}
+
+/** Every live lead you have spoken to must leave the conversation with a date. */
+async function requireNextStep(ctx: PlatformContext, school: { id: string; stage: CrmStage }) {
+  if (!LIVE_STAGES.includes(school.stage)) return
+  if (await hasNextStep(ctx, school.id)) return
+  throw conflict('Book the next follow-up date, or move the lead to Lost / Not interested / On hold.')
 }
 
 async function bumpNextAt(ctx: PlatformContext, schoolId: string, at: Date, action: string) {
@@ -816,6 +895,8 @@ export async function logVisit(ctx: PlatformContext, schoolId: string, input: Vi
   assertPerm(ctx, 'platform.crm_edit')
   const school = await ctx.db.crmSchool.findFirst({ where: { id: schoolId, deletedAt: null } })
   if (!school) throw notFound('School not found')
+  const booksFollowUp = Boolean(input.followUpRequired && input.followUpAt)
+  if (!booksFollowUp) await requireNextStep(ctx, school)
 
   const visitedAt = combineDue(input.visitDate, input.startTime)
   const endedAt = input.endTime ? combineDue(input.visitDate, input.endTime) : null
@@ -876,7 +957,7 @@ export async function logVisit(ctx: PlatformContext, schoolId: string, input: Vi
     })
   }
 
-  if (input.followUpRequired && input.followUpAt) {
+  if (booksFollowUp && input.followUpAt) {
     await createFollowUp(ctx, schoolId, {
       dueAt: input.followUpAt.toISOString(),
       type: input.followUpType ?? 'CALL',
@@ -1071,15 +1152,74 @@ export async function completeFollowUp(ctx: PlatformContext, id: string) {
   })
 }
 
+/**
+ * Moves a pending follow-up to `days` from today (India), keeping its time of
+ * day. Overdue items keep their slot too, so "tomorrow" lands at a sane hour.
+ */
+export async function snoozeFollowUp(ctx: PlatformContext, id: string, days: number) {
+  assertPerm(ctx, 'platform.crm_edit')
+  const followUp = await ctx.db.crmFollowUp.findUnique({ where: { id }, include: { school: { select: { name: true } } } })
+  if (!followUp) throw notFound('Follow-up not found')
+  if (followUp.status !== 'PENDING') throw conflict('That follow-up is already closed')
+
+  const slot = formatIst(followUp.dueAt, 'HH:mm')
+  const dueAt = combineDue(shiftIso(istClock().iso, days), slot)
+  await ctx.db.crmFollowUp.update({ where: { id }, data: { dueAt } })
+
+  const next = await ctx.db.crmFollowUp.findFirst({
+    where: { schoolId: followUp.schoolId, status: 'PENDING', dueAt: { gte: new Date() } },
+    orderBy: { dueAt: 'asc' },
+  })
+  await ctx.db.crmSchool.update({ where: { id: followUp.schoolId }, data: { nextFollowUpAt: next?.dueAt ?? dueAt } })
+  await writeActivity(ctx, {
+    schoolId: followUp.schoolId,
+    type: 'FOLLOW_UP',
+    summary: `Follow-up moved to ${formatIst(dueAt, 'EEE d MMM, h:mm a')}`,
+    body: followUp.note,
+    meta: { followUpId: id, from: followUp.dueAt.toISOString(), to: dueAt.toISOString() },
+  })
+  return { schoolName: followUp.school.name, dueAt }
+}
+
+/** Live leads past first contact with nothing booked: no pending follow-up, no upcoming meeting. */
+export async function listNeedsNextStep(db: PlatformContext['db'], now = new Date()) {
+  return db.crmSchool.findMany({
+    where: {
+      deletedAt: null,
+      stage: { in: NEXT_STEP_STAGES },
+      followUps: { none: { status: 'PENDING' } },
+      meetings: { none: { status: 'SCHEDULED', startsAt: { gte: now } } },
+    },
+    orderBy: { lastActivityAt: 'asc' },
+    take: 50,
+    select: { id: true, name: true, stage: true, ownerId: true, lastActivityAt: true, phone: true },
+  })
+}
+
+/** Live leads past first contact that nobody has touched for STALE_ALERT_DAYS. */
+export async function listGoingCold(db: PlatformContext['db'], now = new Date()) {
+  return db.crmSchool.findMany({
+    where: {
+      deletedAt: null,
+      stage: { in: NEXT_STEP_STAGES },
+      OR: [{ lastActivityAt: null }, { lastActivityAt: { lt: new Date(now.getTime() - STALE_ALERT_DAYS * 86_400_000) } }],
+    },
+    orderBy: { lastActivityAt: 'asc' },
+    take: 50,
+    select: { id: true, name: true, stage: true, ownerId: true, lastActivityAt: true, phone: true },
+  })
+}
+
 function combineDue(date: string, time?: string) {
-  if (time) {
-    const d = new Date(`${date}T${time}`)
-    if (!Number.isNaN(d.getTime())) return d
-  }
-  const d = new Date(date)
-  if (Number.isNaN(d.getTime())) throw conflict('Invalid follow-up date')
-  if (!date.includes('T')) d.setHours(10, 0, 0, 0)
+  const d = istDateTime(date, time)
+  if (!d) throw conflict('Invalid follow-up date')
   return d
+}
+
+/** Today 00:00 → tomorrow 00:00, India time. */
+function istToday(now = new Date()) {
+  const iso = istClock(now).iso
+  return { iso, start: istDayStart(iso), end: istDayStart(shiftIso(iso, 1)) }
 }
 
 export async function listFollowUps(
@@ -1087,10 +1227,7 @@ export async function listFollowUps(
   filter: 'today' | 'overdue' | 'upcoming' | 'all' = 'all',
 ) {
   const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
+  const { end } = istToday(now)
 
   const where: Prisma.CrmFollowUpWhereInput = {
     status: 'PENDING',
@@ -1118,10 +1255,7 @@ export async function listFollowUps(
 
 export async function fieldDay(ctx: PlatformContext) {
   const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
+  const { start, end } = istToday(now)
 
   const [meetings, tasks, visits, followUpsToday, followUpsOverdue] = await Promise.all([
     ctx.db.crmMeeting.findMany({
@@ -1191,10 +1325,7 @@ export async function dashboard(ctx: PlatformContext) {
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
   const prevMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
-  const todayStart = new Date(now)
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date(todayStart)
-  todayEnd.setDate(todayEnd.getDate() + 1)
+  const { end: todayEnd } = istToday(now)
   const staleBefore = new Date(now.getTime() - STALE_DAYS * 86_400_000)
 
   const live = { deletedAt: null as Date | null, stage: { in: LIVE_STAGES } }

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { format } from 'date-fns'
+import { formatIst } from '@/lib/ist-clock'
 import { requirePlatformContext } from '@/server/context'
 import { getSchool, listOperators, listTemplates } from '@/server/modules/platform/growth/service'
 import { getDiscoveryForCrmSchool } from '@/server/modules/platform/growth/discovery/service'
@@ -315,7 +315,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                         {row.contact?.fullName ? ` · ${row.contact.fullName}` : ''}
                       </p>
                       <p className="text-xs text-ink-subtle">
-                        {format(row.createdAt, 'd MMM, HH:mm')} · {row.to} · {row.status.toLowerCase()}
+                        {formatIst(row.createdAt, 'd MMM, HH:mm')} · {row.to} · {row.status.toLowerCase()}
                         {row.template?.name ? ` · ${row.template.name}` : ''}
                       </p>
                       <p className="mt-1 line-clamp-3 text-sm text-ink-muted">{row.body}</p>
@@ -366,7 +366,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                 <p className="text-xs text-ink-subtle">
                   Sources: {discovery.evidence.length}
                   {discovery.lastVerifiedAt
-                    ? ` · Last verified ${format(discovery.lastVerifiedAt, 'd MMM yyyy')}`
+                    ? ` · Last verified ${formatIst(discovery.lastVerifiedAt, 'd MMM yyyy')}`
                     : ''}
                 </p>
                 <Link
@@ -460,7 +460,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                         <li key={f.id} className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-sm text-ink">
-                              {format(f.dueAt, 'd MMM, HH:mm')} · {f.type.toLowerCase()}
+                              {formatIst(f.dueAt, 'd MMM, HH:mm')} · {f.type.toLowerCase()}
                             </p>
                             <p className="text-xs text-ink-subtle">
                               {followUpDisplayStatus(f.dueAt, f.status) === 'OVERDUE' ? 'Overdue · ' : ''}
@@ -480,7 +480,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                       <ul className="mt-1 space-y-1">
                         {completedFollowUps.map((f) => (
                           <li key={f.id} className="text-xs text-ink-subtle">
-                            {format(f.dueAt, 'd MMM')} · {f.type.toLowerCase()}
+                            {formatIst(f.dueAt, 'd MMM')} · {f.type.toLowerCase()}
                             {f.note ? ` · ${f.note}` : ''}
                           </li>
                         ))}
@@ -502,7 +502,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                         <li key={m.id} className="flex items-start justify-between gap-2">
                           <div>
                             <p className="text-sm text-ink">
-                              {format(m.startsAt, 'd MMM, HH:mm')} · {m.meetingType}
+                              {formatIst(m.startsAt, 'd MMM, HH:mm')} · {m.meetingType}
                             </p>
                             <p className="text-xs text-ink-subtle">
                               {m.mode === 'ONLINE' ? 'Online' : m.location || 'In person'}
@@ -530,7 +530,7 @@ export default async function GrowthSchoolPage({ params }: { params: Promise<{ i
                           <div>
                             <p className="text-sm text-ink">{t.title}</p>
                             <p className="text-xs text-ink-subtle">
-                              {t.dueAt ? format(t.dueAt, 'd MMM') : 'No date'} · {t.priority.toLowerCase()}
+                              {t.dueAt ? formatIst(t.dueAt, 'd MMM') : 'No date'} · {t.priority.toLowerCase()}
                             </p>
                           </div>
                           {canEdit ? <CompleteTaskButton id={t.id} schoolId={school.id} /> : null}

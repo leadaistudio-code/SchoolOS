@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { formatIst } from '@/lib/ist-clock'
 import { requirePlatformContext } from '@/server/context'
 import { parseListQuery } from '@/lib/query'
 import { listOperators, listSchools } from '@/server/modules/platform/growth/service'
@@ -116,7 +116,7 @@ export default async function GrowthSchoolsPage({
                           : '—'}
                       </TD>
                       <TD className="text-sm text-ink-muted">
-                        {school.nextFollowUpAt ? format(school.nextFollowUpAt, 'd MMM') : (
+                        {school.nextFollowUpAt ? formatIst(school.nextFollowUpAt, 'd MMM') : (
                           <span className="text-warning">None</span>
                         )}
                       </TD>

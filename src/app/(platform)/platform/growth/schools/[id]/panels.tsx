@@ -21,6 +21,7 @@ import {
   updateSchoolAction,
 } from '../../actions'
 import { emptyFormState } from '@/lib/form-state'
+import { istClock } from '@/lib/ist-clock'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -236,6 +237,24 @@ export function ActivityForm({
       <Field label="Notes" htmlFor="body">
         <Textarea id="body" name="body" rows={3} />
       </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Next follow-up"
+          htmlFor="nextFollowUpOn"
+          hint="Needed after a call or visit, unless one is already booked"
+        >
+          <Input id="nextFollowUpOn" name="nextFollowUpOn" type="date" min={istClock().iso} />
+        </Field>
+        <Field label="Follow-up by" htmlFor="nextFollowUpType">
+          <Select id="nextFollowUpType" name="nextFollowUpType" defaultValue="CALL">
+            {FOLLOW_UP_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {FOLLOW_UP_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
       <Button type="submit" loading={pending} size="sm">
         Log activity
       </Button>
@@ -246,7 +265,7 @@ export function ActivityForm({
 export function VisitForm({ schoolId }: { schoolId: string }) {
   const action = logVisitAction.bind(null, schoolId)
   const [state, formAction, pending] = useActionState(action, emptyFormState)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = istClock().iso
   return (
     <form action={formAction} className="space-y-3">
       {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
@@ -317,7 +336,11 @@ export function VisitForm({ schoolId }: { schoolId: string }) {
       <label className="flex items-center gap-2 text-sm text-ink-muted">
         <Checkbox name="followUpRequired" defaultChecked /> Schedule a follow-up
       </label>
-      <Field label="Follow-up at" htmlFor="followUpAt">
+      <Field
+        label="Follow-up at"
+        htmlFor="followUpAt"
+        hint="Required for an open lead unless a follow-up or meeting is already booked"
+      >
         <Input id="followUpAt" name="followUpAt" type="datetime-local" />
       </Field>
       <Button type="submit" loading={pending} size="sm">

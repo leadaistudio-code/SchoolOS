@@ -1,18 +1,23 @@
 import { requirePlatformContext } from '@/server/context'
-import { listOperators } from '@/server/modules/platform/growth/service'
+import { listOperators, listStageCadence } from '@/server/modules/platform/growth/service'
 import { listRecipients } from '@/server/modules/platform/growth/reminders'
 import { CRM_WA_TEMPLATES } from '@/lib/growth-reminders'
+import { SALES_HELP } from '@/lib/growth-commands'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
-import { RecipientActions, RecipientForm, type OperatorOption } from './forms'
+import { CadenceForm, RecipientActions, RecipientForm, type OperatorOption } from './forms'
 
 export const metadata = { title: 'Reminders · Growth CRM' }
 
 export default async function GrowthRemindersPage() {
   const ctx = await requirePlatformContext('platform.crm')
-  const [recipients, users] = await Promise.all([listRecipients(ctx), listOperators(ctx)])
+  const [recipients, users, cadence] = await Promise.all([
+    listRecipients(ctx),
+    listOperators(ctx),
+    listStageCadence(ctx),
+  ])
   const canEdit = ctx.user.permissions.has('platform.crm_comms')
   const operators: OperatorOption[] = users.map((u) => ({
     id: u.id,
@@ -56,7 +61,12 @@ export default async function GrowthRemindersPage() {
                       .join(' · ')}
                   </p>
                   <p className="text-xs text-ink-subtle">
-                    {[r.morning ? 'Morning plan' : null, r.evening ? 'Wrap-up' : null, r.meetings ? 'Meeting alerts' : null]
+                    {[
+                      r.morning ? 'Morning plan' : null,
+                      r.evening ? 'Wrap-up' : null,
+                      r.meetings ? 'Meeting alerts' : null,
+                      r.weekly ? 'Monday scorecard' : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ') || 'No reminders selected'}
                   </p>
@@ -89,7 +99,29 @@ export default async function GrowthRemindersPage() {
                   <li key={name}>{name}</li>
                 ))}
               </ul>
-              <p>Any message a salesperson sends to the business number, including the “Show my list” button, is answered with their pending list.</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Reply on WhatsApp</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-ink-muted">
+              <p>
+                A salesperson messaging the business number (or tapping “Show my list”) gets a numbered list. They can
+                reply to update the CRM. Updates need their CRM login linked above.
+              </p>
+              <pre className="whitespace-pre-wrap font-sans text-xs text-ink">{SALES_HELP.replace(/\*/g, '')}</pre>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Automatic follow-ups</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-ink-muted">
+                When a lead moves into a stage, book this follow-up (days from today) unless one is already open.
+              </p>
+              <CadenceForm rules={cadence} canEdit={canEdit} />
             </CardContent>
           </Card>
         </div>

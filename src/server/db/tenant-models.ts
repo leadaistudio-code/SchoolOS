@@ -329,6 +329,7 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'CrmTask',
   'CrmReminderSend',
   'CrmReminderRecipient',
+  'CrmStageCadence',
   'CrmTemplate',
   'CrmCommunication',
   'CrmDiscoveryLocation',
