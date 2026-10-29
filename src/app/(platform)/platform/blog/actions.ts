@@ -52,7 +52,7 @@ export async function regenerateCoverAction(id: string): Promise<BlogActionResul
   revalidatePath('/platform/blog')
   return key
     ? { ok: true, message: 'Cover photo generated.' }
-    : { ok: false, message: 'Cover generation failed — check WebApp logs (Gemini: gemini-2.5-flash-image + AI_API_KEY).' }
+    : { ok: false, message: 'Cover generation failed — check WebApp logs. Gemini image models need billing enabled on the API key\'s project.' }
 }
 
 export async function deletePostAction(id: string): Promise<BlogActionResult> {

@@ -78,7 +78,7 @@ function openAiImageClient() {
 }
 
 async function generateCoverImageGemini(prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
-  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'].filter(
+  const models = [env().BLOG_IMAGE_MODEL?.trim(), 'gemini-2.5-flash-image', 'gemini-3.1-flash-image'].filter(
     (m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i,
   )
   const client = geminiImageClient()
@@ -100,6 +100,7 @@ async function generateCoverImageGemini(prompt: string): Promise<{ buffer: Buffe
       const mimeType = inline.inlineData.mimeType || 'image/png'
       return { buffer: Buffer.from(inline.inlineData.data, 'base64'), mimeType }
     } catch (error) {
+      console.warn(`[blog] gemini ${model} failed:`, error instanceof Error ? error.message.slice(0, 300) : error)
       lastError = error
     }
   }
