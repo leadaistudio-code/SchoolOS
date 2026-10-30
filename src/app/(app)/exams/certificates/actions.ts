@@ -38,6 +38,16 @@ function reportCardConfigFromForm(formData: FormData) {
     competencies: linesToList(str('competencies')),
     coScholastic: linesToList(str('coScholastic')),
     signatories: [str('signatory0'), str('signatory1'), str('signatory2')],
+    fields: json(str('fieldsJson')),
+    style: json(str('styleJson')),
+  }
+}
+
+function json(value: string): unknown {
+  try {
+    return value ? JSON.parse(value) : undefined
+  } catch {
+    return undefined
   }
 }
 

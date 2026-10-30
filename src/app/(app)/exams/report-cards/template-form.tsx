@@ -40,6 +40,8 @@ export function ReportCardTemplateForm({ initial }: { initial?: TemplateValues }
     <form action={formAction} className="space-y-5" noValidate>
       {initial?.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <input type="hidden" name="design" value={config.design} />
+      <input type="hidden" name="fieldsJson" value={JSON.stringify(config.fields)} />
+      <input type="hidden" name="styleJson" value={JSON.stringify(config.style)} />
       {state.error ? <Notice tone="danger">{state.error}</Notice> : null}
       {state.ok && state.message ? <Notice tone="success">{state.message}</Notice> : null}
 

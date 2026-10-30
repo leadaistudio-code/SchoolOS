@@ -4,8 +4,24 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, LayoutTemplate, Palette, Printer, RotateCcw, Save } from 'lucide-react'
 import { saveReportCardDesignAction } from '../actions'
-import type { ReportCardConfig, SignatureImages } from '@/lib/exams/report-card-config'
+import {
+  DEFAULT_REPORT_CARD_STYLE,
+  FRAME_OPTIONS,
+  HEADER_OPTIONS,
+  SECTION_OPTIONS,
+  TABLE_HEAD_OPTIONS,
+  type ReportCardConfig,
+  type ReportCardStyle,
+  type SignatureImages,
+} from '@/lib/exams/report-card-config'
 import { REPORT_CARD_DESIGNS } from '@/lib/exams/report-card-designs'
+import {
+  DEFAULT_REPORT_CARD_FIELDS,
+  REPORT_CARD_FIELD_GROUPS,
+  REPORT_CARD_FIELDS,
+  REPORT_CARD_FONTS,
+  type ReportCardFieldKey,
+} from '@/lib/exams/report-card-fields'
 import type { ReportCardDocumentData } from '@/lib/exams/report-card-data'
 import { HolisticReportCard } from '@/components/print/holistic-report-card'
 import { Button } from '@/components/ui/button'
@@ -97,6 +113,9 @@ export function ReportCardStudio({ templates, sample }: { templates: StudioTempl
     patch({ signatories: config.signatories.map((v, j) => (j === i ? label : v)) as ReportCardConfig['signatories'] })
   const setSignature = (i: number, url: string | null) =>
     patch({ signatureImages: config.signatureImages.map((v, j) => (j === i ? url : v)) as SignatureImages })
+  const setStyle = (p: Partial<ReportCardStyle>) => patch({ style: { ...config.style, ...p } })
+  const setField = (key: ReportCardFieldKey, p: Partial<{ show: boolean; label: string }>) =>
+    patch({ fields: { ...config.fields, [key]: { ...config.fields[key], ...p } } })
 
   return (
     <div className="space-y-4">
@@ -213,6 +232,57 @@ export function ReportCardStudio({ templates, sample }: { templates: StudioTempl
               </div>
             </div>
 
+            <StudioSection title="Fonts & colours" defaultOpen>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Heading font" htmlFor="rcs-hfont">
+                  <Select id="rcs-hfont" value={config.style.headingFont} onChange={(e) => setStyle({ headingFont: e.target.value as ReportCardStyle['headingFont'] })}>
+                    {REPORT_CARD_FONTS.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Body font" htmlFor="rcs-bfont">
+                  <Select id="rcs-bfont" value={config.style.bodyFont} onChange={(e) => setStyle({ bodyFont: e.target.value as ReportCardStyle['bodyFont'] })}>
+                    {REPORT_CARD_FONTS.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
+                  </Select>
+                </Field>
+              </div>
+              <Field label={`Text size · ${Math.round(config.style.fontScale * 100)}%`} htmlFor="rcs-fs">
+                <input
+                  id="rcs-fs"
+                  type="range"
+                  min={80}
+                  max={130}
+                  step={5}
+                  value={Math.round(config.style.fontScale * 100)}
+                  onChange={(e) => setStyle({ fontScale: Number(e.target.value) / 100 })}
+                  className="w-full accent-[var(--product-600)]"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <ColourInput label="Heading colour" value={config.style.headingColor || config.accent} onChange={(v) => setStyle({ headingColor: v })} />
+                <ColourInput label="Text colour" value={config.style.textColor} onChange={(v) => setStyle({ textColor: v })} />
+                <ColourInput label="Label colour" value={config.style.labelColor} onChange={(v) => setStyle({ labelColor: v })} />
+                <ColourInput label="Table lines" value={config.style.lineColor} onChange={(v) => setStyle({ lineColor: v })} />
+                <ColourInput label="Paper colour" value={config.style.paperColor} onChange={(v) => setStyle({ paperColor: v })} />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStyle({ ...DEFAULT_REPORT_CARD_STYLE, frame: config.style.frame, header: config.style.header, section: config.style.section, tableHead: config.style.tableHead, watermark: config.style.watermark })}
+              >
+                <RotateCcw aria-hidden /> Default fonts & colours
+              </Button>
+            </StudioSection>
+
+            <StudioSection title="Layout details">
+              <div className="grid grid-cols-2 gap-2">
+                <OverrideSelect label="Border" value={config.style.frame} options={FRAME_OPTIONS} onChange={(v) => setStyle({ frame: v })} />
+                <OverrideSelect label="Header" value={config.style.header} options={HEADER_OPTIONS} onChange={(v) => setStyle({ header: v })} />
+                <OverrideSelect label="Section headings" value={config.style.section} options={SECTION_OPTIONS} onChange={(v) => setStyle({ section: v })} />
+                <OverrideSelect label="Table header" value={config.style.tableHead} options={TABLE_HEAD_OPTIONS} onChange={(v) => setStyle({ tableHead: v })} />
+                <OverrideSelect label="Logo watermark" value={config.style.watermark} options={['on', 'off'] as const} onChange={(v) => setStyle({ watermark: v })} />
+              </div>
+            </StudioSection>
+
             <Field label="Layout" htmlFor="rcs-layout">
               <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-sm)] bg-surface-2 p-1">
                 {(['HOLISTIC', 'CLASSIC'] as const).map((l) => (
@@ -255,6 +325,9 @@ export function ReportCardStudio({ templates, sample }: { templates: StudioTempl
               <Field label="Card title" htmlFor="rcs-title">
                 <Input id="rcs-title" maxLength={160} value={config.title} onChange={(e) => patch({ title: e.target.value })} />
               </Field>
+              <Field label="Subtitle" htmlFor="rcs-subtitle">
+                <Input id="rcs-subtitle" maxLength={160} value={config.subtitle} onChange={(e) => patch({ subtitle: e.target.value })} />
+              </Field>
               <Field label="Affiliation line" htmlFor="rcs-aff">
                 <Input id="rcs-aff" maxLength={160} value={config.affiliation} placeholder="Affiliated to CBSE, New Delhi" onChange={(e) => patch({ affiliation: e.target.value })} />
               </Field>
@@ -286,10 +359,104 @@ export function ReportCardStudio({ templates, sample }: { templates: StudioTempl
                 principal signature in Settings → Branding.
               </p>
             </fieldset>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-ink">Fields & labels</p>
+                <Button variant="ghost" size="sm" onClick={() => patch({ fields: DEFAULT_REPORT_CARD_FIELDS })}>
+                  <RotateCcw aria-hidden /> Reset
+                </Button>
+              </div>
+              <p className="text-[11px] text-ink-subtle">Tick to show a field, and type to rename it on the printed card.</p>
+              {REPORT_CARD_FIELD_GROUPS.map((group) => (
+                <StudioSection key={group} title={group}>
+                  {REPORT_CARD_FIELDS.filter((f) => f.group === group).map((f) => {
+                    const value = config.fields[f.key]
+                    return (
+                      <div key={f.key} className="flex items-center gap-2">
+                        {f.toggle ? (
+                          <Checkbox
+                            aria-label={`Show ${f.label}`}
+                            checked={value.show}
+                            onChange={(e) => setField(f.key, { show: e.target.checked })}
+                          />
+                        ) : (
+                          <span className="size-4 shrink-0" aria-hidden />
+                        )}
+                        {f.renamable ? (
+                          <Input
+                            aria-label={`${f.label} label`}
+                            maxLength={80}
+                            value={value.label}
+                            disabled={!value.show}
+                            onChange={(e) => setField(f.key, { label: e.target.value })}
+                            onBlur={(e) => {
+                              if (!e.target.value.trim()) setField(f.key, { label: f.label })
+                            }}
+                            className="h-8 text-xs"
+                          />
+                        ) : (
+                          <span className="text-sm text-ink">{f.label}</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </StudioSection>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
+  )
+}
+
+function StudioSection({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  return (
+    <details open={defaultOpen} className="group rounded-[var(--radius-sm)] border border-line">
+      <summary className="cursor-pointer select-none px-2.5 py-2 text-sm font-medium text-ink">{title}</summary>
+      <div className="space-y-2 border-t border-line p-2.5">{children}</div>
+    </details>
+  )
+}
+
+function ColourInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-ink">
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value.toLowerCase())}
+        className="h-7 w-9 shrink-0 cursor-pointer rounded border border-line bg-transparent p-0"
+      />
+      {label}
+    </label>
+  )
+}
+
+function OverrideSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: '' | T
+  options: readonly T[]
+  onChange: (value: '' | T) => void
+}) {
+  return (
+    <label className="space-y-1 text-xs text-ink">
+      <span className="block font-medium">{label}</span>
+      <Select value={value} onChange={(e) => onChange(e.target.value as '' | T)} className="h-8 text-xs">
+        <option value="">As design</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o.charAt(0).toUpperCase() + o.slice(1)}
+          </option>
+        ))}
+      </Select>
+    </label>
   )
 }
 

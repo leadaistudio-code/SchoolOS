@@ -6,7 +6,7 @@ import { saveAttendanceAction } from './actions'
 import type { Register } from '@/server/modules/attendance/service'
 import { MARKABLE_STATUSES, STATUS_LABEL, type AttendanceStatusValue } from '@/server/modules/attendance/schema'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/input'
+import { Checkbox, Input, Select } from '@/components/ui/input'
 import { BulkSelectionBar, useBulkSelection } from '@/components/bulk-selection'
 import { EmptyState } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
@@ -77,6 +77,44 @@ export function AttendanceRegister({ register }: { register: Register }) {
       return next
     })
     setDirty(true)
+  }
+
+  const [quick, setQuick] = React.useState('')
+  const [quickStatus, setQuickStatus] = React.useState<AttendanceStatusValue>('ABSENT')
+
+  /** Applies a status to the roll numbers (3, 7, 12-15) or admission numbers typed in. */
+  const applyQuick = () => {
+    const tokens = quick.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean)
+    if (tokens.length === 0) return
+    const rolls = new Set<number>()
+    const admissions = new Set<string>()
+    for (const token of tokens) {
+      const range = /^(\d+)\s*-\s*(\d+)$/.exec(token)
+      if (range) {
+        const [a, b] = [Number(range[1]), Number(range[2])].sort((x, y) => x - y)
+        for (let n = a!; n <= Math.min(b!, a! + 500); n++) rolls.add(n)
+      } else if (/^\d+$/.test(token)) rolls.add(Number(token))
+      else admissions.add(token.toLowerCase())
+    }
+    const ids = register.rows
+      .filter((row) => (row.rollNumber !== null && rolls.has(row.rollNumber)) || admissions.has(row.admissionNo.toLowerCase()))
+      .map((row) => row.studentId)
+    if (ids.length === 0) {
+      toast.push({ tone: 'error', title: 'No matching students', description: 'Check the roll or admission numbers.' })
+      return
+    }
+    setDraft((current) => {
+      const next = { ...current }
+      for (const id of ids) next[id] = { ...next[id], status: quickStatus }
+      return next
+    })
+    setDirty(true)
+    setQuick('')
+    toast.push({
+      tone: 'success',
+      title: `${ids.length} student${ids.length === 1 ? '' : 's'} marked ${STATUS_LABEL[quickStatus].toLowerCase()}`,
+      description: 'Remember to save the register.',
+    })
   }
 
   const counts = React.useMemo(() => {
@@ -161,6 +199,41 @@ export function AttendanceRegister({ register }: { register: Register }) {
           </>
         ) : null}
       </div>
+
+      {register.editable ? (
+        <form
+          className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            applyQuick()
+          }}
+        >
+          <span className="text-xs font-medium text-ink-muted">Quick mark</span>
+          <Input
+            aria-label="Roll or admission numbers"
+            value={quick}
+            onChange={(e) => setQuick(e.target.value)}
+            placeholder="Roll nos. e.g. 3, 7, 12-15"
+            className="h-8 min-w-48 flex-1 text-sm"
+          />
+          <Select
+            aria-label="Status for these students"
+            value={quickStatus}
+            onChange={(e) => setQuickStatus(e.target.value as AttendanceStatusValue)}
+            className="h-8 w-28 text-sm"
+          >
+            {MARKABLE_STATUSES.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            ))}
+          </Select>
+          <Button type="submit" size="sm" variant="secondary" disabled={!quick.trim()}>
+            Apply
+          </Button>
+          <span className="w-full text-[11px] text-ink-subtle">
+            Or tick students below to mark them together.
+          </span>
+        </form>
+      ) : null}
 
       {register.editable ? (
         <BulkSelectionBar

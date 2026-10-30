@@ -12,10 +12,11 @@ import {
   ColorTile,
   colorBannerSecondaryBtn,
 } from '@/components/dashboard/color-tiles'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/states'
 import { SectionPicker } from './section-picker'
 import { AttendanceRegister } from './register'
+import { PendingSections } from './pending-sections'
 
 export const metadata = { title: 'Student attendance' }
 
@@ -35,17 +36,15 @@ export default async function AttendancePage({
   const sections = await markableSections(ctx)
   const sectionId = params.sectionId ?? sections[0]?.id
 
-  const pending =
-    ctx.can('attendance.report') && sections.length > 0
-      ? await unmarkedSections(ctx, onDate)
-      : []
+  const showPending = (ctx.can('attendance.report') || ctx.can('attendance.mark')) && sections.length > 0
+  const pending = showPending ? await unmarkedSections(ctx, onDate) : []
 
   return (
     <div className="space-y-4">
       <ColorBanner
         tone="attendance"
         eyebrow="Attendance"
-        title={onDate === today ? "Today’s register" : `Register for ${onDate}`}
+        title={onDate === today ? "Todayâ€™s register" : `Register for ${onDate}`}
         description={
           sections.length > 0
             ? `${formatNumber(sections.length)} sections you can mark`
@@ -71,7 +70,7 @@ export default async function AttendancePage({
             icon={<Layers className="size-5" aria-hidden />}
             delayMs={40}
           />
-          {ctx.can('attendance.report') ? (
+          {showPending ? (
             <ColorTile
               label="Not yet marked"
               value={formatNumber(pending.length)}
@@ -117,58 +116,11 @@ export default async function AttendancePage({
             )}
           </Card>
 
-          {ctx.can('attendance.report') ? (
-            <PendingSectionsList pending={pending} onDate={onDate} />
+          {showPending ? (
+            <PendingSections pending={pending} onDate={onDate} canMark={ctx.can('attendance.mark')} />
           ) : null}
         </div>
       )}
     </div>
-  )
-}
-
-/** Which sections still have nobody marked today — the reason a register gets chased. */
-function PendingSectionsList({
-  pending,
-  onDate,
-}: {
-  pending: Awaited<ReturnType<typeof unmarkedSections>>
-  onDate: string
-}) {
-  return (
-    <Card id="pending-sections" variant="elevated" className="scroll-mt-20">
-      <CardHeader>
-        <CardTitle>Not yet marked</CardTitle>
-      </CardHeader>
-      <CardContent className="py-1">
-        {pending.length === 0 ? (
-          <EmptyState title="Every section is marked" description="Nothing outstanding for this date." />
-        ) : (
-          <ul className="divide-y divide-[var(--border)]">
-            {pending.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 py-2">
-                <Link
-                  href={`/attendance?sectionId=${s.id}&onDate=${onDate}`}
-                  className="text-sm text-ink hover:text-[var(--brand-600)]"
-                >
-                  {s.label}
-                </Link>
-                <span className="text-xs tnum text-ink-subtle">
-                  <span
-                    className={
-                      s.marked === 0
-                        ? 'text-[var(--danger)] font-medium'
-                        : 'text-warning font-medium'
-                    }
-                  >
-                    {s.marked}
-                  </span>
-                  /{s.enrolled}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
   )
 }

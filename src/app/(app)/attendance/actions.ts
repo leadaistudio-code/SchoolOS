@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
-import { markAttendance } from '@/server/modules/attendance/service'
-import { markAttendanceSchema } from '@/server/modules/attendance/schema'
+import { bulkMarkSections, markAttendance } from '@/server/modules/attendance/service'
+import { bulkMarkSectionsSchema, markAttendanceSchema } from '@/server/modules/attendance/schema'
 import { checkIn, checkOut } from '@/server/modules/staff-attendance/service'
 import { checkInSchema, overrideAttendance, manualMarkSchema } from '@/server/modules/staff-attendance/service'
 
@@ -36,6 +36,30 @@ export async function saveAttendanceAction(payload: unknown): Promise<SaveResult
       ok: false,
       message: err instanceof Error ? err.message : 'The register could not be saved',
     }
+  }
+}
+
+/** Marks every unmarked student in several sections at once. */
+export async function bulkMarkSectionsAction(payload: unknown): Promise<SaveResult> {
+  const ctx = await requireContext('attendance.mark')
+  try {
+    const input = bulkMarkSectionsSchema.parse(payload)
+    const results = await bulkMarkSections(ctx, input)
+    revalidatePath('/attendance')
+    revalidatePath('/')
+    const done = results.filter((r) => r.ok)
+    const failed = results.filter((r) => !r.ok)
+    const students = done.reduce((sum, r) => sum + r.saved, 0)
+    const message = [
+      `${done.length} section${done.length === 1 ? '' : 's'} saved · ${students} student${students === 1 ? '' : 's'} marked`,
+      ...failed.map((r) => `${r.label}: ${r.message}`),
+    ].join(' · ')
+    return done.length > 0 ? { ok: true, message } : { ok: false, message }
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return { ok: false, message: err.issues[0]?.message ?? 'Choose sections to mark' }
+    }
+    return { ok: false, message: err instanceof Error ? err.message : 'Bulk marking failed' }
   }
 }
 

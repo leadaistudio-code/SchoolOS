@@ -1239,7 +1239,22 @@ export async function getReportCard(ctx: AppContext, resultId: string): Promise<
     ctx.db.mark.findMany({
       where: { studentId: result.studentId, notApplicable: false, examSubject: { examId: result.examId, closedWithoutMarks: false } },
       orderBy: { examSubject: { classSubject: { subject: { name: 'asc' } } } },
-      select: { marksObtained: true, isAbsent: true, remarks: true, examSubject: { select: { maxMarks: true, passMarks: true, classSubject: { select: { subject: { select: { code: true, name: true } } } } } } },
+      select: {
+        marksObtained: true,
+        internalMarks: true,
+        oralMarks: true,
+        isAbsent: true,
+        remarks: true,
+        examSubject: {
+          select: {
+            maxMarks: true,
+            passMarks: true,
+            internalMaxMarks: true,
+            oralMaxMarks: true,
+            classSubject: { select: { subject: { select: { code: true, name: true } } } },
+          },
+        },
+      },
     }),
     getDefaultReportCardTemplate(ctx),
     ctx.db.school.findFirst({ select: { addressLine1: true, addressLine2: true, city: true, state: true, postalCode: true, phone: true, email: true, website: true } }),
@@ -1264,11 +1279,28 @@ export async function getReportCard(ctx: AppContext, resultId: string): Promise<
   const subjects = marks.map((mark) => {
     const percent = mark.marksObtained === null || mark.examSubject.maxMarks === 0 ? null : (mark.marksObtained / mark.examSubject.maxMarks) * 100
     const band = percent === null ? null : gradeForPercent(percent, bands)
+    const paper = mark.examSubject
+    const hasParts = Boolean(paper.internalMaxMarks || paper.oralMaxMarks)
+    const internal = paper.internalMaxMarks ? mark.internalMarks : null
+    const oral = paper.oralMaxMarks ? mark.oralMarks : null
     return {
-      code: mark.examSubject.classSubject.subject.code,
-      name: mark.examSubject.classSubject.subject.name,
-      maxMarks: mark.examSubject.maxMarks,
+      code: paper.classSubject.subject.code,
+      name: paper.classSubject.subject.name,
+      maxMarks: paper.maxMarks,
       marksObtained: mark.marksObtained,
+      parts: hasParts
+        ? {
+            written:
+              mark.isAbsent || mark.marksObtained === null
+                ? null
+                : Math.round((mark.marksObtained - (internal ?? 0) - (oral ?? 0)) * 100) / 100,
+            writtenMax: writtenMax(paper),
+            internal: mark.isAbsent ? null : internal,
+            internalMax: paper.internalMaxMarks,
+            oral: mark.isAbsent ? null : oral,
+            oralMax: paper.oralMaxMarks,
+          }
+        : null,
       isAbsent: mark.isAbsent,
       scaled: percent === null ? null : Math.round(percent * 10) / 10,
       grade: band?.grade ?? null,

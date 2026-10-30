@@ -1,8 +1,55 @@
-import { REPORT_CARD_DESIGNS, type ReportCardDesignKey } from './report-card-designs'
+import { REPORT_CARD_DESIGNS, type ReportCardDesign, type ReportCardDesignKey } from './report-card-designs'
+import {
+  DEFAULT_REPORT_CARD_FIELDS,
+  parseReportCardFields,
+  REPORT_CARD_FONTS,
+  type ReportCardFields,
+  type ReportCardFontKey,
+} from './report-card-fields'
 
 export type ReportCardLayout = 'HOLISTIC' | 'CLASSIC'
 
 export type SignatureImages = [string | null, string | null, string | null]
+
+/** Overrides on top of the chosen design; an empty value keeps the design's own choice. */
+export type ReportCardStyle = {
+  bodyFont: ReportCardFontKey
+  headingFont: ReportCardFontKey
+  /** Multiplier for every text size on the card. */
+  fontScale: number
+  textColor: string
+  labelColor: string
+  /** Heading and school-name colour; empty means the theme colour. */
+  headingColor: string
+  paperColor: string
+  lineColor: string
+  frame: '' | ReportCardDesign['frame']
+  header: '' | ReportCardDesign['header']
+  section: '' | ReportCardDesign['section']
+  tableHead: '' | ReportCardDesign['tableHead']
+  watermark: '' | 'on' | 'off'
+}
+
+export const FRAME_OPTIONS = ['double', 'single', 'thick', 'stripe', 'rounded'] as const
+export const HEADER_OPTIONS = ['classic', 'band', 'centered'] as const
+export const SECTION_OPTIONS = ['solid', 'outline', 'underline', 'pill'] as const
+export const TABLE_HEAD_OPTIONS = ['tint', 'solid'] as const
+
+export const DEFAULT_REPORT_CARD_STYLE: ReportCardStyle = {
+  bodyFont: 'design',
+  headingFont: 'design',
+  fontScale: 1,
+  textColor: '#0f172a',
+  labelColor: '#64748b',
+  headingColor: '',
+  paperColor: '#ffffff',
+  lineColor: '#e2e8f0',
+  frame: '',
+  header: '',
+  section: '',
+  tableHead: '',
+  watermark: '',
+}
 
 export type ReportCardConfig = {
   layout: ReportCardLayout
@@ -20,6 +67,8 @@ export type ReportCardConfig = {
   competencies: string[]
   coScholastic: string[]
   signatories: [string, string, string]
+  fields: ReportCardFields
+  style: ReportCardStyle
 }
 
 export const DEFAULT_COMPETENCIES = [
@@ -58,6 +107,37 @@ export const DEFAULT_REPORT_CARD_CONFIG: ReportCardConfig = {
   competencies: DEFAULT_COMPETENCIES,
   coScholastic: DEFAULT_CO_SCHOLASTIC,
   signatories: ['Class Teacher', 'Exam Controller', 'Principal'],
+  fields: DEFAULT_REPORT_CARD_FIELDS,
+  style: DEFAULT_REPORT_CARD_STYLE,
+}
+
+const HEX = /^#[0-9a-fA-F]{6}$/
+const hex = (value: unknown, fallback: string) => (typeof value === 'string' && HEX.test(value) ? value.toLowerCase() : fallback)
+const oneOf = <T extends string>(value: unknown, options: readonly T[]): '' | T =>
+  typeof value === 'string' && (options as readonly string[]).includes(value) ? (value as T) : ''
+const font = (value: unknown): ReportCardFontKey =>
+  REPORT_CARD_FONTS.some((f) => f.key === value) ? (value as ReportCardFontKey) : 'design'
+
+export function parseReportCardStyle(raw: unknown): ReportCardStyle {
+  const d = DEFAULT_REPORT_CARD_STYLE
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...d }
+  const s = raw as Record<string, unknown>
+  const scale = typeof s.fontScale === 'number' && Number.isFinite(s.fontScale) ? s.fontScale : d.fontScale
+  return {
+    bodyFont: font(s.bodyFont),
+    headingFont: font(s.headingFont),
+    fontScale: Math.round(Math.min(1.3, Math.max(0.8, scale)) * 100) / 100,
+    textColor: hex(s.textColor, d.textColor),
+    labelColor: hex(s.labelColor, d.labelColor),
+    headingColor: s.headingColor === '' ? '' : hex(s.headingColor, d.headingColor),
+    paperColor: hex(s.paperColor, d.paperColor),
+    lineColor: hex(s.lineColor, d.lineColor),
+    frame: oneOf(s.frame, FRAME_OPTIONS),
+    header: oneOf(s.header, HEADER_OPTIONS),
+    section: oneOf(s.section, SECTION_OPTIONS),
+    tableHead: oneOf(s.tableHead, TABLE_HEAD_OPTIONS),
+    watermark: oneOf(s.watermark, ['on', 'off'] as const),
+  }
 }
 
 const text = (value: unknown, fallback: string, max = 160) =>
@@ -82,7 +162,7 @@ function signatureImage(value: unknown): string | null {
 /** Template `config` JSON is user-editable, so read it defensively. */
 export function parseReportCardConfig(raw: unknown): ReportCardConfig {
   const d = DEFAULT_REPORT_CARD_CONFIG
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...d }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...d, fields: { ...d.fields }, style: { ...d.style } }
   const c = raw as Record<string, unknown>
   const signatories = Array.isArray(c.signatories) ? c.signatories : []
   const images = Array.isArray(c.signatureImages) ? c.signatureImages : []
@@ -102,6 +182,8 @@ export function parseReportCardConfig(raw: unknown): ReportCardConfig {
     competencies: list(c.competencies, d.competencies),
     coScholastic: list(c.coScholastic, d.coScholastic),
     signatories: [0, 1, 2].map((i) => text(signatories[i], d.signatories[i]!, 40) || d.signatories[i]!) as [string, string, string],
+    fields: parseReportCardFields(c.fields),
+    style: parseReportCardStyle(c.style),
   }
 }
 

@@ -9,6 +9,15 @@ export type ReportCardSubjectRow = {
   name: string
   maxMarks: number
   marksObtained: number | null
+  /** Written / internal / oral split; null when the paper has no parts. */
+  parts: {
+    written: number | null
+    writtenMax: number
+    internal: number | null
+    internalMax: number | null
+    oral: number | null
+    oralMax: number | null
+  } | null
   isAbsent: boolean
   /** Marks scaled to 100 so papers with different maxima read alike. */
   scaled: number | null
@@ -83,9 +92,13 @@ export function sampleReportCard(
     ['087', 'Social Science', 78, 'B+', 8, 'Consistent effort; can improve map work'],
     ['402', 'Information Technology', 94, 'A+', 10, 'Excellent practical and coding skills'],
   ]
-  const subjects: ReportCardSubjectRow[] = rows.map(([code, name, marks, grade, points, remarks]) => ({
-    code, name, maxMarks: 100, marksObtained: marks, isAbsent: false, scaled: marks, grade, points, remarks, isPass: true,
-  }))
+  const subjects: ReportCardSubjectRow[] = rows.map(([code, name, marks, grade, points, remarks]) => {
+    const oral = Math.min(20, Math.round(marks / 5))
+    return {
+      code, name, maxMarks: 100, marksObtained: marks, isAbsent: false, scaled: marks, grade, points, remarks, isPass: true,
+      parts: { written: marks - oral, writtenMax: 80, internal: null, internalMax: null, oral, oralMax: 20 },
+    }
+  })
   const obtained = subjects.reduce((sum, s) => sum + (s.marksObtained ?? 0), 0)
   const competencies = Object.fromEntries(
     config.competencies.map((name, i) => [name, { score: [5, 4, 5, 4, 4, 5, 3][i % 7]!, note: null }]),

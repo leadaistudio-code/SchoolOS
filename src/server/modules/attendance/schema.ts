@@ -41,6 +41,12 @@ export const markAttendanceSchema = z.object({
 
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>
 
+export const bulkMarkSectionsSchema = z.object({
+  sectionIds: z.array(z.string().min(1)).min(1, 'Choose at least one section').max(60),
+  onDate: isoDate,
+  status: z.enum(['PRESENT', 'ABSENT', 'LEAVE']).default('PRESENT'),
+})
+
 export const attendanceRegisterQuerySchema = z.object({
   sectionId: z.string().optional(),
   onDate: isoDate.optional(),

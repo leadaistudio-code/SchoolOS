@@ -280,6 +280,45 @@ export async function markAttendance(
   }
 }
 
+/**
+ * Marks several sections in one go. Students who already have a mark keep it,
+ * students on approved leave get LEAVE, everyone else gets `status`. Each
+ * section is saved through `markAttendance`, so scope, locking and audit rules
+ * are exactly those of a single register.
+ */
+export async function bulkMarkSections(
+  ctx: AppContext,
+  input: { sectionIds: string[]; onDate: string; status: AttendanceStatusValue },
+) {
+  ctx.require('attendance.mark')
+  const results: Array<{ sectionId: string; label: string; ok: boolean; saved: number; message?: string }> = []
+  for (const sectionId of [...new Set(input.sectionIds)]) {
+    let label = sectionId
+    try {
+      const register = await getRegister(ctx, sectionId, input.onDate)
+      label = `${register.section.className} ${register.section.name}`
+      if (register.rows.length === 0) {
+        results.push({ sectionId, label, ok: true, saved: 0 })
+        continue
+      }
+      const result = await markAttendance(ctx, {
+        sectionId,
+        onDate: input.onDate,
+        entries: register.rows.map((row) => ({
+          studentId: row.studentId,
+          status: row.status ?? (row.onApprovedLeave ? 'LEAVE' : input.status),
+          minutesLate: row.status === 'LATE' ? (row.minutesLate ?? undefined) : undefined,
+          remarks: row.remarks ?? undefined,
+        })),
+      })
+      results.push({ sectionId, label, ok: true, saved: result.created })
+    } catch (err) {
+      results.push({ sectionId, label, ok: false, saved: 0, message: err instanceof Error ? err.message : 'Failed' })
+    }
+  }
+  return results
+}
+
 async function notifyAbsentees(
   ctx: AppContext,
   studentIds: string[],
