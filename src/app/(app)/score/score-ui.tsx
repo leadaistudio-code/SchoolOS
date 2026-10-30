@@ -1,4 +1,5 @@
 import * as React from 'react'
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
@@ -193,17 +194,32 @@ export function CoverageNote({ coverage }: { coverage: number }) {
  * Every row states its own evidence, because the point of the number is that a
  * principal can disagree with it and immediately see why it says what it says.
  */
-export function MetricBreakdown({ composed }: { composed: ComposedScore }) {
+export function MetricBreakdown({
+  composed,
+  hrefFor,
+}: {
+  composed: ComposedScore
+  /** Where a metric's evidence lives; the label becomes a link to it. */
+  hrefFor?: (metric: string) => string | null
+}) {
   if (composed.parts.length === 0) {
     return <p className="text-sm text-ink-subtle">No metric carries any weight.</p>
   }
 
   return (
     <ul className="divide-y divide-[var(--border)]">
-      {composed.parts.map((part) => (
+      {composed.parts.map((part) => {
+        const href = hrefFor?.(part.metric) ?? null
+        return (
         <li key={part.metric} className="py-2.5">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-medium text-ink">{part.label}</span>
+            {href ? (
+              <Link href={href} className="text-sm font-medium text-[var(--brand-600)] hover:underline">
+                {part.label}
+              </Link>
+            ) : (
+              <span className="text-sm font-medium text-ink">{part.label}</span>
+            )}
             <span className="shrink-0 text-sm tnum text-ink">
               {part.score === null ? (
                 <span className="text-ink-subtle">not measured</span>
@@ -237,7 +253,8 @@ export function MetricBreakdown({ composed }: { composed: ComposedScore }) {
             </span>
           </p>
         </li>
-      ))}
+        )
+      })}
     </ul>
   )
 }

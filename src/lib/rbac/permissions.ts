@@ -219,6 +219,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['sell', 'Sell items at the store counter'],
     ['manage', 'Add items, receive stock and adjust quantities'],
     ['void', 'Cancel store bills and return stock'],
+    ['delete', 'Delete store items entered by mistake'],
   ]),
   ...mod('frontoffice', [
     ['view', 'View front office'],

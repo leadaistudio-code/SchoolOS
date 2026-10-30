@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import type { AppContext } from '@/server/context'
@@ -12,6 +13,7 @@ import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { paymentProvider } from '@/server/providers'
 import { notify } from '@/server/notifications'
 import { ROLE } from '@/lib/rbac/roles'
+import { billBookNoTaken, issueBillBookNo } from './counter'
 import {
   allocatePayment,
   computeInvoiceTotals,
@@ -32,17 +34,42 @@ const rupeesOrZero = z.coerce
   .max(10_000_000)
   .transform((v) => Math.round(v * 100))
 
+const counterMode = z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER', 'CARD', 'UPI', 'NET_BANKING'])
+
 export const collectSchema = z
   .object({
     studentId: z.string().min(1, 'Choose a student'),
     collectedById: z.string().min(1, 'Choose the accountant who collected this payment').optional(),
-    amount: rupeesOrZero,
+    /** Single-mode amount. Ignored when `payments` splits the collection. */
+    amount: rupeesOrZero.default(0),
     /** One-shot counter waive in rupees, applied oldest-first before the cash settles. */
     discount: rupeesOrZero.optional(),
     discountReason: z.string().trim().min(3).max(300).optional(),
-    mode: z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER', 'CARD', 'UPI', 'NET_BANKING']),
+    mode: counterMode.optional(),
     reference: z.string().trim().max(60).optional(),
-    /** Serial from the school's paper receipt book, when one was also issued. */
+    /** Split collection: one entry per mode, e.g. ₹1,500 cash + ₹1,500 UPI. */
+    payments: z
+      .array(
+        z.object({
+          mode: counterMode,
+          amount: rupees,
+          reference: z.string().trim().max(60).optional(),
+        }),
+      )
+      .max(6, 'Split a payment across at most six modes')
+      .optional(),
+    /** Charges added at the counter (fine, school trip …), billed and collected now. */
+    extraCharges: z
+      .array(
+        z.object({
+          feeHeadId: z.string().min(1).optional(),
+          label: z.string().trim().min(2, 'Name each extra charge').max(120),
+          amount: rupees,
+        }),
+      )
+      .max(10)
+      .optional(),
+    /** Accepted for old clients and ignored: bill book numbers are issued automatically. */
     billBookNo: z.string().trim().max(40).optional(),
     notes: z.string().trim().max(300).optional(),
     /**
@@ -59,12 +86,17 @@ export const collectSchema = z
     idempotencyKey: z.string().trim().min(8).max(80).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.amount <= 0 && !(data.discount && data.discount > 0)) {
+    const split = data.payments && data.payments.length > 0
+    const received = split ? sumMinor(data.payments!.map((p) => p.amount)) : data.amount
+    if (received <= 0 && !(data.discount && data.discount > 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['amount'],
         message: 'Enter an amount greater than zero',
       })
+    }
+    if (!split && data.amount > 0 && !data.mode) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mode'], message: 'Choose how the money was paid' })
     }
     if ((data.discount ?? 0) > 0 && !data.discountReason) {
       ctx.addIssue({
@@ -98,6 +130,7 @@ export const collectSchema = z
   })
 
 export type CollectResult = {
+  /** The first receipt of the collection; split collections list every part in `parts`. */
   paymentId: string
   receiptNumber: string
   allocatedMinor: Minor
@@ -106,6 +139,10 @@ export type CollectResult = {
   invoices: { number: string; appliedMinor: Minor; balanceMinor: Minor }[]
   /** Cheque receipted but not yet cleared; dues stay open until it is. */
   pendingClearance?: boolean
+  billBookNo?: string | null
+  /** Invoice raised for counter extra charges, if any. */
+  extraInvoiceNumber?: string | null
+  parts?: { paymentId: string; receiptNumber: string; mode: string; amountMinor: Minor; pending: boolean }[]
 }
 
 type OpenInvoice = {
@@ -162,6 +199,9 @@ async function settleAgainstInvoices(
         status: deriveInvoiceStatus({ totalMinor: invoice.totalMinor, paidMinor, dueOn: invoice.dueOn }),
       },
     })
+    // Later parts of a split collection settle against what this part left.
+    invoice.paidMinor = paidMinor
+    invoice.balanceMinor = balanceMinor
     applied.push({ number: invoice.number, appliedMinor: allocation.amountMinor, balanceMinor })
   }
 
@@ -205,7 +245,7 @@ export async function feeCollectorOptions(ctx: AppContext) {
       status: 'ACTIVE',
       OR: [
         { id: ctx.user.userId },
-        { roles: { some: { role: { key: ROLE.ACCOUNTANT } } } },
+        { roles: { some: { role: { key: { in: COLLECTOR_ROLES } } } } },
       ],
     },
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -235,6 +275,18 @@ export async function collectPayment(
   if (discountMinor > 0) ctx.require('fees.concession')
   const paidAt = attendanceDate(input.paidOn ?? toDateInput(new Date()))
 
+  // Settled modes first, so a cheque in a split never holds up the cash.
+  const parts = (
+    input.payments && input.payments.length > 0
+      ? input.payments.map((p) => ({ mode: p.mode, amountMinor: p.amount, reference: p.reference }))
+      : input.amount > 0 && input.mode
+        ? [{ mode: input.mode, amountMinor: input.amount, reference: input.reference }]
+        : []
+  ).sort((a, b) => Number(a.mode === 'CHEQUE') - Number(b.mode === 'CHEQUE'))
+  const receivedMinor = sumMinor(parts.map((p) => p.amountMinor))
+  const extraCharges = input.extraCharges ?? []
+  const extraMinor = sumMinor(extraCharges.map((c) => c.amount))
+
   const student = await ctx.db.student.findFirst({
     where: { id: input.studentId, deletedAt: null },
     select: {
@@ -255,7 +307,7 @@ export async function collectPayment(
       status: 'ACTIVE',
       OR: [
         { id: ctx.user.userId },
-        { roles: { some: { role: { key: ROLE.ACCOUNTANT } } } },
+        { roles: { some: { role: { key: { in: COLLECTOR_ROLES } } } } },
       ],
     },
     select: { id: true, firstName: true, lastName: true },
@@ -272,24 +324,88 @@ export async function collectPayment(
       include: { receipt: true, allocations: { include: { invoice: true } } },
     })
     if (existing) {
+      const siblings = existing.collectionId
+        ? await ctx.db.feePayment.findMany({
+            where: { collectionId: existing.collectionId },
+            orderBy: { createdAt: 'asc' },
+            include: { receipt: true, allocations: { include: { invoice: true } } },
+          })
+        : [existing]
+      const allocations = siblings.flatMap((p) => p.allocations)
+      const allocatedMinor = sumMinor(allocations.map((a) => a.amountMinor))
       return {
         paymentId: existing.id,
         receiptNumber: existing.receipt?.number ?? '',
-        allocatedMinor: sumMinor(existing.allocations.map((a) => a.amountMinor)),
-        unallocatedMinor:
-          existing.amountMinor - sumMinor(existing.allocations.map((a) => a.amountMinor)),
+        allocatedMinor,
+        unallocatedMinor: sumMinor(siblings.map((p) => p.amountMinor)) - allocatedMinor,
         discountedMinor: 0,
-        invoices: existing.allocations.map((a) => ({
+        invoices: allocations.map((a) => ({
           number: a.invoice.number,
           appliedMinor: a.amountMinor,
           balanceMinor: a.invoice.balanceMinor,
         })),
-        pendingClearance: existing.status === 'PENDING',
+        pendingClearance: siblings.some((p) => p.status === 'PENDING'),
+        billBookNo: existing.billBookNo,
+        parts: siblings.map((p) => ({
+          paymentId: p.id,
+          receiptNumber: p.receipt?.number ?? '',
+          mode: p.mode,
+          amountMinor: p.amountMinor,
+          pending: p.status === 'PENDING',
+        })),
       }
     }
   }
 
   const result = await ctx.db.$transaction(async (tx) => {
+    // Extra charges taken at the counter become a normal invoice first, so the
+    // money below settles them exactly like any other due.
+    let extraInvoice: { id: string; number: string } | null = null
+    if (extraCharges.length > 0) {
+      const session =
+        (await tx.academicSession.findFirst({ where: { isCurrent: true }, select: { id: true } }))
+        ?? (await tx.academicSession.findFirst({ orderBy: { startsOn: 'desc' }, select: { id: true } }))
+      if (!session) throw conflict('Set up an academic session before adding charges')
+      const headIds = extraCharges.flatMap((c) => (c.feeHeadId ? [c.feeHeadId] : []))
+      if (headIds.length > 0) {
+        const found = await tx.feeHead.count({ where: { id: { in: headIds }, deletedAt: null } })
+        if (found !== new Set(headIds).size) throw notFound('Fee head')
+      }
+      const number = await nextDocumentNumber(tx, {
+        tenantId: ctx.tenant.id,
+        kind: 'INVOICE',
+        sessionLabel: financialYearLabel(paidAt),
+      })
+      extraInvoice = await tx.feeInvoice.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          number,
+          studentId: input.studentId,
+          sessionId: session.id,
+          title:
+            extraCharges.length === 1
+              ? extraCharges[0]!.label
+              : `Counter charges: ${extraCharges.map((c) => c.label).join(', ')}`.slice(0, 190),
+          issuedOn: paidAt,
+          dueOn: paidAt,
+          status: deriveInvoiceStatus({ totalMinor: extraMinor, paidMinor: 0, dueOn: paidAt }),
+          subtotalMinor: extraMinor,
+          totalMinor: extraMinor,
+          balanceMinor: extraMinor,
+          notes: `Added at the fee counter by ${ctx.user.firstName} ${ctx.user.lastName}`.trim(),
+          lines: {
+            create: extraCharges.map((c) => ({
+              tenantId: ctx.tenant.id,
+              feeHeadId: c.feeHeadId ?? null,
+              label: c.label,
+              amountMinor: c.amount,
+            })),
+          },
+        },
+        select: { id: true, number: true },
+      })
+    }
+
     // Serialize every counter touching this student's open invoices. Without
     // row locks two cashiers can both calculate from the same stale balance.
     await tx.$queryRaw`
@@ -301,13 +417,13 @@ export async function collectPayment(
         AND "status" NOT IN ('CANCELLED', 'DRAFT')
       ORDER BY "dueOn", "id"
       FOR UPDATE`
-    const outstanding = await tx.feeInvoice.findMany({
+    const fetched = await tx.feeInvoice.findMany({
       where: {
         studentId: input.studentId,
         balanceMinor: { gt: 0 },
         status: { notIn: ['CANCELLED', 'DRAFT'] },
         ...(input.invoiceIds && input.invoiceIds.length > 0
-          ? { id: { in: input.invoiceIds } }
+          ? { id: { in: [...input.invoiceIds, ...(extraInvoice ? [extraInvoice.id] : [])] } }
           : {}),
       },
       orderBy: { dueOn: 'asc' },
@@ -333,6 +449,14 @@ export async function collectPayment(
         },
       },
     })
+    // Charges added at the counter are what the family came to pay for, so the
+    // money settles them before older dues.
+    const outstanding = extraInvoice
+      ? [
+          ...fetched.filter((i) => i.id === extraInvoice!.id),
+          ...fetched.filter((i) => i.id !== extraInvoice!.id),
+        ]
+      : fetched
 
     let discountedMinor = 0
     const discountReason = input.discountReason?.trim()
@@ -447,66 +571,97 @@ export async function collectPayment(
       }
     }
 
-    // A cheque is receipted at the counter but only settles dues once it clears.
-    const pendingCheque = input.mode === 'CHEQUE' && input.amount > 0
-
     const paymentNotes = [
       discountedMinor > 0
         ? `Counter discount ₹${(discountedMinor / 100).toFixed(2)}${discountReason ? `: ${discountReason}` : ''}`
+        : null,
+      extraInvoice
+        ? `Extra charges ${extraCharges.map((c) => `${c.label} ₹${(c.amount / 100).toFixed(2)}`).join(', ')} (invoice ${extraInvoice.number})`
         : null,
       input.notes?.trim() || null,
     ]
       .filter(Boolean)
       .join('\n')
 
-    const payment = await tx.feePayment.create({
-      data: {
+    // One bill book number per collection, issued under a school-wide lock.
+    const billBookNo = await issueBillBookNo(tx, ctx.tenant.id)
+    const collectionId = parts.length > 1 ? newCollectionId() : null
+    // A discount-only visit still gets a (zero) receipt to show the waiver.
+    const toRecord = parts.length > 0
+      ? parts
+      : [{ mode: input.mode ?? 'CASH', amountMinor: 0, reference: input.reference }]
+
+    const recorded: NonNullable<CollectResult['parts']> = []
+    const applied: CollectResult['invoices'] = []
+    let unallocatedMinor = 0
+    for (const [index, part] of toRecord.entries()) {
+      // A cheque is receipted at the counter but only settles dues once it clears.
+      const pendingCheque = part.mode === 'CHEQUE' && part.amountMinor > 0
+      const payment = await tx.feePayment.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          studentId: input.studentId,
+          amountMinor: part.amountMinor,
+          currency: ctx.tenant.currency,
+          mode: part.mode,
+          // Counter collection is confirmed by the cashier taking it, so it is
+          // SUCCESS at once. Gateway payments are not - see startOnlinePayment.
+          status: pendingCheque ? 'PENDING' : 'SUCCESS',
+          provider: 'manual',
+          reference: part.reference || null,
+          billBookNo,
+          collectionId,
+          notes: paymentNotes || null,
+          idempotencyKey: input.idempotencyKey
+            ? index === 0 ? input.idempotencyKey : `${input.idempotencyKey}:${index + 1}`
+            : undefined,
+          paidAt,
+          collectedById: collector.id,
+          ...(pendingCheque
+            ? {
+                providerResponse: {
+                  cheque: {
+                    status: 'PENDING',
+                    invoiceIds: outstanding.filter((i) => i.balanceMinor > 0).map((i) => i.id),
+                  },
+                },
+              }
+            : {}),
+        },
+      })
+
+      const receiptNumber = await nextDocumentNumber(tx, {
         tenantId: ctx.tenant.id,
-        studentId: input.studentId,
-        amountMinor: input.amount,
-        currency: ctx.tenant.currency,
-        mode: input.mode,
-        // Counter collection is confirmed by the cashier taking it, so it is
-        // SUCCESS at once. Gateway payments are not - see startOnlinePayment.
-        status: pendingCheque ? 'PENDING' : 'SUCCESS',
-        provider: 'manual',
-        reference: input.reference,
-        billBookNo: input.billBookNo,
-        notes: paymentNotes || null,
-        idempotencyKey: input.idempotencyKey,
-        paidAt,
-        collectedById: collector.id,
-        ...(pendingCheque
-          ? {
-              providerResponse: {
-                cheque: { status: 'PENDING', invoiceIds: outstanding.map((i) => i.id) },
-              },
-            }
-          : {}),
-      },
-    })
+        kind: 'RECEIPT',
+        sessionLabel: financialYearLabel(paidAt),
+      })
+      await tx.feeReceipt.create({
+        data: { tenantId: ctx.tenant.id, number: receiptNumber, paymentId: payment.id },
+      })
 
-    const receiptNumber = await nextDocumentNumber(tx, {
-      tenantId: ctx.tenant.id,
-      kind: 'RECEIPT',
-      sessionLabel: financialYearLabel(paidAt),
-    })
-
-    await tx.feeReceipt.create({
-      data: { tenantId: ctx.tenant.id, number: receiptNumber, paymentId: payment.id },
-    })
-
-    const { applied, unallocatedMinor } = pendingCheque
-      ? { applied: [] as CollectResult['invoices'], unallocatedMinor: 0 }
-      : await settleAgainstInvoices(tx, {
+      if (!pendingCheque) {
+        const settled = await settleAgainstInvoices(tx, {
           tenantId: ctx.tenant.id,
           studentId: input.studentId,
           paymentId: payment.id,
-          amountMinor: input.amount,
-          outstanding,
+          amountMinor: part.amountMinor,
+          outstanding: outstanding.filter((i) => i.balanceMinor > 0),
           receiptNumber,
           userId: ctx.user.userId,
         })
+        applied.push(...settled.applied)
+        unallocatedMinor += settled.unallocatedMinor
+      }
+      recorded.push({
+        paymentId: payment.id,
+        receiptNumber,
+        mode: part.mode,
+        amountMinor: part.amountMinor,
+        pending: pendingCheque,
+      })
+    }
+    const receiptNumber = recorded[0]!.receiptNumber
+    const pendingMinor = sumMinor(recorded.filter((p) => p.pending).map((p) => p.amountMinor))
 
     if (discountedMinor > 0) {
       // One audit row per collection keeps the ledger readable; invoice links
@@ -524,16 +679,22 @@ export async function collectPayment(
     }
 
     return {
-      paymentId: payment.id,
+      paymentId: recorded[0]!.paymentId,
       receiptNumber,
-      allocatedMinor: pendingCheque ? 0 : input.amount - unallocatedMinor,
+      allocatedMinor: receivedMinor - pendingMinor - unallocatedMinor,
       unallocatedMinor,
       discountedMinor,
       invoices: applied,
-      pendingClearance: pendingCheque,
+      pendingClearance: pendingMinor > 0,
+      billBookNo,
+      extraInvoiceNumber: extraInvoice?.number ?? null,
+      parts: recorded,
     }
   })
 
+  const modes = (result.parts ?? [])
+    .map((p) => `${p.mode.toLowerCase().replaceAll('_', ' ')} ₹${p.amountMinor / 100}${p.pending ? ' (pending clearance)' : ''}`)
+    .join(' + ')
   await audit({
     tenantId: ctx.tenant.id,
     actorId: ctx.user.userId,
@@ -542,35 +703,45 @@ export async function collectPayment(
     module: 'fees',
     entityType: 'FeePayment',
     entityId: result.paymentId,
-    summary: `Collected ₹${input.amount / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${input.mode.toLowerCase()}${result.pendingClearance ? ' (pending clearance)' : ''}, receipt ${result.receiptNumber}${result.discountedMinor > 0 ? `, discounted ₹${result.discountedMinor / 100}` : ''}${input.billBookNo ? `, bill book ${input.billBookNo}` : ''}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
+    summary: `Collected ₹${receivedMinor / 100} from ${student.firstName} ${student.lastName} (${student.admissionNo}) by ${modes}, receipt ${(result.parts ?? []).map((p) => p.receiptNumber).join(', ')}${result.discountedMinor > 0 ? `, discounted ₹${result.discountedMinor / 100}` : ''}${result.extraInvoiceNumber ? `, extra charges ₹${extraMinor / 100} on ${result.extraInvoiceNumber}` : ''}, bill book ${result.billBookNo}${result.unallocatedMinor > 0 ? `, ₹${result.unallocatedMinor / 100} held as advance` : ''}`,
     after: {
-      amountMinor: input.amount,
+      amountMinor: receivedMinor,
       discountMinor: result.discountedMinor,
       discountReason: input.discountReason ?? null,
-      mode: input.mode,
+      parts: result.parts,
+      extraCharges: extraCharges.map((c) => ({ label: c.label, amountMinor: c.amount, feeHeadId: c.feeHeadId ?? null })),
       receipt: result.receiptNumber,
-      billBookNo: input.billBookNo ?? null,
+      billBookNo: result.billBookNo,
       paidOn: toDateInput(paidAt),
       collectedById: collector.id,
       collectedBy: `${collector.firstName} ${collector.lastName}`,
     },
   })
 
+  const settledMinor = receivedMinor - sumMinor((result.parts ?? []).filter((p) => p.pending).map((p) => p.amountMinor))
   await notify(ctx, {
     userIds: student.guardians
       .map((g) => g.parent.userId)
       .filter((id): id is string => !!id),
     eventKey: 'fee.payment_received',
     title: 'Fee payment received',
-    body: result.pendingClearance
-      ? `We have received a cheque of ₹${(input.amount / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}; dues will update once the cheque clears.`
-      : `We have received ₹${(input.amount / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}.`,
+    body: result.pendingClearance && settledMinor === 0
+      ? `We have received a cheque of ₹${(receivedMinor / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}; dues will update once the cheque clears.`
+      : `We have received ₹${(receivedMinor / 100).toLocaleString('en-IN')} for ${student.firstName}. Receipt ${result.receiptNumber}.`,
     linkUrl: '/finance',
   })
 
-  if (!result.pendingClearance) afterPaymentChange(ctx.tenant.id, result.paymentId, { tally: true })
+  for (const part of result.parts ?? []) {
+    if (!part.pending) afterPaymentChange(ctx.tenant.id, part.paymentId, { tally: true })
+  }
 
   return result
+}
+
+const COLLECTOR_ROLES: string[] = [ROLE.ACCOUNTANT, ROLE.FRONT_DESK]
+
+function newCollectionId() {
+  return `col_${randomUUID().replaceAll('-', '')}`
 }
 
 /* --------------------------------------------------------- online payment */
@@ -1465,13 +1636,22 @@ export const editPaymentSchema = z.object({
   mode: z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER', 'CARD', 'UPI', 'NET_BANKING']),
   paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid payment date'),
   reference: z.string().trim().max(60).optional().or(z.literal('')),
-  billBookNo: z.string().trim().max(40).optional().or(z.literal('')),
+  billBookNo: z.string().trim().min(1, 'Enter the bill book number').max(40),
   notes: z.string().trim().max(300).optional().or(z.literal('')),
+  /** Corrected amount in rupees; re-settles the receipt against open dues. */
+  amount: rupees.optional(),
+  collectedById: z.string().min(1).optional(),
+  /** Why the amount changed; required when it does. */
+  amountReason: z.string().trim().max(300).optional(),
 })
 
 /**
- * Corrects receipt details that do not change money movement.
- * Amount / allocation mistakes still require cancel (reverse) then recollect.
+ * Corrects a counter receipt.
+ *
+ * Date, mode, reference, bill book number, collector and note are plain
+ * corrections. Changing the amount is a money movement: the receipt's
+ * allocations are unwound and the corrected amount is settled oldest-first
+ * again, in one transaction, under the same receipt number.
  */
 export async function editPayment(ctx: AppContext, input: z.infer<typeof editPaymentSchema>) {
   ctx.require('fees.collect')
@@ -1480,6 +1660,7 @@ export async function editPayment(ctx: AppContext, input: z.infer<typeof editPay
     where: { id: input.paymentId },
     include: {
       receipt: { select: { number: true } },
+      refunds: { select: { status: true } },
       student: { select: { firstName: true, lastName: true, admissionNo: true } },
     },
   })
@@ -1492,20 +1673,123 @@ export async function editPayment(ctx: AppContext, input: z.infer<typeof editPay
   }
 
   const paidAt = attendanceDate(input.paidOn)
+  if (paidAt.getTime() > attendanceDate(new Date()).getTime()) {
+    throw conflict('Payment date cannot be in the future')
+  }
   const reference = input.reference?.trim() || null
-  const billBookNo = input.billBookNo?.trim() || null
+  const billBookNo = input.billBookNo.trim()
   const notes = input.notes?.trim() || null
+  const amountChanged = input.amount !== undefined && input.amount !== payment.amountMinor
+  if (amountChanged) {
+    ctx.require('fees.reverse')
+    if (!input.amountReason || input.amountReason.trim().length < 3) {
+      throw conflict('Give a reason for changing the amount')
+    }
+    if (payment.refunds.some((r) => r.status !== 'FAILED')) {
+      throw conflict('This receipt has a refund against it; its amount can no longer be changed')
+    }
+    if (input.mode === 'CHEQUE' && payment.mode !== 'CHEQUE') {
+      throw conflict('Cancel this receipt and collect again to switch it to an uncleared cheque')
+    }
+  }
 
-  const updated = await ctx.db.feePayment.update({
-    where: { id: payment.id },
-    data: {
-      mode: input.mode,
-      paidAt,
-      reference,
-      billBookNo,
-      notes,
-    },
-  })
+  let collectedById = payment.collectedById
+  if (input.collectedById && input.collectedById !== payment.collectedById) {
+    const collector = await ctx.db.user.findFirst({
+      where: {
+        id: input.collectedById,
+        deletedAt: null,
+        status: 'ACTIVE',
+        OR: [
+          { id: ctx.user.userId },
+          { roles: { some: { role: { key: { in: COLLECTOR_ROLES } } } } },
+        ],
+      },
+      select: { id: true },
+    })
+    if (!collector) throw conflict('Choose an active accountant from this school')
+    collectedById = collector.id
+  }
+
+  const siblings = payment.collectionId
+    ? await ctx.db.feePayment.findMany({ where: { collectionId: payment.collectionId }, select: { id: true } })
+    : [{ id: payment.id }]
+
+  const updated = await ctx.db.$transaction(async (tx) => {
+    if (billBookNo !== payment.billBookNo) {
+      const taken = await billBookNoTaken(tx, ctx.tenant.id, billBookNo, {
+        paymentIds: siblings.map((s) => s.id),
+      })
+      if (taken) throw conflict(`Bill book number ${billBookNo} is already on another receipt`)
+      // The parts of a split collection share one paper bill.
+      await tx.feePayment.updateMany({
+        where: { id: { in: siblings.map((s) => s.id) } },
+        data: { billBookNo },
+      })
+    }
+
+    if (amountChanged) {
+      await tx.$queryRaw`
+        SELECT "id" FROM "FeeInvoice"
+        WHERE "tenantId" = ${ctx.tenant.id} AND "studentId" = ${payment.studentId}
+          AND "status" NOT IN ('CANCELLED', 'DRAFT')
+        ORDER BY "dueOn", "id"
+        FOR UPDATE`
+      const locked = await tx.feePayment.findFirstOrThrow({
+        where: { id: payment.id },
+        include: { allocations: { include: { invoice: true } }, creditEntries: true },
+      })
+      if (locked.status !== 'SUCCESS') throw conflict('This payment was already changed by another user')
+      if (locked.creditEntries.some((entry) => entry.type === 'APPLIED')) {
+        throw conflict('The advance from this receipt has already been used on a later invoice')
+      }
+      for (const allocation of locked.allocations) {
+        const current = await tx.feeInvoice.findUniqueOrThrow({ where: { id: allocation.invoiceId } })
+        const paidMinor = Math.max(0, current.paidMinor - allocation.amountMinor)
+        await tx.feeInvoice.update({
+          where: { id: current.id },
+          data: {
+            paidMinor,
+            balanceMinor: current.totalMinor - paidMinor,
+            status: deriveInvoiceStatus({ totalMinor: current.totalMinor, paidMinor, dueOn: current.dueOn }),
+          },
+        })
+      }
+      await tx.feePaymentAllocation.deleteMany({ where: { paymentId: payment.id } })
+      await tx.studentFeeCredit.deleteMany({ where: { paymentId: payment.id, type: 'CREDIT' } })
+
+      const open = await tx.feeInvoice.findMany({
+        where: {
+          studentId: payment.studentId,
+          balanceMinor: { gt: 0 },
+          status: { notIn: ['CANCELLED', 'DRAFT'] },
+        },
+        orderBy: [{ dueOn: 'asc' }, { id: 'asc' }],
+        select: { id: true, number: true, balanceMinor: true, totalMinor: true, paidMinor: true, dueOn: true },
+      })
+      await settleAgainstInvoices(tx, {
+        tenantId: ctx.tenant.id,
+        studentId: payment.studentId,
+        paymentId: payment.id,
+        amountMinor: input.amount!,
+        outstanding: open,
+        receiptNumber: payment.receipt?.number ?? payment.id,
+        userId: ctx.user.userId,
+      })
+    }
+
+    return tx.feePayment.update({
+      where: { id: payment.id },
+      data: {
+        mode: input.mode,
+        paidAt,
+        reference,
+        notes,
+        collectedById,
+        ...(amountChanged ? { amountMinor: input.amount! } : {}),
+      },
+    })
+  }, { isolationLevel: 'Serializable' })
 
   await audit({
     tenantId: ctx.tenant.id,
@@ -1515,20 +1799,29 @@ export async function editPayment(ctx: AppContext, input: z.infer<typeof editPay
     module: 'fees',
     entityType: 'FeePayment',
     entityId: payment.id,
-    summary: `Edited receipt ${payment.receipt?.number ?? payment.id} for ${payment.student.firstName} ${payment.student.lastName}`,
+    summary: `Edited receipt ${payment.receipt?.number ?? payment.id} for ${payment.student.firstName} ${payment.student.lastName}${
+      amountChanged
+        ? `: amount ₹${payment.amountMinor / 100} → ₹${updated.amountMinor / 100} (${input.amountReason!.trim()})`
+        : ''
+    }`,
     before: {
+      amountMinor: payment.amountMinor,
       mode: payment.mode,
       paidAt: payment.paidAt,
       reference: payment.reference,
       billBookNo: payment.billBookNo,
+      collectedById: payment.collectedById,
       notes: payment.notes,
     },
     after: {
+      amountMinor: updated.amountMinor,
       mode: updated.mode,
       paidAt: updated.paidAt,
       reference: updated.reference,
       billBookNo: updated.billBookNo,
+      collectedById: updated.collectedById,
       notes: updated.notes,
+      ...(amountChanged ? { amountReason: input.amountReason!.trim() } : {}),
     },
   })
   afterPaymentChange(ctx.tenant.id, payment.id)
@@ -1943,7 +2236,8 @@ export async function listPayments(
 }
 
 export async function getReceipt(ctx: AppContext, paymentId: string) {
-  ctx.require('fees.view')
+  // The counter prints what it just collected; fees.collect alone is enough.
+  if (!ctx.can('fees.collect')) ctx.require('fees.view')
 
   const allowed = await accessibleStudentIds(ctx)
 
@@ -2000,7 +2294,7 @@ export async function getReceipt(ctx: AppContext, paymentId: string) {
 
   if (!payment) throw notFound('Payment')
 
-  const [collectedBy, outstandingAgg, creditEntries] = await Promise.all([
+  const [collectedBy, outstandingAgg, creditEntries, collection] = await Promise.all([
     payment.collectedById
       ? ctx.db.user.findFirst({
           where: { id: payment.collectedById, deletedAt: null },
@@ -2019,6 +2313,20 @@ export async function getReceipt(ctx: AppContext, paymentId: string) {
       where: { studentId: payment.studentId },
       select: { type: true, amountMinor: true },
     }),
+    payment.collectionId
+      ? ctx.db.feePayment.findMany({
+          where: { collectionId: payment.collectionId },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            mode: true,
+            amountMinor: true,
+            status: true,
+            reference: true,
+            receipt: { select: { number: true } },
+          },
+        })
+      : Promise.resolve([]),
   ])
 
   const outstandingMinor = outstandingAgg._sum.balanceMinor ?? 0
@@ -2038,5 +2346,14 @@ export async function getReceipt(ctx: AppContext, paymentId: string) {
     collectedBy,
     outstandingMinor,
     advanceMinor,
+    /** Every part of a split collection, this one included; empty for a single-mode payment. */
+    collection: collection.map((p) => ({
+      paymentId: p.id,
+      mode: p.mode,
+      amountMinor: p.amountMinor,
+      status: p.status,
+      reference: p.reference,
+      receiptNumber: p.receipt?.number ?? null,
+    })),
   }
 }

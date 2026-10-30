@@ -138,7 +138,7 @@ function vendorData(input: VendorInput) {
   }
 }
 
-async function nextVendorCode(tx: Tx, tenantId: string) {
+export async function nextVendorCode(tx: Tx, tenantId: string) {
   await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text AS locked', `${tenantId}:VENDOR_CODE`)
   const rows = await tx.$queryRawUnsafe<{ code: string }[]>(
     `SELECT "code" FROM "Vendor" WHERE "tenantId" = $1 AND "code" ~ '^VEN-[0-9]+$' ORDER BY length("code") DESC, "code" DESC LIMIT 1`,

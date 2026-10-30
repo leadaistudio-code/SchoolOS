@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { formatDay } from '@/lib/dates'
-import { Pencil } from 'lucide-react'
+import { BookOpen, Pencil } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import type { AppContext } from '@/server/context'
 import { getStudent } from '@/server/modules/students/service'
@@ -79,6 +79,15 @@ export default async function StudentDetailPage({
         }
         actions={
           <>
+            {ctx.can('fees.accounts') ? (
+              <Link
+                href={`/finance/students/${student.id}`}
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                <BookOpen aria-hidden />
+                Fee ledger
+              </Link>
+            ) : null}
             {(ctx.can('users.create') || ctx.can('students.edit')) && student.status === 'ACTIVE' ? (
               <StudentLoginButton studentId={student.id} name={fullName(student)} hasLogin={!!student.userId} />
             ) : null}

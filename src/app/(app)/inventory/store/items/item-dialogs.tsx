@@ -2,10 +2,11 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDownUp, EyeOff, Eye, Pencil, Plus } from 'lucide-react'
+import { ArrowDownUp, EyeOff, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   adjustStockAction,
   createStoreItemAction,
+  deleteStoreItemAction,
   setStoreItemActiveAction,
   updateStoreItemAction,
 } from '../actions'
@@ -339,6 +340,65 @@ export function AdjustStockButton({ item }: { item: Pick<ItemDraft, 'id' | 'name
           <p className={cn('text-sm', after < 0 ? 'text-[var(--danger)]' : 'text-ink-muted')}>
             {after < 0 ? `Only ${item.quantity} in hand.` : `Stock after adjustment: ${after} ${item.unit}`}
           </p>
+        </div>
+      </Dialog>
+    </>
+  )
+}
+
+export function DeleteItemButton({ item }: { item: Pick<ItemDraft, 'id' | 'name' | 'variant' | 'quantity' | 'unit'> }) {
+  const router = useRouter()
+  const { push } = useToast()
+  const [open, setOpen] = React.useState(false)
+  const [reason, setReason] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+  const label = item.variant ? `${item.name} (${item.variant})` : item.name
+
+  const remove = async () => {
+    setBusy(true)
+    const res = await deleteStoreItemAction(item.id, reason)
+    setBusy(false)
+    push({ tone: res.ok ? 'success' : 'error', title: res.message })
+    if (res.ok) {
+      setOpen(false)
+      setReason('')
+      router.refresh()
+    }
+  }
+
+  return (
+    <>
+      <IconButton label="Delete item" small onClick={() => setOpen(true)}>
+        <Trash2 />
+      </IconButton>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Delete ${label}?`}
+        description="For items added by mistake. The item leaves the item list, the counter and stock in. Past bills and receipts keep showing it."
+        footer={
+          <>
+            <Button variant="danger" onClick={remove} disabled={busy || reason.trim().length < 3}>
+              {busy ? 'Deleting…' : 'Delete item'}
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {item.quantity !== 0 ? (
+            <p className="rounded-lg bg-warning-bg px-3 py-2 text-sm text-warning">
+              {item.quantity} {item.unit} still in stock will be written off at average cost.
+            </p>
+          ) : null}
+          <Field label="Reason" htmlFor={`del-${item.id}`} required>
+            <Input
+              id={`del-${item.id}`}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Created twice, wrong size"
+            />
+          </Field>
         </div>
       </Dialog>
     </>

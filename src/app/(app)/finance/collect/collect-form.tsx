@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Loader2, Receipt, Search } from 'lucide-react'
+import { CheckCircle2, Loader2, Plus, Receipt, Search, Split, X } from 'lucide-react'
 import { collectPaymentAction } from '../actions'
 import { EditableInvoiceAmounts } from '../students/invoice-amount-editor'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,10 @@ const MODE_LABELS: Record<string, string> = {
   BANK_TRANSFER: 'Bank transfer',
   NET_BANKING: 'Net banking',
 }
+const MODES = Object.keys(MODE_LABELS)
+
+/** One-tap starting points for charges a counter adds on the spot. */
+const CHARGE_PRESETS = ['Late fine', 'School trip', 'Exam fee', 'Other charge']
 
 // crypto.randomUUID only exists in secure contexts (HTTPS / localhost).
 function newIdempotencyKey() {
@@ -31,6 +35,9 @@ function newIdempotencyKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(16))
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+let rowSeq = 0
+const rowKey = () => `r${++rowSeq}`
 
 type StudentHit = {
   id: string
@@ -61,11 +68,20 @@ type CollectorOption = {
   employeeCode: string | null
 }
 
+type ChargeRow = { key: string; feeHeadId: string; label: string; amount: string }
+type SplitRow = { key: string; mode: string; amount: string; reference: string }
+
+const toMinor = (value: string) => {
+  const n = Math.round(Number(value || 0) * 100)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
 /**
  * The fee counter.
  *
  * Built around what a cashier actually does: find the student, see what is
- * owed, take an amount, hand over a receipt. The idempotency key is minted
+ * owed, add anything charged on the spot, take the money (in one mode or
+ * split across several), hand over a receipt. The idempotency key is minted
  * once per form session so a double-click or a retried submit cannot take the
  * money twice.
  */
@@ -76,6 +92,9 @@ export function CollectForm({
   collectors,
   canDiscount,
   canEditAmounts,
+  canViewLedger,
+  feeHeads,
+  nextBillBookNo,
 }: {
   currency: string
   initialStudentId?: string
@@ -83,6 +102,9 @@ export function CollectForm({
   collectors: CollectorOption[]
   canDiscount: boolean
   canEditAmounts: boolean
+  canViewLedger: boolean
+  feeHeads: { id: string; name: string }[]
+  nextBillBookNo: string
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -90,10 +112,14 @@ export function CollectForm({
   const [query, setQuery] = React.useState('')
   const [hits, setHits] = React.useState<StudentHit[]>([])
   const [searching, setSearching] = React.useState(false)
+  const [searchError, setSearchError] = React.useState<string | null>(null)
   const [student, setStudent] = React.useState<StudentHit | null>(null)
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
 
   const [amount, setAmount] = React.useState('')
+  const [splitting, setSplitting] = React.useState(false)
+  const [splits, setSplits] = React.useState<SplitRow[]>([])
+  const [charges, setCharges] = React.useState<ChargeRow[]>([])
   const [paidOn, setPaidOn] = React.useState(() => toDateInput(new Date()))
   const [discount, setDiscount] = React.useState('')
   const [discountReason, setDiscountReason] = React.useState('')
@@ -104,7 +130,6 @@ export function CollectForm({
       : (collectors[0]?.id ?? ''),
   )
   const [reference, setReference] = React.useState('')
-  const [billBookNo, setBillBookNo] = React.useState('')
   const [notes, setNotes] = React.useState('')
   const [pending, startTransition] = React.useTransition()
   const [confirming, setConfirming] = React.useState(false)
@@ -114,86 +139,62 @@ export function CollectForm({
     advance: number
     discount: number
     billBookNo: string | null
+    extraInvoiceNumber: string | null
+    receipts: { paymentId: string; receiptNumber: string; mode: string; amountMinor: number }[]
   } | null>(null)
 
   // One key per attempt; regenerated only after a successful collection.
   const idempotencyKey = React.useRef(newIdempotencyKey())
 
-  const loadStudent = React.useCallback(async (id: string) => {
-    const res = await fetch(`/api/v1/finance/invoices?studentId=${id}&pageSize=50`)
-    const json = await res.json()
-    const rows: Invoice[] = (json.data?.invoices ?? [])
-      .filter((i: Invoice) => i.status !== 'CANCELLED' && i.status !== 'DRAFT')
-      .map((i: Invoice & { dueOn: string }) => ({
-        id: i.id,
-        number: i.number,
-        title: i.title,
-        dueOn: i.dueOn,
-        totalMinor: i.totalMinor,
-        paidMinor: i.paidMinor,
-        balanceMinor: i.balanceMinor,
-        status: i.status,
-      }))
+  const loadStudent = React.useCallback(async (id: string, suggestAmount = true) => {
+    const res = await fetch(`/api/v1/finance/collect/students/${id}`)
+    const json = await res.json().catch(() => null)
+    if (!res.ok || !json?.data) {
+      toast.push({
+        tone: 'error',
+        title: 'Could not load this student',
+        description: json?.error?.message ?? 'Check your connection and try again.',
+      })
+      return
+    }
+    setStudent(json.data.student as StudentHit)
+    const rows = json.data.invoices as Invoice[]
     setInvoices(rows)
+    if (!suggestAmount) return
     const now = new Date()
     const dueNow = rows
       .filter((invoice) => invoice.balanceMinor > 0 && new Date(invoice.dueOn) <= now)
       .reduce((sum, invoice) => sum + invoice.balanceMinor, 0)
-    const due = dueNow || rows.reduce((sum, i) => sum + i.balanceMinor, 0)
+    const due = dueNow || rows.reduce((sum, i) => sum + Math.max(0, i.balanceMinor), 0)
     setAmount(due > 0 ? String(due / 100) : '')
-  }, [])
+  }, [toast])
 
   React.useEffect(() => {
     if (!initialStudentId) return
-    void (async () => {
-      const res = await fetch(`/api/v1/students/${initialStudentId}`)
-      const json = await res.json()
-      if (!json.data) return
-      const s = json.data
-      const primaryGuardian = Array.isArray(s.guardians)
-        ? s.guardians.find((g: { isPrimary?: boolean }) => g.isPrimary) ?? s.guardians[0]
-        : null
-      const parent = primaryGuardian?.parent
-      setStudent({
-        id: s.id,
-        admissionNo: s.admissionNo,
-        firstName: s.firstName,
-        lastName: s.lastName,
-        className: s.enrollments?.[0]?.classLevel?.name ?? null,
-        sectionName: s.enrollments?.[0]?.section?.name ?? null,
-        parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : null,
-        dueMinor: 0,
-      })
-      await loadStudent(initialStudentId)
-    })()
+    void loadStudent(initialStudentId)
   }, [initialStudentId, loadStudent])
 
   React.useEffect(() => {
     if (query.trim().length < 2 || student) {
       setHits([])
+      setSearchError(null)
       return
     }
     const controller = new AbortController()
     setSearching(true)
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/v1/students?q=${encodeURIComponent(query)}&pageSize=8`, {
+        const res = await fetch(`/api/v1/finance/collect/students?q=${encodeURIComponent(query)}`, {
           signal: controller.signal,
         })
-        const json = await res.json()
-        const rows = (json.data ?? []) as Array<StudentHit & { guardianName?: string | null }>
-        setHits(
-          rows.map((row) => ({
-            id: row.id,
-            admissionNo: row.admissionNo,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            className: row.className,
-            sectionName: row.sectionName,
-            parentName: row.parentName ?? row.guardianName ?? null,
-            dueMinor: row.dueMinor ?? 0,
-          })),
-        )
+        const json = await res.json().catch(() => null)
+        if (!res.ok) {
+          setHits([])
+          setSearchError(json?.error?.message ?? 'Search failed')
+          return
+        }
+        setSearchError(null)
+        setHits((json?.data ?? []) as StudentHit[])
       } catch {
         /* aborted */
       } finally {
@@ -206,23 +207,70 @@ export function CollectForm({
     }
   }, [query, student])
 
-  const totalDue = invoices.reduce((sum, i) => sum + i.balanceMinor, 0)
+  const openInvoices = invoices.filter((i) => i.balanceMinor > 0)
+  const totalDue = openInvoices.reduce((sum, i) => sum + i.balanceMinor, 0)
   const totalAnnual = invoices.reduce((sum, i) => sum + i.totalMinor, 0)
   const totalPaid = invoices.reduce((sum, i) => sum + i.paidMinor, 0)
   const now = new Date()
-  const dueNow = invoices
-    .filter((invoice) => invoice.balanceMinor > 0 && new Date(invoice.dueOn) <= now)
+  const dueNow = openInvoices
+    .filter((invoice) => new Date(invoice.dueOn) <= now)
     .reduce((sum, invoice) => sum + invoice.balanceMinor, 0)
-  const upcoming = invoices
-    .filter((invoice) => invoice.balanceMinor > 0 && new Date(invoice.dueOn) > now)
+  const upcoming = openInvoices
+    .filter((invoice) => new Date(invoice.dueOn) > now)
     .reduce((sum, invoice) => sum + invoice.balanceMinor, 0)
-  const overdue = invoices
-    .filter((invoice) => invoice.balanceMinor > 0 && new Date(invoice.dueOn) < now)
+  const overdue = openInvoices
+    .filter((invoice) => new Date(invoice.dueOn) < now)
     .reduce((sum, invoice) => sum + invoice.balanceMinor, 0)
-  const amountMinor = Math.round(Number(amount || 0) * 100)
-  const discountMinor = canDiscount ? Math.round(Number(discount || 0) * 100) : 0
-  const payableMinor = Math.max(0, totalDue - discountMinor)
+
+  const validCharges = charges.filter((c) => c.label.trim().length >= 2 && toMinor(c.amount) > 0)
+  const extraMinor = validCharges.reduce((sum, c) => sum + toMinor(c.amount), 0)
+  const validSplits = splits.filter((s) => toMinor(s.amount) > 0)
+  const amountMinor = splitting
+    ? validSplits.reduce((sum, s) => sum + toMinor(s.amount), 0)
+    : toMinor(amount)
+  const discountMinor = canDiscount ? toMinor(discount) : 0
+  const payableMinor = Math.max(0, totalDue + extraMinor - discountMinor)
   const advance = Math.max(0, amountMinor - payableMinor)
+  const incompleteCharge = charges.some(
+    (c) => (c.label.trim().length > 0 || c.amount !== '') && !(c.label.trim().length >= 2 && toMinor(c.amount) > 0),
+  )
+
+  // Adding or removing a charge moves the suggested amount with it, so the
+  // cashier is never one edit away from under-collecting.
+  const lastExtra = React.useRef(0)
+  React.useEffect(() => {
+    const delta = extraMinor - lastExtra.current
+    lastExtra.current = extraMinor
+    if (delta === 0 || splitting) return
+    setAmount((current) => {
+      const next = Math.max(0, toMinor(current) + delta)
+      return next > 0 ? String(next / 100) : ''
+    })
+  }, [extraMinor, splitting])
+
+  const startSplit = () => {
+    const total = toMinor(amount)
+    const first = Math.ceil(total / 200) * 100
+    setSplits([
+      { key: rowKey(), mode, amount: total > 0 ? String(first / 100) : '', reference },
+      { key: rowKey(), mode: mode === 'CASH' ? 'UPI' : 'CASH', amount: total > 0 ? String((total - first) / 100) : '', reference: '' },
+    ])
+    setSplitting(true)
+  }
+
+  const stopSplit = () => {
+    const total = validSplits.reduce((sum, s) => sum + toMinor(s.amount), 0)
+    setAmount(total > 0 ? String(total / 100) : '')
+    setMode(validSplits[0]?.mode ?? mode)
+    setReference(validSplits[0]?.reference ?? '')
+    setSplitting(false)
+    setSplits([])
+  }
+
+  const addCharge = (label = '') => {
+    const head = feeHeads.find((h) => h.name.toLowerCase() === label.toLowerCase())
+    setCharges((rows) => [...rows, { key: rowKey(), feeHeadId: head?.id ?? '', label, amount: '' }])
+  }
 
   const submit = () => {
     if (!student) return
@@ -231,13 +279,25 @@ export function CollectForm({
       const result = await collectPaymentAction({
         studentId: student.id,
         collectedById,
-        amount: Number(amount),
+        ...(splitting
+          ? {
+              payments: validSplits.map((s) => ({
+                mode: s.mode,
+                amount: toMinor(s.amount) / 100,
+                reference: s.reference.trim() || undefined,
+              })),
+            }
+          : { amount: amountMinor / 100, mode, reference: reference || undefined }),
+        extraCharges: validCharges.length
+          ? validCharges.map((c) => ({
+              feeHeadId: c.feeHeadId || undefined,
+              label: c.label.trim(),
+              amount: toMinor(c.amount) / 100,
+            }))
+          : undefined,
         paidOn,
-        discount: discountMinor > 0 ? Number(discount) : undefined,
+        discount: discountMinor > 0 ? discountMinor / 100 : undefined,
         discountReason: discountMinor > 0 ? discountReason.trim() : undefined,
-        mode,
-        reference: reference || undefined,
-        billBookNo: billBookNo || undefined,
         notes: notes || undefined,
         idempotencyKey: idempotencyKey.current,
       })
@@ -253,7 +313,9 @@ export function CollectForm({
         number: result.data?.receiptNumber ?? '',
         advance: result.data?.unallocatedMinor ?? 0,
         discount: result.data?.discountedMinor ?? 0,
-        billBookNo: billBookNo || null,
+        billBookNo: result.data?.billBookNo ?? null,
+        extraInvoiceNumber: result.data?.extraInvoiceNumber ?? null,
+        receipts: result.data?.receipts ?? [],
       })
       idempotencyKey.current = newIdempotencyKey()
       router.refresh()
@@ -265,6 +327,10 @@ export function CollectForm({
     setInvoices([])
     setQuery('')
     setAmount('')
+    setSplitting(false)
+    setSplits([])
+    setCharges([])
+    lastExtra.current = 0
     setPaidOn(toDateInput(new Date()))
     setDiscount('')
     setDiscountReason('')
@@ -274,7 +340,6 @@ export function CollectForm({
         : (collectors[0]?.id ?? ''),
     )
     setReference('')
-    setBillBookNo('')
     setNotes('')
     setReceipt(null)
   }
@@ -288,7 +353,12 @@ export function CollectForm({
           </div>
           <p className="text-xl font-semibold text-ink">Payment recorded</p>
           <p className="text-base text-ink-muted mt-1">
-            Receipt <span className="font-medium text-ink tnum">{receipt.number}</span>
+            {receipt.receipts.length > 1 ? 'Receipts ' : 'Receipt '}
+            <span className="font-medium text-ink tnum">
+              {receipt.receipts.length > 1
+                ? receipt.receipts.map((r) => r.receiptNumber).join(', ')
+                : receipt.number}
+            </span>
             {receipt.billBookNo
               ? <> · bill book <span className="font-medium text-ink tnum">{receipt.billBookNo}</span></>
               : null}
@@ -299,9 +369,23 @@ export function CollectForm({
               ? ` · ${formatMoney(receipt.advance, currency)} held as advance`
               : ''}
           </p>
+          {receipt.receipts.length > 1 ? (
+            <p className="mt-1 text-sm text-ink-muted">
+              Paid as{' '}
+              {receipt.receipts
+                .map((r) => `${MODE_LABELS[r.mode] ?? r.mode} ${formatMoney(r.amountMinor, currency)}`)
+                .join(' + ')}
+            </p>
+          ) : null}
+          {receipt.extraInvoiceNumber ? (
+            <p className="mt-1 text-sm text-ink-muted">
+              Extra charges billed on invoice{' '}
+              <span className="font-medium text-ink tnum">{receipt.extraInvoiceNumber}</span>
+            </p>
+          ) : null}
           <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
             <Button onClick={reset}>Collect another payment</Button>
-            {student ? (
+            {student && canViewLedger ? (
               <Link
                 href={`/finance/students/${student.id}`}
                 className={buttonVariants({ variant: 'secondary' })}
@@ -343,7 +427,7 @@ export function CollectForm({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Name, admission number or parent"
+                  placeholder="Name, admission number, parent or phone"
                   className="pl-9"
                   aria-label="Search for a student"
                 />
@@ -355,7 +439,9 @@ export function CollectForm({
                 ) : null}
               </div>
 
-              {hits.length > 0 ? (
+              {searchError ? (
+                <p className="text-sm text-[var(--danger)]">{searchError}</p>
+              ) : hits.length > 0 ? (
                 <ul className="divide-y divide-[var(--border)] border border-line rounded-[var(--radius)]">
                   {hits.map((h) => (
                     <li key={h.id}>
@@ -402,12 +488,14 @@ export function CollectForm({
                     {student.className ? ` · ${student.className} ${student.sectionName ?? ''}`.trimEnd() : ''}
                   </p>
                 </div>
-                <Link
-                  href={`/finance/students/${student.id}`}
-                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                >
-                  View ledger
-                </Link>
+                {canViewLedger ? (
+                  <Link
+                    href={`/finance/students/${student.id}`}
+                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                  >
+                    View ledger
+                  </Link>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-[var(--radius-sm)] border border-line px-3.5 py-3 sm:grid-cols-4">
@@ -418,30 +506,209 @@ export function CollectForm({
                 {overdue > 0 ? <p className="col-span-2 text-xs text-[var(--danger)] sm:col-span-4">{formatMoney(overdue, currency)} is overdue</p> : null}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Amount received" htmlFor="amount" required>
-                  <Input
-                    id="amount"
-                    type="number"
-                    min={1}
-                    step="1"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    autoFocus
-                  />
-                  {amountMinor > 0 ? (
-                    <p className="mt-1.5 text-xs text-ink-muted">
-                      Outstanding fees after payment:{' '}
-                      <span className="font-medium text-ink tnum">
-                        {formatMoney(Math.max(0, payableMinor - amountMinor), currency)}
-                      </span>
-                      {advance > 0
-                        ? ` · ${formatMoney(advance, currency)} held as advance`
-                        : ''}
+              <section className="rounded-[var(--radius)] border border-line">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium text-ink">Extra charges</p>
+                    <p className="text-xs text-ink-subtle">
+                      Fine, school trip or anything else to bill and collect right now
                     </p>
-                  ) : null}
-                </Field>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CHARGE_PRESETS.map((preset) => (
+                      <Button
+                        key={preset}
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => addCharge(preset === 'Other charge' ? '' : preset)}
+                      >
+                        <Plus className="size-3.5" aria-hidden />
+                        {preset}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {charges.length > 0 ? (
+                  <ul className="divide-y divide-[var(--border)] border-t border-line">
+                    {charges.map((charge) => (
+                      <li key={charge.key} className="grid gap-2 px-3.5 py-2.5 sm:grid-cols-[180px_1fr_120px_auto] sm:items-center">
+                        <Select
+                          aria-label="Fee head"
+                          value={charge.feeHeadId}
+                          onChange={(e) => {
+                            const id = e.target.value
+                            const head = feeHeads.find((h) => h.id === id)
+                            setCharges((rows) => rows.map((r) => r.key === charge.key
+                              ? { ...r, feeHeadId: id, label: head && (!r.label || feeHeads.some((h) => h.name === r.label)) ? head.name : r.label }
+                              : r))
+                          }}
+                        >
+                          <option value="">No fee head</option>
+                          {feeHeads.map((head) => (
+                            <option key={head.id} value={head.id}>{head.name}</option>
+                          ))}
+                        </Select>
+                        <Input
+                          aria-label="What is this charge for"
+                          placeholder="e.g. School trip to Science City"
+                          value={charge.label}
+                          maxLength={120}
+                          onChange={(e) => setCharges((rows) => rows.map((r) => r.key === charge.key ? { ...r, label: e.target.value } : r))}
+                        />
+                        <Input
+                          aria-label="Charge amount"
+                          type="number"
+                          min={1}
+                          step="1"
+                          placeholder="Amount"
+                          className="tnum"
+                          value={charge.amount}
+                          onChange={(e) => setCharges((rows) => rows.map((r) => r.key === charge.key ? { ...r, amount: e.target.value } : r))}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label="Remove charge"
+                          onClick={() => setCharges((rows) => rows.filter((r) => r.key !== charge.key))}
+                        >
+                          <X className="size-4" aria-hidden />
+                        </Button>
+                      </li>
+                    ))}
+                    <li className="flex items-center justify-between px-3.5 py-2 text-sm">
+                      <span className="text-ink-muted">Extra charges total</span>
+                      <span className="font-semibold tnum text-ink">{formatMoney(extraMinor, currency)}</span>
+                    </li>
+                  </ul>
+                ) : null}
+              </section>
 
+              {!splitting ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Amount received" htmlFor="amount" required>
+                    <Input
+                      id="amount"
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      autoFocus
+                    />
+                    {amountMinor > 0 ? (
+                      <p className="mt-1.5 text-xs text-ink-muted">
+                        Outstanding after payment:{' '}
+                        <span className="font-medium text-ink tnum">
+                          {formatMoney(Math.max(0, payableMinor - amountMinor), currency)}
+                        </span>
+                        {advance > 0
+                          ? ` · ${formatMoney(advance, currency)} held as advance`
+                          : ''}
+                      </p>
+                    ) : null}
+                  </Field>
+
+                  <Field label="Mode" htmlFor="mode" required>
+                    <Select id="mode" value={mode} onChange={(e) => setMode(e.target.value)}>
+                      {MODES.map((m) => <option key={m} value={m}>{MODE_LABELS[m]}</option>)}
+                    </Select>
+                    <button
+                      type="button"
+                      onClick={startSplit}
+                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-[var(--brand-600)] hover:underline"
+                    >
+                      <Split className="size-3.5" aria-hidden />
+                      Split across cash, UPI and other modes
+                    </button>
+                  </Field>
+
+                  {mode !== 'CASH' ? (
+                    <Field label="Reference" htmlFor="reference" hint="Cheque number, UPI reference or UTR">
+                      <Input id="reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+                    </Field>
+                  ) : null}
+                </div>
+              ) : (
+                <section className="rounded-[var(--radius)] border border-line">
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+                    <div>
+                      <p className="text-sm font-medium text-ink">Split payment</p>
+                      <p className="text-xs text-ink-subtle">
+                        Each mode gets its own receipt line; together they settle the dues
+                      </p>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={stopSplit}>
+                      Use one mode
+                    </Button>
+                  </div>
+                  <ul className="divide-y divide-[var(--border)] border-t border-line">
+                    {splits.map((row, index) => (
+                      <li key={row.key} className="grid gap-2 px-3.5 py-2.5 sm:grid-cols-[150px_130px_1fr_auto] sm:items-center">
+                        <Select
+                          aria-label={`Mode ${index + 1}`}
+                          value={row.mode}
+                          onChange={(e) => setSplits((rows) => rows.map((r) => r.key === row.key ? { ...r, mode: e.target.value } : r))}
+                        >
+                          {MODES.map((m) => <option key={m} value={m}>{MODE_LABELS[m]}</option>)}
+                        </Select>
+                        <Input
+                          aria-label={`Amount ${index + 1}`}
+                          type="number"
+                          min={1}
+                          step="1"
+                          className="tnum"
+                          value={row.amount}
+                          onChange={(e) => setSplits((rows) => rows.map((r) => r.key === row.key ? { ...r, amount: e.target.value } : r))}
+                        />
+                        <Input
+                          aria-label={`Reference ${index + 1}`}
+                          placeholder={row.mode === 'CASH' ? 'No reference needed' : 'UPI ref / cheque no. / UTR'}
+                          disabled={row.mode === 'CASH'}
+                          value={row.mode === 'CASH' ? '' : row.reference}
+                          onChange={(e) => setSplits((rows) => rows.map((r) => r.key === row.key ? { ...r, reference: e.target.value } : r))}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label="Remove this mode"
+                          disabled={splits.length <= 2}
+                          onClick={() => setSplits((rows) => rows.filter((r) => r.key !== row.key))}
+                        >
+                          <X className="size-4" aria-hidden />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3.5 py-2.5 text-sm">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={splits.length >= 6}
+                      onClick={() => {
+                        const left = Math.max(0, payableMinor - amountMinor)
+                        setSplits((rows) => [...rows, { key: rowKey(), mode: 'CARD', amount: left > 0 ? String(left / 100) : '', reference: '' }])
+                      }}
+                    >
+                      <Plus className="size-3.5" aria-hidden />
+                      Add another mode
+                    </Button>
+                    <span className="text-ink-muted">
+                      Total <span className="font-semibold tnum text-ink">{formatMoney(amountMinor, currency)}</span>
+                      {payableMinor - amountMinor > 0
+                        ? ` · ${formatMoney(payableMinor - amountMinor, currency)} still outstanding`
+                        : advance > 0
+                          ? ` · ${formatMoney(advance, currency)} held as advance`
+                          : ' · dues cleared'}
+                    </span>
+                  </div>
+                </section>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label="Payment date"
                   htmlFor="paidOn"
@@ -457,15 +724,19 @@ export function CollectForm({
                   />
                 </Field>
 
-                <Field label="Mode" htmlFor="mode" required>
-                  <Select id="mode" value={mode} onChange={(e) => setMode(e.target.value)}>
-                    <option value="CASH">Cash</option>
-                    <option value="UPI">UPI</option>
-                    <option value="CARD">Card</option>
-                    <option value="CHEQUE">Cheque</option>
-                    <option value="BANK_TRANSFER">Bank transfer</option>
-                    <option value="NET_BANKING">Net banking</option>
-                  </Select>
+                <Field
+                  label="Bill book number"
+                  htmlFor="billBookNo"
+                  required
+                  hint="Issued automatically and never repeated"
+                >
+                  <Input
+                    id="billBookNo"
+                    value={nextBillBookNo}
+                    readOnly
+                    aria-readonly
+                    className="tnum bg-surface-2"
+                  />
                 </Field>
               </div>
 
@@ -485,9 +756,10 @@ export function CollectForm({
                       onChange={(e) => {
                         const next = e.target.value
                         setDiscount(next)
+                        if (splitting) return
                         const nextDiscountMinor = Math.round(Number(next || 0) * 100)
                         if (Number.isFinite(nextDiscountMinor) && nextDiscountMinor >= 0) {
-                          const nextPayable = Math.max(0, totalDue - nextDiscountMinor)
+                          const nextPayable = Math.max(0, totalDue + extraMinor - nextDiscountMinor)
                           setAmount(nextPayable > 0 ? String(nextPayable / 100) : '0')
                         }
                       }}
@@ -522,7 +794,7 @@ export function CollectForm({
               <Field
                 label="Collected by"
                 htmlFor="collectedById"
-                hint="Accountant name shown on the receipt"
+                hint="Name shown on the receipt"
                 required
               >
                 <Select
@@ -546,41 +818,6 @@ export function CollectForm({
                 </Select>
               </Field>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                {mode !== 'CASH' ? (
-                  <Field
-                    label="Reference"
-                    htmlFor="reference"
-                    hint="Cheque number, UPI reference or UTR"
-                  >
-                    <Input
-                      id="reference"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                    />
-                  </Field>
-                ) : null}
-
-                {/* The serial off the paper receipt book. Left free-form and
-                    unvalidated on purpose: a school running two counters from
-                    two books will have numbers that repeat, and a cashier with
-                    a queue must never be blocked by this field. */}
-                <Field
-                  label="Bill book number"
-                  htmlFor="billBookNo"
-                  hint="Serial on the paper receipt, if one was issued"
-                >
-                  <Input
-                    id="billBookNo"
-                    value={billBookNo}
-                    onChange={(e) => setBillBookNo(e.target.value)}
-                    inputMode="text"
-                    autoComplete="off"
-                    maxLength={40}
-                  />
-                </Field>
-              </div>
-
               <Field label="Notes" htmlFor="notes">
                 <Textarea
                   id="notes"
@@ -596,12 +833,19 @@ export function CollectForm({
                   excess will be recorded as an advance.
                 </p>
               ) : null}
+              {incompleteCharge ? (
+                <p className="text-xs text-[var(--danger)]">
+                  Give every extra charge a name and an amount, or remove it.
+                </p>
+              ) : null}
 
               <Button
                 onClick={() => setConfirming(true)}
                 loading={pending}
                 disabled={
                   !collectedById ||
+                  incompleteCharge ||
+                  (splitting && validSplits.length !== splits.length) ||
                   (amountMinor <= 0 && discountMinor <= 0) ||
                   (discountMinor > 0 && discountReason.trim().length < 3)
                 }
@@ -635,6 +879,18 @@ export function CollectForm({
                     {student.firstName} {student.lastName}
                     <span className="text-ink-subtle"> · {student.admissionNo}</span>
                   </dd>
+                  {extraMinor > 0 ? (
+                    <>
+                      <dt className="text-ink-muted">Extra charges</dt>
+                      <dd className="text-ink">
+                        {validCharges.map((c) => (
+                          <span key={c.key} className="block">
+                            {c.label.trim()} <span className="tnum">{formatMoney(toMinor(c.amount), currency)}</span>
+                          </span>
+                        ))}
+                      </dd>
+                    </>
+                  ) : null}
                   {amountMinor > 0 ? (
                     <>
                       <dt className="text-ink-muted">Amount received</dt>
@@ -652,19 +908,25 @@ export function CollectForm({
                   ) : null}
                   <dt className="text-ink-muted">Mode</dt>
                   <dd className="text-ink">
-                    {MODE_LABELS[mode] ?? mode}
-                    {reference ? <span className="text-ink-subtle"> · {reference}</span> : null}
+                    {splitting
+                      ? validSplits.map((s) => (
+                          <span key={s.key} className="block">
+                            {MODE_LABELS[s.mode] ?? s.mode}{' '}
+                            <span className="tnum">{formatMoney(toMinor(s.amount), currency)}</span>
+                            {s.reference && s.mode !== 'CASH' ? <span className="text-ink-subtle"> · {s.reference}</span> : null}
+                          </span>
+                        ))
+                      : <>
+                          {MODE_LABELS[mode] ?? mode}
+                          {reference ? <span className="text-ink-subtle"> · {reference}</span> : null}
+                        </>}
                   </dd>
                   <dt className="text-ink-muted">Payment date</dt>
                   <dd className="text-ink">{paidOn ? formatDay(new Date(`${paidOn}T00:00:00.000Z`), 'd MMM yyyy') : '—'}</dd>
                   <dt className="text-ink-muted">Collected by</dt>
                   <dd className="text-ink">{collectors.find((collector) => collector.id === collectedById)?.name ?? '—'}</dd>
-                  {billBookNo ? (
-                    <>
-                      <dt className="text-ink-muted">Bill book no.</dt>
-                      <dd className="text-ink tnum">{billBookNo}</dd>
-                    </>
-                  ) : null}
+                  <dt className="text-ink-muted">Bill book no.</dt>
+                  <dd className="text-ink tnum">{nextBillBookNo} <span className="text-ink-subtle">(confirmed on save)</span></dd>
                   <dt className="text-ink-muted">Outstanding after</dt>
                   <dd className="text-ink tnum">{formatMoney(Math.max(0, payableMinor - amountMinor), currency)}</dd>
                 </dl>
@@ -698,20 +960,20 @@ export function CollectForm({
               The unpaid invoices will be listed here, oldest first — which is the order the
               payment settles them in.
             </p>
-          ) : invoices.length === 0 ? (
+          ) : openInvoices.length === 0 && extraMinor === 0 ? (
             <p className="text-sm text-success">Nothing outstanding for this student.</p>
           ) : canEditAmounts ? (
             <EditableInvoiceAmounts
-              invoices={invoices}
+              invoices={openInvoices}
               currency={currency}
               canEdit
               onSaved={() => {
-                if (student) void loadStudent(student.id)
+                if (student) void loadStudent(student.id, false)
               }}
             />
           ) : (
             <ul className="divide-y divide-[var(--border)]">
-              {invoices.map((i) => (
+              {openInvoices.map((i) => (
                 <li key={i.id} className="flex items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
                     <p className="text-sm text-ink truncate">{i.title}</p>
@@ -724,6 +986,16 @@ export function CollectForm({
               ))}
             </ul>
           )}
+          {student && extraMinor > 0 ? (
+            <div className="mt-2 border-t border-line pt-2">
+              {validCharges.map((c) => (
+                <div key={c.key} className="flex items-center justify-between gap-2 py-1.5">
+                  <span className="text-sm text-ink truncate">{c.label.trim()} <Badge tone="info">new</Badge></span>
+                  <span className="text-sm font-medium tnum text-ink">{formatMoney(toMinor(c.amount), currency)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

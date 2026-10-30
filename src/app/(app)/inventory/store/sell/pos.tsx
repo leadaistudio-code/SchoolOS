@@ -55,6 +55,7 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
   const [customerPhone, setCustomerPhone] = React.useState('')
   const [paymentMode, setPaymentMode] = React.useState('CASH')
   const [paymentRef, setPaymentRef] = React.useState('')
+  const [feeDue, setFeeDue] = React.useState<'CURRENT' | 'NEXT'>('CURRENT')
   const [cashGiven, setCashGiven] = React.useState('')
   const [saving, setSaving] = React.useState(false)
   const searchRef = React.useRef<HTMLInputElement>(null)
@@ -158,7 +159,12 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
     setPaymentRef('')
     setCashGiven('')
     setPaymentMode('CASH')
+    setFeeDue('CURRENT')
   }
+
+  React.useEffect(() => {
+    if (buyerType === 'walkin' && paymentMode === 'FEE_ACCOUNT') setPaymentMode('CASH')
+  }, [buyerType, paymentMode])
 
   const submit = async () => {
     if (cart.length === 0) return push({ tone: 'error', title: 'Add items to the bill first' })
@@ -171,7 +177,8 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
       customerName: buyerType === 'walkin' ? customerName : undefined,
       customerPhone: customerPhone || undefined,
       paymentMode,
-      paymentRef: paymentMode === 'CASH' ? undefined : paymentRef || undefined,
+      feeDue,
+      paymentRef: paymentMode === 'CASH' || paymentMode === 'FEE_ACCOUNT' ? undefined : paymentRef || undefined,
       lines: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity, discount: Number(l.discount) || 0 })),
     })
     setSaving(false)
@@ -398,7 +405,10 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
           <div>
             <p className="mb-1 text-sm font-medium text-ink">Payment</p>
             <div className="flex flex-wrap gap-1.5">
-              {STORE_PAYMENT_MODES.map((m) => (
+              {[
+                ...STORE_PAYMENT_MODES,
+                ...(buyerType === 'student' ? [{ value: 'FEE_ACCOUNT', label: 'Add to fees' }] : []),
+              ].map((m) => (
                 <button
                   key={m.value}
                   type="button"
@@ -415,7 +425,22 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
               ))}
             </div>
           </div>
-          {paymentMode === 'CASH' ? (
+          {paymentMode === 'FEE_ACCOUNT' ? (
+            <div className="space-y-2 rounded-lg bg-surface-2 p-3">
+              <p className="text-xs text-ink-muted">
+                Nothing is taken now. The bill is added to {student ? `${student.firstName}'s` : "the student's"} fee
+                account and collected at the fee counter.
+              </p>
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+                <SegButton active={feeDue === 'CURRENT'} onClick={() => setFeeDue('CURRENT')}>
+                  With current fees
+                </SegButton>
+                <SegButton active={feeDue === 'NEXT'} onClick={() => setFeeDue('NEXT')}>
+                  With next fees
+                </SegButton>
+              </div>
+            </div>
+          ) : paymentMode === 'CASH' ? (
             <div className="grid grid-cols-2 items-end gap-2">
               <Field label="Cash received (₹)" htmlFor="pos-cash">
                 <Input id="pos-cash" inputMode="decimal" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} placeholder={String(total / 100)} />
@@ -431,7 +456,11 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
           )}
 
           <Button type="button" className="w-full" size="lg" disabled={saving || cart.length === 0} onClick={submit}>
-            {saving ? 'Saving bill…' : `Save bill · ${formatMoney(total, currency)}`}
+            {saving
+              ? 'Saving bill…'
+              : paymentMode === 'FEE_ACCOUNT'
+                ? `Add ${formatMoney(total, currency)} to fees`
+                : `Save bill · ${formatMoney(total, currency)}`}
           </Button>
         </div>
       </aside>

@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import type { AppContext } from '@/server/context'
+import { SCORE_METRIC_TAB } from '@/server/modules/students/insights'
 import { formatDay, toDateInput } from '@/lib/dates'
 import { formatMoney } from '@/lib/utils'
 import { bandMeta } from '@/lib/score'
@@ -90,6 +92,8 @@ export async function Student360({
   const currency = ctx.tenant.currency
   const ledgerEnabled = canSeeFeeAmounts && (await getAccountingFlags(ctx.db)).studentLedger
 
+  const drill = (metric: string) => `/students/${student.id}/insights?m=${metric}`
+
   const columns = ((): 2 | 3 | 4 => {
     let n = 0
     if (canAttendance) n += 1
@@ -106,9 +110,10 @@ export async function Student360({
       <MetricRow columns={columns}>
         {canAttendance ? (
           <Metric
+            href={drill('attendance')}
             label="Attendance"
             value={attPercent === null ? 'No data' : `${attPercent}%`}
-            sub="this session"
+            sub="this session · see the days"
             emphasis={
               attPercent === null
                 ? undefined
@@ -122,6 +127,7 @@ export async function Student360({
         ) : null}
         {canResults ? (
           <Metric
+            href={drill('academics')}
             label="Latest marks"
             value={latest ? `${latest.percent}%` : '—'}
             sub={
@@ -133,6 +139,7 @@ export async function Student360({
         ) : null}
         {canFeedback ? (
           <Metric
+            href={drill('feedback')}
             label="Teacher feedback"
             value={String(feedback?.length ?? 0)}
             sub="shared notes"
@@ -149,7 +156,7 @@ export async function Student360({
           />
         ) : canSeeFeeStatus ? (
           <Metric
-            href={canSeeFeeAmounts ? `/students/${student.id}/fee-ledger` : undefined}
+            href={canSeeFeeAmounts ? drill('fees') : undefined}
             label="Fees"
             value={
               canSeeFeeAmounts
@@ -176,7 +183,9 @@ export async function Student360({
         <Card>
           <CardHeader>
             <CardTitle>Health score</CardTitle>
-            <span className="text-xs text-ink-subtle">This session</span>
+            <Link href={drill('score')} className="text-xs font-medium text-[var(--brand-600)] hover:underline">
+              How is this worked out?
+            </Link>
           </CardHeader>
           {composed ? (
             <CardContent>
@@ -185,7 +194,10 @@ export async function Student360({
                   <ScoreDial score={composed.score} band={composed.band} />
                   <CoverageNote coverage={composed.coverage} />
                 </div>
-                <MetricBreakdown composed={composed} />
+                <MetricBreakdown
+                  composed={composed}
+                  hrefFor={(metric) => (SCORE_METRIC_TAB[metric] ? drill(SCORE_METRIC_TAB[metric]) : null)}
+                />
               </div>
             </CardContent>
           ) : (
@@ -201,7 +213,9 @@ export async function Student360({
         <Card>
           <CardHeader>
             <CardTitle>Attendance</CardTitle>
-            <span className="text-xs text-ink-subtle">This session</span>
+            <Link href={drill('attendance')} className="text-xs font-medium text-[var(--brand-600)] hover:underline">
+              Day by day
+            </Link>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-[200px_1fr] sm:items-center">
@@ -238,7 +252,9 @@ export async function Student360({
         <Card>
           <CardHeader>
             <CardTitle>Marks trend</CardTitle>
-            <span className="text-xs text-ink-subtle">Published exams, oldest first</span>
+            <Link href={drill('academics')} className="text-xs font-medium text-[var(--brand-600)] hover:underline">
+              Subject-wise marks
+            </Link>
           </CardHeader>
           {trend && trend.length ? (
             <CardContent>

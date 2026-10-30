@@ -2,9 +2,8 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { MoreHorizontal, Printer } from 'lucide-react'
+import { MoreHorizontal, Pencil, Printer } from 'lucide-react'
 import { CancelReceiptDialog } from '../payments/cancel-receipt-dialog'
-import { EditReceiptDialog } from '../payments/edit-receipt-dialog'
 import { buttonVariants } from '@/components/ui/button-variants'
 
 export type LedgerPaymentAction = {
@@ -29,7 +28,6 @@ export function LedgerReceiptActions({
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [cancelOpen, setCancelOpen] = React.useState(false)
-  const [editOpen, setEditOpen] = React.useState(false)
   const rootRef = React.useRef<HTMLDivElement>(null)
 
   const isManualSuccess =
@@ -75,16 +73,14 @@ export function LedgerReceiptActions({
             Print receipt
           </Link>
           {canEdit && isManualSuccess ? (
-            <button
-              type="button"
+            <Link
+              href={`/finance/payments/${payment.paymentId}/edit`}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink hover:bg-[var(--surface-2)]"
-              onClick={() => {
-                setMenuOpen(false)
-                setEditOpen(true)
-              }}
+              onClick={() => setMenuOpen(false)}
             >
+              <Pencil className="size-3.5 text-ink-subtle" aria-hidden />
               Edit receipt
-            </button>
+            </Link>
           ) : null}
           {canCancel && isManualSuccess ? (
             <button
@@ -105,18 +101,6 @@ export function LedgerReceiptActions({
         paymentId={payment.paymentId}
         open={cancelOpen}
         onOpenChange={setCancelOpen}
-      />
-      <EditReceiptDialog
-        values={{
-          paymentId: payment.paymentId,
-          mode: payment.mode,
-          paidOn: payment.paidOn ?? '',
-          reference: payment.paymentReference,
-          billBookNo: payment.billBookNo,
-          notes: payment.notes,
-        }}
-        open={editOpen}
-        onOpenChange={setEditOpen}
       />
     </div>
   )

@@ -27,14 +27,19 @@ export function GrnForm({
   today,
   currency,
   preselect,
+  preselectVendorId,
+  canBuyOnCredit = false,
   vendors = [],
 }: {
   items: GrnItem[]
   today: string
   currency: string
   preselect?: string
+  preselectVendorId?: string
+  canBuyOnCredit?: boolean
   vendors?: { id: string; code: string; name: string }[]
 }) {
+  const preselectedVendor = vendors.find((v) => v.id === preselectVendorId)
   const router = useRouter()
   const { push } = useToast()
   const byId = React.useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
@@ -44,8 +49,10 @@ export function GrnForm({
     return { key: nextKey.current++, itemId, quantity: '', unitCost: it?.avgCostMinor ? String(it.avgCostMinor / 100) : '' }
   }
   const [lines, setLines] = React.useState<Line[]>(() => [lineFor(preselect && byId.has(preselect) ? preselect : '')])
-  const [vendorName, setVendorName] = React.useState('')
-  const [vendorId, setVendorId] = React.useState('')
+  const [vendorName, setVendorName] = React.useState(preselectedVendor?.name ?? '')
+  const [vendorId, setVendorId] = React.useState(preselectedVendor?.id ?? '')
+  const typedMatch = vendors.find((v) => v.name.trim().toLowerCase() === vendorName.trim().toLowerCase())
+  const willCreateVendor = !vendorId && vendorName.trim().length >= 2 && !typedMatch
   const [invoiceNo, setInvoiceNo] = React.useState('')
   const [purchaseDate, setPurchaseDate] = React.useState(today)
   const [paymentMode, setPaymentMode] = React.useState('BANK_TRANSFER')
@@ -71,13 +78,13 @@ export function GrnForm({
   const save = async () => {
     const filled = lines.filter((l) => l.itemId)
     if (filled.length === 0) return push({ tone: 'error', title: 'Add at least one item' })
-    if (paymentMode === 'CREDIT' && (!vendorId || !invoiceNo.trim())) {
-      return push({ tone: 'error', title: 'To buy on credit, choose the vendor master and enter the vendor bill no.' })
+    if (paymentMode === 'CREDIT' && !invoiceNo.trim()) {
+      return push({ tone: 'error', title: 'To buy on credit, enter the vendor bill no.' })
     }
     setSaving(true)
     const res = await createStorePurchaseAction({
       vendorName,
-      vendorId: vendorId || null,
+      vendorId: vendorId || typedMatch?.id || null,
       invoiceNo,
       purchaseDate,
       paymentMode,
@@ -92,21 +99,45 @@ export function GrnForm({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Vendor / supplier" htmlFor="grn-vendor" required className="lg:col-span-2">
-          <Input id="grn-vendor" autoFocus value={vendorName} onChange={(e) => setVendorName(e.target.value)} placeholder="e.g. Sharma Uniforms, City Book Depot" />
+        <Field
+          label="Vendor / supplier"
+          htmlFor="grn-vendor"
+          required
+          className="lg:col-span-2"
+          hint={
+            willCreateVendor
+              ? `New vendor: “${vendorName.trim()}” will be added to the vendor master`
+              : typedMatch && !vendorId
+                ? `Linked to ${typedMatch.name} · ${typedMatch.code}`
+                : undefined
+          }
+        >
+          <Input
+            id="grn-vendor"
+            autoFocus={!preselectedVendor}
+            list="grn-vendor-names"
+            value={vendorName}
+            onChange={(e) => setVendorName(e.target.value)}
+            placeholder="e.g. Sharma Uniforms, City Book Depot"
+          />
+          <datalist id="grn-vendor-names">
+            {vendors.map((v) => (
+              <option key={v.id} value={v.name} />
+            ))}
+          </datalist>
         </Field>
         {vendors.length > 0 ? (
-          <Field label="Vendor master (optional)" htmlFor="grn-vendor-id" hint="Shows this receipt on the vendor's 360 page" className="lg:col-span-2">
+          <Field label="Vendor master" htmlFor="grn-vendor-id" hint="Shows this receipt on the vendor's 360 page" className="lg:col-span-2">
             <Select
               id="grn-vendor-id"
               value={vendorId}
               onChange={(e) => {
                 setVendorId(e.target.value)
                 const v = vendors.find((x) => x.id === e.target.value)
-                if (v && !vendorName.trim()) setVendorName(v.name)
+                if (v) setVendorName(v.name)
               }}
             >
-              <option value="">Not linked</option>
+              <option value="">Match by the name typed</option>
               {vendors.map((v) => (
                 <option key={v.id} value={v.id}>{v.name} · {v.code}</option>
               ))}
@@ -129,7 +160,7 @@ export function GrnForm({
             {STORE_PAYMENT_MODES.map((m) => (
               <option key={m.value} value={m.value}>{m.label}</option>
             ))}
-            {vendors.length > 0 ? <option value="CREDIT">On credit (vendor bill)</option> : null}
+            {canBuyOnCredit ? <option value="CREDIT">On credit (vendor bill)</option> : null}
           </Select>
         </Field>
         <Field label="Notes" htmlFor="grn-notes" className="sm:col-span-1 lg:col-span-3">

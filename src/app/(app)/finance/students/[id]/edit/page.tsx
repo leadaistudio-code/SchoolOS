@@ -21,13 +21,17 @@ export default async function EditStudentFeesPage({
     ctx.require('fees.accounts')
   }
 
-  const [account, feeHeads] = await Promise.all([
+  const [account, feeHeads, overrides] = await Promise.all([
     getStudentFeeAccount(ctx, id),
     listFeeHeads(ctx),
+    ctx.db.studentFeeLineOverride.findMany({
+      where: { studentId: id },
+      select: { installmentLineId: true, amountMinor: true },
+    }),
   ])
 
   const student = account.student
-  const heads = buildEditRows(account)
+  const heads = buildEditRows(account, new Map(overrides.map((o) => [o.installmentLineId, o.amountMinor])))
 
   return (
     <div className="space-y-4">
@@ -73,6 +77,7 @@ export default async function EditStudentFeesPage({
 
 function buildEditRows(
   account: Awaited<ReturnType<typeof getStudentFeeAccount>>,
+  overrides: Map<string, number>,
 ): EditFeeHeadRow[] {
   const fromPlan = new Map<string, EditFeeHeadRow>()
   const enrollmentClassId = account.student.enrollments[0]?.classLevelId ?? null
@@ -109,14 +114,18 @@ function buildEditRows(
                   monthKey(row.dueOn) === monthKey(installment.dueOn)
                   && row.lines.some((invoiceLine) => invoiceLine.feeHeadId === item.feeHeadId),
               )
+              const override = overrides.get(line.id)
               return {
                 ...invoiceDates(invoice),
                 invoiceId: invoice?.id ?? null,
+                installmentLineId: line.id,
+                planAmountMinor: line.amountMinor,
+                overridden: !invoice && override !== undefined,
                 dueOn: installment.dueOn.toISOString(),
                 label: formatDay(invoice?.dueOn ?? installment.dueOn, 'dd MMM yyyy'),
                 amountMinor: invoice
                   ? sumInvoiceHead(invoice, item.feeHeadId)
-                  : line.amountMinor,
+                  : override ?? line.amountMinor,
                 paidMinor: invoice ? sharePaid(invoice, item.feeHeadId) : 0,
               }
             }),

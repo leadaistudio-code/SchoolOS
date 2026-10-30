@@ -248,7 +248,7 @@ export const NAVIGATION: NavItem[] = [
     href: '/finance',
     icon: 'Wallet',
     section: 'FINANCE' as const,
-    permission: 'fees.view',
+    anyPermission: ['fees.view', 'fees.collect'],
     mobile: true,
     children: [
       { label: 'Dashboard', href: '/finance', icon: 'LayoutDashboard', permission: 'fees.view' },

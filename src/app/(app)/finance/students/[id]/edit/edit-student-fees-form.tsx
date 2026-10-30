@@ -3,7 +3,11 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { setInvoiceChargeAmountAction, grantConcessionAction } from '../../../actions'
+import {
+  setInvoiceChargeAmountAction,
+  setFutureFeeAmountAction,
+  grantConcessionAction,
+} from '../../../actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/input'
@@ -21,6 +25,10 @@ export type EditFeeHeadRow = {
   waiverMinor: number
   installments: {
     invoiceId: string | null
+    /** Plan line this month comes from; set for months not invoiced yet. */
+    installmentLineId?: string
+    planAmountMinor?: number
+    overridden?: boolean
     invoiceNumber?: string
     issuedOn?: string
     invoiceDueOn?: string
@@ -32,6 +40,64 @@ export type EditFeeHeadRow = {
 }
 
 type Tab = 'class' | 'non-class' | 'waiver'
+
+function FutureAmountRow({
+  row,
+  currency,
+  draft,
+  reason,
+  pending,
+  onDraft,
+  onReason,
+  onSave,
+}: {
+  row: EditFeeHeadRow['installments'][number]
+  currency: string
+  draft: string
+  reason: string
+  pending: boolean
+  onDraft: (value: string) => void
+  onReason: (value: string) => void
+  onSave: () => void
+}) {
+  const unchanged = Math.round(Number(draft || 0) * 100) === row.amountMinor
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-ink-subtle">₹</span>
+      <Input
+        className="w-28 tnum"
+        inputMode="decimal"
+        aria-label={`Amount for ${row.label}`}
+        value={draft}
+        onChange={(e) => onDraft(e.target.value)}
+      />
+      <Input
+        className="min-w-[12rem] flex-1"
+        placeholder="Reason (optional)"
+        value={reason}
+        onChange={(e) => onReason(e.target.value)}
+      />
+      <Button size="sm" variant="secondary" loading={pending} onClick={onSave} disabled={unchanged}>
+        Save
+      </Button>
+      <span className="text-xs text-ink-subtle">
+        not invoiced yet
+        {row.overridden && row.planAmountMinor !== undefined
+          ? ` · will bill this amount (plan ${formatMoney(row.planAmountMinor, currency)})`
+          : ' · will bill this amount when generated'}
+      </span>
+      {row.overridden && row.planAmountMinor !== undefined ? (
+        <button
+          type="button"
+          className="text-xs text-[var(--brand-600)] hover:underline"
+          onClick={() => onDraft(String(row.planAmountMinor! / 100))}
+        >
+          Use plan amount
+        </button>
+      ) : null}
+    </div>
+  )
+}
 
 export function EditStudentFeesForm({
   studentId,
@@ -89,6 +155,31 @@ export function EditStudentFeesForm({
       toast.push({
         tone: result.ok ? 'success' : 'error',
         title: result.ok ? 'Amount updated' : 'Could not update',
+        description: result.message,
+      })
+      setPendingId(null)
+      if (result.ok) router.refresh()
+    })()
+  }
+
+  const saveFuture = (lineId: string) => {
+    const key = `line:${lineId}`
+    const amount = Number(drafts[key])
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.push({ tone: 'error', title: 'Enter a valid amount' })
+      return
+    }
+    setPendingId(key)
+    void (async () => {
+      const result = await setFutureFeeAmountAction({
+        studentId,
+        installmentLineId: lineId,
+        amount,
+        reason: (reasons[key] ?? '').trim() || undefined,
+      })
+      toast.push({
+        tone: result.ok ? 'success' : 'error',
+        title: result.ok ? 'Future amount saved' : 'Could not save',
         description: result.message,
       })
       setPendingId(null)
@@ -320,6 +411,21 @@ export function EditStudentFeesForm({
                                           </span>
                                         ) : null}
                                       </div>
+                                    ) : row.installmentLineId ? (
+                                      <FutureAmountRow
+                                        row={row}
+                                        currency={currency}
+                                        draft={drafts[`line:${row.installmentLineId}`] ?? String(row.amountMinor / 100)}
+                                        reason={reasons[`line:${row.installmentLineId}`] ?? ''}
+                                        pending={pendingId === `line:${row.installmentLineId}`}
+                                        onDraft={(value) =>
+                                          setDrafts((prev) => ({ ...prev, [`line:${row.installmentLineId}`]: value }))
+                                        }
+                                        onReason={(value) =>
+                                          setReasons((prev) => ({ ...prev, [`line:${row.installmentLineId}`]: value }))
+                                        }
+                                        onSave={() => saveFuture(row.installmentLineId!)}
+                                      />
                                     ) : (
                                       <span className="text-ink-muted tnum">
                                         {formatMoney(row.amountMinor, currency)} · not invoiced yet

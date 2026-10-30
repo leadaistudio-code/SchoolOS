@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PackagePlus } from 'lucide-react'
 import { requireContext } from '@/server/context'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -64,6 +66,7 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
       })
     : []
   const canManage = ctx.can('accounts.manage')
+  const canReceiveStock = vendor.isActive && ctx.can('store.manage')
   const me = ctx.user.userId
 
   const accounts = canManage
@@ -89,11 +92,24 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
         breadcrumbs={[{ label: 'Accounts', href: '/accounts' }, { label: 'Vendors', href: '/accounts/vendors' }, { label: vendor.code }]}
         description={[vendor.code, vendor.gstin && `GSTIN ${vendor.gstin}`, vendor.pan && `PAN ${vendor.pan}`, vendor.creditDays ? `${vendor.creditDays}-day terms` : 'Immediate payment'].filter(Boolean).join(' · ')}
         actions={
-          canManage ? (
+          canManage || canReceiveStock ? (
             <div className="flex flex-wrap gap-2">
-              <VendorDialog label="Edit" vendor={vendor} />
-              {vendor.isActive ? <PurchaseVoucherDialog vendorId={vendor.id} accounts={accounts} creditDays={vendor.creditDays} /> : null}
-              <VendorPaymentDialog vendorId={vendor.id} bills={openBills} />
+              {canReceiveStock ? (
+                <Link
+                  href={`/inventory/store/purchases/new?vendorId=${vendor.id}`}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  <PackagePlus className="size-3.5" aria-hidden />
+                  Receive stock
+                </Link>
+              ) : null}
+              {canManage ? (
+                <>
+                  <VendorDialog label="Edit" vendor={vendor} />
+                  {vendor.isActive ? <PurchaseVoucherDialog vendorId={vendor.id} accounts={accounts} creditDays={vendor.creditDays} /> : null}
+                  <VendorPaymentDialog vendorId={vendor.id} bills={openBills} />
+                </>
+              ) : null}
             </div>
           ) : null
         }
@@ -258,7 +274,9 @@ export default async function Vendor360Page({ params }: { params: Promise<{ id: 
                     <TR key={p.id}>
                       <TD className="whitespace-nowrap tnum">
                         {toIsoDay(p.purchaseDate)}
-                        <span className="block text-xs text-ink-subtle">{p.number}</span>
+                        <Link href={`/inventory/store/purchases/${p.id}`} className="block text-xs text-[var(--brand-600)] hover:underline">
+                          {p.number}
+                        </Link>
                       </TD>
                       <TD className="text-sm">
                         {p.lines.map((l) => <span key={l.id} className="block">{l.quantity} × {l.item.name}</span>)}

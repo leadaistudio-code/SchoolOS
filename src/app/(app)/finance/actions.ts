@@ -55,6 +55,8 @@ import {
   saveTransportFeeRate,
   setInvoiceChargeAmount,
   setInvoiceChargeAmountSchema,
+  setFutureFeeAmount,
+  setFutureFeeAmountSchema,
   setInvoiceDates,
   simulateFeeIncrease,
   updateInstallmentDates,
@@ -212,6 +214,9 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
   allocatedMinor: number
   unallocatedMinor: number
   discountedMinor: number
+  billBookNo: string | null
+  extraInvoiceNumber: string | null
+  receipts: { paymentId: string; receiptNumber: string; mode: string; amountMinor: number }[]
 }>> {
   const ctx = await requireContext('fees.collect')
   try {
@@ -224,7 +229,13 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
     revalidatePath('/finance/dues')
     revalidatePath('/finance/students')
 
-    const parts = [`Receipt ${result.receiptNumber}`]
+    const receipts = result.parts ?? []
+    const parts = [
+      receipts.length > 1
+        ? `Receipts ${receipts.map((r) => r.receiptNumber).join(', ')}`
+        : `Receipt ${result.receiptNumber}`,
+    ]
+    if (result.billBookNo) parts.push(`bill book ${result.billBookNo}`)
     if (result.pendingClearance) {
       parts.push('cheque pending clearance; dues update once it is marked cleared')
     }
@@ -243,6 +254,14 @@ export async function collectPaymentAction(payload: unknown): Promise<ActionResu
         allocatedMinor: result.allocatedMinor,
         unallocatedMinor: result.unallocatedMinor,
         discountedMinor: result.discountedMinor,
+        billBookNo: result.billBookNo ?? null,
+        extraInvoiceNumber: result.extraInvoiceNumber ?? null,
+        receipts: receipts.map((r) => ({
+          paymentId: r.paymentId,
+          receiptNumber: r.receiptNumber,
+          mode: r.mode,
+          amountMinor: r.amountMinor,
+        })),
       },
     }
   } catch (err) {
@@ -338,7 +357,8 @@ export async function editPaymentAction(payload: unknown): Promise<ActionResult>
     revalidatePath('/finance/students')
     revalidatePath(`/finance/students/${result.studentId}`)
     revalidatePath('/finance/collect')
-    return { ok: true, message: 'Receipt details updated.' }
+    revalidatePath('/finance/dues')
+    return { ok: true, message: 'Receipt updated.' }
   } catch (err) {
     return fail(err, 'The receipt could not be updated')
   }
@@ -528,6 +548,24 @@ export async function saveTransportFeeRateAction(payload: unknown): Promise<Acti
     return { ok: true, message: 'Transport fee rate saved.' }
   } catch (err) {
     return fail(err, 'Could not save the transport fee rate')
+  }
+}
+
+export async function setFutureFeeAmountAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext()
+  try {
+    const result = await setFutureFeeAmount(ctx, setFutureFeeAmountSchema.parse(payload))
+    revalidatePath(`/finance/students/${result.studentId}`)
+    revalidatePath(`/finance/students/${result.studentId}/edit`)
+    return {
+      ok: true,
+      message:
+        result.amountMinor === result.planMinor
+          ? `${result.month} is back to the plan amount.`
+          : `${result.month} will be invoiced at ₹${(result.amountMinor / 100).toLocaleString('en-IN')}.`,
+    }
+  } catch (err) {
+    return fail(err, 'The future amount could not be saved')
   }
 }
 

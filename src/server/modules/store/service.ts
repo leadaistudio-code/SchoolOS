@@ -5,6 +5,7 @@ import { audit } from '@/server/audit'
 import { badRequest, conflict, notFound } from '@/server/api/response'
 import { financialYearLabel, nextDocumentNumber } from '@/server/numbering'
 import { attendanceDate } from '@/lib/dates'
+import { deriveInvoiceStatus } from '@/lib/money'
 import { presetRange, schoolToday } from '@/lib/periods'
 import {
   STORE_CATEGORIES,
@@ -73,7 +74,6 @@ export const storePurchaseSchema = z
   })
   .superRefine((v, issue) => {
     if (v.paymentMode !== 'CREDIT') return
-    if (!v.vendorId) issue.addIssue({ code: 'custom', path: ['vendorId'], message: 'Choose the vendor from the vendor master to buy on credit' })
     if (!v.invoiceNo) issue.addIssue({ code: 'custom', path: ['invoiceNo'], message: 'Enter the vendor bill number to buy on credit' })
   })
 
@@ -82,7 +82,10 @@ export const storeSaleSchema = z
     studentId: z.string().min(1).optional().nullable(),
     customerName: optionalText(120),
     customerPhone: optionalText(20),
-    paymentMode: paymentModeEnum,
+    /** FEE_ACCOUNT: nothing taken now; the bill is added to the student's fees. */
+    paymentMode: z.enum([...paymentModeEnum.options, 'FEE_ACCOUNT']),
+    /** With FEE_ACCOUNT: due with the current dues, or with the next fee instalment. */
+    feeDue: z.enum(['CURRENT', 'NEXT']).default('CURRENT'),
     paymentRef: optionalText(80),
     notes: optionalText(300),
     lines: z
@@ -93,6 +96,10 @@ export const storeSaleSchema = z
   .refine((v) => v.studentId || v.customerName, {
     message: 'Pick a student or enter the buyer name',
     path: ['customerName'],
+  })
+  .refine((v) => v.paymentMode !== 'FEE_ACCOUNT' || v.studentId, {
+    message: 'Pick the student whose fees this should be added to',
+    path: ['studentId'],
   })
 
 export const stockAdjustmentSchema = z.object({
@@ -221,7 +228,7 @@ export type ItemFilter = {
 
 export async function listStoreItems(ctx: AppContext, filter: ItemFilter = {}) {
   ctx.require('store.view')
-  const where: Prisma.StoreItemWhereInput = {}
+  const where: Prisma.StoreItemWhereInput = { deletedAt: null }
   if (filter.status !== 'all') where.isActive = filter.status !== 'inactive'
   if (filter.category && STORE_CATEGORIES.some((c) => c.value === filter.category)) {
     where.category = filter.category as StoreCategory
@@ -393,6 +400,7 @@ export async function setStoreItemActive(ctx: AppContext, id: string, active: bo
   ctx.require('store.manage')
   const before = await ctx.db.storeItem.findFirst({ where: { id } })
   if (!before) throw notFound('Store item')
+  if (before.deletedAt) throw conflict('This item was deleted; add it again instead')
   const updated = await ctx.db.storeItem.update({ where: { id }, data: { isActive: active } })
   await audit({
     tenantId: ctx.tenant.id,
@@ -405,6 +413,74 @@ export async function setStoreItemActive(ctx: AppContext, id: string, active: bo
     summary: `${active ? 'Re-activated' : 'Stopped selling'} ${itemLabel(before)}`,
   })
   return updated
+}
+
+export const deleteStoreItemSchema = z.object({
+  id: z.string().min(1),
+  reason: z.string().trim().min(3, 'Say why the item is being deleted').max(200),
+})
+
+/**
+ * Removes an item entered by mistake, stock and all.
+ *
+ * Past bills and goods receipts still point at the row, so it is never
+ * dropped: any units left are written off (which keeps the stock account in
+ * step), and the item disappears from every list, the POS and stock-in. Its SKU
+ * and barcode are released so the item can be entered again correctly.
+ */
+export async function deleteStoreItem(ctx: AppContext, raw: z.input<typeof deleteStoreItemSchema>) {
+  ctx.require('store.delete')
+  const input = deleteStoreItemSchema.parse(raw)
+
+  const result = await ctx.db.$transaction(async (raw) => {
+    const tx = raw as unknown as Prisma.TransactionClient
+    const items = await lockItems(tx, ctx.tenant.id, [input.id])
+    const item = items.get(input.id)!
+    const current = await tx.storeItem.findUniqueOrThrow({ where: { id: item.id } })
+    if (current.deletedAt) throw conflict('This item is already deleted')
+
+    let writeOffId: string | null = null
+    const units = item.quantity
+    if (units !== 0) {
+      await tx.storeItem.update({ where: { id: item.id }, data: { quantity: 0 } })
+      const m = await movement(tx, ctx, {
+        itemId: item.id,
+        type: units > 0 ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+        quantity: -units,
+        unitCostMinor: item.avgCostMinor,
+        balanceAfter: 0,
+        reason: `Item deleted: ${input.reason}`,
+      })
+      writeOffId = m.id
+    }
+    const tag = `DEL-${item.id.slice(-6)}`
+    await tx.storeItem.update({
+      where: { id: item.id },
+      data: {
+        isActive: false,
+        deletedAt: new Date(),
+        sku: `${current.sku}~${tag}`.slice(0, 60),
+        barcode: null,
+      },
+    })
+    return { item: current, units, writeOffId }
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'store.item_delete',
+    module: 'store',
+    entityType: 'StoreItem',
+    entityId: input.id,
+    summary: `Deleted ${itemLabel(result.item)} (${result.item.sku})${
+      result.units ? `, wrote off ${result.units} in stock` : ''
+    }: ${input.reason}`,
+    before: result.item,
+  })
+  if (result.writeOffId) postLedger(ctx.tenant.id, 'movement', result.writeOffId)
+  return { units: result.units }
 }
 
 /* ------------------------------------------------------------ adjustments */
@@ -464,6 +540,10 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
   const purchase = await ctx.db.$transaction(async (raw) => {
     const tx = raw as unknown as Prisma.TransactionClient
     const items = await lockItems(tx, ctx.tenant.id, input.lines.map((l) => l.itemId))
+    const vendor = input.vendorId
+      ? { id: input.vendorId, created: null }
+      : await vendorByName(raw, ctx, input.vendorName)
+    const vendorId = vendor.id
     const totalMinor = input.lines.reduce((s, l) => s + l.quantity * l.unitCost, 0)
     const number = await nextDocumentNumber(tx, {
       tenantId: ctx.tenant.id,
@@ -475,7 +555,7 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
         tenantId: ctx.tenant.id,
         number,
         vendorName: input.vendorName,
-        vendorId: input.vendorId,
+        vendorId,
         invoiceNo: input.invoiceNo,
         purchaseDate,
         paymentMode: input.paymentMode,
@@ -511,7 +591,7 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
       await payables.createStoreBillTx(raw, ctx, {
         storePurchaseId: created.id,
         storePurchaseNumber: number,
-        vendorId: input.vendorId!,
+        vendorId,
         supplierInvoiceNo: input.invoiceNo!,
         invoiceDate: input.purchaseDate,
         lines: input.lines.map((l) => ({
@@ -522,7 +602,7 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
         })),
       })
     }
-    return created
+    return { ...created, vendorCreated: vendor.created }
   })
 
   await audit({
@@ -533,11 +613,48 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
     module: 'store',
     entityType: 'StorePurchase',
     entityId: purchase.id,
-    summary: `Received stock ${purchase.number} from ${purchase.vendorName} worth ₹${purchase.totalMinor / 100}`,
+    summary: `Received stock ${purchase.number} from ${purchase.vendorName} worth ₹${purchase.totalMinor / 100}${
+      purchase.vendorCreated ? `; added vendor ${purchase.vendorCreated}` : ''
+    }`,
     after: purchase,
   })
   postLedger(ctx.tenant.id, 'purchase', purchase.id)
   return purchase
+}
+
+/**
+ * The vendor-master row for a supplier typed by name on a stock receipt:
+ * matched case-insensitively, or created so the receipt shows on Vendor 360.
+ */
+async function vendorByName(
+  raw: Parameters<Parameters<AppContext['db']['$transaction']>[0]>[0],
+  ctx: AppContext,
+  typed: string,
+): Promise<{ id: string; created: string | null }> {
+  const name = typed.trim().replace(/\s+/g, ' ')
+  await raw.$queryRawUnsafe(
+    'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text AS locked',
+    `${ctx.tenant.id}:VENDOR_NAME`,
+  )
+  const existing = await raw.vendor.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+    orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  })
+  if (existing) return { id: existing.id, created: null }
+  const { nextVendorCode } = await import('@/server/modules/accounting/payables-service')
+  const code = await nextVendorCode(raw, ctx.tenant.id)
+  const vendor = await raw.vendor.create({
+    data: {
+      tenantId: ctx.tenant.id,
+      code,
+      name,
+      createdById: ctx.user.userId,
+      notes: 'Added automatically from a store stock receipt',
+    },
+    select: { id: true },
+  })
+  return { id: vendor.id, created: `${name} (${code})` }
 }
 
 export async function listStorePurchases(ctx: AppContext, filter: { q?: string; preset?: string } = {}) {
@@ -669,7 +786,16 @@ export async function createStoreSale(ctx: AppContext, raw: StoreSaleInput) {
         reason: number,
       })
     }
-    return created
+    let feeInvoice: { number: string; dueOn: Date } | null = null
+    if (input.paymentMode === 'FEE_ACCOUNT' && student) {
+      feeInvoice = await addSaleToFees(tx, ctx, {
+        sale: created,
+        studentId: student.id,
+        due: input.feeDue,
+        lines: lines.map((l) => ({ label: itemLabel(l.item), quantity: l.quantity, amountMinor: l.amount })),
+      })
+    }
+    return { ...created, feeInvoice }
   })
 
   await audit({
@@ -680,11 +806,88 @@ export async function createStoreSale(ctx: AppContext, raw: StoreSaleInput) {
     module: 'store',
     entityType: 'StoreSale',
     entityId: sale.id,
-    summary: `Store bill ${sale.number} for ${sale.customerName ?? 'walk-in'}: ₹${sale.totalMinor / 100} (${sale.paymentMode})`,
+    summary: `Store bill ${sale.number} for ${sale.customerName ?? 'walk-in'}: ₹${sale.totalMinor / 100} (${
+      sale.feeInvoice ? `added to fees on ${sale.feeInvoice.number}` : sale.paymentMode
+    })`,
     after: sale,
   })
   postLedger(ctx.tenant.id, 'sale', sale.id)
   return sale
+}
+
+export const storeSaleFeeKey = (saleId: string) => `store-sale:${saleId}`
+
+/**
+ * Bills a store sale to the student's fee account: one invoice the counter
+ * collects like any other due. CURRENT is due today; NEXT is due with the
+ * student's next fee instalment (or the 1st of next month if none is set).
+ */
+async function addSaleToFees(
+  tx: Prisma.TransactionClient,
+  ctx: AppContext,
+  args: {
+    sale: { id: string; number: string; soldAt: Date; totalMinor: number }
+    studentId: string
+    due: 'CURRENT' | 'NEXT'
+    lines: { label: string; quantity: number; amountMinor: number }[]
+  },
+) {
+  const session =
+    (await tx.academicSession.findFirst({ where: { isCurrent: true }, select: { id: true } }))
+    ?? (await tx.academicSession.findFirst({ orderBy: { startsOn: 'desc' }, select: { id: true } }))
+  if (!session) throw conflict('Set up an academic session before adding a bill to fees')
+
+  const today = attendanceDate(schoolToday())
+  let dueOn = today
+  if (args.due === 'NEXT') {
+    const next = await tx.feeInstallment.findFirst({
+      where: {
+        dueOn: { gt: today },
+        structure: { assignments: { some: { studentId: args.studentId, status: 'ACTIVE' } } },
+      },
+      orderBy: { dueOn: 'asc' },
+      select: { dueOn: true },
+    })
+    dueOn = next?.dueOn ?? new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1))
+  }
+
+  const number = await nextDocumentNumber(tx, {
+    tenantId: ctx.tenant.id,
+    kind: 'INVOICE',
+    sessionLabel: financialYearLabel(today),
+  })
+  const linesTotal = args.lines.reduce((s, l) => s + l.amountMinor, 0)
+  const invoice = await tx.feeInvoice.create({
+    data: {
+      tenantId: ctx.tenant.id,
+      number,
+      studentId: args.studentId,
+      sessionId: session.id,
+      sourceKey: storeSaleFeeKey(args.sale.id),
+      title: `School store bill ${args.sale.number}`,
+      issuedOn: today,
+      dueOn,
+      status: deriveInvoiceStatus({ totalMinor: linesTotal, paidMinor: 0, dueOn }),
+      subtotalMinor: linesTotal,
+      totalMinor: linesTotal,
+      balanceMinor: linesTotal,
+      notes: `Added to fees from the school store by ${actorLabel(ctx)}`,
+      lines: {
+        create: args.lines.map((l) => ({
+          tenantId: ctx.tenant.id,
+          feeHeadId: null,
+          label: l.quantity > 1 ? `${l.label} × ${l.quantity}` : l.label,
+          amountMinor: l.amountMinor,
+        })),
+      },
+    },
+    select: { number: true, dueOn: true },
+  })
+  await tx.storeSale.update({
+    where: { id: args.sale.id },
+    data: { paymentRef: invoice.number },
+  })
+  return invoice
 }
 
 export async function voidStoreSale(ctx: AppContext, id: string, reason: string) {
@@ -704,6 +907,27 @@ export async function voidStoreSale(ctx: AppContext, id: string, reason: string)
 
     const current = await tx.storeSale.findFirst({ where: { id }, include: { lines: true } })
     if (!current) throw notFound('Store bill')
+    if (current.paymentMode === 'FEE_ACCOUNT') {
+      const invoice = await tx.feeInvoice.findFirst({
+        where: { sourceKey: storeSaleFeeKey(current.id), status: { not: 'CANCELLED' } },
+        select: { id: true, number: true, paidMinor: true },
+      })
+      if (invoice && invoice.paidMinor > 0) {
+        throw conflict(
+          `Fees were already collected against ${invoice.number}. Cancel that fee receipt first, then void this bill.`,
+        )
+      }
+      if (invoice) {
+        await tx.feeInvoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: 'CANCELLED',
+            balanceMinor: 0,
+            notes: `Store bill ${current.number} voided: ${why}`,
+          },
+        })
+      }
+    }
     const items = await lockItems(tx, ctx.tenant.id, current.lines.map((l) => l.itemId))
     for (const line of current.lines) {
       const item = items.get(line.itemId)!

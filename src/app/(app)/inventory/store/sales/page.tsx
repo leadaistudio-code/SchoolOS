@@ -61,7 +61,7 @@ export default async function StoreSalesPage({ searchParams }: { searchParams: P
           <StoreFilters
             filters={[
               { param: 'preset', label: 'Period', allLabel: 'Any time', options: PERIOD_PRESETS.map((p) => ({ value: p.key, label: p.label })) },
-              { param: 'mode', label: 'Payment', allLabel: 'Any mode', options: STORE_PAYMENT_MODES.map((m) => ({ value: m.value, label: m.label })) },
+              { param: 'mode', label: 'Payment', allLabel: 'Any mode', options: [...STORE_PAYMENT_MODES.map((m) => ({ value: m.value, label: m.label })), { value: 'FEE_ACCOUNT', label: 'Added to fees' }] },
               { param: 'status', label: 'Status', allLabel: 'All bills', options: [{ value: 'COMPLETED', label: 'Completed' }, { value: 'VOIDED', label: 'Voided' }] },
             ]}
           />

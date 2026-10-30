@@ -14,7 +14,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { formatMoney, formatNumber } from '@/lib/utils'
 import { StoreTabs } from '../store-tabs'
 import { StoreFilters } from '../store-filters'
-import { AdjustStockButton, ItemDialogButton, ToggleActiveButton } from './item-dialogs'
+import { AdjustStockButton, DeleteItemButton, ItemDialogButton, ToggleActiveButton } from './item-dialogs'
 
 export const metadata = { title: 'Store items & stock' }
 
@@ -29,6 +29,7 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
   }
   const items = await listStoreItems(ctx, filter)
   const canManage = ctx.can('store.manage')
+  const canDelete = ctx.can('store.delete')
   const currency = ctx.tenant.currency
   const value = items.reduce((s, i) => s + Math.max(i.quantity, 0) * i.avgCostMinor, 0)
   const units = items.reduce((s, i) => s + Math.max(i.quantity, 0), 0)
@@ -157,6 +158,7 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
                               <ToggleActiveButton id={i.id} active={i.isActive} />
                             </>
                           ) : null}
+                          {canDelete ? <DeleteItemButton item={i} /> : null}
                         </RowActions>
                       </TD>
                     </TR>

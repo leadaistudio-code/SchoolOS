@@ -91,6 +91,9 @@ export default async function StudentFeeLedgerPage({
                 <a href={exportHref('pdf')} target="_blank" rel="noopener" className="font-medium text-[var(--brand-600)] hover:underline">PDF</a>
               </>
             ) : null}
+            <Link href={`/students/${id}`} className="font-medium text-[var(--brand-600)] hover:underline">
+              Student 360
+            </Link>
             <BackButton fallbackHref={`/students/${id}`} />
           </div>
         }

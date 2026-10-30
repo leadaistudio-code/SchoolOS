@@ -45,9 +45,16 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
   let created = 0
   let skipped = 0
   for (const assignment of assignments) {
-    const concessions = await prisma.feeConcession.findMany({
-      where: { tenantId: assignment.tenantId, studentId: assignment.studentId },
-    })
+    const [concessions, overrides] = await Promise.all([
+      prisma.feeConcession.findMany({
+        where: { tenantId: assignment.tenantId, studentId: assignment.studentId },
+      }),
+      prisma.studentFeeLineOverride.findMany({
+        where: { tenantId: assignment.tenantId, studentId: assignment.studentId },
+        select: { installmentLineId: true, amountMinor: true },
+      }),
+    ])
+    const overrideFor = new Map(overrides.map((o) => [o.installmentLineId, o.amountMinor]))
     for (const installment of assignment.structure.installments) {
       for (const line of installment.lines) {
         if (
@@ -69,7 +76,12 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
           skipped++
           continue
         }
-        let remaining = line.amountMinor
+        const amountMinor = overrideFor.get(line.id) ?? line.amountMinor
+        if (amountMinor <= 0) {
+          skipped++
+          continue
+        }
+        let remaining = amountMinor
         let discountMinor = 0
         for (const concession of concessions.filter((item) =>
           (!item.feeHeadId || item.feeHeadId === line.feeHeadId)
@@ -112,7 +124,7 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
                   paidMinor: 0,
                   dueOn: installment.dueOn,
                 }),
-                subtotalMinor: line.amountMinor,
+                subtotalMinor: amountMinor,
                 discountMinor,
                 totalMinor: remaining,
                 balanceMinor: remaining,
@@ -121,7 +133,7 @@ export async function runScheduledMonthlyFeeInvoices(now = new Date()) {
                     tenantId: assignment.tenantId,
                     feeHeadId: line.feeHeadId,
                     label: line.label,
-                    amountMinor: line.amountMinor,
+                    amountMinor,
                     discountMinor,
                   },
                 },

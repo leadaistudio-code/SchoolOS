@@ -1,4 +1,8 @@
+import Link from 'next/link'
+import { ListTree } from 'lucide-react'
 import type { AppContext } from '@/server/context'
+import { STAFF_SCORE_METRIC_TAB } from '@/server/modules/staff/insights'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { formatDay } from '@/lib/dates'
 import { formatNumber } from '@/lib/utils'
 import { bandMeta } from '@/lib/score'
@@ -69,10 +73,14 @@ export async function Staff360({
         ) / 10
       : null
 
+  const drill = (metric: string, session = false) =>
+    `/staff/${staff.id}/insights?m=${metric}${session ? '&w=session' : ''}`
+
   const cells = [
     canScore ? (
       <Metric
         key="score"
+        href={drill('score')}
         label="Health score"
         value={composed?.score != null ? composed.score.toFixed(0) : '—'}
         sub={composed?.band ? bandMeta(composed.band).label : 'not scored'}
@@ -80,6 +88,7 @@ export async function Staff360({
     ) : null,
     <Metric
       key="att"
+      href={drill('attendance')}
       label="Attendance"
       value={attPercent === null ? 'No data' : `${attPercent}%`}
       sub={`${a.marked} days marked · last ${performance.window.days}`}
@@ -89,6 +98,7 @@ export async function Staff360({
     />,
     <Metric
       key="load"
+      href={isTeacher ? drill('load') : undefined}
       label="Teaching load"
       value={String(performance.teaching.periodsPerWeek)}
       sub={`periods a week · ${performance.teaching.subjects} subjects`}
@@ -96,6 +106,7 @@ export async function Staff360({
     feedback.available ? (
       <Metric
         key="fb"
+        href={isTeacher ? drill('feedback') : undefined}
         label="Feedback"
         value={fbAvg === null ? '—' : `${fbAvg} / 5`}
         sub={`${feedback.responseCount} responses`}
@@ -115,13 +126,21 @@ export async function Staff360({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link href={drill(isTeacher ? 'load' : 'attendance')} className={buttonVariants({ size: 'sm', variant: 'secondary' })}>
+          <ListTree className="size-4" aria-hidden />
+          View in detail
+        </Link>
+      </div>
       <MetricRow columns={columns}>{cells}</MetricRow>
 
       {canScore ? (
         <Card>
           <CardHeader>
             <CardTitle>Health score</CardTitle>
-            <span className="text-xs text-ink-subtle">This session</span>
+            <Link href={drill('score')} className="text-xs font-medium text-[var(--brand-600)] hover:underline">
+              How is this worked out?
+            </Link>
           </CardHeader>
           {composed ? (
             <CardContent>
@@ -130,7 +149,12 @@ export async function Staff360({
                   <ScoreDial score={composed.score} band={composed.band} />
                   <CoverageNote coverage={composed.coverage} />
                 </div>
-                <MetricBreakdown composed={composed} />
+                <MetricBreakdown
+                  composed={composed}
+                  hrefFor={(metric) =>
+                    STAFF_SCORE_METRIC_TAB[metric] ? drill(STAFF_SCORE_METRIC_TAB[metric], true) : null
+                  }
+                />
               </div>
             </CardContent>
           ) : (
@@ -145,7 +169,9 @@ export async function Staff360({
       <Card>
         <CardHeader>
           <CardTitle>Attendance</CardTitle>
-          <span className="text-xs text-ink-subtle">Last {performance.window.days} days</span>
+          <Link href={drill('attendance')} className="text-xs font-medium text-[var(--brand-600)] hover:underline">
+            Day by day · last {performance.window.days} days
+          </Link>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-[200px_1fr] sm:items-center">
@@ -191,16 +217,19 @@ export async function Staff360({
         <CardContent>
           <MetricRow columns={3}>
             <Metric
+              href={isTeacher ? drill('classwork') : undefined}
               label="Lessons logged"
               value={formatNumber(performance.teaching.classworkLogged)}
               sub="classwork entries"
             />
             <Metric
+              href={isTeacher ? drill('homework') : undefined}
               label="Homework set"
               value={formatNumber(performance.teaching.homeworkSet)}
               sub="tasks assigned"
             />
             <Metric
+              href={isTeacher ? drill('marks') : undefined}
               label="Marks entered"
               value={formatNumber(performance.teaching.marksEntered)}
               sub={`${performance.teaching.classTeacherOf} as class teacher`}

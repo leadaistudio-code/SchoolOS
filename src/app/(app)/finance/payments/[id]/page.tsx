@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { CheckCircle2, Landmark, ReceiptText, ShieldCheck } from 'lucide-react'
+import { redirect } from 'next/navigation'
+import { CheckCircle2, Landmark, Pencil, ReceiptText, ShieldCheck } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getReceipt } from '@/server/modules/finance/payments'
-import { formatDay, toDateInput } from '@/lib/dates'
+import { formatDay } from '@/lib/dates'
 import { formatMoney } from '@/lib/utils'
 import { sumMinor } from '@/lib/money'
 import { PageHeader } from '@/components/page-header'
@@ -13,14 +14,14 @@ import { DocumentLetterhead } from '@/components/print/document-letterhead'
 import { PrintButton } from './print-button'
 import { RefundDialog } from './refund-dialog'
 import { CancelReceiptDialog } from '../cancel-receipt-dialog'
-import { EditReceiptDialog } from '../edit-receipt-dialog'
 import { ChequeActions } from '../cheque-actions'
 
 export const metadata = { title: 'Receipt' }
 
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const ctx = await requireContext('fees.view')
+  const ctx = await requireContext()
+  if (!ctx.canAny('fees.view', 'fees.collect')) redirect('/403')
   const [payment, schoolDetails] = await Promise.all([
     getReceipt(ctx, id),
     ctx.db.school.findFirst({
@@ -91,16 +92,13 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
               {ctx.can('fees.collect') &&
               payment.status === 'SUCCESS' &&
               payment.provider === 'manual' ? (
-                <EditReceiptDialog
-                  values={{
-                    paymentId: payment.id,
-                    mode: payment.mode,
-                    paidOn: payment.paidAt ? toDateInput(payment.paidAt) : '',
-                    reference: payment.reference,
-                    billBookNo: payment.billBookNo,
-                    notes: payment.notes,
-                  }}
-                />
+                <Link
+                  href={`/finance/payments/${payment.id}/edit`}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  <Pencil className="size-3.5" aria-hidden />
+                  Edit receipt
+                </Link>
               ) : null}
               {ctx.can('fees.refund') && payment.status === 'SUCCESS' ? (
                 <RefundDialog
@@ -114,13 +112,15 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
               payment.provider === 'manual' ? (
                 <CancelReceiptDialog paymentId={payment.id} />
               ) : null}
-              <BackButton fallbackHref="/finance/payments" />
-              <Link
-                href={`/finance/students/${payment.studentId}`}
-                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-              >
-                View ledger
-              </Link>
+              <BackButton fallbackHref={ctx.can('fees.view') ? '/finance/payments' : '/finance/collect'} />
+              {ctx.can('fees.view') ? (
+                <Link
+                  href={`/finance/students/${payment.studentId}`}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  View ledger
+                </Link>
+              ) : null}
             </>
           }
         />
@@ -188,6 +188,41 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
             </p>
           </div>
         </div>
+
+        {payment.collection.length > 1 ? (
+          <div className="mb-5 rounded-[var(--radius)] border border-line px-4 py-3">
+            <p className="text-xs font-semibold text-ink-muted">
+              Split payment · one bill, {payment.collection.length} modes · total{' '}
+              {formatMoney(
+                sumMinor(payment.collection.filter((p) => p.status !== 'REVERSED').map((p) => p.amountMinor)),
+                currency,
+              )}
+            </p>
+            <ul className="mt-2 divide-y divide-[var(--border)] text-sm">
+              {payment.collection.map((part) => (
+                <li key={part.paymentId} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                  <span className="capitalize text-ink">
+                    {part.mode.toLowerCase().replaceAll('_', ' ')}
+                    {part.reference ? <span className="text-xs text-ink-subtle tnum"> · Ref. {part.reference}</span> : null}
+                    {part.status !== 'SUCCESS' ? (
+                      <span className="text-xs text-warning"> · {part.status === 'REVERSED' ? 'cancelled' : part.status.toLowerCase()}</span>
+                    ) : null}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    {part.paymentId === payment.id ? (
+                      <span className="text-xs text-ink-subtle tnum">{part.receiptNumber} (this receipt)</span>
+                    ) : (
+                      <Link href={`/finance/payments/${part.paymentId}`} className="text-xs text-[var(--product-600)] underline-offset-2 hover:underline tnum">
+                        {part.receiptNumber}
+                      </Link>
+                    )}
+                    <span className="font-medium text-ink tnum">{formatMoney(part.amountMinor, currency)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2">
           <section className="rounded-[var(--radius)] bg-surface-2 p-4">

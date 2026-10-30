@@ -88,6 +88,7 @@ export const TENANT_SCOPED_MODELS = [
   'FeeRefundAllocation',
   'FeePenaltyRule',
   'StudentFeeCredit',
+  'StudentFeeLineOverride',
   'FeeAdjustment',
   'FeeReminderRule',
   'FeeReminderLog',

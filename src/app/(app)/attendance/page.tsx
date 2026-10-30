@@ -51,11 +51,18 @@ export default async function AttendancePage({
             : 'Mark presence for the sections assigned to you.'
         }
         actions={
-          ctx.can('attendance.report') ? (
-            <Link href="/attendance/reports" className={colorBannerSecondaryBtn()}>
-              Reports
-            </Link>
-          ) : null
+          <>
+            {sections.length > 0 ? (
+              <Link href="/attendance/ptm-sheet" className={colorBannerSecondaryBtn()}>
+                PTM signature sheet
+              </Link>
+            ) : null}
+            {ctx.can('attendance.report') ? (
+              <Link href="/attendance/reports" className={colorBannerSecondaryBtn()}>
+                Reports
+              </Link>
+            ) : null}
+          </>
         }
       />
 

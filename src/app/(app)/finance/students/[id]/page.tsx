@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { History, Plus, Settings2 } from 'lucide-react'
+import { History, Plus, Settings2, UserRound } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getStudentFeeAccount } from '@/server/modules/finance/simplicity'
 import { PageHeader } from '@/components/page-header'
@@ -23,9 +23,8 @@ export default async function StudentFeeAccountPage({ params }: { params: Promis
   const classLabel = enrollment
     ? `${enrollment.classLevel.name}${enrollment.section.name ? ` ${enrollment.section.name}` : ''}`
     : null
-  const title = `Ledger: ${account.student.firstName} ${account.student.lastName}${
-    classLabel ? ` (${classLabel})` : ''
-  }`
+  const studentName = `${account.student.firstName} ${account.student.lastName}`
+  const canOpenProfile = ctx.can('students.view')
 
   const ledger = account.ledger.map((entry) => ({
     ...entry,
@@ -35,7 +34,7 @@ export default async function StudentFeeAccountPage({ params }: { params: Promis
   return (
     <div className="space-y-4">
       <PageHeader
-        title={title}
+        title={`Ledger: ${studentName}${classLabel ? ` (${classLabel})` : ''}`}
         description={
           parent
             ? `Father's Name: ${parent.firstName} ${parent.lastName}`
@@ -49,6 +48,15 @@ export default async function StudentFeeAccountPage({ params }: { params: Promis
         actions={
           <>
             <BackButton fallbackHref="/finance/students" />
+            {canOpenProfile ? (
+              <Link
+                href={`/students/${id}`}
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                <UserRound className="size-3.5" aria-hidden />
+                Student 360
+              </Link>
+            ) : null}
             <Link
               href={`/finance/students/${id}?history=1`}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}

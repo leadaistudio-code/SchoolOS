@@ -195,7 +195,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'expense_approval.validate',
       'expense_approval.approve_finance',
       ...all('accounts'),
-      ...all('store'),
+      // Deleting stock items is a school-admin decision.
+      ...all('store').filter((k) => k !== 'store.delete'),
       'notices.view',
       'messages.view', 'messages.send',
       'assistant.use',
@@ -250,6 +251,9 @@ export const SYSTEM_ROLES: RoleDef[] = [
       ...all('admissions'),
       'expenses.view',
       'expenses.manage',
+      // Counter collection only: student search and open dues come through the
+      // collect endpoints, so this grants no wider finance access.
+      'fees.collect',
       'store.view', 'store.sell',
       'notices.view',
       'messages.view', 'messages.send', 'messages.parent_queries',

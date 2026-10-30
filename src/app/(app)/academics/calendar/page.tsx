@@ -277,6 +277,14 @@ export default async function CalendarPage({
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Badge tone="neutral">{humanizeStatus(e.kind)}</Badge>
+                        {e.kind === 'PTM' && !e.readOnly && ctx.can('attendance.view') ? (
+                          <Link
+                            href={`/attendance/ptm-sheet?eventId=${e.id}`}
+                            className="text-xs font-medium text-[var(--brand-600)] hover:underline"
+                          >
+                            Signature sheet
+                          </Link>
+                        ) : null}
                         {canManage && !e.readOnly ? <EditCalendarEventButton event={toDraft(e)} /> : null}
                       </div>
                     </div>

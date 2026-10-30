@@ -326,6 +326,22 @@ async function desiredStoreSale(db: TenantClient, resolve: AccountResolver, sale
   const sale = await db.storeSale.findFirst({ where: { id: saleId } })
   if (!sale) return { sale: null, desired: null }
   if (sale.status !== 'COMPLETED' || sale.totalMinor <= 0) return { sale, desired: null }
+  if (sale.paymentMode === 'FEE_ACCOUNT') {
+    // The money arrives later as a fee receipt against the store invoice and is
+    // booked there; only the goods leaving the shelf are booked now.
+    if (sale.costMinor <= 0) return { sale, desired: null }
+    const desired: Desired = {
+      date: bookDay(sale.soldAt),
+      voucherType: 'JOURNAL',
+      narration: `Store sale ${sale.number}${sale.customerName ? ` to ${sale.customerName}` : ''} added to fees`,
+      reference: sale.number,
+      lines: [
+        { accountId: resolve.system('EXP_STORE_COGS'), debitMinor: sale.costMinor, creditMinor: 0, memo: 'Cost of goods sold' },
+        { accountId: resolve.system('STORE_STOCK'), debitMinor: 0, creditMinor: sale.costMinor, memo: 'Cost of goods sold' },
+      ],
+    }
+    return { sale, desired }
+  }
   const lines: DraftLine[] = [
     { accountId: resolve.mode(sale.paymentMode), debitMinor: sale.totalMinor, creditMinor: 0 },
     { accountId: resolve.system('STORE_SALES_INCOME'), debitMinor: 0, creditMinor: sale.totalMinor - sale.taxMinor },

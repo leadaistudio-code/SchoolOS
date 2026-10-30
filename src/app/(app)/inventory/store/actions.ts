@@ -8,6 +8,7 @@ import {
   createStoreItem,
   createStorePurchase,
   createStoreSale,
+  deleteStoreItem,
   setStoreItemActive,
   updateStoreItem,
   voidStoreSale,
@@ -59,6 +60,20 @@ export async function setStoreItemActiveAction(id: string, active: boolean): Pro
   }
 }
 
+export async function deleteStoreItemAction(id: string, reason: string): Promise<StoreActionResult> {
+  const ctx = await requireContext('store.delete')
+  try {
+    const r = await deleteStoreItem(ctx, { id, reason })
+    revalidateStore()
+    return {
+      ok: true,
+      message: r.units ? `Item deleted and ${r.units} in stock written off.` : 'Item deleted.',
+    }
+  } catch (err) {
+    return fail(err, 'The item could not be deleted')
+  }
+}
+
 export async function adjustStockAction(payload: unknown): Promise<StoreActionResult> {
   const ctx = await requireContext('store.manage')
   try {
@@ -75,7 +90,11 @@ export async function createStorePurchaseAction(payload: unknown): Promise<Store
   try {
     const p = await createStorePurchase(ctx, payload as never)
     revalidateStore()
-    return { ok: true, id: p.id, message: `${p.number} saved. Stock increased.` }
+    return {
+      ok: true,
+      id: p.id,
+      message: `${p.number} saved. Stock increased.${p.vendorCreated ? ` Vendor ${p.vendorCreated} added.` : ''}`,
+    }
   } catch (err) {
     return fail(err, 'The stock receipt could not be saved')
   }
@@ -86,6 +105,14 @@ export async function createStoreSaleAction(payload: unknown): Promise<StoreActi
   try {
     const sale = await createStoreSale(ctx, payload as never)
     revalidateStore()
+    if (sale.feeInvoice) {
+      revalidatePath('/finance', 'layout')
+      return {
+        ok: true,
+        id: sale.id,
+        message: `Bill ${sale.number} for ₹${sale.totalMinor / 100} added to fees (${sale.feeInvoice.number}).`,
+      }
+    }
     return { ok: true, id: sale.id, message: `Bill ${sale.number} saved for ₹${sale.totalMinor / 100}.` }
   } catch (err) {
     return fail(err, 'The bill could not be saved')
@@ -97,6 +124,7 @@ export async function voidStoreSaleAction(id: string, reason: string): Promise<S
   try {
     const sale = await voidStoreSale(ctx, id, reason)
     revalidateStore()
+    if (sale.paymentMode === 'FEE_ACCOUNT') revalidatePath('/finance', 'layout')
     return { ok: true, message: `Bill ${sale.number} voided and stock returned.` }
   } catch (err) {
     return fail(err, 'The bill could not be voided')

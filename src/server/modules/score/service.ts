@@ -73,13 +73,13 @@ export type SchoolScore = {
 type Period = { sessionId: string; sessionName: string; from: Date; to: Date }
 
 /** Severity of a discipline record, in points off a clean 100. */
-const SEVERITY_PENALTY: Record<string, number> = {
+export const SEVERITY_PENALTY: Record<string, number> = {
   MINOR: 5,
   MAJOR: 12,
   SEVERE: 25,
   CRITICAL: 25,
 }
-const DEFAULT_SEVERITY_PENALTY = 8
+export const DEFAULT_SEVERITY_PENALTY = 8
 
 function pct(numerator: number, denominator: number): number | null {
   if (denominator <= 0) return null

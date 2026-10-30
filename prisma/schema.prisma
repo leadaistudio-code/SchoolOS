@@ -2483,11 +2483,12 @@ model FeePayment {
   idempotencyKey String?
 
   reference     String? // cheque no / UTR
-  // Serial number written on the school's physical receipt book when the
-  // cashier issues a paper receipt alongside this one. Free text and not
-  // unique: schools commonly run two counters from two books whose numbers
-  // overlap. It exists to reconcile paper against system, so it is indexed.
+  // Bill book serial. Counter collections are numbered automatically and
+  // uniquely per school (shared by the parts of one split collection); older
+  // rows may hold free-text values typed before numbering was automatic.
   billBookNo    String?
+  /// Groups the per-mode payments of one split collection (e.g. cash + UPI).
+  collectionId  String?
   paidAt        DateTime?
   failedAt      DateTime?
   failureReason String?
@@ -2508,6 +2509,24 @@ model FeePayment {
   @@index([tenantId, status, createdAt])
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, billBookNo])
+  @@index([tenantId, collectionId])
+}
+
+/// A per-student amount for one plan installment line that has not been
+/// invoiced yet. Generation bills this amount instead of the plan's.
+model StudentFeeLineOverride {
+  id                String   @id @default(cuid())
+  tenantId          String
+  studentId         String
+  installmentLineId String
+  amountMinor       Int
+  reason            String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tenantId, studentId, installmentLineId])
+  @@index([tenantId, installmentLineId])
 }
 
 // One payment can settle several invoices; this is the money ledger.
@@ -3896,6 +3915,8 @@ model StoreItem {
   reorderLevel      Int           @default(0)
   description       String?
   isActive          Boolean       @default(true)
+  /// Set when an admin deletes an item that already has sales or receipts.
+  deletedAt         DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

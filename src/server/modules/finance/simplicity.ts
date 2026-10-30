@@ -791,7 +791,7 @@ export async function generateCustomInvoices(
   const generateUntilExclusive =
     autoFrom && autoFrom.getTime() > nextMonthStart.getTime() ? autoFrom : nextMonthStart
 
-  const [concessions, existing] = await Promise.all([
+  const [concessions, existing, overrides] = await Promise.all([
     ctx.db.feeConcession.findMany({ where: { studentId: { in: studentIds } } }),
     ctx.db.feeInvoice.findMany({
       where: {
@@ -803,7 +803,15 @@ export async function generateCustomInvoices(
       },
       select: { sourceKey: true },
     }),
+    ctx.db.studentFeeLineOverride.findMany({
+      where: {
+        studentId: { in: studentIds },
+        installmentLineId: { in: selectedLines.map(({ line }) => line.id) },
+      },
+      select: { studentId: true, installmentLineId: true, amountMinor: true },
+    }),
   ])
+  const overrideFor = new Map(overrides.map((o) => [`${o.studentId}:${o.installmentLineId}`, o.amountMinor]))
   const existingKeys = new Set(existing.flatMap((invoice) => invoice.sourceKey ? [invoice.sourceKey] : []))
   const concessionsByStudent = new Map<string, typeof concessions>()
   for (const concession of concessions) {
@@ -817,7 +825,8 @@ export async function generateCustomInvoices(
   for (const enrollment of enrollments) {
     for (const { installment, line } of selectedLines) {
       const sourceKey = `fee-line:${line.id}:student:${enrollment.studentId}`
-      let remaining = line.amountMinor
+      const amountMinor = overrideFor.get(`${enrollment.studentId}:${line.id}`) ?? line.amountMinor
+      let remaining = amountMinor
       let discountMinor = 0
       for (const concession of (concessionsByStudent.get(enrollment.studentId) ?? []).filter((item) =>
         (!item.feeHeadId || item.feeHeadId === line.feeHeadId)
@@ -830,6 +839,8 @@ export async function generateCustomInvoices(
       let skipReason: string | undefined
       if (existingKeys.has(sourceKey)) {
         skipReason = 'Already invoiced'
+      } else if (amountMinor <= 0) {
+        skipReason = 'Set to zero for this student'
       } else if (!feeHeadActiveOn(line.feeHead, installment.dueOn)) {
         skipReason = `Outside the ${line.feeHead.name} billing period`
       } else if (installment.issueOn && installment.issueOn > today) {
@@ -847,9 +858,9 @@ export async function generateCustomInvoices(
         month: installment.dueOn.toISOString().slice(0, 7),
         feeHeadId: line.feeHeadId,
         feeHead: line.feeHead.name,
-        amountMinor: line.amountMinor,
+        amountMinor,
         discountMinor,
-        netMinor: line.amountMinor - discountMinor,
+        netMinor: amountMinor - discountMinor,
         ...(skipReason ? { skipReason } : {}),
       })
     }
@@ -2021,6 +2032,90 @@ export async function simulateFeeIncrease(
 
 export function daysOverdue(dueOn: Date, today = attendanceDate(new Date())) {
   return Math.max(0, differenceInCalendarDays(today, dueOn))
+}
+
+export const setFutureFeeAmountSchema = z.object({
+  studentId: z.string().min(1),
+  installmentLineId: z.string().min(1),
+  /** Rupees this student will be billed when the month is generated. */
+  amount: z.coerce.number().min(0).max(10_000_000),
+  reason: z.string().trim().max(300).optional(),
+})
+
+/**
+ * Sets what one student will be billed for a month that has not been invoiced
+ * yet. The daily job and the custom generator read it in place of the plan
+ * amount; setting it back to the plan amount removes the override.
+ */
+export async function setFutureFeeAmount(ctx: AppContext, raw: z.infer<typeof setFutureFeeAmountSchema>) {
+  if (!ctx.can('fees.concession') && !ctx.can('fees.invoice') && !ctx.can('fees.accounts')) {
+    ctx.require('fees.accounts')
+  }
+  const input = setFutureFeeAmountSchema.parse(raw)
+  const amountMinor = Math.round(input.amount * 100)
+
+  const [student, line] = await Promise.all([
+    ctx.db.student.findFirst({
+      where: { id: input.studentId, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true },
+    }),
+    ctx.db.feeInstallmentLine.findFirst({
+      where: { id: input.installmentLineId },
+      include: { feeHead: { select: { name: true } }, installment: { select: { dueOn: true } } },
+    }),
+  ])
+  if (!student) throw notFound('Student')
+  if (!line) throw notFound('Fee installment')
+
+  const invoiced = await ctx.db.feeInvoice.findFirst({
+    where: {
+      sourceKey: `fee-line:${line.id}:student:${student.id}`,
+      status: { not: 'CANCELLED' },
+    },
+    select: { number: true },
+  })
+  if (invoiced) {
+    throw conflict(`This month is already invoiced (${invoiced.number}). Edit that invoice instead.`)
+  }
+
+  const existing = await ctx.db.studentFeeLineOverride.findFirst({
+    where: { studentId: student.id, installmentLineId: line.id },
+  })
+  if (amountMinor === line.amountMinor) {
+    if (existing) await ctx.db.studentFeeLineOverride.delete({ where: { id: existing.id } })
+  } else if (existing) {
+    await ctx.db.studentFeeLineOverride.update({
+      where: { id: existing.id },
+      data: { amountMinor, reason: input.reason?.trim() || null, createdById: ctx.user.userId },
+    })
+  } else {
+    await ctx.db.studentFeeLineOverride.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        studentId: student.id,
+        installmentLineId: line.id,
+        amountMinor,
+        reason: input.reason?.trim() || null,
+        createdById: ctx.user.userId,
+      },
+    })
+  }
+
+  const month = line.installment.dueOn.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'fee_schedule.student_amount',
+    module: 'fees',
+    entityType: 'Student',
+    entityId: student.id,
+    summary: `${line.feeHead.name} for ${month} will bill ${student.firstName} ${student.lastName} ₹${amountMinor / 100} (plan ₹${line.amountMinor / 100})`,
+    before: { amountMinor: existing?.amountMinor ?? line.amountMinor },
+    after: { amountMinor, reason: input.reason?.trim() || null },
+  })
+
+  return { studentId: student.id, amountMinor, planMinor: line.amountMinor, month }
 }
 
 export const setInvoiceChargeAmountSchema = z.object({

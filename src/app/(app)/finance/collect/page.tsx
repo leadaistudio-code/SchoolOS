@@ -1,5 +1,6 @@
 import { requireContext } from '@/server/context'
 import { feeCollectorOptions } from '@/server/modules/finance/payments'
+import { counterFeeHeads, peekNextBillBookNo } from '@/server/modules/finance/counter'
 import { PageHeader } from '@/components/page-header'
 import { BackButton } from '@/components/back-button'
 import { CollectForm } from './collect-form'
@@ -13,14 +14,18 @@ export default async function CollectPage({
 }) {
   const ctx = await requireContext('fees.collect')
   const params = await searchParams
-  const collectors = await feeCollectorOptions(ctx)
+  const [collectors, feeHeads, nextBillBookNo] = await Promise.all([
+    feeCollectorOptions(ctx),
+    counterFeeHeads(ctx),
+    peekNextBillBookNo(ctx),
+  ])
 
   return (
     <div>
       <PageHeader
         title="Collect a payment"
         description="Payments settle the oldest invoice first"
-        actions={<BackButton fallbackHref="/finance" />}
+        actions={<BackButton fallbackHref={ctx.can('fees.view') ? '/finance' : '/'} />}
       />
       <CollectForm
         currency={ctx.tenant.currency}
@@ -30,6 +35,9 @@ export default async function CollectPage({
         canEditAmounts={
           ctx.can('fees.concession') || ctx.can('fees.invoice') || ctx.can('fees.accounts')
         }
+        canViewLedger={ctx.can('fees.view')}
+        feeHeads={feeHeads}
+        nextBillBookNo={nextBillBookNo}
         collectors={collectors.map((collector) => ({
           id: collector.id,
           name: `${collector.firstName} ${collector.lastName}`,
