@@ -5,6 +5,7 @@ import {
   Activity,
   Cable,
   Cloud,
+  Download,
   Fingerprint,
   Gauge,
   History,
@@ -21,6 +22,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox, Field, Input, Select } from '@/components/ui/input'
@@ -28,6 +30,8 @@ import { EmptyState } from '@/components/ui/states'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { useToast } from '@/components/ui/toast'
 import { minutesToTime, timeToMinutes } from '@/lib/attendance-hours'
+
+const CONNECT_APP_DOWNLOAD_PATH = '/downloads/MyCampusView-Connect-Setup.exe'
 
 type Overview = {
   connectors: number
@@ -340,6 +344,26 @@ export function BiometricConsole({ canManage }: { canManage: boolean }) {
                   </div>
                 </div>
               </CardHeader>
+              <CardContent className="grid gap-4 border-b border-line p-5 md:grid-cols-[1fr_auto] md:items-start">
+                <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink">
+                  <li>
+                    Download MyCampusView Connect on a Windows 10/11 PC that is on the same network as the terminals and stays on
+                    during school hours.
+                  </li>
+                  <li>
+                    Open it and click <b>Yes</b> when Windows asks for permission. If you see <b>“Windows protected your PC”</b>,
+                    click <b>More info → Run anyway</b>.
+                  </li>
+                  <li>Generate a pairing code below and type it into the setup, then add each terminal’s Cloud ID.</li>
+                  <li>
+                    On each terminal, set the Web Server URL to the address the setup shows, for example{' '}
+                    <code className="font-mono text-xs">http://192.168.1.20:8080/hdata.aspx</code>.
+                  </li>
+                </ol>
+                <a href={CONNECT_APP_DOWNLOAD_PATH} download className={`${buttonVariants({ variant: 'primary', size: 'sm' })} justify-self-start`}>
+                  <Download aria-hidden /> Download for Windows
+                </a>
+              </CardContent>
               <CardContent className="grid gap-4 p-5 sm:grid-cols-[minmax(15rem,1fr)_auto] sm:items-end">
                 <Field label="Connector name" hint="Use a name staff will recognize, such as Front Office PC.">
                   <Input
@@ -378,7 +402,9 @@ export function BiometricConsole({ canManage }: { canManage: boolean }) {
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-success">Pairing code ready</p>
-                      <p className="mt-0.5 text-xs text-success">Enter it in MyCampusView Connect within 30 minutes.</p>
+                      <p className="mt-0.5 text-xs text-success">
+                        Type it into MyCampusView Connect setup within 30 minutes. It works once.
+                      </p>
                     </div>
                     <code className="rounded-[var(--radius-sm)] bg-surface px-4 py-2 font-mono text-lg font-semibold tracking-[0.16em] text-ink shadow-sm">
                       {pairingCode}

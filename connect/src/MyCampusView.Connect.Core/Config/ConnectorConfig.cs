@@ -43,11 +43,17 @@ public sealed class ConnectorConfig
 
     public List<DeviceConfigEntry> Devices { get; set; } = new();
 
+    /// <summary>
+    /// %ProgramData%\MyCampusView\Connect, unless MYCAMPUSVIEW_CONNECT_DATA points
+    /// elsewhere (support and testing on a PC that already has a live pairing).
+    /// </summary>
     public static string ProgramDataRoot =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "MyCampusView",
-            "Connect");
+        Environment.GetEnvironmentVariable("MYCAMPUSVIEW_CONNECT_DATA") is { Length: > 0 } custom
+            ? custom
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "MyCampusView",
+                "Connect");
 
     public static string QueueDbPath => Path.Combine(ProgramDataRoot, "queue.db");
 

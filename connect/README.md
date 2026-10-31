@@ -18,7 +18,24 @@ connect/
     MyCampusView.Connect/          Worker (Windows Service host)
     MyCampusView.Connect.Core/     Adapters, queue, cloud client, sync
     MyCampusView.Connect.Setup/    Interactive pairing console
+    MyCampusView.Connect.App/      One-file installer + status window (also hosts the service)
 ```
+
+## One-click installer
+
+`MyCampusView.Connect.App` publishes a single self-contained
+`MyCampusViewConnect.exe` (win-x64, ~65 MB) that is the setup wizard, the
+status/manager window and the Windows Service host (`MyCampusViewConnect.exe service`).
+Schools download it from **Settings → Biometric → Connectors** in the app.
+
+```powershell
+.\scripts\build-installer.ps1   # -> public\downloads\MyCampusView-Connect-Setup.exe
+```
+
+Silent switches and the school-side walkthrough are in
+[docs/mycampusview-connect-installation.md](../docs/mycampusview-connect-installation.md).
+Set `MYCAMPUSVIEW_CONNECT_DATA` to point config, credentials, queue and logs at
+another folder (testing on a PC that already has a live pairing).
 
 ## Requirements
 

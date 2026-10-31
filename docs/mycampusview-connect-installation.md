@@ -3,6 +3,48 @@
 For the complete new-school procedure and handover checklist, see
 [SOP: Set Up an RS9W Biometric Device for a New School](biometric-new-school-sop.md).
 
+## One-click installer (recommended)
+
+`MyCampusView-Connect-Setup.exe` is a single self-contained file: no .NET,
+PowerShell or config editing on the school PC.
+
+1. In MyCampusView open **Settings → Biometric → Connectors** and click
+   **Download for Windows**, then **Generate pairing code**.
+2. Run the downloaded file on a PC on the same network as the terminals and
+   accept the Windows permission prompt. If SmartScreen shows "Windows protected
+   your PC", click **More info → Run anyway**.
+3. Type the pairing code, add each terminal (name + Cloud ID from
+   **Menu → Comm → Cloud server**; IP optional), and click **Install**.
+4. Setup installs to `C:\Program Files\MyCampusView\Connect`, registers the
+   `MyCampusViewConnect` Windows service (auto start, restarts on failure), opens
+   the firewall port for the local subnet, adds Start-menu/desktop shortcuts and
+   an Apps & features entry, then checks the service, the cloud connection and
+   the listening port.
+5. On each terminal set the **Web Server URL** to the address shown on the last
+   page, e.g. `http://192.168.1.20:8080/hdata.aspx`.
+
+Opening the app again later shows a status window: service state, cloud
+connection, terminal URL, recent activity, and buttons to edit terminals,
+re-pair, restart, open logs or uninstall. Running a newer setup file upgrades in
+place and keeps the existing pairing.
+
+Unattended install (elevated prompt, e.g. via remote support):
+
+```powershell
+MyCampusView-Connect-Setup.exe --silent --code=MCV-ABCD-EFGH [--name="Front Office PC"] [--port=8080] [--no-desktop-shortcut]
+MyCampusView-Connect-Setup.exe --uninstall --quiet [--remove-data]
+```
+
+Silent install exits `0` when everything is verified, `2` when installed but the
+service or cloud check did not pass, and `1` on failure (details in
+`%ProgramData%\MyCampusView\Connect\logs\setup.log`). Terminals are then added
+from the app's **Terminals…** button.
+
+Rebuild the installer from source with `connect\scripts\build-installer.ps1`; it
+writes `public\downloads\MyCampusView-Connect-Setup.exe`, which the app serves.
+
+The sections below describe the older script-based install.
+
 ## Prerequisites
 
 - Windows 10/11 or Windows Server (x64)
