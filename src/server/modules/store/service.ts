@@ -46,6 +46,7 @@ const itemFields = {
   hsnCode: optionalText(20),
   taxPercent: z.coerce.number().min(0).max(28).default(0),
   sellingPrice: rupees().refine((v) => v > 0, 'Enter the selling price'),
+  discountPercent: z.coerce.number().min(0).max(100, 'Discount cannot be more than 100%').default(0),
   reorderLevel: z.coerce.number().int().min(0).max(100_000).default(0),
   description: optionalText(500),
 }
@@ -56,7 +57,12 @@ export const storeItemSchema = z.object({
   openingUnitCost: rupees().default(0),
 })
 
-export const storeItemUpdateSchema = z.object({ id: z.string().min(1), ...itemFields })
+export const storeItemUpdateSchema = z.object({
+  id: z.string().min(1),
+  ...itemFields,
+  /** Physically counted quantity; the difference is booked as a stock adjustment. */
+  stockCount: z.coerce.number().int().min(0, 'Stock cannot be negative').max(100_000).optional(),
+})
 
 export const storePurchaseSchema = z
   .object({
@@ -274,6 +280,7 @@ export async function storeCatalogue(ctx: AppContext) {
       category: true,
       unit: true,
       sellingPriceMinor: true,
+      discountPercent: true,
       avgCostMinor: true,
       taxPercent: true,
       quantity: true,
@@ -319,6 +326,7 @@ export async function createStoreItem(ctx: AppContext, raw: z.input<typeof store
         hsnCode: input.hsnCode,
         taxPercent: input.taxPercent,
         sellingPriceMinor: input.sellingPrice,
+        discountPercent: input.discountPercent,
         reorderLevel: input.reorderLevel,
         description: input.description,
         quantity: input.openingQuantity,
@@ -377,6 +385,7 @@ export async function updateStoreItem(ctx: AppContext, raw: z.input<typeof store
       hsnCode: input.hsnCode,
       taxPercent: input.taxPercent,
       sellingPriceMinor: input.sellingPrice,
+      discountPercent: input.discountPercent,
       reorderLevel: input.reorderLevel,
       description: input.description,
     },
@@ -393,7 +402,45 @@ export async function updateStoreItem(ctx: AppContext, raw: z.input<typeof store
     before,
     after: updated,
   })
+  if (input.stockCount !== undefined) await setStockCount(ctx, updated.id, input.stockCount)
   return updated
+}
+
+/** Sets stock to a counted quantity, booking the difference as an adjustment. */
+async function setStockCount(ctx: AppContext, itemId: string, counted: number) {
+  const result = await ctx.db.$transaction(async (raw) => {
+    const tx = raw as unknown as Prisma.TransactionClient
+    const item = (await lockItems(tx, ctx.tenant.id, [itemId])).get(itemId)!
+    const from = item.quantity
+    const diff = counted - from
+    if (diff === 0) return null
+    const cost = item.avgCostMinor
+    const balance = diff > 0
+      ? await receiveUnits(tx, ctx.tenant.id, item, diff, cost)
+      : await issueUnits(tx, item, -diff)
+    const created = await movement(tx, ctx, {
+      itemId,
+      type: diff > 0 ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT',
+      quantity: diff,
+      unitCostMinor: cost,
+      balanceAfter: balance,
+      reason: `Stock count correction: ${from} → ${counted}`,
+    })
+    return { created, item, from }
+  })
+  if (!result) return
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'store.stock_adjust',
+    module: 'store',
+    entityType: 'StoreItem',
+    entityId: itemId,
+    summary: `Stock of ${itemLabel(result.item)} corrected from ${result.from} to ${counted}`,
+    after: result.created,
+  })
+  postLedger(ctx.tenant.id, 'movement', result.created.id)
 }
 
 export async function setStoreItemActive(ctx: AppContext, id: string, active: boolean) {

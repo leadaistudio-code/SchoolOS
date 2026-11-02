@@ -7,6 +7,7 @@ import { createStoreSaleAction } from '../actions'
 import {
   STORE_CATEGORIES,
   STORE_PAYMENT_MODES,
+  itemDiscountMinor,
   itemLabel,
   priceLine,
   storeCategory,
@@ -25,11 +26,18 @@ export type PosItem = {
   category: string
   unit: string
   sellingPriceMinor: number
+  discountPercent: number
   taxPercent: number
   quantity: number
 }
 
-type CartLine = { itemId: string; quantity: number; discount: string }
+/** `manual`: the cashier typed the discount, so it no longer follows the item's default %. */
+type CartLine = { itemId: string; quantity: number; discount: string; manual?: boolean }
+
+const defaultDiscount = (item: PosItem, quantity: number) => {
+  const minor = itemDiscountMinor(quantity, item.sellingPriceMinor, item.discountPercent)
+  return minor > 0 ? String(minor / 100) : ''
+}
 
 type StudentHit = {
   id: string
@@ -83,8 +91,12 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
     }
     setCart((c) =>
       have > 0
-        ? c.map((l) => (l.itemId === item.id ? { ...l, quantity: l.quantity + n } : l))
-        : [...c, { itemId: item.id, quantity: n, discount: '' }],
+        ? c.map((l) =>
+            l.itemId === item.id
+              ? { ...l, quantity: l.quantity + n, discount: l.manual ? l.discount : defaultDiscount(item, l.quantity + n) }
+              : l,
+          )
+        : [...c, { itemId: item.id, quantity: n, discount: defaultDiscount(item, n) }],
     )
   }
 
@@ -96,7 +108,10 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
       push({ tone: 'error', title: `Only ${item.quantity} of ${itemLabel(item)} in stock` })
       quantity = item.quantity
     }
-    setCart((c) => c.map((l) => (l.itemId === id ? { ...l, quantity } : l)))
+    const q = quantity
+    setCart((c) =>
+      c.map((l) => (l.itemId === id ? { ...l, quantity: q, discount: l.manual ? l.discount : defaultDiscount(item, q) } : l)),
+    )
   }
 
   const onScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -308,7 +323,7 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
                           inputMode="decimal"
                           value={line.discount}
                           onChange={(e) =>
-                            setCart((c) => c.map((l) => (l.itemId === line.itemId ? { ...l, discount: e.target.value } : l)))
+                            setCart((c) => c.map((l) => (l.itemId === line.itemId ? { ...l, discount: e.target.value, manual: true } : l)))
                           }
                           placeholder="0"
                           className="h-7 w-16 rounded-md border border-line bg-surface px-1.5 text-sm tnum text-ink outline-none focus:border-[var(--brand-500)]"

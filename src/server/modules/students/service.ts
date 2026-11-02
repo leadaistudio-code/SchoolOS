@@ -47,9 +47,33 @@ export async function listStudents(
   query: ListQuery,
   filter: StudentListFilter,
 ): Promise<{ rows: StudentListRow[]; total: number }> {
-  const scope = await studentScopeWhere(ctx)
+  const where = await studentListWhere(ctx, query.q, filter)
 
-  const where: Prisma.StudentWhereInput = {
+  const orderBy = orderByFrom(query.sort, query.dir, STUDENT_SORT_FIELDS, {
+    firstName: 'asc',
+  })
+
+  const [rows, total] = await Promise.all([
+    ctx.db.student.findMany({
+      where,
+      orderBy,
+      ...skipTake(query),
+      select: STUDENT_LIST_SELECT,
+    }),
+    ctx.db.student.count({ where }),
+  ])
+
+  return { total, rows: rows.map(toListRow) }
+}
+
+/** The student list's search + filters, also used by the full export. */
+export async function studentListWhere(
+  ctx: AppContext,
+  q: string | undefined,
+  filter: StudentListFilter,
+): Promise<Prisma.StudentWhereInput> {
+  const scope = await studentScopeWhere(ctx)
+  return {
     deletedAt: null,
     ...scope,
     ...(filter.status ? { status: filter.status } : {}),
@@ -65,20 +89,20 @@ export async function listStudents(
           },
         }
       : {}),
-    ...(query.q
+    ...(q
       ? {
           OR: [
-            { firstName: { contains: query.q, mode: 'insensitive' } },
-            { lastName: { contains: query.q, mode: 'insensitive' } },
-            { admissionNo: { contains: query.q, mode: 'insensitive' } },
+            { firstName: { contains: q, mode: 'insensitive' } },
+            { lastName: { contains: q, mode: 'insensitive' } },
+            { admissionNo: { contains: q, mode: 'insensitive' } },
             {
               guardians: {
                 some: {
                   parent: {
                     OR: [
-                      { firstName: { contains: query.q, mode: 'insensitive' } },
-                      { lastName: { contains: query.q, mode: 'insensitive' } },
-                      { phone: { contains: query.q } },
+                      { firstName: { contains: q, mode: 'insensitive' } },
+                      { lastName: { contains: q, mode: 'insensitive' } },
+                      { phone: { contains: q } },
                     ],
                   },
                 },
@@ -94,69 +118,117 @@ export async function listStudents(
       ? { invoices: { every: { OR: [{ balanceMinor: { lte: 0 } }, { status: { in: ['CANCELLED', 'DRAFT'] } }] } } }
       : {}),
   }
+}
 
-  const orderBy = orderByFrom(query.sort, query.dir, STUDENT_SORT_FIELDS, {
-    firstName: 'asc',
-  })
+const OPEN_INVOICE = { balanceMinor: { gt: 0 }, status: { notIn: ['CANCELLED', 'DRAFT'] } } satisfies Prisma.FeeInvoiceWhereInput
 
-  const [rows, total] = await Promise.all([
-    ctx.db.student.findMany({
-      where,
-      orderBy,
-      ...skipTake(query),
-      select: {
-        id: true,
-        userId: true,
-        admissionNo: true,
-        firstName: true,
-        lastName: true,
-        photoUrl: true,
-        gender: true,
-        status: true,
-        enrollments: {
-          where: { isCurrent: true },
-          take: 1,
-          select: {
-            rollNumber: true,
-            classLevel: { select: { name: true } },
-            section: { select: { name: true } },
-          },
-        },
-        guardians: {
-          where: { isPrimary: true },
-          take: 1,
-          select: { parent: { select: { firstName: true, lastName: true, phone: true } } },
-        },
-        invoices: {
-          where: { balanceMinor: { gt: 0 }, status: { notIn: ['CANCELLED', 'DRAFT'] } },
-          select: { balanceMinor: true },
+const STUDENT_LIST_SELECT = {
+  id: true,
+  userId: true,
+  admissionNo: true,
+  firstName: true,
+  lastName: true,
+  photoUrl: true,
+  gender: true,
+  status: true,
+  enrollments: {
+    where: { isCurrent: true },
+    take: 1,
+    select: {
+      rollNumber: true,
+      classLevel: { select: { name: true } },
+      section: { select: { name: true } },
+    },
+  },
+  guardians: {
+    where: { isPrimary: true },
+    take: 1,
+    select: { parent: { select: { firstName: true, lastName: true, phone: true } } },
+  },
+  invoices: { where: OPEN_INVOICE, select: { balanceMinor: true } },
+} satisfies Prisma.StudentSelect
+
+function toListRow(s: Prisma.StudentGetPayload<{ select: typeof STUDENT_LIST_SELECT }>): StudentListRow {
+  return {
+    id: s.id,
+    userId: s.userId,
+    admissionNo: s.admissionNo,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    photoUrl: s.photoUrl,
+    gender: s.gender,
+    status: s.status,
+    className: s.enrollments[0]?.classLevel.name ?? null,
+    sectionName: s.enrollments[0]?.section.name ?? null,
+    rollNumber: s.enrollments[0]?.rollNumber ?? null,
+    guardianName: s.guardians[0]
+      ? `${s.guardians[0].parent.firstName} ${s.guardians[0].parent.lastName}`
+      : null,
+    guardianPhone: s.guardians[0]?.parent.phone ?? null,
+    dueMinor: s.invoices.reduce((sum, i) => sum + i.balanceMinor, 0),
+  }
+}
+
+/**
+ * Every student matching the list filters with their full profile, guardians
+ * and transport, ordered class → section → roll number for printing.
+ */
+export async function exportStudents(ctx: AppContext, q: string | undefined, filter: StudentListFilter) {
+  ctx.require('students.export')
+  const where = await studentListWhere(ctx, q, filter)
+  const students = await ctx.db.student.findMany({
+    where,
+    take: 20_000,
+    include: {
+      enrollments: {
+        where: { isCurrent: true },
+        take: 1,
+        select: {
+          rollNumber: true,
+          joinedOn: true,
+          session: { select: { name: true } },
+          classLevel: { select: { name: true, numeric: true } },
+          section: { select: { name: true } },
         },
       },
-    }),
-    ctx.db.student.count({ where }),
-  ])
-
-  return {
-    total,
-    rows: rows.map((s) => ({
-      id: s.id,
-      userId: s.userId,
-      admissionNo: s.admissionNo,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      photoUrl: s.photoUrl,
-      gender: s.gender,
-      status: s.status,
-      className: s.enrollments[0]?.classLevel.name ?? null,
-      sectionName: s.enrollments[0]?.section.name ?? null,
-      rollNumber: s.enrollments[0]?.rollNumber ?? null,
-      guardianName: s.guardians[0]
-        ? `${s.guardians[0].parent.firstName} ${s.guardians[0].parent.lastName}`
-        : null,
-      guardianPhone: s.guardians[0]?.parent.phone ?? null,
-      dueMinor: s.invoices.reduce((sum, i) => sum + i.balanceMinor, 0),
-    })),
-  }
+      guardians: {
+        orderBy: [{ isPrimary: 'desc' }],
+        select: {
+          relation: true,
+          isPrimary: true,
+          parent: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+              secondaryPhone: true,
+              email: true,
+              occupation: true,
+              annualIncome: true,
+            },
+          },
+        },
+      },
+      transport: {
+        where: { isActive: true },
+        take: 1,
+        select: { direction: true, route: { select: { name: true } }, stop: { select: { name: true } } },
+      },
+      invoices: { where: OPEN_INVOICE, select: { balanceMinor: true } },
+    },
+  })
+  const rank = (s: (typeof students)[number]) => s.enrollments[0]
+  return students.sort((a, b) => {
+    const ea = rank(a)
+    const eb = rank(b)
+    return (
+      (ea?.classLevel.numeric ?? 999) - (eb?.classLevel.numeric ?? 999) ||
+      (ea?.classLevel.name ?? '').localeCompare(eb?.classLevel.name ?? '') ||
+      (ea?.section.name ?? '').localeCompare(eb?.section.name ?? '') ||
+      (ea?.rollNumber ?? 1e9) - (eb?.rollNumber ?? 1e9) ||
+      `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+    )
+  })
 }
 
 export async function getStudent(ctx: AppContext, id: string) {

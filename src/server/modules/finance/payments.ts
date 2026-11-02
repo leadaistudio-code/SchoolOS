@@ -69,7 +69,7 @@ export const collectSchema = z
       )
       .max(10)
       .optional(),
-    /** Accepted for old clients and ignored: bill book numbers are issued automatically. */
+    /** Typed by the cashier to match the paper bill book; blank issues the next number. */
     billBookNo: z.string().trim().max(40).optional(),
     notes: z.string().trim().max(300).optional(),
     /**
@@ -583,8 +583,12 @@ export async function collectPayment(
       .filter(Boolean)
       .join('\n')
 
-    // One bill book number per collection, issued under a school-wide lock.
-    const billBookNo = await issueBillBookNo(tx, ctx.tenant.id)
+    // One bill book number per collection, issued or checked under a school-wide lock.
+    const typedBillBookNo = input.billBookNo?.trim() || null
+    if (typedBillBookNo && (await billBookNoTaken(tx, ctx.tenant.id, typedBillBookNo, { paymentIds: [] }))) {
+      throw conflict(`Bill book number ${typedBillBookNo} is already on another receipt`)
+    }
+    const billBookNo = typedBillBookNo ?? (await issueBillBookNo(tx, ctx.tenant.id))
     const collectionId = parts.length > 1 ? newCollectionId() : null
     // A discount-only visit still gets a (zero) receipt to show the waiver.
     const toRecord = parts.length > 0

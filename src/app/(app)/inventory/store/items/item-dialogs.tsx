@@ -28,6 +28,7 @@ export type ItemDraft = {
   hsnCode: string | null
   taxPercent: number
   sellingPriceMinor: number
+  discountPercent: number
   reorderLevel: number
   description: string | null
   quantity: number
@@ -44,10 +45,12 @@ type Form = {
   hsnCode: string
   taxPercent: string
   sellingPrice: string
+  discountPercent: string
   reorderLevel: string
   description: string
   openingQuantity: string
   openingUnitCost: string
+  stockCount: string
 }
 
 const blank: Form = {
@@ -60,10 +63,12 @@ const blank: Form = {
   hsnCode: '',
   taxPercent: '0',
   sellingPrice: '',
+  discountPercent: '0',
   reorderLevel: '5',
   description: '',
   openingQuantity: '0',
   openingUnitCost: '',
+  stockCount: '',
 }
 
 const fromDraft = (d: ItemDraft): Form => ({
@@ -76,10 +81,12 @@ const fromDraft = (d: ItemDraft): Form => ({
   hsnCode: d.hsnCode ?? '',
   taxPercent: String(d.taxPercent),
   sellingPrice: String(d.sellingPriceMinor / 100),
+  discountPercent: String(d.discountPercent ?? 0),
   reorderLevel: String(d.reorderLevel),
   description: d.description ?? '',
   openingQuantity: '0',
   openingUnitCost: '',
+  stockCount: String(d.quantity),
 })
 
 const UNITS = ['pcs', 'set', 'pair', 'book', 'pack', 'dozen', 'kit', 'metre']
@@ -115,6 +122,14 @@ function ItemFields({ form, set, editing }: { form: Form; set: (k: keyof Form, v
           ))}
         </Select>
       </Field>
+      <Field label="Discount %" htmlFor="si-disc" hint="Applied automatically at the counter; can be changed per bill">
+        <Input id="si-disc" type="number" min="0" max="100" step="0.5" value={form.discountPercent} onChange={(e) => set('discountPercent', e.target.value)} />
+      </Field>
+      {editing ? (
+        <Field label="Quantity in hand" htmlFor="si-stock" hint="Change after a physical count; the difference is saved in stock history">
+          <Input id="si-stock" type="number" min="0" step="1" value={form.stockCount} onChange={(e) => set('stockCount', e.target.value)} />
+        </Field>
+      ) : null}
       <Field label="Unit" htmlFor="si-unit">
         <Select id="si-unit" value={form.unit} onChange={(e) => set('unit', e.target.value)}>
           {UNITS.map((u) => (
@@ -180,13 +195,22 @@ export function ItemDialogButton({ item }: { item?: ItemDraft }) {
       hsnCode: form.hsnCode,
       taxPercent: form.taxPercent,
       sellingPrice: form.sellingPrice,
+      discountPercent: form.discountPercent || '0',
       reorderLevel: form.reorderLevel || '0',
       description: form.description,
     }
     let ok = true
     let message = ''
     if (item) {
-      const res = await updateStoreItemAction({ ...common, id: item.id, variant: form.variants, sku: form.sku, barcode: form.barcode })
+      const counted = form.stockCount.trim()
+      const res = await updateStoreItemAction({
+        ...common,
+        id: item.id,
+        variant: form.variants,
+        sku: form.sku,
+        barcode: form.barcode,
+        stockCount: counted !== '' && Number(counted) !== item.quantity ? counted : undefined,
+      })
       ok = res.ok
       message = res.message
     } else {
@@ -238,7 +262,7 @@ export function ItemDialogButton({ item }: { item?: ItemDraft }) {
         onClose={() => setOpen(false)}
         size="lg"
         title={item ? `Edit ${item.name}` : 'Add store item'}
-        description={item ? `In stock: ${item.quantity} ${item.unit}. Quantity only changes through stock in, sales and adjustments.` : 'Books, uniform, shoes, bags, stationery or anything the school sells.'}
+        description={item ? `In stock: ${item.quantity} ${item.unit}. Deliveries go through Stock in; edit the quantity here only after a physical count.` : 'Books, uniform, shoes, bags, stationery or anything the school sells.'}
         footer={
           <>
             <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : item ? 'Save changes' : 'Add item'}</Button>

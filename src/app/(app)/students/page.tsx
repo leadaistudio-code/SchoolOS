@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { GraduationCap, HeartHandshake, Plus, Upload, Users } from 'lucide-react'
+import { Download, GraduationCap, HeartHandshake, Plus, Upload, Users } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { classLevelScopeWhere, studentScopeWhere } from '@/server/scope'
 import { listStudents, getClassOptions } from '@/server/modules/students/service'
@@ -22,6 +22,15 @@ import { StudentTable } from './student-table'
 export const metadata = { title: 'Students' }
 
 type SearchParams = Promise<Record<string, string | undefined>>
+
+const EXPORT_PARAMS = ['q', 'classLevelId', 'sectionId', 'status', 'gender', 'hasDues']
+
+function exportQuery(params: Record<string, string | undefined>) {
+  const qs = new URLSearchParams(
+    EXPORT_PARAMS.flatMap((k) => (params[k] ? [[k, params[k]] as [string, string]] : [])),
+  ).toString()
+  return qs ? `?${qs}` : ''
+}
 
 export default async function StudentsPage({ searchParams }: { searchParams: SearchParams }) {
   const ctx = await requireContext('students.view')
@@ -66,6 +75,16 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
               <Link href="/students/deleted" className={colorBannerSecondaryBtn()}>
                 Deleted
               </Link>
+            ) : null}
+            {ctx.can('students.export') ? (
+              <a
+                href={`/api/v1/students/export${exportQuery(params)}`}
+                className={colorBannerSecondaryBtn()}
+                title="All details of the students matching the class, section and other filters below"
+              >
+                <Download aria-hidden />
+                Export to Excel
+              </a>
             ) : null}
             {ctx.can('students.import') ? (
               <Link href="/students/import" className={colorBannerSecondaryBtn()}>

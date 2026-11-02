@@ -121,6 +121,11 @@ export function CollectForm({
   const [splits, setSplits] = React.useState<SplitRow[]>([])
   const [charges, setCharges] = React.useState<ChargeRow[]>([])
   const [paidOn, setPaidOn] = React.useState(() => toDateInput(new Date()))
+  /** null: take the next number automatically. */
+  const [billBookNo, setBillBookNo] = React.useState<string | null>(null)
+  const customBillBookNo = billBookNo !== null && billBookNo.trim() !== '' && billBookNo.trim() !== nextBillBookNo
+    ? billBookNo.trim()
+    : null
   const [discount, setDiscount] = React.useState('')
   const [discountReason, setDiscountReason] = React.useState('')
   const [mode, setMode] = React.useState('CASH')
@@ -296,6 +301,7 @@ export function CollectForm({
             }))
           : undefined,
         paidOn,
+        billBookNo: customBillBookNo ?? undefined,
         discount: discountMinor > 0 ? discountMinor / 100 : undefined,
         discountReason: discountMinor > 0 ? discountReason.trim() : undefined,
         notes: notes || undefined,
@@ -318,6 +324,7 @@ export function CollectForm({
         receipts: result.data?.receipts ?? [],
       })
       idempotencyKey.current = newIdempotencyKey()
+      setBillBookNo(null)
       router.refresh()
     })
   }
@@ -728,14 +735,21 @@ export function CollectForm({
                   label="Bill book number"
                   htmlFor="billBookNo"
                   required
-                  hint="Issued automatically and never repeated"
+                  hint={
+                    customBillBookNo
+                      ? `Using your number. Next automatic number is ${nextBillBookNo}.`
+                      : 'Filled automatically; change it to match the paper bill book'
+                  }
                 >
                   <Input
                     id="billBookNo"
-                    value={nextBillBookNo}
-                    readOnly
-                    aria-readonly
-                    className="tnum bg-surface-2"
+                    value={billBookNo ?? nextBillBookNo}
+                    onChange={(e) => setBillBookNo(e.target.value)}
+                    onBlur={() => {
+                      if (billBookNo !== null && billBookNo.trim() === '') setBillBookNo(null)
+                    }}
+                    maxLength={40}
+                    className="tnum"
                   />
                 </Field>
               </div>
@@ -926,7 +940,10 @@ export function CollectForm({
                   <dt className="text-ink-muted">Collected by</dt>
                   <dd className="text-ink">{collectors.find((collector) => collector.id === collectedById)?.name ?? '—'}</dd>
                   <dt className="text-ink-muted">Bill book no.</dt>
-                  <dd className="text-ink tnum">{nextBillBookNo} <span className="text-ink-subtle">(confirmed on save)</span></dd>
+                  <dd className="text-ink tnum">
+                    {customBillBookNo ?? nextBillBookNo}
+                    {customBillBookNo ? null : <span className="text-ink-subtle"> (confirmed on save)</span>}
+                  </dd>
                   <dt className="text-ink-muted">Outstanding after</dt>
                   <dd className="text-ink tnum">{formatMoney(Math.max(0, payableMinor - amountMinor), currency)}</dd>
                 </dl>

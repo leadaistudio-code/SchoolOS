@@ -57,6 +57,16 @@ export function priceLine(input: { quantity: number; unitPriceMinor: number; dis
   return { gross, discount, amount, tax, net: amount - tax }
 }
 
+/** Discount in paise on `quantity` units at the item's default discount %. */
+export function itemDiscountMinor(quantity: number, unitPriceMinor: number, discountPercent: number) {
+  if (!(discountPercent > 0)) return 0
+  return Math.round((Math.max(0, quantity) * Math.max(0, unitPriceMinor) * Math.min(discountPercent, 100)) / 100)
+}
+
+export function discountedPrice(unitPriceMinor: number, discountPercent: number) {
+  return unitPriceMinor - itemDiscountMinor(1, unitPriceMinor, discountPercent)
+}
+
 /** Weighted average cost after receiving `inQty` units at `inCost`. */
 export function weightedAverageCost(onHand: number, avgCost: number, inQty: number, inCost: number) {
   const base = Math.max(0, onHand)

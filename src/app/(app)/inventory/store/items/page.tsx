@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { AlertTriangle, History, Package, PackageX, Wallet } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStoreItems, type ItemFilter } from '@/server/modules/store/service'
-import { STORE_CATEGORIES, stockState, storeCategory } from '@/lib/store/options'
+import { STORE_CATEGORIES, discountedPrice, stockState, storeCategory } from '@/lib/store/options'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -104,6 +104,7 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
                   <TH>Item</TH>
                   <TH>Category</TH>
                   <TH align="right">Price</TH>
+                  <TH align="right">Discount</TH>
                   <TH align="right">In stock</TH>
                   <TH align="right">Reorder at</TH>
                   <TH align="right">Avg cost</TH>
@@ -134,6 +135,18 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
                         </span>
                       </TD>
                       <TD align="right" className="text-ink">{formatMoney(i.sellingPriceMinor, currency)}</TD>
+                      <TD align="right">
+                        {i.discountPercent > 0 ? (
+                          <>
+                            <span className="text-ink">{formatNumber(i.discountPercent)}%</span>
+                            <span className="block text-xs text-ink-subtle">
+                              {formatMoney(discountedPrice(i.sellingPriceMinor, i.discountPercent), currency)} after
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-ink-subtle">—</span>
+                        )}
+                      </TD>
                       <TD align="right">
                         <Badge tone={state === 'OUT' ? 'danger' : state === 'LOW' ? 'warning' : 'success'}>
                           {i.quantity} {i.unit}

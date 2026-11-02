@@ -3909,6 +3909,8 @@ model StoreItem {
   /// GST included in the selling price.
   taxPercent        Float         @default(0)
   sellingPriceMinor Int
+  /// Default discount on the selling price, pre-filled on each counter bill line.
+  discountPercent   Float         @default(0)
   /// Weighted average cost of units in stock.
   avgCostMinor      Int           @default(0)
   quantity          Int           @default(0)
