@@ -57,6 +57,7 @@ export const MEGA_MENUS: MegaMenu[] = [
         heading: 'Also in the platform',
         links: [
           { label: 'Transport & tracking', href: '/transport' },
+          { label: 'Science & robotics labs', href: '/cbse-science-lab' },
           { label: 'Parent & teacher experience', href: '/product#parents' },
           { label: 'Reports & MIS', href: '/product#reports' },
           { label: 'Integrations', href: '/integrations' },
@@ -163,6 +164,7 @@ export const FOOTER_COLUMNS: NavColumn[] = [
       { label: 'Admission CRM', href: '/admission-crm' },
       { label: 'School ERP', href: '/school-erp' },
       { label: 'Transport', href: '/transport' },
+      { label: 'Science & robotics labs', href: '/cbse-science-lab' },
       { label: 'Integrations', href: '/integrations' },
     ],
   },

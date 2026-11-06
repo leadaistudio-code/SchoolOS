@@ -176,6 +176,7 @@ export const BLOG_INTERNAL_LINKS: { path: string; label: string }[] = [
   { path: '/admission-crm', label: 'Admission CRM' },
   { path: '/school-erp', label: 'School ERP: fees, staff and communication' },
   { path: '/transport', label: 'School transport and bus tracking' },
+  { path: '/cbse-science-lab', label: 'CBSE science lab compliance' },
   { path: '/security', label: 'Security and data protection' },
   { path: '/services', label: 'Implementation and support' },
   { path: '/book-demo', label: 'Book a demo' },

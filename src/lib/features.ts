@@ -26,6 +26,8 @@ export const FEATURE = {
   MODULE_WHITE_LABEL_APP: 'module.white_label_app',
   MODULE_AI_ASSIST: 'module.ai_assist',
   MODULE_FEEDBACK: 'module.feedback',
+  /** Paid add-on, switched on per school from the platform console. */
+  MODULE_SCIENCE_LAB: 'module.science_lab',
 
   LIMIT_STUDENTS: 'limit.students',
   LIMIT_STAFF: 'limit.staff',

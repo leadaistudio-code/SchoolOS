@@ -57,6 +57,8 @@ BEGIN
     'Bus','BusMaintenance','Route','BusStop','TransportAssignment','BusTrip',
     'BusLocation','TransportBoardingLog',
     'Sport','SportsTeam','SportsTeamMember','SchoolEvent','EventParticipant',
+    'Lab','LabItem','LabStockMovement','LabExperiment','LabSession',
+    'LabSessionStudent','LabInspection','LabIncident','LabWasteLog',
     'CmsPage','CmsBlock','CmsPost','CmsMedia',
     'Document','Attachment','ImportBatch','SupportTicket',
     'PushSubscription','TenantDomain'

@@ -244,6 +244,13 @@ export const PERMISSIONS: PermissionDef[] = [
     ['track', 'Live tracking'],
     ['drive', 'Driver trip operations'],
   ]),
+  ...mod('labs', [
+    ['view', 'View science labs, registers and readiness'],
+    ['manage', 'Set up labs and edit the practical library'],
+    ['stock', 'Receive, adjust and write off lab stock'],
+    ['sessions', 'Book and conduct practical sessions'],
+    ['safety', 'Record inspections, incidents and waste disposal'],
+  ]),
   ...mod('sports', [['view', 'View sports'], ['manage', 'Manage sports and teams']]),
   ...mod('events', [['view', 'View events'], ['manage', 'Manage events']]),
   ...mod('website', [['view', 'View website CMS'], ['manage', 'Manage website content']]),

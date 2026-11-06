@@ -7,6 +7,7 @@ import {
   archiveTenant,
   provisionTenant,
   reactivateTenant,
+  removeEntitlementOverride,
   setEntitlementOverride,
   suspendTenant,
   updateTenant,
@@ -104,6 +105,22 @@ export async function setOverrideAction(tenantId: string, formData: FormData) {
     redirectWithFormError(`/platform/tenants/${tenantId}`, parsed.error)
   }
   await setEntitlementOverride(ctx, tenantId, parsed.data)
+  revalidatePath(`/platform/tenants/${tenantId}`)
+}
+
+/** Switches a module or add-on on or off for one school, or hands it back to the plan. */
+export async function setModuleAction(tenantId: string, featureKey: string, state: 'on' | 'off' | 'plan') {
+  const ctx = await requirePlatformContext('platform.tenants')
+  const parsed = entitlementOverrideSchema.safeParse({
+    featureKey,
+    enabled: state === 'on',
+    note: state === 'plan' ? undefined : `Switched ${state} from the platform console`,
+  })
+  if (!parsed.success || !featureKey.startsWith('module.')) {
+    redirect(`/platform/tenants/${tenantId}?error=${encodeURIComponent('Unknown module')}`)
+  }
+  if (state === 'plan') await removeEntitlementOverride(ctx, tenantId, featureKey)
+  else await setEntitlementOverride(ctx, tenantId, parsed.data)
   revalidatePath(`/platform/tenants/${tenantId}`)
 }
 

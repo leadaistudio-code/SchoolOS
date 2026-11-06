@@ -25,6 +25,7 @@ const PAGES: { path: string; priority: number; changeFrequency: MetadataRoute.Si
   { path: '/modules', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/integrations', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/transport', priority: 0.7, changeFrequency: 'monthly' },
+  { path: '/cbse-science-lab', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/solutions', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/solutions/private-schools', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/solutions/international-schools', priority: 0.7, changeFrequency: 'monthly' },

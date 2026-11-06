@@ -107,10 +107,16 @@ async function main() {
     for (const def of SYSTEM_ROLES) {
       // A compound unique containing a nullable column cannot be matched with
       // null in Prisma, so system roles are resolved by findFirst.
-      const role = await prisma.role.findFirst({ where: { tenantId: null, key: def.key } })
+      let role = await prisma.role.findFirst({ where: { tenantId: null, key: def.key } })
       if (!role) {
-        console.log(`  ${def.key}: not in the database — run npm run db:seed first`)
-        continue
+        if (dryRun) {
+          console.log(`  ${def.key}: would create the role with ${def.permissions.length} permissions`)
+          continue
+        }
+        role = await prisma.role.create({
+          data: { tenantId: null, key: def.key, name: def.name, description: def.description, isSystem: true },
+        })
+        console.log(`  ${def.key}: created`)
       }
 
       const current = await prisma.rolePermission.findMany({

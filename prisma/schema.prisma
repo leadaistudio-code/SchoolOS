@@ -7931,3 +7931,329 @@ model BlogPost {
   @@index([category, status, publishedAt])
   @@index([topicKey])
 }
+
+// ─────────────────────────────────────────────────────────── Science labs ──
+// Paid add-on (module.science_lab). A lab is created from a CBSE template in
+// src/lib/labs/templates; the template supplies the required item list,
+// infrastructure checklist, inspections and default practicals.
+
+enum LabType {
+  COMPOSITE_SCIENCE
+  ROBOTICS_AI
+  PHYSICS
+  CHEMISTRY
+  BIOLOGY
+  COMPUTER
+  MATHEMATICS
+  OTHER
+}
+
+enum LabItemCategory {
+  APPARATUS
+  GLASSWARE
+  INSTRUMENT
+  CHEMICAL
+  SPECIMEN
+  SLIDE
+  CHART
+  CONSUMABLE
+  SAFETY
+  EQUIPMENT
+}
+
+enum LabItemKind {
+  NON_CONSUMABLE
+  CONSUMABLE
+}
+
+enum LabMovementType {
+  OPENING
+  PURCHASE
+  ADJUSTMENT
+  CONSUMPTION
+  BREAKAGE
+  DISPOSAL
+}
+
+enum LabSessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum LabInspectionType {
+  DAILY
+  MONTHLY
+  QUARTERLY
+}
+
+enum LabIncidentType {
+  INJURY
+  BURN
+  CHEMICAL_SPILL
+  CHEMICAL_EXPOSURE
+  FIRE
+  GAS_LEAK
+  ELECTRICAL
+  BREAKAGE
+  OTHER
+}
+
+enum LabIncidentSeverity {
+  MINOR
+  MODERATE
+  SERIOUS
+}
+
+enum LabIncidentStatus {
+  OPEN
+  CLOSED
+}
+
+enum LabWasteCategory {
+  BIODEGRADABLE
+  NON_BIODEGRADABLE
+  BROKEN_GLASS
+  CHEMICAL
+  FLAMMABLE_BOTTLES
+  EMPTY_CONTAINERS
+  E_WASTE
+  BATTERIES
+}
+
+model Lab {
+  id               String    @id @default(cuid())
+  tenantId         String
+  name             String
+  type             LabType
+  /// Template code from src/lib/labs/templates, or null for a custom lab.
+  templateCode     String?
+  room             String?
+  inChargeStaffId  String?
+  assistantStaffId String?
+  /// Emergency numbers printed on the display board: [{ label, phone }].
+  emergencyContacts Json     @default("[]")
+  /// Answers to the template's infrastructure checklist:
+  /// { [code]: { ok: boolean, value?: number, note?: string } }.
+  infrastructure   Json      @default("{}")
+  notes            String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  items       LabItem[]
+  movements   LabStockMovement[]
+  sessions    LabSession[]
+  inspections LabInspection[]
+  incidents   LabIncident[]
+  wasteLogs   LabWasteLog[]
+
+  @@index([tenantId, deletedAt])
+}
+
+model LabItem {
+  id              String          @id @default(cuid())
+  tenantId        String
+  labId           String
+  /// Template item code; links the item to CBSE requirements and practicals.
+  templateCode    String?
+  name            String
+  category        LabItemCategory
+  kind            LabItemKind
+  unit            String
+  /// Quantity the template requires for a batch of 40. 0 = not mandated.
+  requiredQty     Float           @default(0)
+  quantity        Float           @default(0)
+  reorderLevel    Float           @default(0)
+  storageLocation String?
+  hazards         String[]
+  /// Expiry for chemicals, refill date for extinguishers.
+  expiresOn       DateTime?       @db.Date
+  /// Safety data sheet in object storage (labs/<tenant>/...).
+  msdsKey         String?
+  unitCostMinor   Int             @default(0)
+  notes           String?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  lab       Lab                @relation(fields: [labId], references: [id], onDelete: Cascade)
+  movements LabStockMovement[]
+
+  @@index([tenantId, labId])
+  @@index([tenantId, labId, templateCode])
+}
+
+/// Append-only stock ledger for lab items.
+model LabStockMovement {
+  id            String          @id @default(cuid())
+  tenantId      String
+  labId         String
+  itemId        String
+  type          LabMovementType
+  /// Signed: positive adds stock, negative removes it.
+  quantity      Float
+  balanceAfter  Float
+  unitCostMinor Int             @default(0)
+  sessionId     String?
+  /// Student responsible for a breakage.
+  studentId     String?
+  /// Amount recovered from the student for a breakage, if any.
+  chargeMinor   Int?
+  vendorName    String?
+  invoiceNo     String?
+  reason        String?
+  actorId       String?
+  actorLabel    String?
+  createdAt     DateTime        @default(now())
+
+  lab     Lab         @relation(fields: [labId], references: [id], onDelete: Cascade)
+  item    LabItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  session LabSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, labId, createdAt])
+  @@index([tenantId, itemId, createdAt])
+  @@index([tenantId, type, createdAt])
+  @@index([tenantId, studentId])
+}
+
+/// A practical in the school's library. Seeded from the template and editable.
+model LabExperiment {
+  id           String    @id @default(cuid())
+  tenantId     String
+  labType      LabType
+  templateCode String?
+  classNumber  Int?
+  subject      String?
+  title        String
+  aim          String?
+  /// [{ itemCode, qty }] — template item codes and the amount used per session.
+  apparatus    Json      @default("[]")
+  safetyNotes  String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  sessions LabSession[]
+
+  @@index([tenantId, labType, classNumber])
+}
+
+model LabSession {
+  id             String           @id @default(cuid())
+  tenantId       String
+  labId          String
+  experimentId   String?
+  sectionId      String?
+  teacherStaffId String?
+  date           DateTime         @db.Date
+  periodId       String?
+  startTime      String // HH:mm, school local time
+  endTime        String
+  /// Batch label when a class is split (e.g. "Group A").
+  batch          String?
+  status         LabSessionStatus @default(SCHEDULED)
+  notes          String?
+  completedAt    DateTime?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  lab        Lab                 @relation(fields: [labId], references: [id], onDelete: Cascade)
+  experiment LabExperiment?      @relation(fields: [experimentId], references: [id], onDelete: SetNull)
+  students   LabSessionStudent[]
+  movements  LabStockMovement[]
+
+  @@index([tenantId, labId, date])
+  @@index([tenantId, sectionId, date])
+}
+
+/// One student's attendance and record marks for a practical session.
+model LabSessionStudent {
+  id          String   @id @default(cuid())
+  tenantId    String
+  sessionId   String
+  studentId   String
+  present     Boolean  @default(true)
+  /// Practical-record (file) checked by the teacher.
+  recordDone  Boolean  @default(false)
+  marks       Float?
+  remarks     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session LabSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+  @@index([tenantId, studentId])
+}
+
+model LabInspection {
+  id            String            @id @default(cuid())
+  tenantId      String
+  labId         String
+  type          LabInspectionType
+  inspectedOn   DateTime          @db.Date
+  /// { [checklistCode]: boolean }
+  checklist     Json              @default("{}")
+  passed        Int               @default(0)
+  failed        Int               @default(0)
+  issues        String?
+  inspectorName String?
+  photoKeys     String[]
+  nextDueOn     DateTime?         @db.Date
+  createdById   String?
+  createdAt     DateTime          @default(now())
+
+  lab Lab @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, labId, type, inspectedOn])
+}
+
+model LabIncident {
+  id              String              @id @default(cuid())
+  tenantId        String
+  labId           String
+  occurredAt      DateTime
+  type            LabIncidentType
+  severity        LabIncidentSeverity
+  description     String
+  studentIds      String[]
+  firstAidGiven   Boolean             @default(false)
+  parentInformed  Boolean             @default(false)
+  actionTaken     String?
+  status          LabIncidentStatus   @default(OPEN)
+  photoKeys       String[]
+  reportedById    String?
+  reportedByLabel String?
+  closedAt        DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  lab Lab @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, labId, occurredAt])
+  @@index([tenantId, status])
+}
+
+model LabWasteLog {
+  id          String           @id @default(cuid())
+  tenantId    String
+  labId       String
+  disposedOn  DateTime         @db.Date
+  category    LabWasteCategory
+  quantity    Float?
+  unit        String?
+  /// Agency or person the waste was handed to.
+  handedTo    String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+
+  lab Lab @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, labId, disposedOn])
+}

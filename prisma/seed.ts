@@ -7,6 +7,7 @@ import { PERMISSIONS } from '../src/lib/rbac/permissions'
 import { SYSTEM_ROLES, ROLE } from '../src/lib/rbac/roles'
 import { FEATURE } from '../src/server/entitlements'
 import { ensureExamDefaults } from '../src/server/modules/exams/defaults'
+import { compositeScience, roboticsAi } from '../src/lib/labs/templates'
 import {
   ASSET_ITEMS,
   BLOOD_GROUPS,
@@ -175,7 +176,10 @@ const PLAN_DEFS = [
       [FEATURE.LIMIT_AI_EVAL_PAGES_PER_MONTH]: 50000,
       [FEATURE.LIMIT_AI_GENERATE_PER_MONTH]: 50000,
     },
-    modules: Object.values(FEATURE).filter((f) => f.startsWith('module.')),
+    // Add-ons are sold separately and switched on per school.
+    modules: Object.values(FEATURE).filter(
+      (f) => f.startsWith('module.') && f !== FEATURE.MODULE_SCIENCE_LAB,
+    ),
   },
 ]
 
@@ -327,8 +331,458 @@ async function seedTenant(spec: TenantSpec, planId: string, passwordHash: string
   await seedLeave(tenant.id, students, staff, rand)
   await seedSubmissions(tenant.id, rand)
   await seedDemoAccounts(tenant.id, spec, passwordHash, students)
+  if (spec.slug === 'demo') await seedScienceLab(tenant.id, spec, rand)
 
   return tenant
+}
+
+/* ------------------------------------------------------------ science lab */
+
+/**
+ * The CBSE science lab add-on, switched on for the demo school with a lab that
+ * is nearly but not quite ready: a few shortfalls, a chemical about to expire,
+ * an overdue quarterly inspection and a term of practicals behind it.
+ */
+async function seedScienceLab(tenantId: string, spec: TenantSpec, rand: Random) {
+  console.log('    science lab')
+  await prisma.tenantEntitlementOverride.upsert({
+    where: { tenantId_featureKey: { tenantId, featureKey: FEATURE.MODULE_SCIENCE_LAB } },
+    create: { tenantId, featureKey: FEATURE.MODULE_SCIENCE_LAB, enabled: true, note: 'Demo school' },
+    update: { enabled: true },
+  })
+  await seedRoboticsLab(tenantId, spec, rand)
+  if (await prisma.lab.findFirst({ where: { tenantId, type: 'COMPOSITE_SCIENCE', deletedAt: null } })) return
+
+  const template = compositeScience
+  const today = attendanceDate(new Date())
+  const [teacher, assistant] = await Promise.all(
+    [`teacher@${spec.emailDomain}`, `lab@${spec.emailDomain}`].map((email) =>
+      prisma.staff.findFirst({ where: { tenantId, email }, select: { id: true, firstName: true, lastName: true } }),
+    ),
+  )
+
+  const infrastructure: Record<string, { ok: boolean; value?: number }> = {}
+  for (const c of template.infrastructure) {
+    if (/EXHAUST/i.test(c.code)) infrastructure[c.code] = { ok: true, value: Math.max(0, (c.min ?? 1) - 1) }
+    else if (/SMART/i.test(c.code)) infrastructure[c.code] = { ok: false }
+    else infrastructure[c.code] = c.min ? { ok: true, value: c.min } : { ok: true }
+  }
+
+  const lab = await prisma.lab.create({
+    data: {
+      tenantId,
+      name: 'Composite Science Lab',
+      type: 'COMPOSITE_SCIENCE',
+      templateCode: template.code,
+      room: 'Block B, Room 204',
+      inChargeStaffId: teacher?.id ?? null,
+      assistantStaffId: assistant?.id ?? null,
+      emergencyContacts: [
+        { label: 'Principal', phone: '+91 98110 00001' },
+        { label: 'School nurse', phone: '+91 98110 00002' },
+        { label: 'Fire', phone: '101' },
+        { label: 'Ambulance', phone: '108' },
+      ],
+      infrastructure,
+    },
+  })
+
+  const actorLabel = assistant ? `${assistant.firstName} ${assistant.lastName}` : 'Lab assistant'
+  const items = []
+  for (const [i, t] of template.items.entries()) {
+    // Every seventh item is short, so the shortfall list has something on it.
+    const quantity = i % 7 === 3 ? Math.floor(t.required / 2) : t.required + (t.kind === 'CONSUMABLE' ? intBetween(rand, 0, 3) : 0)
+    const expiresOn =
+      t.category === 'CHEMICAL'
+        ? addDays(today, i % 11 === 0 ? 18 : intBetween(rand, 200, 700))
+        : t.code.includes('EXTINGUISHER')
+          ? addDays(today, 150)
+          : null
+    items.push(
+      await prisma.labItem.create({
+        data: {
+          tenantId,
+          labId: lab.id,
+          templateCode: t.code,
+          name: t.name,
+          category: t.category,
+          kind: t.kind,
+          unit: t.unit,
+          requiredQty: t.required,
+          quantity,
+          reorderLevel: t.kind === 'CONSUMABLE' ? Math.ceil(t.required / 4) : 0,
+          hazards: t.hazards ?? [],
+          expiresOn,
+          storageLocation: t.category === 'CHEMICAL' ? 'Chemical cupboard' : t.category === 'GLASSWARE' ? 'Glassware rack' : 'Almirah 1',
+          notes: t.note ?? null,
+        },
+      }),
+    )
+  }
+  await prisma.labStockMovement.createMany({
+    data: items
+      .filter((it) => it.quantity > 0)
+      .map((it) => ({
+        tenantId,
+        labId: lab.id,
+        itemId: it.id,
+        type: 'OPENING' as const,
+        quantity: it.quantity,
+        balanceAfter: it.quantity,
+        actorLabel,
+        createdAt: subDays(new Date(), 120),
+      })),
+  })
+
+  await prisma.labExperiment.createMany({
+    data: template.practicals.map((p) => ({
+      tenantId,
+      labType: 'COMPOSITE_SCIENCE' as const,
+      templateCode: p.code,
+      classNumber: p.classNumber,
+      subject: p.subject,
+      title: p.title,
+      aim: p.aim,
+      apparatus: p.apparatus,
+      safetyNotes: p.safety ?? null,
+    })),
+  })
+
+  await prisma.labInspection.createMany({
+    data: [
+      { type: 'DAILY' as const, on: subDays(today, 1), failed: 0, issues: null },
+      { type: 'MONTHLY' as const, on: subDays(today, 12), failed: 1, issues: 'One gas tap stiff; reported to maintenance.' },
+      { type: 'QUARTERLY' as const, on: subDays(today, 104), failed: 0, issues: null },
+    ].map((x) => {
+      const spec = template.inspections.find((s) => s.type === x.type)!
+      return {
+        tenantId,
+        labId: lab.id,
+        type: x.type,
+        inspectedOn: x.on,
+        checklist: Object.fromEntries(spec.items.map((it, n) => [it.code, n >= x.failed])),
+        passed: spec.items.length - x.failed,
+        failed: x.failed,
+        issues: x.issues,
+        inspectorName: actorLabel,
+        nextDueOn: addDays(x.on, spec.everyDays),
+      }
+    }),
+  })
+
+  await prisma.labIncident.create({
+    data: {
+      tenantId,
+      labId: lab.id,
+      occurredAt: subDays(new Date(), 9),
+      type: 'BURN',
+      severity: 'MINOR',
+      description: 'Student touched a hot test tube while heating; minor redness on fingers.',
+      firstAidGiven: true,
+      parentInformed: true,
+      actionTaken: 'Cold water and burn gel applied. Reminded class to use test-tube holders.',
+      status: 'CLOSED',
+      closedAt: subDays(new Date(), 9),
+      reportedByLabel: actorLabel,
+    },
+  })
+  await prisma.labWasteLog.create({
+    data: {
+      tenantId,
+      labId: lab.id,
+      disposedOn: subDays(today, 20),
+      category: 'BROKEN_GLASS',
+      quantity: 2,
+      unit: 'kg',
+      handedTo: 'Municipal sanitation',
+    },
+  })
+
+  // A term of practicals for the senior-most science section, plus two booked ahead.
+  const section = await prisma.section.findFirst({
+    where: { tenantId, deletedAt: null, classLevel: { numeric: { gte: 6, lte: 10 }, session: { isCurrent: true } } },
+    orderBy: [{ classLevel: { numeric: 'desc' } }, { name: 'asc' }],
+    select: { id: true, classLevel: { select: { numeric: true } } },
+  })
+  if (!section) return
+  const roster = await prisma.enrollment.findMany({
+    where: { tenantId, sectionId: section.id, isCurrent: true },
+    select: { studentId: true },
+  })
+  const experiments = await prisma.labExperiment.findMany({
+    where: { tenantId, labType: 'COMPOSITE_SCIENCE', classNumber: section.classLevel.numeric, deletedAt: null },
+    orderBy: { title: 'asc' },
+  })
+  const itemByCode = new Map(items.map((it) => [it.templateCode, it]))
+  const completed = experiments.slice(0, 4)
+  for (const [n, exp] of completed.entries()) {
+    const date = subDays(today, 7 * (completed.length - n))
+    const session = await prisma.labSession.create({
+      data: {
+        tenantId,
+        labId: lab.id,
+        experimentId: exp.id,
+        sectionId: section.id,
+        teacherStaffId: teacher?.id ?? null,
+        date,
+        startTime: '10:40',
+        endTime: '11:20',
+        status: 'COMPLETED',
+        completedAt: date,
+      },
+    })
+    await prisma.labSessionStudent.createMany({
+      data: roster.map((r) => {
+        const present = chance(rand, 0.92)
+        return {
+          tenantId,
+          sessionId: session.id,
+          studentId: r.studentId,
+          present,
+          recordDone: present && chance(rand, 0.8),
+          marks: present ? intBetween(rand, 6, 10) : null,
+        }
+      }),
+    })
+    for (const a of (exp.apparatus as { itemCode: string; qty: number }[]) ?? []) {
+      const it = itemByCode.get(a.itemCode)
+      if (!it || it.kind !== 'CONSUMABLE' || it.quantity < a.qty) continue
+      it.quantity -= a.qty
+      await prisma.labItem.update({ where: { id: it.id }, data: { quantity: it.quantity } })
+      await prisma.labStockMovement.create({
+        data: { tenantId, labId: lab.id, itemId: it.id, type: 'CONSUMPTION', quantity: -a.qty, balanceAfter: it.quantity, sessionId: session.id, actorLabel, createdAt: date },
+      })
+    }
+    if (n === 1 && roster[0]) {
+      const glass = items.find((it) => it.kind === 'NON_CONSUMABLE' && it.category === 'GLASSWARE' && it.quantity > 0)
+      if (glass) {
+        glass.quantity -= 1
+        await prisma.labItem.update({ where: { id: glass.id }, data: { quantity: glass.quantity } })
+        await prisma.labStockMovement.create({
+          data: {
+            tenantId,
+            labId: lab.id,
+            itemId: glass.id,
+            type: 'BREAKAGE',
+            quantity: -1,
+            balanceAfter: glass.quantity,
+            sessionId: session.id,
+            studentId: roster[0].studentId,
+            chargeMinor: 5000,
+            reason: 'Dropped while washing',
+            actorLabel,
+            createdAt: date,
+          },
+        })
+      }
+    }
+  }
+  for (const [n, exp] of experiments.slice(4, 6).entries()) {
+    await prisma.labSession.create({
+      data: {
+        tenantId,
+        labId: lab.id,
+        experimentId: exp.id,
+        sectionId: section.id,
+        teacherStaffId: teacher?.id ?? null,
+        date: addDays(today, 2 + n * 7),
+        startTime: '10:40',
+        endTime: '11:20',
+      },
+    })
+  }
+}
+
+/**
+ * A Robotics & AI lab beside the science lab: most kit in place, the 3D printer
+ * and oscilloscope still to buy, and a few practicals already run.
+ */
+async function seedRoboticsLab(tenantId: string, spec: TenantSpec, rand: Random) {
+  if (await prisma.lab.findFirst({ where: { tenantId, type: 'ROBOTICS_AI', deletedAt: null } })) return
+
+  const template = roboticsAi
+  const today = attendanceDate(new Date())
+  const [teacher, assistant] = await Promise.all(
+    [`teacher@${spec.emailDomain}`, `lab@${spec.emailDomain}`].map((email) =>
+      prisma.staff.findFirst({ where: { tenantId, email }, select: { id: true, firstName: true, lastName: true } }),
+    ),
+  )
+  const actorLabel = assistant ? `${assistant.firstName} ${assistant.lastName}` : 'Lab assistant'
+
+  const infrastructure: Record<string, { ok: boolean; value?: number }> = {}
+  for (const c of template.infrastructure) {
+    if (c.code === 'UPS' || c.code === 'BATTERY_BIN') infrastructure[c.code] = { ok: false }
+    else infrastructure[c.code] = c.min ? { ok: true, value: c.min } : { ok: true }
+  }
+
+  const lab = await prisma.lab.create({
+    data: {
+      tenantId,
+      name: 'Robotics & AI Lab',
+      type: 'ROBOTICS_AI',
+      templateCode: template.code,
+      room: 'Block C, Room 110',
+      inChargeStaffId: teacher?.id ?? null,
+      assistantStaffId: assistant?.id ?? null,
+      emergencyContacts: [
+        { label: 'Principal', phone: '+91 98110 00001' },
+        { label: 'School nurse', phone: '+91 98110 00002' },
+        { label: 'Fire', phone: '101' },
+      ],
+      infrastructure,
+    },
+  })
+
+  const missing = new Set(['PRINTER_3D', 'OSCILLOSCOPE', 'PLA_FILAMENT'])
+  const items = []
+  for (const [i, t] of template.items.entries()) {
+    const quantity = missing.has(t.code)
+      ? 0
+      : i % 9 === 4
+        ? Math.floor(t.required / 2)
+        : t.required + (t.kind === 'CONSUMABLE' ? intBetween(rand, 0, 5) : 0)
+    items.push(
+      await prisma.labItem.create({
+        data: {
+          tenantId,
+          labId: lab.id,
+          templateCode: t.code,
+          name: t.name,
+          category: t.category,
+          kind: t.kind,
+          unit: t.unit,
+          requiredQty: t.required,
+          quantity,
+          reorderLevel: t.kind === 'CONSUMABLE' ? Math.ceil(t.required / 4) : 0,
+          hazards: t.hazards ?? [],
+          expiresOn: t.code === 'FIRE_EXT' ? addDays(today, 200) : null,
+          storageLocation: t.kind === 'CONSUMABLE' ? 'Component drawers' : 'Kit cabinet',
+          notes: t.note ?? null,
+        },
+      }),
+    )
+  }
+  await prisma.labStockMovement.createMany({
+    data: items
+      .filter((it) => it.quantity > 0)
+      .map((it) => ({
+        tenantId,
+        labId: lab.id,
+        itemId: it.id,
+        type: 'OPENING' as const,
+        quantity: it.quantity,
+        balanceAfter: it.quantity,
+        actorLabel,
+        createdAt: subDays(new Date(), 90),
+      })),
+  })
+
+  await prisma.labExperiment.createMany({
+    data: template.practicals.map((p) => ({
+      tenantId,
+      labType: 'ROBOTICS_AI' as const,
+      templateCode: p.code,
+      classNumber: p.classNumber,
+      subject: p.subject,
+      title: p.title,
+      aim: p.aim,
+      apparatus: p.apparatus,
+      safetyNotes: p.safety ?? null,
+    })),
+  })
+
+  await prisma.labInspection.createMany({
+    data: [
+      { type: 'DAILY' as const, on: subDays(today, 1), failed: 0, issues: null },
+      { type: 'MONTHLY' as const, on: subDays(today, 20), failed: 1, issues: 'One LiPo pack slightly swollen; moved to the disposal bin.' },
+    ].map((x) => {
+      const s = template.inspections.find((i) => i.type === x.type)!
+      return {
+        tenantId,
+        labId: lab.id,
+        type: x.type,
+        inspectedOn: x.on,
+        checklist: Object.fromEntries(s.items.map((it, n) => [it.code, n >= x.failed])),
+        passed: s.items.length - x.failed,
+        failed: x.failed,
+        issues: x.issues,
+        inspectorName: actorLabel,
+        nextDueOn: addDays(x.on, s.everyDays),
+      }
+    }),
+  })
+
+  await prisma.labWasteLog.create({
+    data: {
+      tenantId,
+      labId: lab.id,
+      disposedOn: subDays(today, 15),
+      category: 'E_WASTE',
+      quantity: 3,
+      unit: 'kg',
+      handedTo: 'Authorised e-waste recycler',
+    },
+  })
+
+  const section = await prisma.section.findFirst({
+    where: { tenantId, deletedAt: null, classLevel: { numeric: { gte: 6, lte: 12 }, session: { isCurrent: true } } },
+    orderBy: [{ classLevel: { numeric: 'desc' } }, { name: 'desc' }],
+    select: { id: true, classLevel: { select: { numeric: true } } },
+  })
+  if (!section) return
+  const roster = await prisma.enrollment.findMany({
+    where: { tenantId, sectionId: section.id, isCurrent: true },
+    select: { studentId: true },
+  })
+  const experiments = await prisma.labExperiment.findMany({
+    where: { tenantId, labType: 'ROBOTICS_AI', classNumber: section.classLevel.numeric, deletedAt: null },
+    orderBy: { templateCode: 'asc' },
+  })
+  for (const [n, exp] of experiments.slice(0, 3).entries()) {
+    const date = subDays(today, 7 * (3 - n) + 2)
+    const session = await prisma.labSession.create({
+      data: {
+        tenantId,
+        labId: lab.id,
+        experimentId: exp.id,
+        sectionId: section.id,
+        teacherStaffId: teacher?.id ?? null,
+        date,
+        startTime: '12:00',
+        endTime: '12:40',
+        status: 'COMPLETED',
+        completedAt: date,
+      },
+    })
+    await prisma.labSessionStudent.createMany({
+      data: roster.map((r) => {
+        const present = chance(rand, 0.93)
+        return {
+          tenantId,
+          sessionId: session.id,
+          studentId: r.studentId,
+          present,
+          recordDone: present && chance(rand, 0.85),
+          marks: present ? intBetween(rand, 6, 10) : null,
+        }
+      }),
+    })
+  }
+  const next = experiments[3]
+  if (next) {
+    await prisma.labSession.create({
+      data: {
+        tenantId,
+        labId: lab.id,
+        experimentId: next.id,
+        sectionId: section.id,
+        teacherStaffId: teacher?.id ?? null,
+        date: addDays(today, 4),
+        startTime: '12:00',
+        endTime: '12:40',
+      },
+    })
+  }
 }
 
 /* ------------------------------------------------------- academic structure */
@@ -1678,6 +2132,7 @@ async function seedDemoAccounts(
     { role: ROLE.DRIVER, email: `driver@${spec.emailDomain}`, firstName: 'Ramesh', lastName: 'Yadav' },
     { role: ROLE.FRONT_DESK, email: `reception@${spec.emailDomain}`, firstName: 'Priya', lastName: 'Nair' },
     { role: ROLE.HR, email: `hr@${spec.emailDomain}`, firstName: 'Deepak', lastName: 'Sinha' },
+    { role: ROLE.LAB_ASSISTANT, email: `lab@${spec.emailDomain}`, firstName: 'Arjun', lastName: 'Pillai' },
   ]
 
   for (const acc of accounts) {

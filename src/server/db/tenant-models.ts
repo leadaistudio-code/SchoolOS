@@ -234,6 +234,17 @@ export const TENANT_SCOPED_MODELS = [
   'TapasyaUnlockRequest',
   'TapasyaXpEvent',
   'TapasyaUserAchievement',
+
+  // Science labs (add-on)
+  'Lab',
+  'LabItem',
+  'LabStockMovement',
+  'LabExperiment',
+  'LabSession',
+  'LabSessionStudent',
+  'LabInspection',
+  'LabIncident',
+  'LabWasteLog',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -324,6 +335,7 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'CrmSchool',
   'CrmContact',
   'CrmOpportunity',
+  'CrmPhoto',
   'CrmActivity',
   'CrmFollowUp',
   'CrmVisit',

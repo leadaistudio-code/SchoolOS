@@ -181,6 +181,28 @@ export async function readFileForCaller(
     return { body: await storageProvider().get(storageKey), mimeType, fileName: 'signature' }
   }
 
+  if (storageKey.startsWith(`${ctx.tenant.id}/labs/`)) {
+    if (!ctx.can('labs.view')) throw new ApiException(403, 'FORBIDDEN', 'You cannot view this file')
+    const [item, inspection, incident] = await Promise.all([
+      ctx.db.labItem.findFirst({ where: { msdsKey: storageKey }, select: { name: true } }),
+      ctx.db.labInspection.findFirst({ where: { photoKeys: { has: storageKey } }, select: { id: true } }),
+      ctx.db.labIncident.findFirst({ where: { photoKeys: { has: storageKey } }, select: { id: true } }),
+    ])
+    if (!item && !inspection && !incident) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+    const ext = storageKey.split('.').pop()?.toLowerCase()
+    const mimeType =
+      ext === 'pdf' ? 'application/pdf'
+        : ext === 'png' ? 'image/png'
+          : ext === 'webp' ? 'image/webp'
+            : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+              : 'application/octet-stream'
+    return {
+      body: await storageProvider().get(storageKey),
+      mimeType,
+      fileName: item ? `${item.name} safety data sheet.${ext}` : `lab-photo.${ext}`,
+    }
+  }
+
   const [attachment, document, textbook, answerSheet] = await Promise.all([
     ctx.db.attachment.findFirst({
       where: { storageKey },

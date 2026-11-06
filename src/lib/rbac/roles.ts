@@ -16,6 +16,7 @@ export const ROLE = {
   DRIVER: 'DRIVER',
   FRONT_DESK: 'FRONT_DESK',
   HR: 'HR',
+  LAB_ASSISTANT: 'LAB_ASSISTANT',
   STUDENT: 'STUDENT',
   PARENT: 'PARENT',
 } as const
@@ -112,6 +113,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'admissions.view', 'admissions.manage', 'admissions.convert',
       'transport.view', 'transport.track',
       ...all('sports'),
+      ...all('labs'),
       ...all('events'),
       ...all('reports'),
       ...all('score'),
@@ -182,6 +184,9 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'teacher_refresh.take',
       'tapasya.teach',
       'assistant.use',
+      // Science teachers book and run practicals; the module itself is a paid add-on.
+      'labs.view',
+      'labs.sessions',
     ],
   },
   {
@@ -277,6 +282,21 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'notices.view',
       'users.view', 'users.create', 'users.edit',
       'roles.view',
+    ],
+  },
+  {
+    key: ROLE.LAB_ASSISTANT,
+    name: 'Lab Assistant',
+    description: 'Keeps the science and robotics lab registers, prepares practicals and records safety checks.',
+    permissions: [
+      'dashboard.view',
+      'labs.view',
+      'labs.stock',
+      'labs.sessions',
+      'labs.safety',
+      'notices.view',
+      'staff_attendance.mark',
+      'leave.view', 'leave.apply',
     ],
   },
   {
@@ -381,6 +401,7 @@ export function isTeacherScoped(roleKeys: string[]): boolean {
     ROLE.TRANSPORT_MANAGER,
     ROLE.FRONT_DESK,
     ROLE.HR,
+    ROLE.LAB_ASSISTANT,
   ]
   return (
     roleKeys.includes(ROLE.TEACHER) &&

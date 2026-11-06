@@ -26,6 +26,7 @@ const SCHOOL_WIDE_OPERATIONAL_ROLE_KEYS = new Set<string>([
   ROLE.TRANSPORT_MANAGER,
   ROLE.FRONT_DESK,
   ROLE.HR,
+  ROLE.LAB_ASSISTANT,
 ])
 
 export function isTeacherOnlyRole(roleKeys: string[]): boolean {

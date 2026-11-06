@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatMoney, formatNumber } from '@/lib/utils'
 import { FEATURE } from '@/lib/features'
+import { getEntitlements } from '@/server/entitlements'
 import { getTenant } from '@/server/modules/platform/tenants'
 import {
   archiveTenantAction,
@@ -16,11 +17,32 @@ import {
   enterAsSupportAction,
   impersonateAction,
   reactivateTenantAction,
+  setModuleAction,
   setOverrideAction,
   suspendTenantAction,
 } from '../../actions'
 
 export const metadata = { title: 'School detail · Platform' }
+
+const MODULE_LABELS: Record<string, string> = {
+  [FEATURE.MODULE_TRANSPORT]: 'Transport',
+  [FEATURE.MODULE_LIBRARY]: 'Library',
+  [FEATURE.MODULE_INVENTORY]: 'Inventory & store',
+  [FEATURE.MODULE_SPORTS]: 'Sports',
+  [FEATURE.MODULE_EVENTS]: 'Events',
+  [FEATURE.MODULE_WEBSITE]: 'School website',
+  [FEATURE.MODULE_ADMISSIONS_CRM]: 'Admissions CRM',
+  [FEATURE.MODULE_CERTIFICATES]: 'Certificates',
+  [FEATURE.MODULE_FRONT_OFFICE]: 'Front office',
+  [FEATURE.MODULE_ONLINE_PAYMENTS]: 'Online payments',
+  [FEATURE.MODULE_CUSTOM_DOMAIN]: 'Custom domain',
+  [FEATURE.MODULE_WHITE_LABEL_APP]: 'White-label app',
+  [FEATURE.MODULE_AI_ASSIST]: 'AI assist',
+  [FEATURE.MODULE_FEEDBACK]: 'Feedback',
+  [FEATURE.MODULE_SCIENCE_LAB]: 'Labs (Science, Robotics & AI)',
+}
+
+const ADD_ON_MODULES = new Set<string>([FEATURE.MODULE_SCIENCE_LAB])
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -29,6 +51,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   const plans = await ctx.db.plan.findMany({ orderBy: { sortOrder: 'asc' } })
 
   const limitKeys = Object.entries(FEATURE).filter(([, v]) => v.startsWith('limit.'))
+  const moduleKeys = Object.values(FEATURE).filter((v) => v.startsWith('module.'))
+  const entitlements = await getEntitlements(id)
 
   return (
     <div className="space-y-4">
@@ -130,6 +154,44 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modules &amp; add-ons</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y divide-line text-sm">
+            {moduleKeys.map((key) => {
+              const enabled = entitlements[key]?.enabled ?? false
+              const override = tenant.overrides.find((o) => o.featureKey === key && o.enabled !== null)
+              return (
+                <li key={key} className="py-2 flex flex-wrap items-center gap-2">
+                  <span className="flex-1 min-w-0">
+                    {MODULE_LABELS[key] ?? key}
+                    {ADD_ON_MODULES.has(key) ? (
+                      <Badge tone="info" className="ml-2">Add-on</Badge>
+                    ) : null}
+                  </span>
+                  <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'On' : 'Off'}</Badge>
+                  <span className="text-xs text-ink-muted w-24">{override ? 'Set for this school' : 'From plan'}</span>
+                  <form action={setModuleAction.bind(null, id, key, enabled ? 'off' : 'on')}>
+                    <Button type="submit" size="sm" variant={enabled ? 'secondary' : 'primary'}>
+                      {enabled ? 'Switch off' : 'Switch on'}
+                    </Button>
+                  </form>
+                  {override ? (
+                    <form action={setModuleAction.bind(null, id, key, 'plan')}>
+                      <Button type="submit" size="sm" variant="ghost">
+                        Use plan
+                      </Button>
+                    </form>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

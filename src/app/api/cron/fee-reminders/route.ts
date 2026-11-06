@@ -10,6 +10,7 @@ import {
 } from '@/server/modules/finance/jobs'
 import { reconcilePendingOnlineRefunds } from '@/server/modules/finance/payments'
 import { runLedgerCatchUp } from '@/server/modules/accounts/posting'
+import { runLabAlerts } from '@/server/modules/labs/jobs'
 
 /** POST with CRON_SECRET. Schedule daily after the school day begins. */
 export const POST = publicRoute(async (req: NextRequest) => {
@@ -28,5 +29,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
     reconcilePendingOnlineRefunds(),
   ])
   const ledger = await runLedgerCatchUp()
-  return ok({ monthlyInvoices, transport, reminders, lateFees, refunds, ledger })
+  // Rides on this daily schedule; a failure here must not fail the fee jobs.
+  const labs = await runLabAlerts().catch((error: unknown) => ({ error: String(error) }))
+  return ok({ monthlyInvoices, transport, reminders, lateFees, refunds, ledger, labs })
 })

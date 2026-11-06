@@ -377,6 +377,14 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
         route: '/inventory',
       },
       {
+        name: 'Science and Robotics & AI labs (add-on)',
+        blurb:
+          'The CBSE science lab list and an Atal Tinkering Lab style robotics kit list with required quantities, stock and breakage registers, practical bookings, inspections, incidents and a printable readiness score.',
+        status: 'available',
+        route: '/labs',
+        href: '/cbse-science-lab',
+      },
+      {
         name: 'Events',
         blurb: 'School events with the audience they concern and their place in the calendar.',
         status: 'available',
