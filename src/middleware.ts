@@ -75,6 +75,39 @@ function isMarketingHost(host: string): boolean {
   return bare === root || bare === `www.${root}`
 }
 
+/**
+ * The one public origin of a marketing-only deployment, from `APP_URL`.
+ *
+ * Every other hostname that reaches the service (the apex, the provider's own
+ * `*.up.railway.app` address) answers with a permanent redirect to it. A copy
+ * of the site on a second domain, with tags pointing between them, is what
+ * Google Ads reads as a compromised site.
+ */
+function canonicalRedirect(request: NextRequest, host: string): NextResponse | null {
+  const target = process.env.APP_URL
+  if (!target) return null
+  let canonical: URL
+  try {
+    canonical = new URL(target)
+  } catch {
+    return null
+  }
+  const bare = host.split(':')[0]!.toLowerCase()
+  if (
+    !bare ||
+    bare === canonical.hostname.toLowerCase() ||
+    bare === 'localhost' ||
+    bare === '127.0.0.1' ||
+    bare.endsWith('.railway.internal') ||
+    bare.endsWith('.lvh.me') ||
+    bare === 'lvh.me'
+  ) {
+    return null
+  }
+  const url = new URL(request.nextUrl.pathname + request.nextUrl.search, canonical.origin)
+  return NextResponse.redirect(url, 301)
+}
+
 function withPathname(request: NextRequest, pathname: string) {
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
@@ -99,6 +132,11 @@ export function middleware(request: NextRequest) {
   // host. Anything belonging to it goes to the website's front page rather than
   // rendering a sign-in form on a hostname that should only ever serve pages.
   if (deployment === 'marketing' && !internal) {
+    if (!pathname.startsWith('/api/health')) {
+      const redirect = canonicalRedirect(request, host)
+      if (redirect) return redirect
+    }
+
     const appOnly =
       pathname.startsWith('/platform') ||
       pathname.startsWith('/login') ||
