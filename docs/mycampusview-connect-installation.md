@@ -41,7 +41,7 @@ service or cloud check did not pass, and `1` on failure (details in
 from the app's **Terminals…** button.
 
 Rebuild the installer from source with `connect\scripts\build-installer.ps1`; it
-writes `public\downloads\MyCampusView-Connect-Setup.exe`, which the app serves.
+writes `installers\MyCampusView-Connect-Setup.exe`, which the app serves.
 
 The sections below describe the older script-based install.
 

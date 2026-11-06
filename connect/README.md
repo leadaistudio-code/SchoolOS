@@ -29,7 +29,7 @@ status/manager window and the Windows Service host (`MyCampusViewConnect.exe ser
 Schools download it from **Settings → Biometric → Connectors** in the app.
 
 ```powershell
-.\scripts\build-installer.ps1   # -> public\downloads\MyCampusView-Connect-Setup.exe
+.\scripts\build-installer.ps1   # -> installers\MyCampusView-Connect-Setup.exe
 ```
 
 Silent switches and the school-side walkthrough are in

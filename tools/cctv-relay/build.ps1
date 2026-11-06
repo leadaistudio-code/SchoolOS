@@ -1,4 +1,4 @@
-# Builds MyCampusView-CCTV-Relay.exe and copies it to public/downloads.
+# Builds MyCampusView-CCTV-Relay.exe and copies it to installers.
 #   powershell -ExecutionPolicy Bypass -File tools/cctv-relay/build.ps1
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -61,8 +61,8 @@ $src.Dispose()
 dotnet publish CctvRelay.csproj -c Release -o (Join-Path $here 'out') --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 
-$dest = Join-Path $root 'public\downloads'
+$dest = Join-Path $root 'installers'
 New-Item -ItemType Directory -Force $dest | Out-Null
 Copy-Item (Join-Path $here 'out\MyCampusView-CCTV-Relay.exe') (Join-Path $dest 'MyCampusView-CCTV-Relay.exe') -Force
 $size = [math]::Round((Get-Item (Join-Path $dest 'MyCampusView-CCTV-Relay.exe')).Length / 1MB, 1)
-Write-Host "Built public/downloads/MyCampusView-CCTV-Relay.exe ($size MB)"
+Write-Host "Built installers/MyCampusView-CCTV-Relay.exe ($size MB)"

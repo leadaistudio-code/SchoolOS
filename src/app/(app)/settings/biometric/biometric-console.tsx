@@ -31,7 +31,7 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/tabl
 import { useToast } from '@/components/ui/toast'
 import { minutesToTime, timeToMinutes } from '@/lib/attendance-hours'
 
-const CONNECT_APP_DOWNLOAD_PATH = '/downloads/MyCampusView-Connect-Setup.exe'
+const CONNECT_APP_DOWNLOAD_PATH = '/api/v1/biometric/connect-installer'
 
 type Overview = {
   connectors: number

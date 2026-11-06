@@ -7,7 +7,7 @@ export const RELAY_PORT = 8888
 
 /** The Windows relay app, served from /public. */
 export const RELAY_APP_VERSION = '1.0.0'
-export const RELAY_APP_DOWNLOAD_PATH = '/downloads/MyCampusView-CCTV-Relay.exe'
+export const RELAY_APP_DOWNLOAD_PATH = '/api/v1/cctv/relay-installer'
 /** The relay app swaps this for the recorder password, which never leaves the school PC. */
 export const RELAY_PASSWORD_PLACEHOLDER = '__MCV_DVR_PASSWORD__'
 /** How long after its last check-in the relay app still counts as online. */
