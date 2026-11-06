@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Camera, LogOut } from 'lucide-react'
+import { LogOut, Mic } from 'lucide-react'
 import { getPlatformContext } from '@/server/context'
 import { MyCampusViewLogo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -72,12 +72,14 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               {canCapture ? (
                 <Link
-                  href="/platform/growth/capture"
+                  href="/platform/growth/capture?voice=1"
                   prefetch={false}
-                  className="flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--brand-500)] px-3 text-sm font-medium text-[var(--brand-contrast)] hover:bg-[var(--brand-600)] xl:hidden"
+                  title="Speak about a school visit; the form fills itself"
+                  className="flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--brand-500)] px-3 text-sm font-medium text-[var(--brand-contrast)] hover:bg-[var(--brand-600)]"
                 >
-                  <Camera className="size-4" aria-hidden />
-                  Visit
+                  <Mic className="size-4" aria-hidden />
+                  <span className="sm:hidden">Visit</span>
+                  <span className="hidden sm:inline">Log visit by voice</span>
                 </Link>
               ) : null}
               <div className="hidden sm:block">

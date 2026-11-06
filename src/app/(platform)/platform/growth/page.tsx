@@ -39,9 +39,14 @@ export default async function GrowthDashboardPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {canCreate ? (
-              <Link href="/platform/growth/capture" className={buttonVariants({ size: 'sm' })}>
-                Field capture
-              </Link>
+              <>
+                <Link href="/platform/growth/capture?voice=1" className={buttonVariants({ size: 'sm' })}>
+                  Log visit by voice
+                </Link>
+                <Link href="/platform/growth/capture" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  Field capture
+                </Link>
+              </>
             ) : null}
             <Link href="/platform/growth/discovery" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               AI Discovery

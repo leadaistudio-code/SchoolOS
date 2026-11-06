@@ -10,6 +10,10 @@ export async function transcribeWithWhisper(input: {
   filename: string
   mimeType: string
   language?: string | null
+  /** Let Whisper detect the language, for speakers who mix Hindi and English. */
+  autoDetect?: boolean
+  /** Transcription model; defaults to whisper-1. */
+  model?: string
 }): Promise<{ transcript: string }> {
   if (!whisperSttConfigured()) {
     throw new Error('Whisper speech-to-text needs AI_DRIVER=openai and AI_API_KEY.')
@@ -27,8 +31,8 @@ export async function transcribeWithWhisper(input: {
 
   const result = await client.audio.transcriptions.create({
     file,
-    model: 'whisper-1',
-    language: whisperLanguageCode(input.language),
+    model: input.model ?? 'whisper-1',
+    ...(input.autoDetect ? {} : { language: whisperLanguageCode(input.language) }),
     response_format: 'json',
   })
 

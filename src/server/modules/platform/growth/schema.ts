@@ -244,12 +244,15 @@ export const sendMessageSchema = z
 export type SendMessageInput = z.infer<typeof sendMessageSchema>
 
 /** Mobile field capture — only the fields needed to keep the funnel trackable. */
-export const fieldCaptureSchema = z.object({
+export const fieldCaptureSchema = z
+  .object({
+  /** Log the visit on a school already in the CRM instead of creating one. */
+  existingSchoolId: z.string().trim().optional().transform((v) => v || undefined),
   name: z.string().trim().min(2, 'Enter the school name').max(200),
   city: z.string().trim().min(2, 'Enter the city').max(80),
   contactName: z.string().trim().min(2, 'Enter who you met').max(120),
   contactDesignation: z.enum(CONTACT_ROLES).optional().or(z.literal('')).transform((v) => v || 'PRINCIPAL'),
-  contactMobile: z.string().trim().min(8, 'Enter a mobile number').max(20),
+  contactMobile: z.string().trim().max(20).optional().transform((v) => v ?? ''),
   contactEmail: z
     .string()
     .trim()
@@ -283,4 +286,9 @@ export const fieldCaptureSchema = z.object({
   stage: z.enum(CRM_STAGES).optional().or(z.literal('')).transform((v) => v || 'CONTACTED'),
   confirmDuplicate: optionalBool,
 })
+  .superRefine((v, ctx) => {
+    if (!v.existingSchoolId && v.contactMobile.length < 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['contactMobile'], message: 'Enter a mobile number' })
+    }
+  })
 export type FieldCaptureInput = z.infer<typeof fieldCaptureSchema>

@@ -41,7 +41,7 @@ import {
   resolveCadence,
   type StageCadence,
 } from '@/lib/growth-cadence'
-import { followUpCreateSchema } from './schema'
+import { followUpCreateSchema, stageChangeSchema } from './schema'
 import type {
   ActivityCreateInput,
   ContactCreateInput,
@@ -348,6 +348,7 @@ export async function deleteCrmPhoto(ctx: PlatformContext, id: string) {
  * together so the funnel always has an owner, a contact, and a next action.
  */
 export async function captureFieldLead(ctx: PlatformContext, input: FieldCaptureInput, photos: File[] = []) {
+  if (input.existingSchoolId) return captureFieldVisit(ctx, input.existingSchoolId, input, photos)
   assertPerm(ctx, 'platform.crm_create')
   const photoUploads = await validatePhotos(photos)
 
@@ -465,6 +466,103 @@ export async function captureFieldLead(ctx: PlatformContext, input: FieldCapture
     entityType: 'CrmSchool',
     entityId: school.id,
     summary: `Field capture for ${school.name}`,
+  })
+
+  return school
+}
+
+/** A field visit to a school already in the CRM: same capture form, no new school. */
+async function captureFieldVisit(ctx: PlatformContext, schoolId: string, input: FieldCaptureInput, photos: File[]) {
+  assertPerm(ctx, 'platform.crm_edit')
+  const school = await ctx.db.crmSchool.findFirst({
+    where: { id: schoolId, deletedAt: null },
+    include: { contacts: { where: { deletedAt: null } } },
+  })
+  if (!school) throw notFound('School not found')
+  const photoUploads = await validatePhotos(photos)
+
+  const ownerId = ctx.user.userId
+  const mobile = input.contactMobile ? (phoneOrNull(input.contactMobile) ?? input.contactMobile.trim()) : null
+  const spokenName = input.contactName.trim().toLowerCase()
+  let contact =
+    (mobile ? school.contacts.find((c) => c.mobile === mobile || c.whatsapp === mobile) : undefined) ??
+    school.contacts.find((c) => c.fullName.trim().toLowerCase() === spokenName)
+  if (!contact) {
+    contact = await ctx.db.crmContact.create({
+      data: {
+        schoolId,
+        fullName: input.contactName,
+        designation: input.contactDesignation ?? 'PRINCIPAL',
+        mobile,
+        whatsapp: mobile,
+        email: input.contactEmail ?? null,
+        isPrimary: school.contacts.length === 0,
+        isDecisionMaker: input.isDecisionMaker,
+      },
+    })
+  }
+
+  const visit = await ctx.db.crmVisit.create({
+    data: {
+      schoolId,
+      visitedAt: input.visitedAt,
+      contactsMet: input.contactName,
+      purpose: 'Field visit',
+      meetingType: 'Follow-up meeting',
+      summary: input.visitSummary,
+      currentErp: input.currentErp ?? null,
+      objections: input.primaryObjection ?? null,
+      nextAction: input.nextAction,
+      createdById: ownerId,
+    },
+  })
+  await storePhotos(ctx, schoolId, visit.id, photoUploads)
+
+  const followUp = await ctx.db.crmFollowUp.create({
+    data: {
+      schoolId,
+      contactId: contact.id,
+      dueAt: input.nextFollowUpAt,
+      type: 'CALL',
+      priority: 'NORMAL',
+      note: input.nextAction,
+      assignedToId: school.ownerId ?? ownerId,
+      createdById: ownerId,
+    },
+  })
+
+  await ctx.db.crmSchool.update({
+    where: { id: schoolId },
+    data: {
+      nextFollowUpAt: input.nextFollowUpAt,
+      nextAction: input.nextAction,
+      ...(input.currentErp ? { currentErp: input.currentErp } : {}),
+      ...(input.primaryObjection ? { primaryObjection: input.primaryObjection } : {}),
+    },
+  })
+
+  await writeActivity(ctx, {
+    schoolId,
+    type: 'VISIT',
+    summary: `Field visit · met ${input.contactName}`,
+    body: input.visitSummary,
+    contactId: contact.id,
+    meta: { followUpId: followUp.id, source: 'field_capture', photos: photoUploads.length },
+  })
+
+  if (input.stage && input.stage !== school.stage) {
+    await moveStage(ctx, schoolId, stageChangeSchema.parse({ stage: input.stage }))
+  }
+
+  await audit({
+    tenantId: null,
+    actorId: ownerId,
+    actorLabel: actorLabel(ctx),
+    action: 'crm.field_capture',
+    module: 'growth',
+    entityType: 'CrmSchool',
+    entityId: schoolId,
+    summary: `Field visit logged for ${school.name}`,
   })
 
   return school

@@ -62,6 +62,10 @@ function convert(node: z.ZodTypeAny): { schema: JsonSchema; optional: boolean } 
       current = current.unwrap() as z.ZodTypeAny
       continue
     }
+    if (current instanceof z.ZodCatch) {
+      current = current.removeCatch() as z.ZodTypeAny
+      continue
+    }
     break
   }
 
