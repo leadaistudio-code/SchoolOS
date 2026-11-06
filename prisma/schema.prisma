@@ -88,6 +88,8 @@ model Tenant {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   archivedAt DateTime?
+  /// Schools under one owner. Set from the platform console only.
+  groupId    String?
 
   school         School?
   domains        TenantDomain[]
@@ -95,8 +97,38 @@ model Tenant {
   overrides      TenantEntitlementOverride[]
   usageMetrics   UsageMetric[]
   supportTickets SupportTicket[]
+  group          SchoolGroup?                @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([status])
+  @@index([groupId])
+}
+
+/// Several schools owned by one person or trust. The owner sees combined
+/// figures across them; each school's own data stays separate.
+model SchoolGroup {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants Tenant[]
+  owners  SchoolGroupOwner[]
+}
+
+/// A school user account allowed to open the group overview. The owner signs
+/// in to their own school as usual; this link is the only thing that grants
+/// the cross-school view.
+model SchoolGroupOwner {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  group SchoolGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
 }
 
 model TenantDomain {
@@ -359,6 +391,7 @@ model User {
   crmVisitsCreated      CrmVisit[]                @relation("CrmVisitCreatedBy")
   crmReminderRecipients CrmReminderRecipient[]    @relation("CrmReminderRecipientUser")
   tapasyaGlobalProfile  GlobalLeaderboardProfile?
+  groupOwnerships       SchoolGroupOwner[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])

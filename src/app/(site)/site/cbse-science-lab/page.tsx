@@ -14,13 +14,14 @@ export default function CbseScienceLabPage() {
   return (
     <>
       <PageIntro
+        image={{ src: '/images/site/intro-labs.jpg', alt: 'Illustration of a microscope, a flask and test tubes beside a small robot' }}
         eyebrow="Add-on · Science and Robotics & AI labs"
         title="Know your lab is inspection-ready before the inspector does."
         lead="CBSE expects a composite science lab with a specified room, a specified list of apparatus, chemicals, specimens and slides for a batch of forty, and the registers to prove it. Most schools keep that in a cupboard of notebooks. MyCampusView keeps it in one place and tells you where you fall short."
       />
 
       <ProseSection>
-        <Prose title="A readiness score, not a guess">
+        <Prose title="A readiness score, not a guess" image={{ src: '/images/site/r-lab-readiness.jpg', alt: 'Illustration of a score gauge beside a ticked lab checklist' }}>
           <p>
             Every lab gets a score out of a hundred, built from four things CBSE looks at: the room and its fittings,
             the non-consumable apparatus, consumables and chemicals, and safety — extinguishers, first-aid kits,
@@ -29,7 +30,7 @@ export default function CbseScienceLabPage() {
           </p>
         </Prose>
 
-        <Prose title="The CBSE list, already loaded">
+        <Prose title="The CBSE list, already loaded" image={{ src: '/images/site/r-lab-register.jpg', alt: 'Illustration of a shelf of glassware and reagent bottles beside an open register' }}>
           <p>
             Creating a lab loads the CBSE item list with the quantity required for a batch of forty: glassware,
             instruments, chemicals, specimens, permanent slides and safety equipment. The lab assistant counts what is
@@ -37,7 +38,7 @@ export default function CbseScienceLabPage() {
           </p>
         </Prose>
 
-        <Prose title="Stock that keeps itself">
+        <Prose title="Stock that keeps itself" image={{ src: '/images/site/r-lab-stock.jpg', alt: 'Illustration of boxes and a dropper bottle flowing into a stock ledger' }}>
           <p>
             Purchases, counts, breakages and disposals go through a ledger with a running balance. When a teacher
             completes a practical, the consumables it uses are deducted automatically and any breakage is recorded
@@ -46,7 +47,7 @@ export default function CbseScienceLabPage() {
           </p>
         </Prose>
 
-        <Prose title="Practicals, booked against the timetable">
+        <Prose title="Practicals, booked against the timetable" image={{ src: '/images/site/r-lab-practicals.jpg', alt: 'Illustration of a calendar with a circled day, a flask and a clock' }}>
           <p>
             A practical library for Classes 6 to 10 comes ready to edit. Teachers book the lab against a timetable
             period; clashes with another class, the same section or the same teacher are refused. Attendance and
@@ -54,7 +55,7 @@ export default function CbseScienceLabPage() {
           </p>
         </Prose>
 
-        <Prose title="A Robotics &amp; AI lab, too">
+        <Prose title="A Robotics &amp; AI lab, too" image={{ src: '/images/site/r-lab-robotics.jpg', alt: 'Illustration of a circuit board, a small robot and a robotic arm' }}>
           <p>
             The same add-on runs a Robotics &amp; AI lab for Classes 6 to 12. Its kit list follows the Atal Tinkering
             Lab guidelines: computers, Arduino and ESP32 boards, Raspberry Pi, robot kits, motors, sensors, a 3D
@@ -65,7 +66,7 @@ export default function CbseScienceLabPage() {
           </p>
         </Prose>
 
-        <Prose title="Safety on record">
+        <Prose title="Safety on record" image={{ src: '/images/site/r-lab-safety.jpg', alt: 'Illustration of a fire extinguisher, first aid box, safety goggles and a shield' }}>
           <p>
             Daily, monthly and quarterly inspection checklists with photographs, an accident and incident register
             that alerts the principal the moment something serious is logged, and a waste disposal log. The

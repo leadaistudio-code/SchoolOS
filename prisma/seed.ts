@@ -2330,6 +2330,7 @@ async function main() {
   for (const spec of specs) {
     await seedTenant(spec, plans.get(spec.planCode)!, passwordHash)
   }
+  await seedSchoolGroup()
 
   const counts = {
     tenants: await prisma.tenant.count(),
@@ -2357,8 +2358,26 @@ Sign in at http://demo.lvh.me:3000  (password for every demo account: ${DEMO_PAS
   student@demo.schoolos.dev      Student
 
 Second tenant: http://greenwood.lvh.me:3000  (admin@greenwood.schoolos.dev)
+Group owner:   admin@demo.schoolos.dev sees "Group overview" for Demo + Greenwood
 Platform console: http://lvh.me:3000/platform  (owner@schoolos.dev)
 `)
+}
+
+/** Demo and Greenwood under one owner, so the group overview has two schools to add up. */
+async function seedSchoolGroup() {
+  const tenants = await prisma.tenant.findMany({ where: { slug: { in: ['demo', 'greenwood'] } }, select: { id: true, slug: true } })
+  const demo = tenants.find((t) => t.slug === 'demo')
+  const owner = demo ? await prisma.user.findFirst({ where: { tenantId: demo.id, email: 'admin@demo.schoolos.dev' } }) : null
+  if (tenants.length < 2 || !owner) return
+  const group =
+    (await prisma.schoolGroup.findFirst({ where: { name: 'Demo Education Group' } })) ??
+    (await prisma.schoolGroup.create({ data: { name: 'Demo Education Group' } }))
+  await prisma.tenant.updateMany({ where: { id: { in: tenants.map((t) => t.id) } }, data: { groupId: group.id } })
+  await prisma.schoolGroupOwner.upsert({
+    where: { groupId_userId: { groupId: group.id, userId: owner.id } },
+    create: { groupId: group.id, userId: owner.id },
+    update: {},
+  })
 }
 
 main()

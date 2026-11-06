@@ -7,11 +7,10 @@ import { EditorialProof } from '@/components/site/editorial/proof'
 import { EditorialClosing } from '@/components/site/editorial/closing'
 import { CurtainBase, CurtainPanel, CurtainStack } from '@/components/site/editorial/curtain'
 import { FloatingNav } from '@/components/site/motion/floating-nav'
-import { Admissions } from '@/components/site/home/admissions'
 import { Capabilities } from '@/components/site/home/capabilities'
+import { Labs } from '@/components/site/home/labs'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
-import { Security } from '@/components/site/home/security'
 import { Journey } from '@/components/site/home/journey'
 import { organisationJsonLd, softwareJsonLd } from '@/components/site/seo'
 
@@ -36,9 +35,8 @@ export const metadata: Metadata = {
  *   4  paper   how an implementation actually goes, and everything around it
  *   5  dark    the ask
  *
- * The sections that do not map onto a movement of their own — admissions, the
- * three products, parents, integrations, security, the implementation
- * sequence — keep their content and sit inside movement four, where they are
+ * The sections that do not map onto a movement of their own — the three
+ * products, labs, parents, integrations, the implementation sequence — keep their content and sit inside movement four, where they are
  * the detail behind the claim rather than a queue of equal-weight panels.
  *
  * The three products used to be a movement of their own, pinned, between the
@@ -101,12 +99,11 @@ export default function HomePage() {
           the narrative has done its work.
         */}
         <div className="border-t border-[color-mix(in_srgb,var(--ed-ink)_8%,transparent)]">
-          <Admissions />
           <Capabilities />
           <EditorialFeatures />
+          <Labs />
           <Parents />
           <Integrations />
-          <Security />
           <Journey />
         </div>
       </CurtainPanel>

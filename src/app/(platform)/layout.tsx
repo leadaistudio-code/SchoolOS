@@ -40,6 +40,9 @@ export default async function PlatformLayout({ children }: { children: React.Rea
       ? ([{ label: 'Mail', href: '/platform/mail/inbox', icon: 'mail' }] satisfies PlatformNavItem[])
       : []),
     { label: 'Schools', href: '/platform/tenants', icon: 'schools' },
+    ...(ctx.user.permissions.has('platform.tenants')
+      ? ([{ label: 'Groups', href: '/platform/groups', icon: 'groups' }] satisfies PlatformNavItem[])
+      : []),
     { label: 'Plans', href: '/platform/plans', icon: 'plans' },
     { label: 'Billing', href: '/platform/billing', icon: 'billing' },
     { label: 'Support', href: '/platform/support', icon: 'support' },

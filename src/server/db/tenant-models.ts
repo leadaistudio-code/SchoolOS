@@ -365,6 +365,10 @@ export const PLATFORM_ONLY_MODELS = new Set<string>([
   'GlobalTapasyaSetting',
   // Marketing-site articles: written by the platform, read by the website.
   'BlogPost',
+  // School groups: managed from the console, read only by the owner overview
+  // in src/server/modules/group after it has checked the owner link.
+  'SchoolGroup',
+  'SchoolGroupOwner',
 ])
 
 export function isPlatformOnly(model: string | undefined): boolean {

@@ -52,6 +52,8 @@ export type NavItem = {
    * needs the deployment to allow WhatsApp receipts. Hidden when unknown.
    */
   accounting?: 'module' | 'whatsapp'
+  /** Only accounts linked as owner of the school's group. */
+  groupOwner?: boolean
 }
 
 /**
@@ -61,6 +63,7 @@ export type NavItem = {
  */
 export const NAVIGATION: NavItem[] = [
   { label: 'Dashboard', href: '/', icon: 'LayoutDashboard', section: 'MAIN' as const, permission: 'dashboard.view', mobile: true },
+  { label: 'Group overview', href: '/group', icon: 'Building2', section: 'MAIN' as const, groupOwner: true },
 
   {
     label: 'Students',
@@ -563,6 +566,7 @@ export type NavPredicate = {
   /** Student/parent portal accounts (no school-admin override). */
   isPortal?: boolean
   accounting?: { module: boolean; whatsapp: boolean }
+  isGroupOwner?: boolean
 }
 
 /** Filters the tree down to what this user may actually reach. */
@@ -575,6 +579,7 @@ export function visibleNavigation(items: NavItem[], p: NavPredicate): NavItem[] 
     if (item.portalOnly && !p.isPortal) continue
     if (item.staffOnly && p.isPortal) continue
     if (item.accounting && !p.accounting?.[item.accounting]) continue
+    if (item.groupOwner && !p.isGroupOwner) continue
     const children = item.children ? visibleNavigation(item.children, p) : undefined
     if (item.children && (!children || children.length === 0)) continue
     out.push({ ...item, children })

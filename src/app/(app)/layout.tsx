@@ -12,6 +12,7 @@ import { PwaRegister } from '@/components/pwa-register'
 import { isPortalOnlyRole } from '@/server/scope'
 import { accountingEnvSwitches, getAccountingFlags } from '@/server/modules/accounting/service'
 import { getViewSession, listViewSessions } from '@/server/view-session'
+import { isGroupOwner } from '@/server/modules/group/access'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContext()
@@ -31,9 +32,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login')
   }
 
-  const [entitlements, accountingFlags] = await Promise.all([
+  const [entitlements, accountingFlags, groupOwner] = await Promise.all([
     getEntitlements(ctx.tenant.id),
     getAccountingFlags(ctx.db),
+    isGroupOwner(ctx),
   ])
 
   const navigation = visibleNavigation(NAVIGATION, {
@@ -44,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       module: accountingFlags.module,
       whatsapp: accountingFlags.module && accountingEnvSwitches().whatsappReceipts,
     },
+    isGroupOwner: groupOwner,
   })
 
   const financeUser = ctx.canAny('fees.view', 'fees.report', 'expenses.view', 'accounts.view')
