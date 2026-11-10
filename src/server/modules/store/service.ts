@@ -1033,7 +1033,6 @@ export async function voidStoreSale(ctx: AppContext, id: string, reason: string)
           where: { id: invoice.id },
           data: {
             status: 'CANCELLED',
-            balanceMinor: 0,
             notes: `Store bill ${current.number} voided: ${why}`,
           },
         })

@@ -93,6 +93,9 @@ afterAll(async () => {
   await prisma.journalEntry.updateMany({ where: { id: { in: entries.map((e) => e.id) } }, data: { reversalOfId: null } })
   await prisma.journalEntry.deleteMany({ where: { id: { in: entries.map((e) => e.id) } } })
   await prisma.stockMovement.deleteMany({ where: { tenantId, itemId: { in: itemIds } } })
+  const feeKeys = sales.map((s) => `store-sale:${s.id}`)
+  await prisma.feeInvoiceLine.deleteMany({ where: { invoice: { tenantId, sourceKey: { in: feeKeys } } } })
+  await prisma.feeInvoice.deleteMany({ where: { tenantId, sourceKey: { in: feeKeys } } })
   await prisma.storeSale.deleteMany({ where: { id: { in: sales.map((s) => s.id) } } })
   await prisma.storePurchase.deleteMany({ where: { id: { in: purchases.map((p) => p.id) } } })
   await prisma.storeItem.deleteMany({ where: { id: { in: itemIds } } })
@@ -209,10 +212,81 @@ describe('school store (database)', () => {
     await expect.poll(() => activeEntry('STORE_SALE', sale.id), { timeout: 5000 }).toBeNull()
   })
 
+  it('a split bill debits each mode it was paid by and rejects parts that do not add up', async () => {
+    await expect(
+      createStoreSale(ctx, {
+        customerName: 'Parent',
+        paymentMode: 'SPLIT',
+        payments: [
+          { mode: 'CASH', amount: 500 },
+          { mode: 'UPI', amount: 500 },
+        ],
+        lines: [{ itemId: shirt, quantity: 2 }],
+      }),
+    ).rejects.toThrow(/add up to ₹1000.00 but the bill is ₹1050.00/)
+    expect(await qty(shirt)).toBe(38)
+
+    const sale = await createStoreSale(ctx, {
+      customerName: 'Parent',
+      paymentMode: 'SPLIT',
+      payments: [
+        { mode: 'CASH', amount: 500 },
+        { mode: 'UPI', amount: 550, reference: 'UPI123' },
+      ],
+      lines: [{ itemId: shirt, quantity: 2 }],
+    })
+    expect(sale.feeInvoice).toBeNull()
+    const parts = await prisma.storeSalePayment.findMany({ where: { saleId: sale.id }, orderBy: { amountMinor: 'asc' } })
+    expect(parts.map((p) => [p.mode, p.amountMinor, p.reference])).toEqual([
+      ['CASH', 50000, null],
+      ['UPI', 55000, 'UPI123'],
+    ])
+
+    await syncStoreSaleLedger(tenantId, sale.id)
+    const entry = (await activeEntry('STORE_SALE', sale.id))!
+    const dr = entry.lines.reduce((s, l) => s + l.debitMinor, 0)
+    const cr = entry.lines.reduce((s, l) => s + l.creditMinor, 0)
+    expect(dr).toBe(cr)
+    const by = (k: string) => entry.lines.find((l) => l.account.systemKey === k)
+    expect(by('GST_PAYABLE')?.creditMinor).toBe(5000)
+    expect(by('STORE_SALES_INCOME')?.creditMinor).toBe(100000)
+    expect(await qty(shirt)).toBe(36)
+  })
+
+  it('a split bill can add the balance to fees; only the part paid now is income, and voiding cancels the fee', async () => {
+    const sale = await createStoreSale(ctx, {
+      studentId,
+      paymentMode: 'SPLIT',
+      payments: [
+        { mode: 'CASH', amount: 400 },
+        { mode: 'FEE_ACCOUNT', amount: 650 },
+      ],
+      lines: [{ itemId: shirt, quantity: 2 }],
+    })
+    expect(sale.feeInvoice?.totalMinor).toBe(65000)
+    const invoice = await prisma.feeInvoice.findFirstOrThrow({ where: { tenantId, sourceKey: `store-sale:${sale.id}` } })
+    expect(invoice).toMatchObject({ studentId, totalMinor: 65000, balanceMinor: 65000 })
+
+    await syncStoreSaleLedger(tenantId, sale.id)
+    const entry = (await activeEntry('STORE_SALE', sale.id))!
+    const dr = entry.lines.reduce((s, l) => s + l.debitMinor, 0)
+    const cr = entry.lines.reduce((s, l) => s + l.creditMinor, 0)
+    expect(dr).toBe(cr)
+    const by = (k: string) => entry.lines.find((l) => l.account.systemKey === k)
+    const gstNow = Math.round((5000 * 40000) / 105000)
+    expect(by('GST_PAYABLE')?.creditMinor).toBe(gstNow)
+    expect(by('STORE_SALES_INCOME')?.creditMinor).toBe(40000 - gstNow)
+    expect(by('EXP_STORE_COGS')?.debitMinor).toBe(sale.costMinor)
+
+    await voidStoreSale(ctx, sale.id, 'Parent returned it')
+    expect((await prisma.feeInvoice.findUniqueOrThrow({ where: { id: invoice.id } })).status).toBe('CANCELLED')
+    expect(await qty(shirt)).toBe(36)
+  })
+
   it('adjustments need a reason, cannot go below zero, and keep quantity equal to the movement ledger', async () => {
-    await expect(adjustStock(ctx, { itemId: shirt, direction: 'OUT', quantity: 500, reason: 'Damaged' })).rejects.toThrow(/Only 38/)
+    await expect(adjustStock(ctx, { itemId: shirt, direction: 'OUT', quantity: 500, reason: 'Damaged' })).rejects.toThrow(/Only 36/)
     const m = await adjustStock(ctx, { itemId: shirt, direction: 'OUT', quantity: 2, reason: 'Damaged' })
-    expect(m).toMatchObject({ type: 'ADJUSTMENT_OUT', quantity: -2, balanceAfter: 36 })
+    expect(m).toMatchObject({ type: 'ADJUSTMENT_OUT', quantity: -2, balanceAfter: 34 })
     await syncStockMovementLedger(tenantId, m.id)
     const entry = await activeEntry('STORE_STOCK', m.id)
     expect(entry?.lines.find((l) => l.account.systemKey === 'EXP_STOCK_LOSS')?.debitMinor).toBe(2 * 43000)
