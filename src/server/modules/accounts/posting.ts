@@ -342,12 +342,23 @@ async function desiredStoreSale(db: TenantClient, resolve: AccountResolver, sale
     }
     return { sale, desired }
   }
-  const lines: DraftLine[] = [
-    { accountId: resolve.mode(sale.paymentMode), debitMinor: sale.totalMinor, creditMinor: 0 },
-    { accountId: resolve.system('STORE_SALES_INCOME'), debitMinor: 0, creditMinor: sale.totalMinor - sale.taxMinor },
-  ]
-  if (sale.taxMinor > 0) {
-    lines.push({ accountId: resolve.system('GST_PAYABLE'), debitMinor: 0, creditMinor: sale.taxMinor })
+  // A split bill debits each mode it was paid by. Any part added to fees is
+  // booked when that fee is collected, so only the share paid now is income
+  // here, with GST in the same proportion.
+  const paidNow =
+    sale.paymentMode === 'SPLIT'
+      ? (await db.storeSalePayment.findMany({ where: { saleId: sale.id }, select: { mode: true, amountMinor: true } })).filter(
+          (p) => p.mode !== 'FEE_ACCOUNT' && p.amountMinor > 0,
+        )
+      : [{ mode: sale.paymentMode, amountMinor: sale.totalMinor }]
+  const paidMinor = paidNow.reduce((s, p) => s + p.amountMinor, 0)
+  const taxNow = paidMinor === sale.totalMinor ? sale.taxMinor : Math.round((sale.taxMinor * paidMinor) / sale.totalMinor)
+  const lines: DraftLine[] = paidNow.map((p) => ({ accountId: resolve.mode(p.mode), debitMinor: p.amountMinor, creditMinor: 0 }))
+  if (paidMinor - taxNow > 0) {
+    lines.push({ accountId: resolve.system('STORE_SALES_INCOME'), debitMinor: 0, creditMinor: paidMinor - taxNow })
+  }
+  if (taxNow > 0) {
+    lines.push({ accountId: resolve.system('GST_PAYABLE'), debitMinor: 0, creditMinor: taxNow })
   }
   if (sale.costMinor > 0) {
     lines.push(
@@ -355,10 +366,13 @@ async function desiredStoreSale(db: TenantClient, resolve: AccountResolver, sale
       { accountId: resolve.system('STORE_STOCK'), debitMinor: 0, creditMinor: sale.costMinor, memo: 'Cost of goods sold' },
     )
   }
+  if (lines.length === 0) return { sale, desired: null }
   const desired: Desired = {
     date: bookDay(sale.soldAt),
-    voucherType: 'RECEIPT',
-    narration: `Store sale ${sale.number}${sale.customerName ? ` to ${sale.customerName}` : ''}`,
+    voucherType: paidMinor > 0 ? 'RECEIPT' : 'JOURNAL',
+    narration: `Store sale ${sale.number}${sale.customerName ? ` to ${sale.customerName}` : ''}${
+      sale.paymentMode === 'SPLIT' && paidMinor < sale.totalMinor ? ' (balance added to fees)' : ''
+    }`,
     reference: sale.number,
     lines,
   }

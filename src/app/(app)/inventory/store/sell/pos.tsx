@@ -34,6 +34,11 @@ export type PosItem = {
 /** `manual`: the cashier typed the discount, so it no longer follows the item's default %. */
 type CartLine = { itemId: string; quantity: number; discount: string; manual?: boolean }
 
+/** One part of a split payment; the last part always takes whatever is left of the bill. */
+type SplitPart = { mode: string; amount: string; ref: string }
+
+const MAX_SPLIT_PARTS = 4
+
 const defaultDiscount = (item: PosItem, quantity: number) => {
   const minor = itemDiscountMinor(quantity, item.sellingPriceMinor, item.discountPercent)
   return minor > 0 ? String(minor / 100) : ''
@@ -65,6 +70,10 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
   const [paymentRef, setPaymentRef] = React.useState('')
   const [feeDue, setFeeDue] = React.useState<'CURRENT' | 'NEXT'>('CURRENT')
   const [cashGiven, setCashGiven] = React.useState('')
+  const [splitParts, setSplitParts] = React.useState<SplitPart[]>([
+    { mode: 'CASH', amount: '', ref: '' },
+    { mode: 'UPI', amount: '', ref: '' },
+  ])
   const [saving, setSaving] = React.useState(false)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
@@ -164,6 +173,16 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
   const total = priced.reduce((s, l) => s + l.amount, 0)
   const units = cart.reduce((s, l) => s + l.quantity, 0)
   const change = paymentMode === 'CASH' && cashGiven ? Math.round(Number(cashGiven) * 100) - total : null
+  const split = paymentMode === 'SPLIT'
+  const enteredMinor = splitParts.slice(0, -1).reduce((s, p) => s + Math.round((Number(p.amount) || 0) * 100), 0)
+  const restMinor = total - enteredMinor
+  const splitHasFees = splitParts.some((p) => p.mode === 'FEE_ACCOUNT')
+  const splitModes = [
+    ...STORE_PAYMENT_MODES,
+    ...(buyerType === 'student' ? [{ value: 'FEE_ACCOUNT', label: 'Add to fees' }] : []),
+  ]
+  const setPart = (index: number, patch: Partial<SplitPart>) =>
+    setSplitParts((parts) => parts.map((p, i) => (i === index ? { ...p, ...patch } : p)))
 
   const reset = () => {
     setCart([])
@@ -175,17 +194,33 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
     setCashGiven('')
     setPaymentMode('CASH')
     setFeeDue('CURRENT')
+    setSplitParts([
+      { mode: 'CASH', amount: '', ref: '' },
+      { mode: 'UPI', amount: '', ref: '' },
+    ])
   }
 
   React.useEffect(() => {
     if (buyerType === 'walkin' && paymentMode === 'FEE_ACCOUNT') setPaymentMode('CASH')
-  }, [buyerType, paymentMode])
+    if (buyerType === 'walkin' && splitParts.some((p) => p.mode === 'FEE_ACCOUNT')) {
+      setSplitParts((parts) => parts.map((p) => (p.mode === 'FEE_ACCOUNT' ? { ...p, mode: 'UPI' } : p)))
+    }
+  }, [buyerType, paymentMode, splitParts])
 
   const submit = async () => {
     if (cart.length === 0) return push({ tone: 'error', title: 'Add items to the bill first' })
     if (buyerType === 'student' && !student) return push({ tone: 'error', title: 'Pick the student, or switch to walk-in' })
     if (buyerType === 'walkin' && customerName.trim().length < 2) return push({ tone: 'error', title: 'Enter the buyer name' })
     if (change !== null && change < 0) return push({ tone: 'error', title: 'Cash received is less than the bill total' })
+    if (split) {
+      if (splitParts.slice(0, -1).some((p) => !(Number(p.amount) > 0))) {
+        return push({ tone: 'error', title: 'Enter an amount for each part' })
+      }
+      if (restMinor <= 0) return push({ tone: 'error', title: 'The parts already cover the bill. Remove a part or lower an amount.' })
+      if (splitParts.filter((p) => p.mode === 'FEE_ACCOUNT').length > 1) {
+        return push({ tone: 'error', title: 'Choose "Add to fees" for one part only' })
+      }
+    }
     setSaving(true)
     const res = await createStoreSaleAction({
       studentId: buyerType === 'student' ? student?.id : null,
@@ -193,7 +228,14 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
       customerPhone: customerPhone || undefined,
       paymentMode,
       feeDue,
-      paymentRef: paymentMode === 'CASH' || paymentMode === 'FEE_ACCOUNT' ? undefined : paymentRef || undefined,
+      paymentRef: paymentMode === 'CASH' || paymentMode === 'FEE_ACCOUNT' || split ? undefined : paymentRef || undefined,
+      payments: split
+        ? splitParts.map((p, i) => ({
+            mode: p.mode,
+            amount: i === splitParts.length - 1 ? restMinor / 100 : Number(p.amount),
+            reference: p.mode === 'CASH' || p.mode === 'FEE_ACCOUNT' ? undefined : p.ref || undefined,
+          }))
+        : undefined,
       lines: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity, discount: Number(l.discount) || 0 })),
     })
     setSaving(false)
@@ -423,6 +465,7 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
               {[
                 ...STORE_PAYMENT_MODES,
                 ...(buyerType === 'student' ? [{ value: 'FEE_ACCOUNT', label: 'Add to fees' }] : []),
+                { value: 'SPLIT', label: 'Split payment' },
               ].map((m) => (
                 <button
                   key={m.value}
@@ -440,7 +483,113 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
               ))}
             </div>
           </div>
-          {paymentMode === 'FEE_ACCOUNT' ? (
+          {split ? (
+            <div className="space-y-2 rounded-lg bg-surface-2 p-3">
+              <p className="text-xs text-ink-muted">
+                Enter what the parent pays now. The last line takes the rest of the bill.
+              </p>
+              {splitParts.map((part, i) => {
+                const last = i === splitParts.length - 1
+                return (
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_110px_auto] items-center gap-1.5">
+                    <select
+                      aria-label={`Part ${i + 1} paid by`}
+                      value={part.mode}
+                      onChange={(e) => setPart(i, { mode: e.target.value })}
+                      className="h-9 rounded-md border border-line bg-surface px-2 text-sm"
+                    >
+                      {splitModes.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    {last ? (
+                      <p
+                        className={cn('px-1 text-right text-sm font-semibold tnum', restMinor <= 0 ? 'text-[var(--danger)]' : 'text-ink')}
+                        title="The rest of the bill"
+                      >
+                        {formatMoney(Math.max(0, restMinor), currency)}
+                      </p>
+                    ) : (
+                      <Input
+                        aria-label={`Part ${i + 1} amount`}
+                        inputMode="decimal"
+                        value={part.amount}
+                        onChange={(e) => setPart(i, { amount: e.target.value })}
+                        placeholder="₹"
+                        className="h-9 text-right"
+                      />
+                    )}
+                    {splitParts.length > 2 ? (
+                      <button
+                        type="button"
+                        aria-label={`Remove part ${i + 1}`}
+                        onClick={() => setSplitParts((parts) => parts.filter((_, j) => j !== i))}
+                        className="grid size-7 place-items-center rounded-md text-ink-subtle hover:bg-surface hover:text-ink"
+                      >
+                        <X className="size-3.5" aria-hidden />
+                      </button>
+                    ) : (
+                      <span className="size-7" />
+                    )}
+                    {part.mode !== 'CASH' && part.mode !== 'FEE_ACCOUNT' ? (
+                      <Input
+                        aria-label={`Part ${i + 1} transaction or cheque number`}
+                        value={part.ref}
+                        onChange={(e) => setPart(i, { ref: e.target.value })}
+                        placeholder="Transaction / cheque no. (optional)"
+                        className="col-span-2 h-8 text-xs"
+                      />
+                    ) : null}
+                  </div>
+                )
+              })}
+              <div className="flex items-center justify-between text-xs">
+                {splitParts.length < MAX_SPLIT_PARTS ? (
+                  <button
+                    type="button"
+                    onClick={() => setSplitParts((parts) => [...parts.slice(0, -1), { mode: 'UPI', amount: '', ref: '' }, parts[parts.length - 1]!])}
+                    className="font-medium text-[var(--brand-600)] hover:underline"
+                  >
+                    + Add another part
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <span className="text-ink-muted">
+                  Paid now{' '}
+                  <span className="font-semibold text-ink tnum">
+                    {formatMoney(
+                      splitParts.reduce(
+                        (s, p, i) =>
+                          p.mode === 'FEE_ACCOUNT'
+                            ? s
+                            : s + (i === splitParts.length - 1 ? Math.max(0, restMinor) : Math.round((Number(p.amount) || 0) * 100)),
+                        0,
+                      ),
+                      currency,
+                    )}
+                  </span>
+                </span>
+              </div>
+              {splitHasFees ? (
+                <div className="space-y-1.5 border-t border-line pt-2">
+                  <p className="text-xs text-ink-muted">
+                    The &ldquo;Add to fees&rdquo; part goes on {student ? `${student.firstName}'s` : "the student's"} fee account.
+                  </p>
+                  <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+                    <SegButton active={feeDue === 'CURRENT'} onClick={() => setFeeDue('CURRENT')}>
+                      With current fees
+                    </SegButton>
+                    <SegButton active={feeDue === 'NEXT'} onClick={() => setFeeDue('NEXT')}>
+                      With next fees
+                    </SegButton>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : paymentMode === 'FEE_ACCOUNT' ? (
             <div className="space-y-2 rounded-lg bg-surface-2 p-3">
               <p className="text-xs text-ink-muted">
                 Nothing is taken now. The bill is added to {student ? `${student.firstName}'s` : "the student's"} fee
@@ -475,7 +624,9 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
               ? 'Saving bill…'
               : paymentMode === 'FEE_ACCOUNT'
                 ? `Add ${formatMoney(total, currency)} to fees`
-                : `Save bill · ${formatMoney(total, currency)}`}
+                : split
+                  ? `Save split bill · ${formatMoney(total, currency)}`
+                  : `Save bill · ${formatMoney(total, currency)}`}
           </Button>
         </div>
       </aside>

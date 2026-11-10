@@ -35,6 +35,8 @@ export default async function GroupDetailPage({
   const { group, available } = data
   const schoolName = (t: { name: string; school: { name: string } | null }) => t.school?.name ?? t.name
   const tenantName = new Map(group.tenants.map((t) => [t.id, schoolName(t)]))
+  const blocked = new Set(group.tenants.filter((t) => t.status === 'SUSPENDED' || t.archivedAt).map((t) => t.id))
+  const ownerSchools = group.tenants.filter((t) => !blocked.has(t.id))
 
   return (
     <div className="space-y-4">
@@ -66,6 +68,7 @@ export default async function GroupDetailPage({
                     </Link>
                     <span className="text-xs text-ink-subtle">{t.slug}</span>
                     {t.archivedAt ? <Badge tone="neutral">Archived</Badge> : null}
+                    {t.status === 'SUSPENDED' ? <Badge tone="warning">Suspended</Badge> : null}
                     <form action={removeSchoolAction.bind(null, group.id, t.id)}>
                       <Button type="submit" size="sm" variant="ghost">
                         Remove
@@ -121,6 +124,7 @@ export default async function GroupDetailPage({
                       </span>
                     </span>
                     {o.user.status !== 'ACTIVE' ? <Badge tone="warning">{o.user.status.toLowerCase()}</Badge> : null}
+                    {blocked.has(o.user.tenantId ?? '') ? <Badge tone="warning">School suspended: cannot sign in</Badge> : null}
                     <form action={removeOwnerAction.bind(null, group.id, o.id)}>
                       <Button type="submit" size="sm" variant="ghost">
                         Remove
@@ -130,10 +134,13 @@ export default async function GroupDetailPage({
                 ))}
               </ul>
             )}
-            {group.tenants.length > 0 ? (
+            {ownerSchools.length > 0 ? (
               <form action={addOwnerAction.bind(null, group.id)} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                <select name="tenantId" className={selectClass} required defaultValue={group.tenants[0]?.id}>
-                  {group.tenants.map((t) => (
+                <select name="tenantId" className={selectClass} required defaultValue="">
+                  <option value="" disabled>
+                    School the owner signs in to…
+                  </option>
+                  {ownerSchools.map((t) => (
                     <option key={t.id} value={t.id}>
                       Account at {schoolName(t)}
                     </option>
@@ -145,7 +152,9 @@ export default async function GroupDetailPage({
                 </Button>
               </form>
             ) : (
-              <p className="text-xs text-ink-subtle">Add a school first; the owner needs an account at one of them.</p>
+              <p className="text-xs text-ink-subtle">
+                Add an active school first; the owner needs an account at one they can sign in to.
+              </p>
             )}
           </CardContent>
         </Card>

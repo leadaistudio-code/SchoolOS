@@ -88,11 +88,24 @@ export const storeSaleSchema = z
     studentId: z.string().min(1).optional().nullable(),
     customerName: optionalText(120),
     customerPhone: optionalText(20),
-    /** FEE_ACCOUNT: nothing taken now; the bill is added to the student's fees. */
-    paymentMode: z.enum([...paymentModeEnum.options, 'FEE_ACCOUNT']),
-    /** With FEE_ACCOUNT: due with the current dues, or with the next fee instalment. */
+    /**
+     * FEE_ACCOUNT: nothing taken now; the bill is added to the student's fees.
+     * SPLIT: paid in parts listed in `payments`, which must add up to the bill.
+     */
+    paymentMode: z.enum([...paymentModeEnum.options, 'FEE_ACCOUNT', 'SPLIT']),
+    /** With FEE_ACCOUNT (or a fee part of a split): due with the current dues, or with the next fee instalment. */
     feeDue: z.enum(['CURRENT', 'NEXT']).default('CURRENT'),
     paymentRef: optionalText(80),
+    payments: z
+      .array(
+        z.object({
+          mode: z.enum([...paymentModeEnum.options, 'FEE_ACCOUNT']),
+          amount: rupees(),
+          reference: optionalText(80),
+        }),
+      )
+      .max(6)
+      .optional(),
     notes: optionalText(300),
     lines: z
       .array(z.object({ itemId: z.string().min(1), quantity: qty, discount: rupees().default(0) }))
@@ -106,6 +119,19 @@ export const storeSaleSchema = z
   .refine((v) => v.paymentMode !== 'FEE_ACCOUNT' || v.studentId, {
     message: 'Pick the student whose fees this should be added to',
     path: ['studentId'],
+  })
+  .superRefine((v, issue) => {
+    if (v.paymentMode !== 'SPLIT') return
+    const parts = (v.payments ?? []).filter((p) => p.amount > 0)
+    if (parts.length < 2) {
+      issue.addIssue({ code: 'custom', path: ['payments'], message: 'A split payment needs at least two parts with an amount' })
+    }
+    if (parts.filter((p) => p.mode === 'FEE_ACCOUNT').length > 1) {
+      issue.addIssue({ code: 'custom', path: ['payments'], message: 'Add the balance to fees only once' })
+    }
+    if (parts.some((p) => p.mode === 'FEE_ACCOUNT') && !v.studentId) {
+      issue.addIssue({ code: 'custom', path: ['studentId'], message: 'Pick the student whose fees the balance should be added to' })
+    }
   })
 
 export const stockAdjustmentSchema = z.object({
@@ -781,6 +807,16 @@ export async function createStoreSale(ctx: AppContext, raw: StoreSaleInput) {
     const totalMinor = lines.reduce((s, l) => s + l.amount, 0)
     const costMinor = lines.reduce((s, l) => s + l.quantity * l.item.avgCostMinor, 0)
     if (totalMinor <= 0) throw badRequest('The bill total must be more than zero')
+    const parts = input.paymentMode === 'SPLIT' ? (input.payments ?? []).filter((p) => p.amount > 0) : []
+    if (input.paymentMode === 'SPLIT') {
+      const partsTotal = parts.reduce((s, p) => s + p.amount, 0)
+      if (partsTotal !== totalMinor) {
+        throw badRequest(
+          `The parts add up to ₹${(partsTotal / 100).toFixed(2)} but the bill is ₹${(totalMinor / 100).toFixed(2)}`,
+        )
+      }
+    }
+    const feePart = parts.find((p) => p.mode === 'FEE_ACCOUNT')
 
     const number = await nextDocumentNumber(tx, {
       tenantId: ctx.tenant.id,
@@ -801,10 +837,22 @@ export async function createStoreSale(ctx: AppContext, raw: StoreSaleInput) {
         totalMinor,
         costMinor,
         paymentMode: input.paymentMode,
-        paymentRef: input.paymentRef,
+        paymentRef: input.paymentMode === 'SPLIT' ? null : input.paymentRef,
         notes: input.notes,
         soldById: ctx.user.userId,
         soldByLabel: actorLabel(ctx),
+        ...(parts.length
+          ? {
+              payments: {
+                create: parts.map((p) => ({
+                  tenantId: ctx.tenant.id,
+                  mode: p.mode,
+                  amountMinor: p.amount,
+                  reference: p.mode === 'FEE_ACCOUNT' ? null : p.reference ?? null,
+                })),
+              },
+            }
+          : {}),
         lines: {
           create: lines.map((l) => ({
             tenantId: ctx.tenant.id,
@@ -833,13 +881,28 @@ export async function createStoreSale(ctx: AppContext, raw: StoreSaleInput) {
         reason: number,
       })
     }
-    let feeInvoice: { number: string; dueOn: Date } | null = null
+    let feeInvoice: { number: string; dueOn: Date; totalMinor: number } | null = null
     if (input.paymentMode === 'FEE_ACCOUNT' && student) {
       feeInvoice = await addSaleToFees(tx, ctx, {
         sale: created,
         studentId: student.id,
         due: input.feeDue,
         lines: lines.map((l) => ({ label: itemLabel(l.item), quantity: l.quantity, amountMinor: l.amount })),
+      })
+    } else if (feePart && student) {
+      const paidNow = parts.filter((p) => p.mode !== 'FEE_ACCOUNT')
+      feeInvoice = await addSaleToFees(tx, ctx, {
+        sale: created,
+        studentId: student.id,
+        due: input.feeDue,
+        lines: [
+          {
+            label: `Balance of store bill ${created.number} (${lines.map((l) => itemLabel(l.item)).join(', ')})`.slice(0, 190),
+            quantity: 1,
+            amountMinor: feePart.amount,
+          },
+        ],
+        note: `${paidNow.map((p) => `${p.mode.toLowerCase().replace('_', ' ')} ₹${p.amount / 100}`).join(' + ')} paid at the counter`,
       })
     }
     return { ...created, feeInvoice }
@@ -877,6 +940,7 @@ async function addSaleToFees(
     studentId: string
     due: 'CURRENT' | 'NEXT'
     lines: { label: string; quantity: number; amountMinor: number }[]
+    note?: string
   },
 ) {
   const session =
@@ -918,7 +982,7 @@ async function addSaleToFees(
       subtotalMinor: linesTotal,
       totalMinor: linesTotal,
       balanceMinor: linesTotal,
-      notes: `Added to fees from the school store by ${actorLabel(ctx)}`,
+      notes: `Added to fees from the school store by ${actorLabel(ctx)}${args.note ? `; ${args.note}` : ''}`,
       lines: {
         create: args.lines.map((l) => ({
           tenantId: ctx.tenant.id,
@@ -928,7 +992,7 @@ async function addSaleToFees(
         })),
       },
     },
-    select: { number: true, dueOn: true },
+    select: { number: true, dueOn: true, totalMinor: true },
   })
   await tx.storeSale.update({
     where: { id: args.sale.id },
@@ -954,7 +1018,7 @@ export async function voidStoreSale(ctx: AppContext, id: string, reason: string)
 
     const current = await tx.storeSale.findFirst({ where: { id }, include: { lines: true } })
     if (!current) throw notFound('Store bill')
-    if (current.paymentMode === 'FEE_ACCOUNT') {
+    if (current.paymentMode === 'FEE_ACCOUNT' || current.paymentMode === 'SPLIT') {
       const invoice = await tx.feeInvoice.findFirst({
         where: { sourceKey: storeSaleFeeKey(current.id), status: { not: 'CANCELLED' } },
         select: { id: true, number: true, paidMinor: true },
@@ -1016,7 +1080,13 @@ function saleWhere(filter: SaleFilter): Prisma.StoreSaleWhereInput {
   const range = filter.preset ? presetRange(filter.preset) : null
   if (range) where.soldAt = dayBounds(range.from, range.to)
   if (filter.status === 'COMPLETED' || filter.status === 'VOIDED') where.status = filter.status
-  if (filter.mode) where.paymentMode = filter.mode
+  if (filter.mode) {
+    where.AND = [
+      filter.mode === 'SPLIT'
+        ? { paymentMode: 'SPLIT' }
+        : { OR: [{ paymentMode: filter.mode }, { payments: { some: { mode: filter.mode } } }] },
+    ]
+  }
   const q = filter.q?.trim()
   if (q) {
     where.OR = [
@@ -1039,6 +1109,7 @@ export async function listStoreSales(ctx: AppContext, filter: SaleFilter = {}) {
       take: 500,
       include: {
         student: { select: { admissionNo: true, firstName: true, lastName: true } },
+        payments: { select: { mode: true, amountMinor: true }, orderBy: { createdAt: 'asc' } },
         _count: { select: { lines: true } },
       },
     }),
@@ -1066,6 +1137,7 @@ export async function getStoreSale(ctx: AppContext, id: string) {
     where: { id },
     include: {
       lines: { include: { item: { select: { sku: true, hsnCode: true, unit: true } } } },
+      payments: { orderBy: { createdAt: 'asc' } },
       student: {
         select: {
           admissionNo: true,
@@ -1112,7 +1184,7 @@ export async function storeDashboard(ctx: AppContext) {
   const monthStart = `${today.slice(0, 8)}01`
   const trendStart = new Date(new Date(`${today}T00:00:00+05:30`).getTime() - 13 * 86_400_000)
 
-  const [items, todayAgg, monthAgg, todayModes, recent, monthLines, trendRows] = await Promise.all([
+  const [items, todayAgg, monthAgg, todayModes, recent, monthLines, trendRows, todaySplits] = await Promise.all([
     ctx.db.storeItem.findMany({
       where: { isActive: true },
       select: { id: true, name: true, variant: true, sku: true, category: true, quantity: true, reorderLevel: true, avgCostMinor: true, sellingPriceMinor: true },
@@ -1149,7 +1221,19 @@ export async function storeDashboard(ctx: AppContext) {
       ctx.tenant.id,
       trendStart,
     ),
+    ctx.db.storeSalePayment.groupBy({
+      by: ['mode'],
+      where: { sale: { status: 'COMPLETED', soldAt: dayBounds(today, today) } },
+      _sum: { amountMinor: true },
+    }),
   ])
+
+  const modeTotals = new Map<string, number>()
+  for (const m of todayModes) {
+    if (m.paymentMode === 'SPLIT') continue
+    modeTotals.set(m.paymentMode, (modeTotals.get(m.paymentMode) ?? 0) + (m._sum.totalMinor ?? 0))
+  }
+  for (const p of todaySplits) modeTotals.set(p.mode, (modeTotals.get(p.mode) ?? 0) + (p._sum.amountMinor ?? 0))
 
   const stockValueMinor = items.reduce((s, i) => s + Math.max(i.quantity, 0) * i.avgCostMinor, 0)
   const retailValueMinor = items.reduce((s, i) => s + Math.max(i.quantity, 0) * i.sellingPriceMinor, 0)
@@ -1183,7 +1267,9 @@ export async function storeDashboard(ctx: AppContext) {
       totalMinor: monthSales,
       grossProfitMinor: monthSales - monthTax - monthCost,
     },
-    todayModes: todayModes.map((m) => ({ mode: m.paymentMode, totalMinor: m._sum.totalMinor ?? 0 })),
+    todayModes: [...modeTotals.entries()]
+      .map(([mode, totalMinor]) => ({ mode, totalMinor }))
+      .sort((a, b) => b.totalMinor - a.totalMinor),
     stock: {
       itemCount: items.length,
       units: items.reduce((s, i) => s + Math.max(i.quantity, 0), 0),
@@ -1217,6 +1303,9 @@ export async function exportStoreSales(ctx: AppContext, filter: SaleFilter) {
     where: saleWhere(filter),
     orderBy: { soldAt: 'desc' },
     take: 20000,
-    include: { student: { select: { admissionNo: true } } },
+    include: {
+      student: { select: { admissionNo: true } },
+      payments: { select: { mode: true, amountMinor: true }, orderBy: { createdAt: 'asc' } },
+    },
   })
 }

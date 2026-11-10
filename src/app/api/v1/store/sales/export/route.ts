@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { route } from '@/server/api/handler'
 import { csvResponse } from '@/lib/csv'
 import { toDateInput } from '@/lib/dates'
-import { storePaymentLabel } from '@/lib/store/options'
+import { splitPaymentLabel, storePaymentLabel } from '@/lib/store/options'
 import { exportStoreSales } from '@/server/modules/store/service'
 
 const STAMP = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
@@ -32,7 +32,7 @@ export const GET = route(
         rs(r.taxMinor),
         rs(r.totalMinor),
         rs(r.costMinor),
-        storePaymentLabel(r.paymentMode),
+        r.payments.length ? splitPaymentLabel(r.payments) : storePaymentLabel(r.paymentMode),
         r.paymentRef ?? '',
         r.status === 'VOIDED' ? 'Voided' : 'Completed',
         r.voidReason ?? '',

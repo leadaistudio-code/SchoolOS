@@ -136,6 +136,7 @@ export const TENANT_SCOPED_MODELS = [
   'StorePurchaseLine',
   'StoreSale',
   'StoreSaleLine',
+  'StoreSalePayment',
   'Visitor',
   'Appointment',
   'AdmissionLead',

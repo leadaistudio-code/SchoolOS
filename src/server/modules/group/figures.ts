@@ -133,9 +133,10 @@ export async function groupFigures(schools: GroupSchool[], range: Range): Promis
         where: { ...inGroup, status: 'SUCCESS', completedAt: { gte: since, lt: until } },
         _sum: { amountMinor: true },
       }),
+      // Bills added to fees arrive later as fee receipts and are counted there.
       prisma.storeSale.groupBy({
         by: ['tenantId'],
-        where: { ...inGroup, status: 'COMPLETED', soldAt: { gte: since, lt: until } },
+        where: { ...inGroup, status: 'COMPLETED', paymentMode: { notIn: ['FEE_ACCOUNT', 'SPLIT'] }, soldAt: { gte: since, lt: until } },
         _sum: { totalMinor: true },
       }),
       prisma.schoolExpense.groupBy({
@@ -164,6 +165,11 @@ export async function groupFigures(schools: GroupSchool[], range: Range): Promis
         _sum: { balanceMinor: true },
       }),
     ])
+  const splitPaid = await prisma.storeSalePayment.groupBy({
+    by: ['tenantId'],
+    where: { ...inGroup, mode: { not: 'FEE_ACCOUNT' }, sale: { status: 'COMPLETED', soldAt: { gte: since, lt: until } } },
+    _sum: { amountMinor: true },
+  })
 
   const rows = schools.map((school): SchoolRow => {
     const t = school.tenantId
@@ -184,7 +190,7 @@ export async function groupFigures(schools: GroupSchool[], range: Range): Promis
         attendancePresent: attendanceRows.filter((r) => PRESENT.has(r.status)).reduce((s, r) => s + r._count._all, 0),
         feesMinor: n(one(fees)?._sum.amountMinor),
         refundsMinor: n(one(refunds)?._sum.amountMinor),
-        otherIncomeMinor: n(one(sales)?._sum.totalMinor),
+        otherIncomeMinor: n(one(sales)?._sum.totalMinor) + n(one(splitPaid)?._sum.amountMinor),
         directExpenseMinor: n(expenseRows.find((r) => r.nature === 'DIRECT')?._sum.amountMinor),
         indirectExpenseMinor: n(expenseRows.find((r) => r.nature === 'INDIRECT')?._sum.amountMinor),
         salariesMinor: n(one(payroll)?._sum.netMinor),
@@ -222,8 +228,14 @@ export async function groupTrend(tenantIds: string[]): Promise<TrendMonth[]> {
       WHERE "tenantId" IN (${ids}) AND "status"::text IN ('SUCCESS','PARTIALLY_REFUNDED','REFUNDED') AND "paidAt" >= ${since} GROUP BY 1`,
     prisma.$queryRaw<Row[]>`SELECT ${ist('completedAt')} AS month, SUM("amountMinor") AS total FROM "FeeRefund"
       WHERE "tenantId" IN (${ids}) AND "status"::text = 'SUCCESS' AND "completedAt" >= ${since} GROUP BY 1`,
-    prisma.$queryRaw<Row[]>`SELECT ${ist('soldAt')} AS month, SUM("totalMinor") AS total FROM "StoreSale"
-      WHERE "tenantId" IN (${ids}) AND "status"::text = 'COMPLETED' AND "soldAt" >= ${since} GROUP BY 1`,
+    prisma.$queryRaw<Row[]>`SELECT month, SUM(total) AS total FROM (
+        SELECT ${ist('soldAt')} AS month, "totalMinor" AS total FROM "StoreSale"
+        WHERE "tenantId" IN (${ids}) AND "status"::text = 'COMPLETED' AND "paymentMode" NOT IN ('FEE_ACCOUNT', 'SPLIT') AND "soldAt" >= ${since}
+        UNION ALL
+        SELECT to_char((s."soldAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM') AS month, p."amountMinor" AS total
+        FROM "StoreSalePayment" p JOIN "StoreSale" s ON s.id = p."saleId"
+        WHERE p."tenantId" IN (${ids}) AND p.mode <> 'FEE_ACCOUNT' AND s."status"::text = 'COMPLETED' AND s."soldAt" >= ${since}
+      ) t GROUP BY 1`,
     prisma.$queryRaw<Row[]>`SELECT to_char("expenseDate", 'YYYY-MM') AS month, SUM("amountMinor") AS total FROM "SchoolExpense"
       WHERE "tenantId" IN (${ids}) AND "deletedAt" IS NULL AND "expenseDate" >= ${sinceDay} GROUP BY 1`,
     prisma.$queryRaw<Row[]>`SELECT ${ist('paidAt')} AS month, SUM("netMinor") AS total FROM "StaffPayslip"

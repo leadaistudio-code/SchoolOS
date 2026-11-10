@@ -110,7 +110,10 @@ export async function createStoreSaleAction(payload: unknown): Promise<StoreActi
       return {
         ok: true,
         id: sale.id,
-        message: `Bill ${sale.number} for ₹${sale.totalMinor / 100} added to fees (${sale.feeInvoice.number}).`,
+        message:
+          sale.paymentMode === 'SPLIT'
+            ? `Bill ${sale.number} saved. ₹${sale.feeInvoice.totalMinor / 100} added to fees (${sale.feeInvoice.number}).`
+            : `Bill ${sale.number} for ₹${sale.totalMinor / 100} added to fees (${sale.feeInvoice.number}).`,
       }
     }
     return { ok: true, id: sale.id, message: `Bill ${sale.number} saved for ₹${sale.totalMinor / 100}.` }
@@ -124,7 +127,7 @@ export async function voidStoreSaleAction(id: string, reason: string): Promise<S
   try {
     const sale = await voidStoreSale(ctx, id, reason)
     revalidateStore()
-    if (sale.paymentMode === 'FEE_ACCOUNT') revalidatePath('/finance', 'layout')
+    if (sale.paymentMode === 'FEE_ACCOUNT' || sale.paymentMode === 'SPLIT') revalidatePath('/finance', 'layout')
     return { ok: true, message: `Bill ${sale.number} voided and stock returned.` }
   } catch (err) {
     return fail(err, 'The bill could not be voided')

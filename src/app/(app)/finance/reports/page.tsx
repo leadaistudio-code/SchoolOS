@@ -3,12 +3,16 @@ import { requireContext } from '@/server/context'
 import { feeReportsSummary } from '@/server/modules/finance/simplicity'
 import {
   FEE_STATUS_LABEL,
+  defaultReportMonth,
   sessionClassOptions,
+  sessionMonths,
+  studentFeeMonthReport,
   studentFeePayersReport,
   studentFeeReportSchema,
   studentFeeStatusReport,
   type FeeStatus,
 } from '@/server/modules/finance/student-fee-report'
+import { schoolToday } from '@/lib/periods'
 import { getViewSession, periodOrSession } from '@/server/view-session'
 import { PageHeader } from '@/components/page-header'
 import { BackButton } from '@/components/back-button'
@@ -47,6 +51,7 @@ type Params = {
   q?: string
   sfrom?: string
   sto?: string
+  month?: string
   page?: string
 }
 
@@ -57,16 +62,20 @@ export default async function FeeReportsPage({ searchParams }: { searchParams: P
   const period = periodOrSession(session, params.from, params.to)
   const filter = studentFeeReportSchema.parse({
     view: params.view,
-    status: params.status,
+    status: params.status ?? (params.view === 'month' ? 'due' : undefined),
     classLevelId: params.classLevelId,
     sectionId: params.sectionId,
     q: params.q,
     from: params.sfrom,
     to: params.sto,
+    month: params.month,
   })
   const page = Math.max(1, Number(params.page) || 1)
+  const months = session ? sessionMonths(session) : []
+  const defaultMonth = session ? defaultReportMonth(session, schoolToday()) : ''
+  const month = filter.month && months.some((m) => m.key === filter.month) ? filter.month : defaultMonth
 
-  const [report, structures, classes, status, payers] = await Promise.all([
+  const [report, structures, classes, status, payers, monthly] = await Promise.all([
     feeReportsSummary(ctx, period.from, period.to),
     ctx.can('fees.owner_analytics')
       ? ctx.db.feeStructure.findMany({
@@ -78,12 +87,13 @@ export default async function FeeReportsPage({ searchParams }: { searchParams: P
     session ? sessionClassOptions(ctx, session) : Promise.resolve([]),
     session && filter.view === 'status' ? studentFeeStatusReport(ctx, session, filter) : Promise.resolve(null),
     session && filter.view === 'payers' ? studentFeePayersReport(ctx, session, filter) : Promise.resolve(null),
+    session && filter.view === 'month' ? studentFeeMonthReport(ctx, session, filter, month) : Promise.resolve(null),
   ])
   const currency = ctx.tenant.currency
   const rate = report.billedMinor > 0
     ? Math.round(((report.billedMinor - report.outstandingMinor) / report.billedMinor) * 100)
     : 0
-  const resultCount = status?.rows.length ?? payers?.rows.length ?? 0
+  const resultCount = status?.rows.length ?? payers?.rows.length ?? monthly?.rows.length ?? 0
   const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : '—')
   const feeDrill = (k: 'fee-billed' | 'fee-collected' | 'fee-outstanding') => drillHref(ctx.tenant.id, { k, f: period.from, t: period.to })
 
@@ -162,8 +172,69 @@ export default async function FeeReportsPage({ searchParams }: { searchParams: P
               resultCount={resultCount}
               defaultFrom={session.range.from}
               defaultTo={session.range.to}
+              months={months}
+              defaultMonth={defaultMonth}
             />
           )}
+
+          {monthly ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Metric label={`Students billed for ${monthly.monthLabel}`} value={String(monthly.totalStudents - monthly.counts.none)} sub={`${monthly.totalStudents} enrolled`} />
+                <Metric label="Fully paid" value={String(monthly.counts.paid)} emphasis="success" />
+                <Metric label="Partly paid" value={String(monthly.counts.partial)} emphasis="warning" />
+                <Metric label="Not paid" value={String(monthly.counts.unpaid)} emphasis={monthly.counts.unpaid > 0 ? 'danger' : undefined} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Metric label={`Billed for ${monthly.monthLabel}`} value={formatMoney(monthly.billedMinor, currency)} sub={`Collected ${formatMoney(monthly.paidMinor, currency)}`} />
+                <Metric label={`Due for ${monthly.monthLabel} only`} value={formatMoney(monthly.balanceMinor, currency)} emphasis={monthly.balanceMinor > 0 ? 'danger' : undefined} />
+                <Metric label="Overall due (whole session)" value={formatMoney(monthly.overallBalanceMinor, currency)} sub="All months together" />
+              </div>
+              <div className="overflow-hidden rounded-[var(--radius)] border border-line">
+                <TableWrap>
+                  <Table>
+                    <THead>
+                      <tr>
+                        <TH>Student</TH>
+                        <TH>Class</TH>
+                        <TH>{monthly.monthLabel}</TH>
+                        <TH align="right">Billed</TH>
+                        <TH align="right">Paid</TH>
+                        <TH align="right">Due this month</TH>
+                        <TH align="right">Overall due</TH>
+                      </tr>
+                    </THead>
+                    <TBody>
+                      {monthly.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((r) => (
+                        <TR key={r.studentId}>
+                          <TD>
+                            <Link href={`/finance/students/${r.studentId}`} className="text-sm font-medium text-ink hover:underline">{r.name}</Link>
+                            <div className="text-xs text-ink-subtle">{r.admissionNo}{r.parentPhone ? ` · ${r.parentPhone}` : ''}</div>
+                          </TD>
+                          <TD className="text-sm">{r.className}{r.sectionName ? ` – ${r.sectionName}` : ''}</TD>
+                          <TD><Badge tone={STATUS_TONE[r.status]}>{FEE_STATUS_LABEL[r.status]}</Badge></TD>
+                          <TD align="right" className="tnum">{formatMoney(r.billedMinor, currency)}</TD>
+                          <TD align="right" className="tnum">{formatMoney(r.paidMinor, currency)}</TD>
+                          <TD align="right" className="tnum font-medium">{formatMoney(r.balanceMinor, currency)}</TD>
+                          <TD align="right" className="tnum text-ink-muted">{formatMoney(r.overallBalanceMinor, currency)}</TD>
+                        </TR>
+                      ))}
+                      {monthly.rows.length === 0 ? (
+                        <TR><TD colSpan={7} className="py-6 text-center text-sm text-ink-muted">Nobody matches. Everyone billed for {monthly.monthLabel} may have paid.</TD></TR>
+                      ) : (
+                        <TR>
+                          <TD colSpan={5} className="text-sm font-medium">{monthly.rows.length} listed</TD>
+                          <TD align="right" className="tnum font-semibold">{formatMoney(monthly.rows.reduce((t, r) => t + r.balanceMinor, 0), currency)}</TD>
+                          <TD align="right" className="tnum font-semibold">{formatMoney(monthly.listedOverallMinor, currency)}</TD>
+                        </TR>
+                      )}
+                    </TBody>
+                  </Table>
+                </TableWrap>
+                <Pagination total={monthly.rows.length} page={page} pageSize={PAGE_SIZE} label="students" />
+              </div>
+            </>
+          ) : null}
 
           {status ? (
             <>

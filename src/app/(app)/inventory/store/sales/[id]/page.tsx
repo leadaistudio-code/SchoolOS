@@ -156,13 +156,25 @@ export default async function StoreSalePage({
             </div>
           ))}
           <div className="flex justify-between border-t border-line pt-2 text-lg font-bold">
-            <dt>Total paid</dt>
+            <dt>{sale.payments.length ? 'Total' : 'Total paid'}</dt>
             <dd className="tnum">{formatMoney(sale.totalMinor, currency)}</dd>
           </div>
-          <div className="flex justify-between text-ink-muted">
-            <dt>Payment</dt>
-            <dd>{storePaymentLabel(sale.paymentMode)}{sale.paymentRef ? ` · ${sale.paymentRef}` : ''}</dd>
-          </div>
+          {sale.payments.length ? (
+            sale.payments.map((p) => (
+              <div key={p.id} className="flex justify-between text-ink-muted">
+                <dt>
+                  {p.mode === 'FEE_ACCOUNT' ? 'Added to fees' : `Paid by ${storePaymentLabel(p.mode)}`}
+                  {p.reference ? ` · ${p.reference}` : ''}
+                </dt>
+                <dd className="tnum">{formatMoney(p.amountMinor, currency)}</dd>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between text-ink-muted">
+              <dt>Payment</dt>
+              <dd>{storePaymentLabel(sale.paymentMode)}{sale.paymentRef ? ` · ${sale.paymentRef}` : ''}</dd>
+            </div>
+          )}
         </dl>
 
         <footer className="border-t border-dashed border-line pt-3 text-center text-xs text-ink-subtle">

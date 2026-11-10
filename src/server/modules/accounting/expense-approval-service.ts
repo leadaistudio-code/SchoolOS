@@ -154,6 +154,7 @@ export async function createExpenseRequest(ctx: AppContext, raw: unknown) {
           submittedAt: input.submit ? new Date() : null,
           createdById: actor.id,
           createdByLabel: actor.label,
+          spentBy: input.spentBy || actor.label,
           idempotencyKey: input.idempotencyKey ?? null,
         },
       })
@@ -199,6 +200,7 @@ export async function updateExpenseRequest(ctx: AppContext, id: string, raw: unk
         vendor: input.vendor || null,
         referenceNo: input.referenceNo || null,
         notes: input.notes || null,
+        spentBy: input.spentBy || before.spentBy,
         cashAccountId,
       },
     })
@@ -295,6 +297,7 @@ export async function transitionExpenseRequest(ctx: AppContext, id: string, raw:
           notes: request.notes,
           recordedById: request.createdById,
           recordedByLabel: request.createdByLabel,
+          spentBy: request.spentBy ?? request.createdByLabel,
           receiptKey: request.receiptKey,
           receiptName: request.receiptName,
           receiptMime: request.receiptMime,

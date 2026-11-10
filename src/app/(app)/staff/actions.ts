@@ -16,12 +16,18 @@ import {
 } from '@/server/modules/people/service'
 import {
   deletePayslip,
+  generateMonthPayslips,
   generatePayslip,
+  monthName,
+  payPayslips,
+  payPayslipsSchema,
   payslipDeductionSchema,
   payslipGenerateSchema,
   payslipStatusSchema,
+  quickSalariesSchema,
   salaryStructureSchema,
   setPayslipStatus,
+  setQuickSalaries,
   setSalaryStructure,
   updateDraftPayslipDeduction,
 } from '@/server/modules/staff/payroll'
@@ -354,6 +360,59 @@ export async function bulkPublishPayslipsAction(payload: unknown): Promise<Actio
     }
   } catch (err) {
     return fail(err, 'The selected payslips could not be published')
+  }
+}
+
+const periodSchema = z.object({
+  periodYear: z.number().int().min(2000).max(2100),
+  periodMonth: z.number().int().min(1).max(12),
+})
+
+const failureNote = (failed: { name: string; reason: string }[]) =>
+  failed.length
+    ? ` ${failed.length} could not be done: ${failed.slice(0, 3).map((f) => `${f.name} (${f.reason})`).join('; ')}${failed.length > 3 ? '…' : ''}`
+    : ''
+
+export async function generateMonthPayslipsAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('staff.payroll_manage')
+  try {
+    const { periodYear, periodMonth } = periodSchema.parse(payload)
+    const result = await generateMonthPayslips(ctx, periodYear, periodMonth)
+    revalidatePath('/staff/payroll')
+    const base = `${result.created} payslip${result.created === 1 ? '' : 's'} created for ${monthName(periodMonth)} ${periodYear}.`
+    const missing = result.missingSalary ? ` ${result.missingSalary} staff skipped: no salary set.` : ''
+    return { ok: result.failed.length === 0, message: base + missing + failureNote(result.failed) }
+  } catch (err) {
+    return fail(err, 'The payslips could not be generated')
+  }
+}
+
+export async function payPayslipsAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('staff.payroll_manage')
+  try {
+    const result = await payPayslips(ctx, payPayslipsSchema.parse(payload))
+    revalidatePath('/staff/payroll')
+    revalidatePath('/finance')
+    return {
+      ok: result.failed.length === 0,
+      message: `${result.paid} payslip${result.paid === 1 ? '' : 's'} marked paid (₹${(result.paidMinor / 100).toLocaleString('en-IN')}).${failureNote(result.failed)}`,
+    }
+  } catch (err) {
+    return fail(err, 'The payslips could not be paid')
+  }
+}
+
+export async function setQuickSalariesAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('staff.payroll_manage')
+  try {
+    const result = await setQuickSalaries(ctx, quickSalariesSchema.parse(payload))
+    revalidatePath('/staff/payroll')
+    return {
+      ok: result.failed.length === 0,
+      message: `Salary saved for ${result.saved} staff.${result.failed.length ? ` ${result.failed.length} failed: ${result.failed[0]!.reason}` : ''}`,
+    }
+  } catch (err) {
+    return fail(err, 'The salaries could not be saved')
   }
 }
 

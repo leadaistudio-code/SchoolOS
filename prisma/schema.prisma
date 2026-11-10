@@ -2798,6 +2798,8 @@ model SchoolExpense {
   notes           String?
   recordedById    String?
   recordedByLabel String?
+  /// The person who made the expense, which may differ from whoever typed it in.
+  spentBy         String?
   headId          String?
   /// Copied from the head so dashboards and P&L agree without a join.
   nature          ExpenseNature      @default(INDIRECT)
@@ -4057,13 +4059,31 @@ model StoreSale {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  student Student?        @relation(fields: [studentId], references: [id], onDelete: SetNull)
-  lines   StoreSaleLine[]
+  student  Student?           @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lines    StoreSaleLine[]
+  payments StoreSalePayment[]
 
   @@unique([tenantId, number])
   @@index([tenantId, soldAt])
   @@index([tenantId, studentId])
   @@index([tenantId, status])
+}
+
+/// One part of a bill paid in several ways (paymentMode SPLIT), e.g. some cash and the rest by UPI or added to fees.
+model StoreSalePayment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  saleId      String
+  /// CASH, UPI, CARD, BANK_TRANSFER, CHEQUE or FEE_ACCOUNT.
+  mode        String
+  amountMinor Int
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  sale StoreSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, saleId])
+  @@index([tenantId, mode])
 }
 
 model StoreSaleLine {
@@ -7103,6 +7123,7 @@ model ExpenseApprovalRequest {
   cycle          Int                   @default(1)
   createdById    String?
   createdByLabel String?
+  spentBy        String?
   submittedAt    DateTime?
   /// The SchoolExpense created at final approval.
   expenseId      String?

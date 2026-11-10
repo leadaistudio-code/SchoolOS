@@ -31,7 +31,7 @@ import { ExpenseChart } from './expense-chart'
 
 export const metadata = { title: 'Expenses' }
 
-const FILTER_KEYS = ['q', 'headId', 'nature', 'paymentMode', 'recordedById', 'preset', 'from', 'to', 'category'] as const
+const FILTER_KEYS = ['q', 'headId', 'nature', 'paymentMode', 'recordedById', 'preset', 'from', 'to', 'category', 'source'] as const
 
 export default async function ExpensesPage({
   searchParams,
@@ -54,7 +54,7 @@ export default async function ExpensesPage({
   ])
   const approvals = flags.approvals
   const optional = approvalMode(flags, accountingEnvSwitches().approvals) === 'optional'
-  const { rows, total, totalMinor } = list
+  const { items, total, totalMinor } = list
   const canManage = ctx.can('expenses.manage')
   const currency = ctx.tenant.currency
   const filtered = FILTER_KEYS.some((k) => params[k])
@@ -133,7 +133,11 @@ export default async function ExpensesPage({
         <StatCard
           label={filtered ? 'Filtered total' : session ? `Session ${session.name} total` : 'All-time total'}
           value={formatMoney(totalMinor, currency)}
-          hint={`${total} entries · direct ${formatMoney(list.directMinor, currency)} · indirect ${formatMoney(list.indirectMinor, currency)}`}
+          hint={
+            list.vendorCount > 0
+              ? `${total} entries · expenses ${formatMoney(list.expenseMinor, currency)} · paid to vendors ${formatMoney(list.vendorMinor, currency)}`
+              : `${total} entries · direct ${formatMoney(list.directMinor, currency)} · indirect ${formatMoney(list.indirectMinor, currency)}`
+          }
           icon={Filter}
           accent={ACCENT.teal}
         />
@@ -185,11 +189,11 @@ export default async function ExpensesPage({
       </div>
 
       <Card className="overflow-hidden">
-        <SearchBar placeholder="Search title, vendor, bill number or notes">
+        <SearchBar placeholder="Search title, vendor, bill number, person or notes">
           <ExpenseFilters heads={heads} recorders={recorders} sessionName={session?.name ?? null} />
         </SearchBar>
 
-        {rows.length === 0 ? (
+        {items.length === 0 ? (
           <EmptyState
             title={filtered ? 'No expenses match' : 'No expenses yet'}
             description={
@@ -215,7 +219,35 @@ export default async function ExpensesPage({
                   </tr>
                 </THead>
                 <TBody>
-                  {rows.map((row) => {
+                  {items.map((item) => {
+                    if (item.kind === 'vendor') {
+                      const v = item.row
+                      return (
+                        <TR key={`vp-${v.id}`}>
+                          <TD className="text-sm text-ink-muted whitespace-nowrap">{formatDay(v.paidOn)}</TD>
+                          <TD>
+                            <Link href={`/accounts/vendors/${v.vendorId}`} className="text-sm text-ink hover:text-[var(--brand-600)]">
+                              Payment to {v.vendor.name}
+                            </Link>
+                            <p className="text-xs text-ink-subtle">
+                              {[v.number, v.reference, v.narration, v.createdByLabel ? `by ${v.createdByLabel}` : null]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          </TD>
+                          <TD className="text-sm text-ink-muted">Vendor payment</TD>
+                          <TD>
+                            <Badge tone="neutral">Vendor</Badge>
+                          </TD>
+                          <TD className="text-sm text-ink-muted">{paymentModeLabel(v.mode)}</TD>
+                          <TD align="right" className="text-sm font-medium text-ink tnum">
+                            {formatMoney(v.amountMinor, currency)}
+                          </TD>
+                          {canManage ? <TD align="right"> </TD> : null}
+                        </TR>
+                      )
+                    }
+                    const row = item.row
                     const receiptUrl = row.receiptKey ? `/api/v1/files/${encodeURIComponent(row.receiptKey)}` : null
                     return (
                       <TR key={row.id}>
@@ -230,7 +262,14 @@ export default async function ExpensesPage({
                             ) : null}
                           </p>
                           <p className="text-xs text-ink-subtle">
-                            {[row.vendor, row.referenceNo, row.recordedByLabel].filter(Boolean).join(' · ')}
+                            {[
+                              row.spentBy ? `Expense by ${row.spentBy}` : null,
+                              row.vendor,
+                              row.referenceNo,
+                              row.recordedByLabel && row.recordedByLabel !== row.spentBy ? `recorded by ${row.recordedByLabel}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </p>
                         </TD>
                         <TD className="text-sm text-ink-muted">{row.headName}</TD>
@@ -256,6 +295,7 @@ export default async function ExpensesPage({
                                 vendor: row.vendor,
                                 referenceNo: row.referenceNo,
                                 notes: row.notes,
+                                spentBy: row.spentBy,
                                 receiptName: row.receiptName,
                                 receiptUrl,
                               }}

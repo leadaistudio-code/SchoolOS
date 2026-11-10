@@ -13,24 +13,49 @@ export const GET = route(
       expenseFilterSchema.parse(Object.fromEntries(req.nextUrl.searchParams.entries())),
       await getViewSession(ctx),
     )
-    const rows = await exportExpenses(ctx, filter)
+    const { expenses, vendorPayments } = await exportExpenses(ctx, filter)
+    const rows = [
+      ...expenses.map((r) => ({
+        date: r.expenseDate,
+        cells: [
+          toDateInput(r.expenseDate),
+          r.title,
+          r.head?.name ?? '',
+          natureLabel(r.nature),
+          categoryLabel(r.category),
+          (r.amountMinor / 100).toFixed(2),
+          paymentModeLabel(r.paymentMode),
+          r.vendor ?? '',
+          r.referenceNo ?? '',
+          r.receiptKey ? 'Yes' : 'No',
+          r.spentBy ?? '',
+          r.recordedByLabel ?? '',
+          r.notes ?? '',
+        ],
+      })),
+      ...vendorPayments.map((v) => ({
+        date: v.paidOn,
+        cells: [
+          toDateInput(v.paidOn),
+          `Payment to ${v.vendor.name} (${v.number})`,
+          'Vendor payment',
+          '',
+          '',
+          (v.amountMinor / 100).toFixed(2),
+          paymentModeLabel(v.mode),
+          v.vendor.name,
+          v.reference ?? '',
+          'No',
+          '',
+          v.createdByLabel ?? '',
+          v.narration ?? '',
+        ],
+      })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime())
     return csvResponse(
       `expenses-${toDateInput(new Date())}.csv`,
-      ['Date', 'Expense', 'Head', 'Type', 'Category', 'Amount (Rs)', 'Paid by', 'Vendor', 'Bill / invoice no.', 'Receipt attached', 'Recorded by', 'Notes'],
-      rows.map((r) => [
-        toDateInput(r.expenseDate),
-        r.title,
-        r.head?.name ?? '',
-        natureLabel(r.nature),
-        categoryLabel(r.category),
-        (r.amountMinor / 100).toFixed(2),
-        paymentModeLabel(r.paymentMode),
-        r.vendor ?? '',
-        r.referenceNo ?? '',
-        r.receiptKey ? 'Yes' : 'No',
-        r.recordedByLabel ?? '',
-        r.notes ?? '',
-      ]),
+      ['Date', 'Expense', 'Head', 'Type', 'Category', 'Amount (Rs)', 'Paid by', 'Vendor', 'Bill / invoice no.', 'Receipt attached', 'Expense by', 'Recorded by', 'Notes'],
+      rows.map((r) => r.cells),
     )
   },
   { permission: 'expenses.view' },

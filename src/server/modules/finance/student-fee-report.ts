@@ -31,9 +31,18 @@ export const FEE_STATUS_LABEL: Record<FeeStatus, string> = {
   none: 'No fees billed',
 }
 
+/** Partly paid or not paid at all. */
+export const DUE_STATUS = 'due'
+
 export const studentFeeReportSchema = z.object({
-  view: z.enum(['status', 'payers']).default('status'),
-  status: z.enum(['all', ...FEE_STATUSES]).default('all'),
+  view: z.enum(['status', 'payers', 'month']).default('status'),
+  status: z.enum(['all', DUE_STATUS, ...FEE_STATUSES]).default('all'),
+  /** YYYY-MM: the month whose fees the month view checks. */
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   classLevelId: optionalId,
   sectionId: optionalId,
   q: z.string().trim().max(100).optional().or(z.literal('').transform(() => undefined)),
@@ -192,7 +201,113 @@ export async function studentFeeStatusReport(ctx: AppContext, session: ViewSessi
     paidMinor,
     balanceMinor,
     byClass: [...classes.values()],
-    rows: filter.status === 'all' ? all : all.filter((r) => r.status === filter.status),
+    rows: matchStatus(all, filter.status),
+  }
+}
+
+function matchStatus<T extends { status: FeeStatus }>(rows: T[], status: StudentFeeReportFilter['status']) {
+  if (status === 'all') return rows
+  if (status === DUE_STATUS) return rows.filter((r) => r.status === 'partial' || r.status === 'unpaid')
+  return rows.filter((r) => r.status === status)
+}
+
+/** The months of a session, YYYY-MM, oldest first. */
+export function sessionMonths(session: ViewSession): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = []
+  let y = Number(session.startsOn.slice(0, 4))
+  let m = Number(session.startsOn.slice(5, 7))
+  const endKey = session.endsOn.slice(0, 7)
+  for (let guard = 0; guard < 24; guard++) {
+    const key = `${y}-${String(m).padStart(2, '0')}`
+    out.push({ key, label: monthLabel(key) })
+    if (key >= endKey) break
+    m++
+    if (m > 12) {
+      m = 1
+      y++
+    }
+  }
+  return out
+}
+
+export function monthLabel(key: string) {
+  return new Date(`${key}-01T00:00:00Z`).toLocaleString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
+/** The month to show when none is chosen: this month if it is in the session, else the session's last month. */
+export function defaultReportMonth(session: ViewSession, today: string) {
+  const months = sessionMonths(session)
+  const now = today.slice(0, 7)
+  return months.find((m) => m.key === now)?.key ?? months[months.length - 1]?.key ?? now
+}
+
+export type MonthRow = StatusRow & { overallBalanceMinor: number }
+
+/**
+ * Fees for one month: invoices falling due in that month (the month every
+ * generator bills into), with each student's whole-session balance alongside.
+ */
+export async function studentFeeMonthReport(ctx: AppContext, session: ViewSession, filter: StudentFeeReportFilter, month: string) {
+  ctx.require('fees.report')
+  const students = await enrolledStudents(ctx, session, filter)
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  const first = attendanceDate(month + '-01')
+  const last = attendanceDate(`${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`)
+  const ids = students.map((s) => s.studentId)
+  const base = { sessionId: session.id, status: { notIn: ['CANCELLED' as const, 'DRAFT' as const] }, studentId: { in: ids } }
+  const [monthSums, overallSums] = ids.length
+    ? await Promise.all([
+        ctx.db.feeInvoice.groupBy({
+          by: ['studentId'],
+          where: { ...base, dueOn: { gte: first, lte: last } },
+          _sum: { totalMinor: true, paidMinor: true, balanceMinor: true },
+        }),
+        ctx.db.feeInvoice.groupBy({ by: ['studentId'], where: base, _sum: { balanceMinor: true } }),
+      ])
+    : [[], []]
+  const monthOf = new Map(monthSums.map((s) => [s.studentId, s._sum]))
+  const overallOf = new Map(overallSums.map((s) => [s.studentId, s._sum.balanceMinor ?? 0]))
+
+  const all: MonthRow[] = students.sort(byClassThenName).map((s) => {
+    const sum = monthOf.get(s.studentId)
+    const billedMinor = sum?.totalMinor ?? 0
+    const paidMinor = sum?.paidMinor ?? 0
+    const balanceMinor = sum?.balanceMinor ?? 0
+    return {
+      ...s,
+      billedMinor,
+      paidMinor,
+      balanceMinor,
+      overallBalanceMinor: overallOf.get(s.studentId) ?? 0,
+      status: feeStatusOf(billedMinor, paidMinor, balanceMinor),
+    }
+  })
+
+  const counts: Record<FeeStatus, number> = { paid: 0, partial: 0, unpaid: 0, none: 0 }
+  let billedMinor = 0
+  let paidMinor = 0
+  let balanceMinor = 0
+  let overallBalanceMinor = 0
+  for (const r of all) {
+    counts[r.status]++
+    billedMinor += r.billedMinor
+    paidMinor += r.paidMinor
+    balanceMinor += r.balanceMinor
+    overallBalanceMinor += r.overallBalanceMinor
+  }
+  const rows = matchStatus(all, filter.status)
+  return {
+    session,
+    month,
+    monthLabel: monthLabel(month),
+    counts,
+    totalStudents: all.length,
+    billedMinor,
+    paidMinor,
+    balanceMinor,
+    overallBalanceMinor,
+    rows,
+    listedOverallMinor: rows.reduce((t, r) => t + r.overallBalanceMinor, 0),
   }
 }
 

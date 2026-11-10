@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { BadgePercent, IndianRupee, Receipt, ShoppingCart, TrendingUp } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { listStoreSales, type SaleFilter } from '@/server/modules/store/service'
-import { STORE_PAYMENT_MODES, storePaymentLabel } from '@/lib/store/options'
+import { STORE_PAYMENT_MODES, splitPaymentLabel, storePaymentLabel } from '@/lib/store/options'
 import { PERIOD_PRESETS } from '@/lib/periods'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
@@ -61,7 +61,7 @@ export default async function StoreSalesPage({ searchParams }: { searchParams: P
           <StoreFilters
             filters={[
               { param: 'preset', label: 'Period', allLabel: 'Any time', options: PERIOD_PRESETS.map((p) => ({ value: p.key, label: p.label })) },
-              { param: 'mode', label: 'Payment', allLabel: 'Any mode', options: [...STORE_PAYMENT_MODES.map((m) => ({ value: m.value, label: m.label })), { value: 'FEE_ACCOUNT', label: 'Added to fees' }] },
+              { param: 'mode', label: 'Payment', allLabel: 'Any mode', options: [...STORE_PAYMENT_MODES.map((m) => ({ value: m.value, label: m.label })), { value: 'FEE_ACCOUNT', label: 'Added to fees' }, { value: 'SPLIT', label: 'Split payment' }] },
               { param: 'status', label: 'Status', allLabel: 'All bills', options: [{ value: 'COMPLETED', label: 'Completed' }, { value: 'VOIDED', label: 'Voided' }] },
             ]}
           />
@@ -97,11 +97,31 @@ export default async function StoreSalesPage({ searchParams }: { searchParams: P
                       <p className="text-xs text-ink-subtle">{[s.student?.admissionNo, s.customerPhone, s.soldByLabel && `by ${s.soldByLabel}`].filter(Boolean).join(' · ')}</p>
                     </TD>
                     <TD align="right">{s._count.lines}</TD>
-                    <TD>{storePaymentLabel(s.paymentMode)}</TD>
+                    <TD>
+                      {s.payments.length ? (
+                        <span className="text-sm">
+                          {splitPaymentLabel(s.payments)}
+                        </span>
+                      ) : (
+                        storePaymentLabel(s.paymentMode)
+                      )}
+                    </TD>
                     <TD align="right">{s.taxMinor ? formatMoney(s.taxMinor, currency) : '—'}</TD>
                     <TD align="right" className={s.status === 'VOIDED' ? 'line-through' : 'font-medium text-ink'}>{formatMoney(s.totalMinor, currency)}</TD>
                     <TD>
-                      <StatusBadge status={s.status} tone={s.status === 'VOIDED' ? 'danger' : 'success'} label={s.status === 'VOIDED' ? 'Voided' : 'Paid'} />
+                      <StatusBadge
+                        status={s.status}
+                        tone={s.status === 'VOIDED' ? 'danger' : s.paymentMode === 'FEE_ACCOUNT' || s.payments.some((p) => p.mode === 'FEE_ACCOUNT') ? 'warning' : 'success'}
+                        label={
+                          s.status === 'VOIDED'
+                            ? 'Voided'
+                            : s.paymentMode === 'FEE_ACCOUNT'
+                              ? 'On fees'
+                              : s.payments.some((p) => p.mode === 'FEE_ACCOUNT')
+                                ? 'Part on fees'
+                                : 'Paid'
+                        }
+                      />
                     </TD>
                   </TR>
                 ))}

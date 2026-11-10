@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { SubmissionPanel } from './submission-panel'
 import { ReviewList } from './review-list'
-import { PublishToggle } from './publish-toggle'
+import { DeleteHomeworkButton, PublishToggle } from './publish-toggle'
 import { StatusRegister } from '@/components/status-register'
 import { HOMEWORK_DONE_MARKS, HOMEWORK_OPTIONS } from '@/lib/registers'
 import { saveHomeworkCompletionAction } from '../actions'
@@ -39,8 +39,13 @@ export default async function HomeworkDetailPage({
           homework.section ? ` ${homework.section.name}` : ''
         } · due ${formatDay(homework.dueOn, 'd MMMM yyyy')}`}
         actions={
-          ctx.can('homework.edit') ? (
-            <PublishToggle id={homework.id} isPublished={homework.isPublished} />
+          ctx.can('homework.edit') || ctx.can('homework.delete') ? (
+            <div className="flex items-center gap-2">
+              {ctx.can('homework.edit') ? (
+                <PublishToggle id={homework.id} isPublished={homework.isPublished} />
+              ) : null}
+              {ctx.can('homework.delete') ? <DeleteHomeworkButton id={homework.id} title={homework.title} /> : null}
+            </div>
           ) : null
         }
       />

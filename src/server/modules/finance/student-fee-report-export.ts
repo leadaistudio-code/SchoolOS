@@ -5,11 +5,18 @@ import { schoolToday } from '@/lib/periods'
 import { getViewSession } from '@/server/view-session'
 import { notFound } from '@/server/api/response'
 import {
+  DUE_STATUS,
   FEE_STATUS_LABEL,
+  defaultReportMonth,
+  studentFeeMonthReport,
   studentFeePayersReport,
   studentFeeReportSchema,
   studentFeeStatusReport,
+  type StudentFeeReportFilter,
 } from './student-fee-report'
+
+const statusFilterLabel = (s: StudentFeeReportFilter['status']) =>
+  s === 'all' ? 'All students' : s === DUE_STATUS ? 'Not fully paid' : FEE_STATUS_LABEL[s]
 
 export const studentFeeReportExportSchema = studentFeeReportSchema.extend({
   format: z.enum(['csv', 'pdf']).default('csv'),
@@ -111,6 +118,42 @@ export async function exportStudentFeeReport(ctx: AppContext, query: z.infer<typ
     }
   }
 
+  if (query.view === 'month') {
+    const month = query.month ?? defaultReportMonth(session, stamp)
+    const report = await studentFeeMonthReport(ctx, session, query, month)
+    const headers = [
+      'Student name', 'Admission no.', 'Class', 'Section', 'Roll no.', 'Parent phone', `Status (${report.monthLabel})`,
+      'Billed for month', 'Paid for month', 'Due for month', 'Overall due (session)',
+    ]
+    const matrix = report.rows.map((r) => [
+      r.name, r.admissionNo, r.className, r.sectionName, r.rollNumber ?? '', r.parentPhone ?? '',
+      FEE_STATUS_LABEL[r.status], rupees(r.billedMinor), rupees(r.paidMinor), rupees(r.balanceMinor), rupees(r.overallBalanceMinor),
+    ])
+    const base = `fee-${month}-${query.status}`
+    if (query.format === 'csv') {
+      return { filename: `${base}.csv`, contentType: 'text/csv; charset=utf-8', body: `\uFEFF${toSafeCsv(headers, matrix)}\r\n` }
+    }
+    return {
+      filename: `${base}.html`,
+      contentType: 'text/html; charset=utf-8',
+      body: printablePage(
+        `${school} — Fees for ${report.monthLabel}`,
+        `${statusFilterLabel(query.status)} · ${report.rows.length} listed · Session ${session.name} · Generated ${stamp}`,
+        [
+          ['Students', String(report.totalStudents)],
+          ['Fully paid', String(report.counts.paid)],
+          ['Partly paid', String(report.counts.partial)],
+          ['Not paid', String(report.counts.unpaid)],
+          [`Due for ${report.monthLabel}`, rupees(report.balanceMinor)],
+          ['Overall due (session)', rupees(report.overallBalanceMinor)],
+        ],
+        headers,
+        new Set([7, 8, 9, 10]),
+        matrix,
+      ),
+    }
+  }
+
   const report = await studentFeeStatusReport(ctx, session, query)
   const headers = ['Student name', 'Admission no.', 'Class', 'Section', 'Roll no.', 'Parent phone', 'Status', 'Billed', 'Paid', 'Balance']
   const matrix = report.rows.map((r) => [
@@ -127,7 +170,7 @@ export async function exportStudentFeeReport(ctx: AppContext, query: z.infer<typ
     contentType: 'text/html; charset=utf-8',
     body: printablePage(
       `${school} — Fee status, session ${session.name}`,
-      `${query.status === 'all' ? 'All students' : FEE_STATUS_LABEL[query.status]} · ${report.rows.length} listed · Generated ${stamp}`,
+      `${statusFilterLabel(query.status)} · ${report.rows.length} listed · Generated ${stamp}`,
       [
         ['Students', String(report.totalStudents)],
         ['Fully paid', String(report.counts.paid)],

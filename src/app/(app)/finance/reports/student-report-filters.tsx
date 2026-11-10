@@ -17,6 +17,7 @@ const EXPORT_KEYS: [string, string][] = [
   ['q', 'q'],
   ['sfrom', 'from'],
   ['sto', 'to'],
+  ['month', 'month'],
 ]
 
 /** Tabs, filters and export for the student lists on Fee reports. */
@@ -26,19 +27,25 @@ export function StudentReportFilters({
   resultCount,
   defaultFrom,
   defaultTo,
+  months,
+  defaultMonth,
 }: {
   classes: ClassNode[]
   canExport: boolean
   resultCount: number
   defaultFrom: string
   defaultTo: string
+  months: { key: string; label: string }[]
+  defaultMonth: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
 
-  const view = params.get('view') === 'payers' ? 'payers' : 'status'
-  const status = params.get('status') ?? 'all'
+  const rawView = params.get('view')
+  const view = rawView === 'payers' || rawView === 'month' ? rawView : 'status'
+  const status = params.get('status') ?? (view === 'month' ? 'due' : 'all')
+  const month = params.get('month') ?? defaultMonth
   const classId = params.get('classLevelId') ?? ''
   const sectionId = params.get('sectionId') ?? ''
   const sections = classes.find((c) => c.id === classId)?.sections ?? []
@@ -75,6 +82,8 @@ export function StudentReportFilters({
       if (value) next.set(as, value)
     }
     next.set('view', view)
+    next.set('status', status)
+    if (view === 'month') next.set('month', month)
     return `/api/v1/finance/reports/students/export?${next.toString()}`
   }
 
@@ -82,7 +91,8 @@ export function StudentReportFilters({
     <div className="space-y-3">
       <div role="tablist" aria-label="Student fee lists" className="flex gap-1 border-b border-line">
         {[
-          { key: 'status', label: 'Paid / not paid (session)' },
+          { key: 'status', label: 'Paid / not paid (overall)' },
+          { key: 'month', label: 'Not paid for a month' },
           { key: 'payers', label: 'Paid in a period' },
         ].map((t) => (
           <button
@@ -93,6 +103,7 @@ export function StudentReportFilters({
             onClick={() => push((n) => {
               if (t.key === 'status') n.delete('view')
               else n.set('view', t.key)
+              n.delete('status')
             })}
             className={cn(
               '-mb-px border-b-2 px-3 py-2 text-sm',
@@ -144,11 +155,24 @@ export function StudentReportFilters({
             {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
         </div>
-        {view === 'status' ? (
-          <div className="w-40">
+        {view === 'month' ? (
+          <div className="w-44">
+            <label className="mb-1 block text-xs font-medium text-ink-muted" htmlFor="sfr-month">Month</label>
+            <Select id="sfr-month" value={month} onChange={(e) => setParam('month', e.target.value)}>
+              {months.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+            </Select>
+          </div>
+        ) : null}
+        {view === 'status' || view === 'month' ? (
+          <div className="w-44">
             <label className="mb-1 block text-xs font-medium text-ink-muted" htmlFor="sfr-status">Status</label>
-            <Select id="sfr-status" value={status} onChange={(e) => setParam('status', e.target.value === 'all' ? '' : e.target.value)}>
+            <Select
+              id="sfr-status"
+              value={status}
+              onChange={(e) => setParam('status', e.target.value === (view === 'month' ? 'due' : 'all') ? '' : e.target.value)}
+            >
               <option value="all">All students</option>
+              <option value="due">Not fully paid</option>
               <option value="paid">Fully paid</option>
               <option value="partial">Partly paid</option>
               <option value="unpaid">Not paid</option>

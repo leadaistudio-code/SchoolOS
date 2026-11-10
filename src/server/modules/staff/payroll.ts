@@ -486,6 +486,165 @@ export async function deletePayslip(ctx: AppContext, id: string) {
   return { staffId: payslip.staffId }
 }
 
+/* ------------------------------------------------------------ whole month */
+
+function monthBounds(year: number, month: number) {
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1)),
+    end: new Date(Date.UTC(year, month, 0)),
+  }
+}
+
+/** Staff on the rolls for some part of the month. */
+async function staffForMonth(ctx: AppContext, year: number, month: number) {
+  const { start, end } = monthBounds(year, month)
+  return ctx.db.staff.findMany({
+    where: {
+      deletedAt: null,
+      OR: [{ leftOn: null }, { leftOn: { gte: start } }],
+      AND: [{ OR: [{ joinedOn: null }, { joinedOn: { lte: end } }] }],
+    },
+    orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    select: { id: true, firstName: true, lastName: true, employeeCode: true, department: true, designation: true, salaryMinor: true },
+  })
+}
+
+/**
+ * Who is ready for this month's payroll: staff with a salary in force and no
+ * slip yet, staff with no salary on record, and how many already have a slip.
+ */
+export async function payrollMonthPlan(ctx: AppContext, year: number, month: number) {
+  ctx.require('staff.payroll')
+  const { end } = monthBounds(year, month)
+  const [staff, slips, structures] = await Promise.all([
+    staffForMonth(ctx, year, month),
+    ctx.db.staffPayslip.findMany({ where: { periodYear: year, periodMonth: month }, select: { staffId: true } }),
+    ctx.db.staffSalaryStructure.findMany({
+      where: { effectiveFrom: { lte: end } },
+      orderBy: { effectiveFrom: 'desc' },
+      select: { staffId: true, grossMinor: true, netMinor: true },
+    }),
+  ])
+  const done = new Set(slips.map((s) => s.staffId))
+  const salary = new Map<string, { grossMinor: number; netMinor: number }>()
+  for (const s of structures) if (!salary.has(s.staffId)) salary.set(s.staffId, s)
+
+  const ready: { staffId: string; name: string; netMinor: number }[] = []
+  const missingSalary: {
+    staffId: string
+    name: string
+    employeeCode: string
+    designation: string | null
+    profileSalaryMinor: number | null
+  }[] = []
+  for (const s of staff) {
+    if (done.has(s.id)) continue
+    const name = `${s.firstName} ${s.lastName}`.trim()
+    const pay = salary.get(s.id)
+    if (pay) ready.push({ staffId: s.id, name, netMinor: pay.netMinor })
+    else {
+      missingSalary.push({
+        staffId: s.id,
+        name,
+        employeeCode: s.employeeCode,
+        designation: s.designation,
+        profileSalaryMinor: s.salaryMinor,
+      })
+    }
+  }
+  return {
+    ready,
+    readyNetMinor: ready.reduce((t, r) => t + r.netMinor, 0),
+    missingSalary,
+    alreadyGenerated: done.size,
+  }
+}
+
+/**
+ * Raises the month's payslip for everyone who has a salary and no slip yet,
+ * with the same attendance rules as a single slip. One person's problem is
+ * reported, not allowed to stop the rest.
+ */
+export async function generateMonthPayslips(ctx: AppContext, year: number, month: number) {
+  ctx.require('staff.payroll_manage')
+  const plan = await payrollMonthPlan(ctx, year, month)
+  let created = 0
+  const failed: { name: string; reason: string }[] = []
+  for (const person of plan.ready) {
+    try {
+      await generatePayslip(ctx, payslipGenerateSchema.parse({ staffId: person.staffId, periodYear: year, periodMonth: month }))
+      created++
+    } catch (err) {
+      failed.push({ name: person.name, reason: err instanceof Error ? err.message : 'Could not be generated' })
+    }
+  }
+  return { created, failed, missingSalary: plan.missingSalary.length }
+}
+
+export const payPayslipsSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+  paymentMode: z.enum(SALARY_PAYMENT_MODES).default('BANK_TRANSFER'),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date').optional(),
+})
+
+/** Pays a batch in one step: drafts are published on the way, paid slips are left alone. */
+export async function payPayslips(ctx: AppContext, input: z.infer<typeof payPayslipsSchema>) {
+  ctx.require('staff.payroll_manage')
+  const slips = await ctx.db.staffPayslip.findMany({
+    where: { id: { in: [...new Set(input.ids)] }, status: { in: ['DRAFT', 'PUBLISHED'] } },
+    select: { id: true, status: true, netMinor: true, staff: { select: { firstName: true, lastName: true } } },
+  })
+  let paid = 0
+  let paidMinor = 0
+  const failed: { name: string; reason: string }[] = []
+  for (const slip of slips) {
+    try {
+      if (slip.status === 'DRAFT') await setPayslipStatus(ctx, { id: slip.id, status: 'PUBLISHED' })
+      await setPayslipStatus(ctx, { id: slip.id, status: 'PAID', paymentMode: input.paymentMode, paidOn: input.paidOn })
+      paid++
+      paidMinor += slip.netMinor
+    } catch (err) {
+      failed.push({
+        name: `${slip.staff.firstName} ${slip.staff.lastName}`.trim(),
+        reason: err instanceof Error ? err.message : 'Could not be paid',
+      })
+    }
+  }
+  return { paid, paidMinor, failed, skipped: input.ids.length - slips.length }
+}
+
+export const quickSalariesSchema = z.object({
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date'),
+  entries: z
+    .array(z.object({ staffId: z.string().min(1), monthly: majorToMinor }))
+    .min(1)
+    .max(500),
+})
+
+/** Sets a plain monthly salary (all basic) for several people at once. */
+export async function setQuickSalaries(ctx: AppContext, input: z.infer<typeof quickSalariesSchema>) {
+  ctx.require('staff.payroll_manage')
+  let saved = 0
+  const failed: { staffId: string; reason: string }[] = []
+  for (const entry of input.entries) {
+    if (entry.monthly <= 0) continue
+    try {
+      await setSalaryStructure(ctx, {
+        staffId: entry.staffId,
+        effectiveFrom: input.effectiveFrom,
+        basic: entry.monthly,
+        hra: 0,
+        allowances: 0,
+        deductions: 0,
+      })
+      saved++
+    } catch (err) {
+      failed.push({ staffId: entry.staffId, reason: err instanceof Error ? err.message : 'Could not be saved' })
+    }
+  }
+  return { saved, failed }
+}
+
 /** The payroll month at a glance: how much is drafted, published and paid. */
 export async function payrollSummary(ctx: AppContext, year: number, month: number) {
   ctx.require('staff.payroll')

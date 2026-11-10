@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Send } from 'lucide-react'
+import { Banknote, Send } from 'lucide-react'
 import { bulkPublishPayslipsAction } from '../actions'
 import { PayslipDeductionButton, PayslipStatusControl } from '../[id]/panels'
+import { PayPayslipsDialog } from './month-actions'
 import { BulkSelectionBar, useBulkSelection } from '@/components/bulk-selection'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -58,14 +59,19 @@ export function PayrollTable({
 }) {
   const toast = useToast()
   const [pending, startTransition] = React.useTransition()
-  const draftIds = rows.filter((row) => row.status === 'DRAFT').map((row) => row.id)
-  const selection = useBulkSelection(draftIds)
+  const unpaidRows = rows.filter((row) => row.status !== 'PAID')
+  const unpaidIds = unpaidRows.map((row) => row.id)
+  const unpaidNet = unpaidRows.reduce((sum, row) => sum + row.netMinor, 0)
+  const selection = useBulkSelection(unpaidIds)
   const selectedRows = rows.filter((row) => selection.selected.has(row.id))
   const selectedNet = selectedRows.reduce((sum, row) => sum + row.netMinor, 0)
+  const selectedDrafts = selectedRows.filter((row) => row.status === 'DRAFT')
+  const [payIds, setPayIds] = React.useState<string[] | null>(null)
+  const payTotal = rows.filter((row) => payIds?.includes(row.id)).reduce((sum, row) => sum + row.netMinor, 0)
 
   const publish = () => {
     const message = [
-      `Publish ${selection.selected.size} draft payslip(s) for ${monthLabel} ${year}?`,
+      `Publish ${selectedDrafts.length} draft payslip(s) for ${monthLabel} ${year}?`,
       `Combined net payroll: ${formatMoney(selectedNet, currency)}.`,
       'Published payslips can be unpublished back to draft if you need to correct them before marking paid.',
     ].join('\n\n')
@@ -73,7 +79,7 @@ export function PayrollTable({
 
     startTransition(async () => {
       const result = await bulkPublishPayslipsAction({
-        ids: selection.selectedIds,
+        ids: selectedDrafts.map((row) => row.id),
         periodYear: year,
         periodMonth: month,
       })
@@ -88,16 +94,43 @@ export function PayrollTable({
 
   return (
     <>
+      {canManage && unpaidIds.length > 0 && selection.selected.size === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-2.5">
+          <span className="text-sm text-ink-muted">
+            {unpaidIds.length} unpaid · net <span className="font-medium text-ink">{formatMoney(unpaidNet, currency)}</span>
+          </span>
+          <Button size="sm" onClick={() => setPayIds(unpaidIds)}>
+            <Banknote aria-hidden />
+            Pay all unpaid
+          </Button>
+        </div>
+      ) : null}
       {canManage ? (
-        <BulkSelectionBar count={selection.selected.size} noun="draft payslip" onClear={selection.clear}>
+        <BulkSelectionBar count={selection.selected.size} noun="payslip" onClear={selection.clear}>
           <span className="text-xs text-ink-muted">
             Net {formatMoney(selectedNet, currency)}
           </span>
-          <Button size="sm" loading={pending} onClick={publish}>
-            <Send aria-hidden />
-            Publish selected
+          {selectedDrafts.length > 0 ? (
+            <Button size="sm" variant="secondary" loading={pending} onClick={publish}>
+              <Send aria-hidden />
+              Publish {selectedDrafts.length}
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={() => setPayIds(selection.selectedIds)}>
+            <Banknote aria-hidden />
+            Pay selected
           </Button>
         </BulkSelectionBar>
+      ) : null}
+      {canManage ? (
+        <PayPayslipsDialog
+          open={payIds !== null}
+          onClose={() => setPayIds(null)}
+          ids={payIds ?? []}
+          totalMinor={payTotal}
+          currency={currency}
+          onDone={selection.clear}
+        />
       ) : null}
       <TableWrap>
         <Table>
@@ -106,10 +139,10 @@ export function PayrollTable({
               {canManage ? (
                 <TH>
                   <Checkbox
-                    aria-label="Select all draft payslips"
+                    aria-label="Select all unpaid payslips"
                     checked={selection.allSelected}
                     onChange={selection.toggleAll}
-                    disabled={draftIds.length === 0}
+                    disabled={unpaidIds.length === 0}
                   />
                 </TH>
               ) : null}
@@ -132,7 +165,7 @@ export function PayrollTable({
                       aria-label={`Select payslip for ${payslip.staff.firstName} ${payslip.staff.lastName}`}
                       checked={selection.selected.has(payslip.id)}
                       onChange={() => selection.toggle(payslip.id)}
-                      disabled={payslip.status !== 'DRAFT'}
+                      disabled={payslip.status === 'PAID'}
                     />
                   </TD>
                 ) : null}

@@ -53,6 +53,8 @@ export const expenseSchema = z.object({
   vendor: z.string().trim().max(120).optional(),
   referenceNo: z.string().trim().max(60).optional(),
   notes: z.string().trim().max(500).optional(),
+  /** Who made the expense; blank means the person recording it. */
+  spentBy: z.string().trim().max(120).optional(),
   /** Optional: a retried submission with the same key returns the first expense. */
   idempotencyKey: z.string().trim().min(8).max(100).optional(),
   /** Optional cash / bank ledger; otherwise the account mapped to the payment mode. */
@@ -76,6 +78,8 @@ export const expenseFilterSchema = z.object({
   preset: optional(z.string()),
   from: optional(isoDate),
   to: optional(isoDate),
+  /** Recorded expenses, payments made to vendors, or both. */
+  source: optional(z.enum(['expenses', 'vendors'])),
 })
 
 export type ExpenseFilter = z.infer<typeof expenseFilterSchema>
@@ -98,11 +102,61 @@ export async function expenseRecorderOptions(ctx: AppContext) {
 
 export const EXPENSE_SORT_FIELDS = ['expenseDate', 'amountMinor', 'createdAt', 'title'] as const
 
-function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
+function filterRange(filter: ExpenseFilter) {
   const range = filter.preset ? presetRange(filter.preset) : null
-  const from = filter.from ?? range?.from
-  const to = filter.to ?? range?.to
+  return { from: filter.from ?? range?.from, to: filter.to ?? range?.to }
+}
+
+/** Vendor payments carry no expense head, so a head or type filter leaves them out. */
+function includesVendorPayments(filter: ExpenseFilter) {
+  return filter.source !== 'expenses' && !filter.headId && !filter.category && !filter.nature
+}
+
+function vendorPaymentWhere(filter: ExpenseFilter): Prisma.VendorPaymentWhereInput {
+  const { from, to } = filterRange(filter)
   return {
+    status: 'POSTED',
+    ...(filter.paymentMode ? { mode: filter.paymentMode } : {}),
+    ...(filter.recordedById ? { createdById: filter.recordedById } : {}),
+    ...(from || to
+      ? {
+          paidOn: {
+            ...(from ? { gte: attendanceDate(from) } : {}),
+            ...(to ? { lte: attendanceDate(to) } : {}),
+          },
+        }
+      : {}),
+    ...(filter.q
+      ? {
+          OR: [
+            { number: { contains: filter.q, mode: 'insensitive' as const } },
+            { reference: { contains: filter.q, mode: 'insensitive' as const } },
+            { narration: { contains: filter.q, mode: 'insensitive' as const } },
+            { vendor: { name: { contains: filter.q, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
+  }
+}
+
+const vendorPaymentSelect = {
+  id: true,
+  number: true,
+  vendorId: true,
+  paidOn: true,
+  mode: true,
+  reference: true,
+  narration: true,
+  amountMinor: true,
+  createdAt: true,
+  createdByLabel: true,
+  vendor: { select: { name: true } },
+} satisfies Prisma.VendorPaymentSelect
+
+function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
+  const { from, to } = filterRange(filter)
+  return {
+    ...(filter.source === 'vendors' ? { id: { in: [] } } : {}),
     deletedAt: null,
     ...(filter.category ? { category: filter.category } : {}),
     ...(filter.headId ? { headId: filter.headId } : {}),
@@ -124,6 +178,7 @@ function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
             { vendor: { contains: filter.q, mode: 'insensitive' as const } },
             { referenceNo: { contains: filter.q, mode: 'insensitive' as const } },
             { notes: { contains: filter.q, mode: 'insensitive' as const } },
+            { spentBy: { contains: filter.q, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -134,12 +189,25 @@ export async function listExpenses(ctx: AppContext, query: ListQuery, filter: Ex
   ctx.require('expenses.view')
   await ensureExpenseHeads(ctx)
   const where = expenseWhere(filter)
+  const vendorWhere = includesVendorPayments(filter) ? vendorPaymentWhere(filter) : null
+  const [vendorCount, vendorAgg] = vendorWhere
+    ? await Promise.all([
+        ctx.db.vendorPayment.count({ where: vendorWhere }),
+        ctx.db.vendorPayment.aggregate({ where: vendorWhere, _sum: { amountMinor: true } }),
+      ])
+    : [0, null]
 
-  const [rows, total, agg, byCategory, byNature] = await Promise.all([
+  const orderBy = orderByFrom(query.sort, query.dir, EXPENSE_SORT_FIELDS, { expenseDate: 'desc' })
+  // With vendor payments in the mix, both lists are read up to the end of the
+  // requested page and merged, so paging stays in one consistent order.
+  const { skip, take } = skipTake(query)
+  const paging = vendorCount > 0 ? { skip: 0, take: skip + take } : { skip, take }
+
+  const [rows, total, agg, byCategory, byNature, vendorRows] = await Promise.all([
     ctx.db.schoolExpense.findMany({
       where,
-      ...skipTake(query),
-      orderBy: orderByFrom(query.sort, query.dir, EXPENSE_SORT_FIELDS, { expenseDate: 'desc' }),
+      ...paging,
+      orderBy,
       include: { head: { select: { id: true, name: true } } },
     }),
     ctx.db.schoolExpense.count({ where }),
@@ -152,17 +220,57 @@ export async function listExpenses(ctx: AppContext, query: ListQuery, filter: Ex
       orderBy: { _sum: { amountMinor: 'desc' } },
     }),
     ctx.db.schoolExpense.groupBy({ by: ['nature'], where, _sum: { amountMinor: true } }),
+    vendorWhere && vendorCount > 0
+      ? ctx.db.vendorPayment.findMany({ where: vendorWhere, take: skip + take, select: vendorPaymentSelect, orderBy: { paidOn: 'desc' } })
+      : Promise.resolve([]),
   ])
 
   const natureSum = (n: 'DIRECT' | 'INDIRECT') => byNature.find((r) => r.nature === n)?._sum.amountMinor ?? 0
+  const expenseItems = rows.map((r) => ({
+    kind: 'expense' as const,
+    row: { ...r, headName: r.head?.name ?? categoryLabel(r.category), expenseDateInput: toDateInput(r.expenseDate) },
+    date: r.expenseDate,
+    amountMinor: r.amountMinor,
+    createdAt: r.createdAt,
+    title: r.title,
+  }))
+  const vendorItems = vendorRows.map((v) => ({
+    kind: 'vendor' as const,
+    row: v,
+    date: v.paidOn,
+    amountMinor: v.amountMinor,
+    createdAt: v.createdAt,
+    title: `Payment to ${v.vendor.name}`,
+  }))
+  const sortKey = query.sort && (EXPENSE_SORT_FIELDS as readonly string[]).includes(query.sort) ? query.sort : 'expenseDate'
+  const sign = sortKey === query.sort && query.dir === 'asc' ? 1 : -1
+  const keyOf = (i: (typeof expenseItems)[number] | (typeof vendorItems)[number]): number | string =>
+    sortKey === 'amountMinor' ? i.amountMinor
+    : sortKey === 'createdAt' ? i.createdAt.getTime()
+    : sortKey === 'title' ? i.title.toLowerCase()
+    : i.date.getTime()
+  const items =
+    vendorCount > 0
+      ? [...expenseItems, ...vendorItems]
+          .sort((a, b) => {
+            const ka = keyOf(a)
+            const kb = keyOf(b)
+            if (ka < kb) return -sign
+            if (ka > kb) return sign
+            return b.createdAt.getTime() - a.createdAt.getTime()
+          })
+          .slice(skip, skip + take)
+      : expenseItems
+
+  const vendorMinor = vendorAgg?._sum.amountMinor ?? 0
   return {
-    rows: rows.map((r) => ({
-      ...r,
-      headName: r.head?.name ?? categoryLabel(r.category),
-      expenseDateInput: toDateInput(r.expenseDate),
-    })),
-    total,
-    totalMinor: agg._sum.amountMinor ?? 0,
+    rows: expenseItems.map((i) => i.row),
+    items,
+    total: total + vendorCount,
+    expenseMinor: agg._sum.amountMinor ?? 0,
+    vendorMinor,
+    vendorCount,
+    totalMinor: (agg._sum.amountMinor ?? 0) + vendorMinor,
     directMinor: natureSum('DIRECT'),
     indirectMinor: natureSum('INDIRECT'),
     byCategory: byCategory.map((c) => ({
@@ -288,6 +396,7 @@ export async function createExpense(ctx: AppContext, input: z.infer<typeof expen
           notes: input.notes || null,
           recordedById: ctx.user.userId,
           recordedByLabel: `${ctx.user.firstName} ${ctx.user.lastName}`.trim(),
+          spentBy: input.spentBy || `${ctx.user.firstName} ${ctx.user.lastName}`.trim(),
           voucherNumber,
           idempotencyKey: input.idempotencyKey ?? null,
           cashAccountId,
@@ -359,6 +468,7 @@ export async function updateExpense(ctx: AppContext, input: z.infer<typeof expen
       vendor: data.vendor || null,
       referenceNo: data.referenceNo || null,
       notes: data.notes || null,
+      spentBy: data.spentBy || before.spentBy,
       cashAccountId,
     },
   })
@@ -466,10 +576,21 @@ export async function removeExpenseReceipt(ctx: AppContext, id: string) {
 export async function exportExpenses(ctx: AppContext, filter: ExpenseFilter) {
   ctx.require('expenses.view')
   await ensureExpenseHeads(ctx)
-  return ctx.db.schoolExpense.findMany({
-    where: expenseWhere(filter),
-    orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
-    take: 20000,
-    include: { head: { select: { name: true } } },
-  })
+  const [expenses, vendorPayments] = await Promise.all([
+    ctx.db.schoolExpense.findMany({
+      where: expenseWhere(filter),
+      orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
+      take: 20000,
+      include: { head: { select: { name: true } } },
+    }),
+    includesVendorPayments(filter)
+      ? ctx.db.vendorPayment.findMany({
+          where: vendorPaymentWhere(filter),
+          orderBy: [{ paidOn: 'desc' }, { createdAt: 'desc' }],
+          take: 20000,
+          select: vendorPaymentSelect,
+        })
+      : Promise.resolve([]),
+  ])
+  return { expenses, vendorPayments }
 }

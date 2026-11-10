@@ -28,6 +28,7 @@ export type ExpenseDraft = {
   vendor: string | null
   referenceNo: string | null
   notes: string | null
+  spentBy: string | null
   receiptName: string | null
   receiptUrl: string | null
 }
@@ -41,9 +42,11 @@ type FormState = {
   vendor: string
   referenceNo: string
   notes: string
+  spentBy: string
 }
 
 const emptyForm = (heads: HeadOption[]): FormState => ({
+  spentBy: '',
   title: '',
   headId: heads.find((h) => h.isActive)?.id ?? '',
   amount: '',
@@ -63,6 +66,7 @@ const fromDraft = (e: ExpenseDraft): FormState => ({
   vendor: e.vendor ?? '',
   referenceNo: e.referenceNo ?? '',
   notes: e.notes ?? '',
+  spentBy: e.spentBy ?? '',
 })
 
 const MAX_RECEIPT_MB = 10
@@ -151,6 +155,19 @@ function ExpenseFields({
           </p>
         ) : null}
       </Field>
+      <Field
+        label="Expense by (person's name)"
+        htmlFor={`${idPrefix}-spent-by`}
+        hint="Who made this expense. Leave blank if it was you."
+        className="sm:col-span-2"
+      >
+        <Input
+          id={`${idPrefix}-spent-by`}
+          value={form.spentBy}
+          onChange={(e) => set('spentBy', e.target.value)}
+          placeholder="e.g. Ramesh (office peon)"
+        />
+      </Field>
       <Field label="Payment mode" htmlFor={`${idPrefix}-mode`}>
         <Select id={`${idPrefix}-mode`} value={form.paymentMode} onChange={(e) => set('paymentMode', e.target.value)}>
           {EXPENSE_PAYMENT_MODES.map((m) => (
@@ -222,6 +239,7 @@ function payloadOf(form: FormState) {
     vendor: form.vendor.trim() || undefined,
     referenceNo: form.referenceNo.trim() || undefined,
     notes: form.notes.trim() || undefined,
+    spentBy: form.spentBy.trim() || undefined,
   }
 }
 

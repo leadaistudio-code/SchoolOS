@@ -136,8 +136,14 @@ export async function removeSchoolFromGroup(ctx: PlatformContext, groupId: strin
  */
 export async function addGroupOwner(ctx: PlatformContext, groupId: string, tenantId: string, identifier: string) {
   guard(ctx)
-  const tenant = await ctx.db.tenant.findUnique({ where: { id: tenantId }, select: { groupId: true } })
+  const tenant = await ctx.db.tenant.findUnique({
+    where: { id: tenantId },
+    select: { groupId: true, status: true, archivedAt: true },
+  })
   if (!tenant || tenant.groupId !== groupId) throw new GroupError('Pick a school that is in this group')
+  if (tenant.status === 'SUSPENDED' || tenant.archivedAt) {
+    throw new GroupError('That school is suspended, so nobody can sign in there. Pick the school the owner uses')
+  }
   const value = identifier.trim()
   if (!value) throw new GroupError('Enter the owner’s email or phone number')
   const user = await ctx.db.user.findFirst({

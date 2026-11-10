@@ -6,6 +6,7 @@ import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
   createHomeworkForSections,
+  deleteHomework,
   homeworkCreateSchema,
   homeworkMarksSchema,
   setHomeworkMarks,
@@ -117,6 +118,17 @@ export async function saveHomeworkCompletionAction(
     if (err instanceof ZodError) return { ok: false, message: err.issues[0]?.message ?? 'Invalid marks' }
     return { ok: false, message: err instanceof Error ? err.message : 'Could not save the register' }
   }
+}
+
+export async function deleteHomeworkAction(id: string): Promise<ActionResult> {
+  const ctx = await requireContext('homework.delete')
+  try {
+    await deleteHomework(ctx, id)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'The homework could not be deleted' }
+  }
+  revalidatePath('/academics/homework')
+  redirect('/academics/homework')
 }
 
 export async function togglePublishAction(id: string, isPublished: boolean): Promise<ActionResult> {

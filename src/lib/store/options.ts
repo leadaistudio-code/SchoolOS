@@ -27,7 +27,16 @@ export const storePaymentLabel = (value: string) =>
     ? 'On credit (vendor bill)'
     : value === 'FEE_ACCOUNT'
       ? 'Added to fees'
-      : STORE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
+      : value === 'SPLIT'
+        ? 'Split payment'
+        : STORE_PAYMENT_MODES.find((m) => m.value === value)?.label ?? value
+
+/** "Cash ₹1,000 + UPI ₹500" for a split bill. */
+export function splitPaymentLabel(parts: { mode: string; amountMinor: number }[]) {
+  return parts
+    .map((p) => `${storePaymentLabel(p.mode)} ₹${(p.amountMinor / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`)
+    .join(' + ')
+}
 
 export const GST_RATES = [0, 5, 12, 18, 28] as const
 

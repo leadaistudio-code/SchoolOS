@@ -32,6 +32,13 @@ export function ExpenseFilters({
 
   return (
     <div className="flex flex-wrap items-end gap-2">
+      <Field label="Show" htmlFor="exp-source">
+        <Select id="exp-source" value={searchParams.get('source') ?? ''} onChange={(e) => setParams({ source: e.target.value })}>
+          <option value="">Expenses + vendor payments</option>
+          <option value="expenses">Expenses only</option>
+          <option value="vendors">Vendor payments only</option>
+        </Select>
+      </Field>
       <Field label="Type" htmlFor="exp-nature">
         <Select id="exp-nature" value={nature} onChange={(e) => setParams({ nature: e.target.value, headId: '' })}>
           <option value="">Direct + indirect</option>
