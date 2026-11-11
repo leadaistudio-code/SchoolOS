@@ -1,87 +1,111 @@
 1
-00:00:00,500 --> 00:00:04,200
-MyCampusView Academy. Robotics 101, video 8: Your first Arduino program.
+00:00:00,600 --> 00:00:03,163
+MyCampusView Academy.
 
 2
-00:00:04,800 --> 00:00:08,283
-Now you will write your first program.
+00:00:03,213 --> 00:00:05,900
+Robotics 101, video 8.
 
 3
-00:00:08,333 --> 00:00:12,095
-Programs for Arduino are called sketches.
+00:00:05,950 --> 00:00:09,260
+Your first Arduino program.
 
 4
-00:00:12,145 --> 00:00:16,650
-You write them in the Arduino IDE, which is free.
+00:00:10,450 --> 00:00:13,660
+Now you will write your first program.
 
 5
-00:00:17,300 --> 00:00:23,664
-Install the Arduino IDE and plug in the board with the USB cable.
+00:00:13,710 --> 00:00:17,177
+Programs for Arduino are called sketches.
 
 6
-00:00:23,714 --> 00:00:30,275
-Under Tools, choose the board Arduino Uno, and then choose the port
+00:00:17,227 --> 00:00:21,380
+You write them in the Arduino IDE, which is free.
 
 7
-00:00:30,325 --> 00:00:32,150
-your Arduino is on.
+00:00:22,750 --> 00:00:27,835
+Install the Arduino IDE and plug in the board with the USB cable.
 
 8
-00:00:32,800 --> 00:00:35,211
-Every sketch has two parts.
+00:00:27,885 --> 00:00:33,129
+Under Tools, choose the board Arduino Uno, and then choose the port
 
 9
-00:00:35,261 --> 00:00:39,221
-setup runs once, when the robot switches on.
+00:00:33,179 --> 00:00:34,630
+your Arduino is on.
 
 10
-00:00:39,271 --> 00:00:42,411
-loop runs again and again, forever.
+00:00:35,950 --> 00:00:38,643
+Every sketch has two parts.
 
 11
-00:00:42,461 --> 00:00:44,872
-Remember sense, think, act?
+00:00:38,693 --> 00:00:43,112
+setup runs once, when the robot switches on.
 
 12
-00:00:44,922 --> 00:00:47,150
-That happens inside loop.
+00:00:43,162 --> 00:00:46,668
+loop runs again and again, forever.
 
 13
-00:00:47,800 --> 00:00:50,037
-Here is a tiny program.
+00:00:46,718 --> 00:00:49,410
+Remember sense, think, act?
 
 14
-00:00:50,087 --> 00:00:53,120
-pinMode makes pin 13 an output.
+00:00:49,460 --> 00:00:51,950
+That happens inside loop.
 
 15
-00:00:53,170 --> 00:00:58,689
-In the loop, we switch the light on, wait half a second,
+00:00:53,250 --> 00:00:55,299
+Here is a tiny program.
 
 16
-00:00:58,739 --> 00:01:01,672
-switch it off, and wait again.
+00:00:55,349 --> 00:00:58,129
+pinMode makes pin 13 an output.
 
 17
-00:01:01,722 --> 00:01:05,650
-Every instruction ends with a semicolon.
+00:00:58,179 --> 00:01:03,241
+In the loop, we switch the light on, wait half a second,
 
 18
-00:01:06,300 --> 00:01:09,592
-Click the tick to check your code.
+00:01:03,291 --> 00:01:05,979
+switch it off, and wait again.
 
 19
-00:01:09,642 --> 00:01:14,901
-If you see a red error, read it carefully: it is often
+00:01:06,029 --> 00:01:09,630
+Every instruction ends with a semicolon.
 
 20
-00:01:14,951 --> 00:01:17,948
-a missing semicolon or bracket.
+00:01:10,950 --> 00:01:13,532
+Click the tick to check your code.
 
 21
-00:01:17,998 --> 00:01:23,650
-Then click the arrow to upload, and watch the light blink.
+00:01:13,582 --> 00:01:17,711
+If you see a red error, read it carefully: it is often
 
 22
-00:01:24,300 --> 00:01:30,500
+00:01:17,761 --> 00:01:20,111
+a missing semicolon or bracket.
+
+23
+00:01:20,161 --> 00:01:24,600
+Then click the arrow to upload, and watch the light blink.
+
+24
+00:01:26,100 --> 00:01:27,502
+Let us recap.
+
+25
+00:01:27,552 --> 00:01:31,857
+setup() runs once; loop() runs forever.
+
+26
+00:01:31,907 --> 00:01:36,324
+Every instruction ends with a semicolon.
+
+27
+00:01:36,374 --> 00:01:38,558
+Verify, then upload.
+
+28
+00:01:38,608 --> 00:01:42,690
 Next: Reading the IR sensors in code.

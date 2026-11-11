@@ -12,9 +12,9 @@
  * only those are marked ready by the content sync.
  *
  * Needs: Chrome or Edge (CHROME_PATH), ffmpeg and ffprobe (FFMPEG, FFPROBE or on PATH).
- * Narration audio is not produced: there is no approved Indian English voice
- * in this project yet. The videos ship silent with English captions; the
- * narration script for a voice artist is written next to each storyboard.
+ * Narration: run scripts/robotics101-narration.ts first. Videos with measured
+ * narration get a voice track built from the cached clips, placed where the
+ * timeline expects each line; videos without it render silent.
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -23,7 +23,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
-import { FPS, INTRO_SECONDS, VIDEOS, narrationScript, sceneSeconds, timeline, toSrt, toVtt, type VideoDef } from '../src/lib/lms/robotics101/videos'
+import { narrationSegments } from '../src/lib/lms/robotics101/narration'
+import { FPS, VIDEOS, VOICE_LEAD, narrationScript, narrationVoice, sceneSeconds, timeline, toSrt, toVtt, voiceTiming, type VideoDef } from '../src/lib/lms/robotics101/videos'
+import { SAMPLE_RATE, clipPath, readWav, writeWav } from './video/narration-audio'
 
 const ROOT = path.resolve(__dirname, '..')
 const PUBLIC_DIR = path.join(ROOT, 'public/lms-media/robotics-101/video')
@@ -104,9 +106,9 @@ function storyboard(video: VideoDef) {
     '',
     '| # | Time | Chapter | On-screen text | Visual / animation | Narration |',
     '|---|------|---------|----------------|--------------------|-----------|',
-    `| 0 | 0:00–${mmss(INTRO_SECONDS)} | Introduction | MyCampusView Academy · Robotics 101 · ${video.title} | Branded intro: logo fades up, title slides in | (none) |`,
+    `| 0 | 0:00–${mmss(tl.introSeconds)} | Introduction | MyCampusView Academy · Robotics 101 · ${video.title} | Branded intro: logo fades up, title slides in | ${narrationSegments(video)[0]} |`,
     ...rows,
-    `| ${rows.length + 1} | ${mmss(tl.scenes.at(-1)!.end)}–${mmss(tl.duration)} | Recap | ${video.summary.join(' · ')} · Next: ${video.next} | Branded outro: recap bullets, logo, academy URL | (none) |`,
+    `| ${rows.length + 1} | ${mmss(tl.scenes.at(-1)!.end)}–${mmss(tl.duration)} | Recap | ${video.summary.join(' · ')} · Next: ${video.next} | Branded outro: recap bullets, logo, academy URL | ${narrationSegments(video).at(-1)} |`,
     '',
     '## In-video checkpoints',
     '',
@@ -248,6 +250,26 @@ function run(cmd: string, argv: string[]) {
   })
 }
 
+/** Full-length narration WAV: each cached clip placed where the timeline expects that line. */
+function voiceTrack(video: VideoDef) {
+  if (!voiceTiming(video)) return null
+  const tl = timeline(video)
+  const lines = narrationSegments(video)
+  const starts = [VOICE_LEAD.intro, ...tl.scenes.map((s) => s.start + VOICE_LEAD.scene), tl.duration - tl.outroSeconds + VOICE_LEAD.outro]
+  const out = new Int16Array(Math.ceil(tl.duration * SAMPLE_RATE))
+  lines.forEach((line, i) => {
+    const file = clipPath(line)
+    if (!existsSync(file)) throw new Error(`${video.id}: narration clip missing for "${line.slice(0, 40)}…". Run scripts/robotics101-narration.ts.`)
+    const clip = readWav(file)
+    const at = Math.round(starts[i]! * SAMPLE_RATE)
+    if (at + clip.length > out.length) throw new Error(`${video.id}: line ${i} runs past the end of the video`)
+    out.set(clip, at)
+  })
+  const file = path.join(BUILD_DIR, `${video.id}.voice.wav`)
+  writeWav(file, out)
+  return file
+}
+
 async function renderVideo(cdp: Cdp, pageUrl: string, video: VideoDef) {
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' })
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true })
@@ -269,11 +291,16 @@ async function renderVideo(cdp: Cdp, pageUrl: string, video: VideoDef) {
     return Buffer.from(shot.data, 'base64')
   }
 
-  const { duration } = timeline(video)
+  const tl = timeline(video)
+  const { duration } = tl
   const mp4 = path.join(PUBLIC_DIR, `${video.id}.mp4`)
-  const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-tune', 'animation', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4], {
-    stdio: ['pipe', 'ignore', 'pipe'],
-  })
+  const track = voiceTrack(video)
+  const audioArgs = track ? ['-i', track, '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '96k', '-ar', '48000'] : []
+  const ff = spawn(
+    FFMPEG,
+    ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', ...audioArgs, '-c:v', 'libx264', '-preset', 'medium', '-tune', 'animation', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4],
+    { stdio: ['pipe', 'ignore', 'pipe'] },
+  )
   let ffErr = ''
   ff.stderr.on('data', (d) => (ffErr += d))
   const done = new Promise<void>((resolve, reject) => ff.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${video.id}: ${ffErr.slice(-800)}`)))))
@@ -288,23 +315,39 @@ async function renderVideo(cdp: Cdp, pageUrl: string, video: VideoDef) {
   ff.stdin.end()
   await done
 
-  const posterAt = INTRO_SECONDS - 0.6
+  const posterAt = tl.introSeconds - 0.6
   writeFileSync(path.join(PUBLIC_DIR, `${video.id}.poster.jpg`), await frame(posterAt, 88))
   await cdp.send('Target.closeTarget', { targetId })
   return { frames, seconds: (Date.now() - started) / 1000 }
 }
 
-type ManifestEntry = { src: string; poster: string; captions: string; durationSeconds: number; bytes: number; sha256: string; width: number; height: number; codec: string; renderedAt: string; verified: true }
+type ManifestEntry = {
+  src: string
+  poster: string
+  captions: string
+  durationSeconds: number
+  bytes: number
+  sha256: string
+  width: number
+  height: number
+  codec: string
+  audio: string | null
+  renderedAt: string
+  verified: true
+}
 
 async function verify(video: VideoDef): Promise<ManifestEntry> {
   const file = path.join(PUBLIC_DIR, `${video.id}.mp4`)
-  const probe = JSON.parse(await run(FFPROBE, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,width,height:format=duration', '-of', 'json', file]))
-  const stream = probe.streams?.[0]
+  const probe = JSON.parse(await run(FFPROBE, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height:format=duration', '-of', 'json', file]))
+  const streams: { codec_type: string; codec_name: string; width?: number; height?: number }[] = probe.streams ?? []
+  const stream = streams.find((s) => s.codec_type === 'video')
+  const audio = streams.find((s) => s.codec_type === 'audio')
   const duration = Number(probe.format?.duration)
   const expected = timeline(video).duration
   if (!stream || stream.codec_name !== 'h264') throw new Error(`${video.id}: not H.264`)
   if (stream.width !== 1280 || stream.height !== 720) throw new Error(`${video.id}: ${stream.width}×${stream.height}, expected 1280×720`)
   if (!(Math.abs(duration - expected) < 0.6)) throw new Error(`${video.id}: ${duration}s, expected ${expected}s`)
+  if (voiceTiming(video) && audio?.codec_name !== 'aac') throw new Error(`${video.id}: narration audio missing`)
   if (!existsSync(path.join(PUBLIC_DIR, `${video.id}.poster.jpg`))) throw new Error(`${video.id}: poster missing`)
   const bytes = statSync(file).size
   return {
@@ -317,6 +360,7 @@ async function verify(video: VideoDef): Promise<ManifestEntry> {
     width: stream.width,
     height: stream.height,
     codec: stream.codec_name,
+    audio: audio ? `${audio.codec_name}, ${voiceTiming(video) ? narrationVoice() : 'unknown'}` : null,
     renderedAt: new Date().toISOString(),
     verified: true,
   }
@@ -328,7 +372,10 @@ async function renderAll() {
   const manifest: { narration: string; videos: Record<string, ManifestEntry> } = existsSync(manifestFile)
     ? JSON.parse(readFileSync(manifestFile, 'utf8'))
     : { narration: 'none', videos: {} }
-  manifest.narration = 'none: silent with English captions (no approved Indian English voice yet)'
+  const voiced = VIDEOS.filter((v) => voiceTiming(v)).length
+  manifest.narration = voiced
+    ? `Azure Neural TTS ${narrationVoice()} (Indian English), synthesised narration; English captions${voiced < VIDEOS.length ? `; ${VIDEOS.length - voiced} video(s) still silent` : ''}`
+    : 'none: silent with English captions'
   const queue = [...selected]
   const failures: string[] = []
   // One browser per worker: headless Chrome only paints the most recently opened tab.

@@ -13,7 +13,7 @@ import {
   type SimSettings,
   type StepResult,
 } from '@/lib/lms/robot'
-import { INTRO_SECONDS, OUTRO_SECONDS, timeline, type TimedScene, type VideoDef } from '@/lib/lms/robotics101/videos'
+import { timeline, type TimedScene, type VideoDef } from '@/lib/lms/robotics101/videos'
 import { AMBER, BLUE, BLUE_INK, Diagram, GREEN, INK, PAPER, RED } from './diagrams'
 
 /**
@@ -45,8 +45,8 @@ export function VideoFrame({ video, t, logoDark, logoLight }: { video: VideoDef;
     fontFamily: FONT,
     color: INK,
   }
-  if (t < INTRO_SECONDS) return <div style={box}><Intro video={video} t={t} logo={logoLight} /></div>
-  if (t >= tl.duration - OUTRO_SECONDS) return <div style={box}><Outro video={video} t={t - (tl.duration - OUTRO_SECONDS)} logo={logoLight} /></div>
+  if (t < tl.introSeconds) return <div style={box}><Intro video={video} t={t} length={tl.introSeconds} logo={logoLight} /></div>
+  if (t >= tl.duration - tl.outroSeconds) return <div style={box}><Outro video={video} t={t - (tl.duration - tl.outroSeconds)} logo={logoLight} /></div>
 
   const scene = tl.scenes.find((s) => t >= s.start && t < s.end) ?? tl.scenes.at(-1)!
   const local = t - scene.start
@@ -71,11 +71,11 @@ export function VideoFrame({ video, t, logoDark, logoLight }: { video: VideoDef;
   )
 }
 
-function Intro({ video, t, logo }: { video: VideoDef; t: number; logo: string }) {
+function Intro({ video, t, length, logo }: { video: VideoDef; t: number; length: number; logo: string }) {
   const a = ease(t / 1.1)
   const b = ease((t - 0.9) / 0.8)
   const c = ease((t - 1.6) / 0.8)
-  const out = 1 - ease((t - (INTRO_SECONDS - 0.45)) / 0.45)
+  const out = 1 - ease((t - (length - 0.45)) / 0.45)
   return (
     <div style={{ position: 'absolute', inset: 0, background: INK, color: 'white', opacity: out }}>
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${a * 38}%`, background: '#16161a' }} />
@@ -458,5 +458,3 @@ function SimScene({ scene, local }: { scene: Extract<TimedScene, { kind: 'sim' }
     </div>
   )
 }
-
-export { OUTRO_SECONDS }

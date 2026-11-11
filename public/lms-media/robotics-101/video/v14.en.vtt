@@ -1,85 +1,109 @@
 WEBVTT
 
 1
-00:00:00.500 --> 00:00:04.200
-MyCampusView Academy. Robotics 101, video 14: The final challenge.
+00:00:00.600 --> 00:00:03.283
+MyCampusView Academy.
 
 2
-00:00:04.800 --> 00:00:09.950
-You have built it, programmed it and tuned it.
+00:00:03.333 --> 00:00:06.277
+Robotics 101, video 14.
 
 3
-00:00:10.000 --> 00:00:15.150
-Now it is time to show what your robot can do.
+00:00:06.327 --> 00:00:08.880
+The final challenge.
 
 4
-00:00:15.800 --> 00:00:22.029
-Your challenge track has a start, some gentle curves, an S-bend, at
+00:00:10.050 --> 00:00:13.515
+You have built it, programmed it and tuned it.
 
 5
-00:00:22.079 --> 00:00:28.026
-least one sharp corner, and a black finish line across the track
+00:00:13.565 --> 00:00:17.030
+Now it is time to show what your robot can do.
 
 6
-00:00:28.076 --> 00:00:30.650
-where the robot should stop.
+00:00:18.350 --> 00:00:22.906
+Your challenge track has a start, some gentle curves, an S-bend, at
 
 7
-00:00:31.300 --> 00:00:37.826
-Here is a full run in the simulator with pivot turns.
+00:00:22.956 --> 00:00:27.305
+least one sharp corner, and a black finish line across the track
 
 8
-00:00:37.876 --> 00:00:44.650
-Smooth, steady, and on the line all the way to the end.
+00:00:27.355 --> 00:00:29.230
+where the robot should stop.
 
 9
-00:00:45.300 --> 00:00:49.595
-There are three ways to hand in your project.
+00:00:30.550 --> 00:00:34.828
+Here is a full run in the simulator with pivot turns.
 
 10
-00:00:49.645 --> 00:00:55.098
-If you built it, add a photo, your code and a video link.
+00:00:34.878 --> 00:00:39.320
+Smooth, steady, and on the line all the way to the end.
 
 11
-00:00:55.148 --> 00:01:00.022
-If your teacher watched it run, choose that option.
+00:00:44.550 --> 00:00:48.063
+There are three ways to hand in your project.
 
 12
-00:01:00.072 --> 00:01:07.650
-If you have no kit, finish the S-curve and sharp-turns tracks in the simulator.
+00:00:48.113 --> 00:00:52.576
+If you built it, add a photo, your code and a video link.
 
 13
-00:01:08.300 --> 00:01:11.610
-Your teacher looks at four things.
+00:00:52.626 --> 00:00:56.615
+If your teacher watched it run, choose that option.
 
 14
-00:01:11.660 --> 00:01:15.069
-Does it follow the line to the end?
+00:00:56.665 --> 00:01:02.870
+If you have no kit, finish the S-curve and sharp-turns tracks in the simulator.
 
 15
-00:01:15.119 --> 00:01:19.121
-Does it handle the curves and the corner?
+00:01:04.250 --> 00:01:07.057
+Your teacher looks at four things.
 
 16
-00:01:19.171 --> 00:01:20.999
-Is your code clean?
+00:01:07.107 --> 00:01:09.998
+Does it follow the line to the end?
 
 17
-00:01:21.049 --> 00:01:25.150
-And can you explain one problem you fixed?
+00:01:10.048 --> 00:01:13.444
+Does it handle the curves and the corner?
 
 18
-00:01:25.800 --> 00:01:31.239
-After your teacher approves it, take the final assessment to earn your
+00:01:13.494 --> 00:01:15.041
+Is your code clean?
 
 19
-00:01:31.289 --> 00:01:35.082
-certificate and the Line-Follower Champion badge.
+00:01:15.091 --> 00:01:18.570
+And can you explain one problem you fixed?
 
 20
-00:01:35.132 --> 00:01:36.650
-Well done, engineer!
+00:01:19.950 --> 00:01:25.067
+After your teacher approves it, take the final assessment to earn your
 
 21
-00:01:37.300 --> 00:01:43.500
+00:01:25.117 --> 00:01:28.684
+certificate and the Line-Follower Champion badge.
+
+22
+00:01:28.734 --> 00:01:30.160
+Well done, engineer!
+
+23
+00:01:31.700 --> 00:01:32.875
+Let us recap.
+
+24
+00:01:32.925 --> 00:01:36.643
+Complete the track from start to finish.
+
+25
+00:01:36.693 --> 00:01:42.389
+Hand in a photo, your code and a video, or use the simulator.
+
+26
+00:01:42.439 --> 00:01:44.650
+Your teacher reviews it.
+
+27
+00:01:44.700 --> 00:01:49.360
 Next: The final assessment, then your certificate.

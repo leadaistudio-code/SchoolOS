@@ -1,93 +1,117 @@
 WEBVTT
 
 1
-00:00:00.500 --> 00:00:04.200
-MyCampusView Academy. Robotics 101, video 13: Troubleshooting like an engineer.
+00:00:00.600 --> 00:00:02.966
+MyCampusView Academy.
 
 2
-00:00:04.800 --> 00:00:09.425
-Real engineers spend a lot of time fixing things.
+00:00:03.016 --> 00:00:05.613
+Robotics 101, video 13.
 
 3
-00:00:09.475 --> 00:00:10.856
-That is normal.
+00:00:05.663 --> 00:00:09.410
+Troubleshooting like an engineer.
 
 4
-00:00:10.906 --> 00:00:15.150
-Here is how to troubleshoot like an engineer.
+00:00:10.550 --> 00:00:14.757
+Real engineers spend a lot of time fixing things.
 
 5
-00:00:15.800 --> 00:00:19.711
-First observe carefully: what exactly happens?
+00:00:14.807 --> 00:00:16.060
+That is normal.
 
 6
-00:00:19.761 --> 00:00:22.639
-Then make a guess about the cause.
+00:00:16.110 --> 00:00:19.970
+Here is how to troubleshoot like an engineer.
 
 7
-00:00:22.689 --> 00:00:28.150
-Change only one thing, test again, and write down what happened.
+00:00:21.350 --> 00:00:25.252
+First observe carefully: what exactly happens?
 
 8
-00:00:28.800 --> 00:00:34.110
-If the robot does nothing at all, check the battery and the
+00:00:25.302 --> 00:00:28.172
+Then make a guess about the cause.
 
 9
-00:00:34.160 --> 00:00:40.470
-switch, check that every ground is connected, and make sure the upload
+00:00:28.222 --> 00:00:33.670
+Change only one thing, test again, and write down what happened.
 
 10
-00:00:40.520 --> 00:00:42.650
-finished without errors.
+00:00:35.050 --> 00:00:38.902
+If the robot does nothing at all, check the battery and the
 
 11
-00:00:43.300 --> 00:00:49.671
-If the robot spins in circles, one motor is probably wired backwards.
+00:00:38.952 --> 00:00:43.533
+switch, check that every ground is connected, and make sure the upload
 
 12
-00:00:49.721 --> 00:00:56.650
-Swap that motor's two wires and test each wheel with the motor test sketch.
+00:00:43.583 --> 00:00:45.120
+finished without errors.
 
 13
-00:00:57.300 --> 00:01:03.684
-If the robot turns away from the line, the left and right
+00:00:46.450 --> 00:00:51.628
+If the robot spins in circles, one motor is probably wired backwards.
 
 14
-00:01:03.734 --> 00:01:06.958
-sensors or rules are swapped.
+00:00:51.678 --> 00:00:57.310
+Swap that motor's two wires and test each wheel with the motor test sketch.
 
 15
-00:01:07.008 --> 00:01:12.715
-Swap the sensor wires on D2 and D3, or swap the two
+00:00:58.650 --> 00:01:03.087
+If the robot turns away from the line, the left and right
 
 16
-00:01:12.765 --> 00:01:15.650
-turning rules in the code.
+00:01:03.137 --> 00:01:05.369
+sensors or rules are swapped.
 
 17
-00:01:16.300 --> 00:01:22.642
-If the robot stops on a plain curve, both sensors may think
+00:01:05.419 --> 00:01:09.383
+Swap the sensor wires on D2 and D3, or swap the two
 
 18
-00:01:22.692 --> 00:01:24.267
-they see black.
+00:01:09.433 --> 00:01:11.430
+turning rules in the code.
 
 19
-00:01:24.317 --> 00:01:26.758
-They are too sensitive.
+00:01:17.650 --> 00:01:22.505
+If the robot stops on a plain curve, both sensors may think
 
 20
-00:01:26.808 --> 00:01:33.150
-Turn the knobs until white reads as white, then test again.
+00:01:22.555 --> 00:01:23.752
+they see black.
 
 21
-00:01:33.800 --> 00:01:37.206
-The Serial Monitor is your best friend.
+00:01:23.802 --> 00:01:25.665
+They are too sensitive.
 
 22
-00:01:37.256 --> 00:01:44.650
-If both sensors say BLACK over white paper, you have found the problem: calibration.
+00:01:25.715 --> 00:01:30.570
+Turn the knobs until white reads as white, then test again.
 
 23
-00:01:45.300 --> 00:01:51.500
+00:01:35.150 --> 00:01:38.125
+The Serial Monitor is your best friend.
+
+24
+00:01:38.175 --> 00:01:44.640
+If both sensors say BLACK over white paper, you have found the problem: calibration.
+
+25
+00:01:46.100 --> 00:01:47.414
+Let us recap.
+
+26
+00:01:47.464 --> 00:01:51.609
+Observe, guess, test one change, repeat.
+
+27
+00:01:51.659 --> 00:01:56.329
+Most problems: wiring, calibration, or speed.
+
+28
+00:01:56.379 --> 00:02:01.573
+Use the Serial Monitor to see what the robot sees.
+
+29
+00:02:01.623 --> 00:02:04.300
 Next: The final challenge.

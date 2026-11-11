@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LESSONS } from '@/lib/lms/robotics101'
-import { VIDEOS, captionCues, timeline, toSrt, toVtt, videoById, type TimedScene } from '@/lib/lms/robotics101/videos'
+import { VIDEOS, VOICE_LEAD, captionCues, timeline, toSrt, toVtt, videoById, voiceTiming, type TimedScene } from '@/lib/lms/robotics101/videos'
 import { simSceneOutcome } from '@/components/lms/robotics/video-frame'
 
 /** What each simulator scene's narration says will happen. */
@@ -51,7 +51,18 @@ describe('Robotics 101 videos', () => {
         expect(c.text.split(/\s+/).length).toBeLessThanOrEqual(16)
       })
       expect(toVtt(v).startsWith('WEBVTT')).toBe(true)
-      expect(toSrt(v)).toMatch(/^1\n00:00:00,500 --> /)
+      expect(toSrt(v)).toMatch(/^1\n00:00:00,600 --> /)
+    }
+  })
+
+  it('has measured narration for every line, and every line fits its scene', () => {
+    for (const v of VIDEOS) {
+      const voice = voiceTiming(v)
+      expect(voice, `${v.id}: narration out of date, run scripts/robotics101-narration.ts`).not.toBeNull()
+      const tl = timeline(v)
+      expect(VOICE_LEAD.intro + voice!.intro).toBeLessThan(tl.introSeconds)
+      tl.scenes.forEach((s, i) => expect(VOICE_LEAD.scene + voice!.scenes[i]!, `${v.id} scene ${i + 1}`).toBeLessThan(s.end - s.start))
+      expect(VOICE_LEAD.outro + voice!.outro).toBeLessThan(tl.outroSeconds)
     }
   })
 

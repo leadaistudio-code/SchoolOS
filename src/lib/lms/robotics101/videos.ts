@@ -1,5 +1,7 @@
 import type { DiagramName } from '@/components/lms/robotics/diagrams'
 import type { Algorithm, SimSettings } from '@/lib/lms/robot'
+import { introLine, outroLine } from './narration'
+import narrationTiming from './narration-timing.json'
 
 /**
  * Robotics 101 instructional videos: script, storyboard and timing in one
@@ -48,6 +50,25 @@ export const INTRO_SECONDS = 4.5
 export const OUTRO_SECONDS = 7
 export const FPS = 24
 
+/** Where each narration clip starts, relative to its section. */
+export const VOICE_LEAD = { intro: 0.6, scene: 0.35, outro: 0.5 }
+const VOICE_TAIL = { intro: 0.7, scene: 0.9, outro: 1.6 }
+
+/** Measured clip lengths (seconds), written by scripts/robotics101-narration.ts. */
+export type NarrationTiming = { voice: string | null; videos: Record<string, { intro: number; scenes: number[]; outro: number } | undefined> }
+const TIMING = narrationTiming as NarrationTiming
+
+export function voiceTiming(video: VideoDef) {
+  const t = TIMING.videos[video.id]
+  return t && t.scenes.length === video.scenes.length ? t : undefined
+}
+
+export function narrationVoice() {
+  return TIMING.voice
+}
+
+const tenth = (n: number) => Math.ceil(n * 10) / 10
+
 /** Reading pace for 10–13-year-olds: slow, with a pause after each scene. */
 export function sceneSeconds(scene: Scene) {
   if (scene.seconds) return scene.seconds
@@ -58,48 +79,67 @@ export function sceneSeconds(scene: Scene) {
 
 export type TimedScene = Scene & { start: number; end: number; index: number }
 
+/**
+ * Scene timing. With recorded narration each scene lasts as long as its clip
+ * plus a short pause (simulator scenes never get shorter than the run needs);
+ * without it, the reading-pace estimate is used.
+ */
 export function timeline(video: VideoDef) {
-  let t = INTRO_SECONDS
+  const voice = voiceTiming(video)
+  const introSeconds = voice ? Math.max(INTRO_SECONDS, tenth(VOICE_LEAD.intro + voice.intro + VOICE_TAIL.intro)) : INTRO_SECONDS
+  let t = introSeconds
   const scenes: TimedScene[] = video.scenes.map((s, index) => {
     const start = t
-    t += sceneSeconds(s)
+    const voiced = voice ? tenth(VOICE_LEAD.scene + voice.scenes[index]! + VOICE_TAIL.scene) : 0
+    t += voice ? Math.max(voiced, s.kind === 'sim' ? sceneSeconds(s) : 4) : sceneSeconds(s)
     return { ...s, start, end: t, index }
   })
-  const duration = t + OUTRO_SECONDS
+  const outroSeconds = voice ? Math.max(OUTRO_SECONDS, tenth(VOICE_LEAD.outro + voice.outro + VOICE_TAIL.outro)) : OUTRO_SECONDS
+  const duration = t + outroSeconds
   const chapters = [
     { at: 0, title: 'Introduction' },
     ...scenes.filter((s) => s.chapter).map((s) => ({ at: Math.round(s.start), title: s.chapter! })),
     { at: Math.round(t), title: 'Recap' },
   ]
   const checkpoints = video.checkpoints.map((c) => ({ ...c, at: Math.round(scenes[c.afterScene]!.end - 0.5) }))
-  return { scenes, duration, chapters, checkpoints }
+  return { scenes, duration, introSeconds, outroSeconds, chapters, checkpoints }
 }
 
-/** Splits narration into short caption cues spread across the scene. */
+function captionChunks(text: string) {
+  const sentences = text.match(/[^.!?]+[.!?]+["')]*\s*|[^.!?]+$/g)?.map((x) => x.trim()).filter(Boolean) ?? [text]
+  return sentences.flatMap((sentence) => {
+    const words = sentence.split(/\s+/)
+    if (words.length <= 14) return [sentence]
+    const parts: string[] = []
+    for (let i = 0; i < words.length; i += 12) parts.push(words.slice(i, i + 12).join(' '))
+    return parts
+  })
+}
+
+/** Caption cues spread over the span the narration is spoken in. */
 export function captionCues(video: VideoDef) {
-  const { scenes, duration } = timeline(video)
-  const cues: { start: number; end: number; text: string }[] = [
-    { start: 0.5, end: INTRO_SECONDS - 0.3, text: `MyCampusView Academy. Robotics 101, video ${video.number}: ${video.title}.` },
-  ]
-  for (const s of scenes) {
-    const sentences = s.say.match(/[^.!?]+[.!?]+["')]*\s*|[^.!?]+$/g)?.map((x) => x.trim()).filter(Boolean) ?? [s.say]
-    const chunks = sentences.flatMap((sentence) => {
-      const words = sentence.split(/\s+/)
-      if (words.length <= 14) return [sentence]
-      const parts: string[] = []
-      for (let i = 0; i < words.length; i += 12) parts.push(words.slice(i, i + 12).join(' '))
-      return parts
-    })
+  const { scenes, duration, introSeconds, outroSeconds } = timeline(video)
+  const voice = voiceTiming(video)
+  const cues: { start: number; end: number; text: string }[] = []
+  const spread = (text: string, from: number, span: number) => {
+    const chunks = captionChunks(text)
     const total = chunks.reduce((n, c) => n + c.length, 0)
-    let at = s.start + 0.3
-    const span = s.end - s.start - 0.6
+    let at = from
     for (const c of chunks) {
       const len = (c.length / total) * span
       cues.push({ start: at, end: at + len - 0.05, text: c })
       at += len
     }
   }
-  cues.push({ start: duration - OUTRO_SECONDS + 0.3, end: duration - 0.5, text: `Next: ${video.next}` })
+  if (voice) spread(introLine(video), VOICE_LEAD.intro, voice.intro)
+  else cues.push({ start: 0.5, end: introSeconds - 0.3, text: introLine(video) })
+  for (const s of scenes) {
+    if (voice) spread(s.say, s.start + VOICE_LEAD.scene, voice.scenes[s.index]!)
+    else spread(s.say, s.start + 0.3, s.end - s.start - 0.6)
+  }
+  const outroStart = duration - outroSeconds
+  if (voice) spread(outroLine(video), outroStart + VOICE_LEAD.outro, voice.outro)
+  else cues.push({ start: outroStart + 0.3, end: duration - 0.5, text: `Next: ${video.next}` })
   return cues
 }
 
@@ -128,9 +168,9 @@ export function narrationScript(video: VideoDef) {
   return [
     `# Video ${video.number}: ${video.title}`,
     '',
-    `[${stamp(0, '.')}] (Intro) MyCampusView Academy. Robotics 101. ${video.title}.`,
+    `[${stamp(0, '.')}] (Intro) ${introLine(video)}`,
     ...scenes.map((s) => `[${stamp(s.start, '.')}] ${s.say}`),
-    `[${stamp(scenes.at(-1)!.end, '.')}] (Outro) Next: ${video.next}`,
+    `[${stamp(scenes.at(-1)!.end, '.')}] (Outro) ${outroLine(video)}`,
   ].join('\n')
 }
 

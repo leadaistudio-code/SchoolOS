@@ -1,81 +1,105 @@
 WEBVTT
 
 1
-00:00:00.500 --> 00:00:04.200
-MyCampusView Academy. Robotics 101, video 10: Programming the motors.
+00:00:00.600 --> 00:00:03.151
+MyCampusView Academy.
 
 2
-00:00:04.800 --> 00:00:08.057
-Now let us make the robot move.
+00:00:03.201 --> 00:00:06.001
+Robotics 101, video 10.
 
 3
-00:00:08.107 --> 00:00:15.097
-Before you upload, lift the robot so the wheels are off the table.
+00:00:06.051 --> 00:00:08.850
+Programming the motors.
 
 4
-00:00:15.147 --> 00:00:19.150
-That way it cannot drive off the edge.
+00:00:09.950 --> 00:00:12.481
+Now let us make the robot move.
 
 5
-00:00:19.800 --> 00:00:22.370
-This helper drives one motor.
+00:00:12.531 --> 00:00:17.976
+Before you upload, lift the robot so the wheels are off the table.
 
 6
-00:00:22.420 --> 00:00:27.158
-A positive speed sets the direction pins for forward.
+00:00:18.026 --> 00:00:21.140
+That way it cannot drive off the edge.
 
 7
-00:00:27.208 --> 00:00:29.959
-A negative speed reverses them.
+00:00:22.450 --> 00:00:25.269
+This helper drives one motor.
 
 8
-00:00:30.009 --> 00:00:31.856
-Zero stops the motor.
+00:00:25.319 --> 00:00:30.511
+A positive speed sets the direction pins for forward.
 
 9
-00:00:31.906 --> 00:00:35.650
-analogWrite then sets the speed using PWM.
+00:00:30.561 --> 00:00:33.578
+A negative speed reverses them.
 
 10
-00:00:36.300 --> 00:00:41.901
-setMotors drives both wheels with one line of code.
+00:00:33.628 --> 00:00:35.655
+Zero stops the motor.
 
 11
-00:00:41.951 --> 00:00:47.220
-Motor A, on ENA, IN1 and IN2, is the left wheel.
+00:00:35.705 --> 00:00:39.810
+analogWrite then sets the speed using PWM.
 
 12
-00:00:47.270 --> 00:00:52.650
-Motor B, on ENB, IN3 and IN4, is the right wheel.
+00:00:41.150 --> 00:00:46.986
+setMotors drives both wheels with one line of code.
 
 13
-00:00:53.300 --> 00:00:57.613
-Try setMotors 150, 150 to go straight.
+00:00:47.036 --> 00:00:52.525
+Motor A, on ENA, IN1 and IN2, is the left wheel.
 
 14
-00:00:57.663 --> 00:01:00.598
-Try 40, 150 to curve left.
+00:00:52.575 --> 00:00:58.180
+Motor B, on ENB, IN3 and IN4, is the right wheel.
 
 15
-00:01:00.648 --> 00:01:03.698
-Try 150, 40 to curve right.
+00:00:59.550 --> 00:01:05.218
+Try setMotors 150, 150 to go straight.
 
 16
-00:01:03.748 --> 00:01:05.650
-And 0, 0 to stop.
+00:01:05.268 --> 00:01:09.130
+Try 40, 150 to curve left.
 
 17
-00:01:06.300 --> 00:01:12.280
-If a wheel spins backwards when it should go forward, swap that
+00:01:09.180 --> 00:01:13.192
+Try 150, 40 to curve right.
 
 18
-00:01:12.330 --> 00:01:18.310
-motor's two wires at the motor driver, then test again with the
+00:01:13.242 --> 00:01:15.750
+And 0, 0 to stop.
 
 19
-00:01:18.360 --> 00:01:19.650
-wheels lifted.
+00:01:17.050 --> 00:01:21.045
+If a wheel spins backwards when it should go forward, swap that
 
 20
-00:01:20.300 --> 00:01:26.500
+00:01:21.095 --> 00:01:25.091
+motor's two wires at the motor driver, then test again with the
+
+21
+00:01:25.141 --> 00:01:25.990
+wheels lifted.
+
+22
+00:01:27.500 --> 00:01:28.775
+Let us recap.
+
+23
+00:01:28.825 --> 00:01:33.054
+setMotors(left, right) drives both wheels.
+
+24
+00:01:33.104 --> 00:01:37.537
+Positive forward, negative backward, 0 stop.
+
+25
+00:01:37.587 --> 00:01:41.714
+Test with the robot lifted off the table.
+
+26
+00:01:41.764 --> 00:01:45.280
 Next: The line-following algorithm.

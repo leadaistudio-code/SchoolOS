@@ -1,95 +1,119 @@
 1
-00:00:00,500 --> 00:00:04,200
-MyCampusView Academy. Robotics 101, video 5: How motors and the motor driver work.
+00:00:00,600 --> 00:00:02,999
+MyCampusView Academy.
 
 2
-00:00:04,800 --> 00:00:09,124
-Our robot has two motors, one for each wheel.
+00:00:03,049 --> 00:00:05,565
+Robotics 101, video 5.
 
 3
-00:00:09,174 --> 00:00:15,150
-Let us see how the Arduino controls their direction and speed.
+00:00:05,615 --> 00:00:09,880
+How motors and the motor driver work.
 
 4
-00:00:15,800 --> 00:00:20,895
-Inside the L298N are switches arranged like the letter H.
+00:00:11,050 --> 00:00:14,516
+Our robot has two motors, one for each wheel.
 
 5
-00:00:20,945 --> 00:00:23,332
-That is called an H-bridge.
+00:00:14,566 --> 00:00:19,360
+Let us see how the Arduino controls their direction and speed.
 
 6
-00:00:23,382 --> 00:00:29,650
-Two control pins decide which way the current flows through the motor.
+00:00:20,750 --> 00:00:24,871
+Inside the L298N are switches arranged like the letter H.
 
 7
-00:00:30,300 --> 00:00:36,114
-If IN1 is HIGH and IN2 is LOW, the motor spins forward.
+00:00:24,921 --> 00:00:26,847
+That is called an H-bridge.
 
 8
-00:00:36,164 --> 00:00:39,632
-Swap them, and it spins backward.
+00:00:26,897 --> 00:00:31,970
+Two control pins decide which way the current flows through the motor.
 
 9
-00:00:39,682 --> 00:00:43,150
-If both are LOW, the motor stops.
+00:00:33,350 --> 00:00:38,509
+If IN1 is HIGH and IN2 is LOW, the motor spins forward.
 
 10
-00:00:43,800 --> 00:00:46,971
-The enable pin sets the speed.
+00:00:38,559 --> 00:00:41,635
+Swap them, and it spins backward.
 
 11
-00:00:47,021 --> 00:00:51,803
-The Arduino switches it on and off very fast.
+00:00:41,685 --> 00:00:44,760
+If both are LOW, the motor stops.
 
 12
-00:00:51,853 --> 00:00:53,843
-This is called PWM.
+00:00:46,150 --> 00:00:49,394
+The enable pin sets the speed.
 
 13
-00:00:53,893 --> 00:00:57,171
-On most of the time means fast.
+00:00:49,444 --> 00:00:54,334
+The Arduino switches it on and off very fast.
 
 14
-00:00:57,221 --> 00:01:01,466
-On only a little of the time means slow.
+00:00:54,384 --> 00:00:56,420
+This is called PWM.
 
 15
-00:01:01,516 --> 00:01:04,150
-Speed goes from 0 to 255.
+00:00:56,470 --> 00:00:59,824
+On most of the time means fast.
 
 16
-00:01:04,800 --> 00:01:07,493
-Our robot has no steering wheel.
+00:00:59,874 --> 00:01:04,215
+On only a little of the time means slow.
 
 17
-00:01:07,543 --> 00:01:11,864
-It turns by driving its wheels at different speeds.
+00:01:04,265 --> 00:01:06,960
+Speed goes from 0 to 255.
 
 18
-00:01:11,914 --> 00:01:15,550
-Both wheels the same speed: straight ahead.
+00:01:08,350 --> 00:01:11,218
+Our robot has no steering wheel.
 
 19
-00:01:15,600 --> 00:01:19,064
-Left wheel slower: the robot curves left.
+00:01:11,268 --> 00:01:15,868
+It turns by driving its wheels at different speeds.
 
 20
-00:01:19,114 --> 00:01:22,150
-Right wheel slower: it curves right.
+00:01:15,918 --> 00:01:19,789
+Both wheels the same speed: straight ahead.
 
 21
-00:01:22,800 --> 00:01:28,466
-Watch the left and right motor numbers on the panel.
+00:01:19,839 --> 00:01:23,527
+Left wheel slower: the robot curves left.
 
 22
-00:01:28,516 --> 00:01:35,281
-When the line curves, one wheel slows down and the robot turns
+00:01:23,577 --> 00:01:26,810
+Right wheel slower: it curves right.
 
 23
-00:01:35,331 --> 00:01:37,150
-towards the line.
+00:01:28,150 --> 00:01:31,859
+Watch the left and right motor numbers on the panel.
 
 24
-00:01:37,800 --> 00:01:44,000
+00:01:31,909 --> 00:01:36,341
+When the line curves, one wheel slows down and the robot turns
+
+25
+00:01:36,391 --> 00:01:37,570
+towards the line.
+
+26
+00:01:43,300 --> 00:01:44,587
+Let us recap.
+
+27
+00:01:44,637 --> 00:01:46,849
+IN pins set direction.
+
+28
+00:01:46,899 --> 00:01:49,625
+EN pins set speed with PWM.
+
+29
+00:01:49,675 --> 00:01:53,635
+Different wheel speeds steer the robot.
+
+30
+00:01:53,685 --> 00:01:56,720
 Next: Building the robot body.

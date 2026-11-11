@@ -1,77 +1,101 @@
 WEBVTT
 
 1
-00:00:00.500 --> 00:00:04.200
-MyCampusView Academy. Robotics 101, video 9: Reading the IR sensors.
+00:00:00.600 --> 00:00:03.293
+MyCampusView Academy.
 
 2
-00:00:04.800 --> 00:00:10.623
-Before the robot can follow a line, we must be sure it
+00:00:03.343 --> 00:00:06.166
+Robotics 101, video 9.
 
 3
-00:00:10.673 --> 00:00:12.472
-can see the line.
+00:00:06.216 --> 00:00:09.170
+Reading the IR sensors.
 
 4
-00:00:12.522 --> 00:00:19.650
-In this video, you will read both sensors and print what they see.
+00:00:10.350 --> 00:00:14.305
+Before the robot can follow a line, we must be sure it
 
 5
-00:00:20.300 --> 00:00:23.390
-First we give the pins names.
+00:00:14.355 --> 00:00:15.565
+can see the line.
 
 6
-00:00:23.440 --> 00:00:27.612
-LEFT_IR is pin 2 and RIGHT_IR is pin 3.
+00:00:15.615 --> 00:00:20.460
+In this video, you will read both sensors and print what they see.
 
 7
-00:00:27.662 --> 00:00:31.618
-ON_LINE says which value means black.
+00:00:21.850 --> 00:00:24.685
+First we give the pins names.
 
 8
-00:00:31.668 --> 00:00:34.650
-For many sensors it is HIGH.
+00:00:24.735 --> 00:00:28.564
+LEFT_IR is pin 2 and RIGHT_IR is pin 3.
 
 9
-00:00:35.300 --> 00:00:40.126
-digitalRead reads a pin and gives HIGH or LOW.
+00:00:28.614 --> 00:00:32.245
+ON_LINE says which value means black.
 
 10
-00:00:40.176 --> 00:00:44.896
-Then we print BLACK or WHITE for each sensor.
+00:00:32.295 --> 00:00:35.030
+For many sensors it is HIGH.
 
 11
-00:00:44.946 --> 00:00:51.150
-The short delay slows the printing down so you can read it.
+00:00:36.350 --> 00:00:39.971
+digitalRead reads a pin and gives HIGH or LOW.
 
 12
-00:00:51.800 --> 00:00:57.464
-Upload the sketch and open the Serial Monitor at 9600 baud.
+00:00:40.021 --> 00:00:43.562
+Then we print BLACK or WHITE for each sensor.
 
 13
-00:00:57.514 --> 00:01:01.242
-Slide the robot slowly across the line.
+00:00:43.612 --> 00:00:48.270
+The short delay slows the printing down so you can read it.
 
 14
-00:01:01.292 --> 00:01:07.150
-You should see the left sensor say BLACK, then the right one.
+00:00:49.650 --> 00:00:54.650
+Upload the sketch and open the Serial Monitor at 9600 baud.
 
 15
-00:01:07.800 --> 00:01:13.567
-If black shows as WHITE, your module is the other way round:
+00:00:54.700 --> 00:00:57.989
+Slide the robot slowly across the line.
 
 16
-00:01:13.617 --> 00:01:15.700
-change ON_LINE to LOW.
+00:00:58.039 --> 00:01:03.210
+You should see the left sensor say BLACK, then the right one.
 
 17
-00:01:15.750 --> 00:01:19.869
-If a sensor never changes, adjust its knob.
+00:01:04.550 --> 00:01:09.406
+If black shows as WHITE, your module is the other way round:
 
 18
-00:01:19.919 --> 00:01:23.650
-If nothing prints, check the baud rate.
+00:01:09.456 --> 00:01:11.205
+change ON_LINE to LOW.
 
 19
-00:01:24.300 --> 00:01:30.500
+00:01:11.255 --> 00:01:14.721
+If a sensor never changes, adjust its knob.
+
+20
+00:01:14.771 --> 00:01:17.910
+If nothing prints, check the baud rate.
+
+21
+00:01:19.400 --> 00:01:20.623
+Let us recap.
+
+22
+00:01:20.673 --> 00:01:23.755
+digitalRead() gives HIGH or LOW.
+
+23
+00:01:23.805 --> 00:01:28.160
+The Serial Monitor shows what the robot sees.
+
+24
+00:01:28.210 --> 00:01:31.488
+Set ON_LINE to match your sensors.
+
+25
+00:01:31.538 --> 00:01:35.110
 Next: Controlling the motors in code.

@@ -1,79 +1,103 @@
 1
-00:00:00,500 --> 00:00:04,200
-MyCampusView Academy. Robotics 101, video 11: The line-following algorithm.
+00:00:00,600 --> 00:00:03,087
+MyCampusView Academy.
 
 2
-00:00:04,800 --> 00:00:10,450
-An algorithm is a set of clear steps to solve a problem.
+00:00:03,137 --> 00:00:05,866
+Robotics 101, video 11.
 
 3
-00:00:10,500 --> 00:00:16,150
-Our robot needs one simple algorithm to follow the line.
+00:00:05,916 --> 00:00:09,370
+The line-following algorithm.
 
 4
-00:00:16,800 --> 00:00:21,920
-Two sensors, each black or white, give only four cases.
+00:00:10,550 --> 00:00:14,995
+An algorithm is a set of clear steps to solve a problem.
 
 5
-00:00:21,970 --> 00:00:26,619
-Both white: the line is between them, go straight.
+00:00:15,045 --> 00:00:19,490
+Our robot needs one simple algorithm to follow the line.
 
 6
-00:00:26,669 --> 00:00:31,413
-Left sees black: the line is going left, turn left.
+00:00:20,850 --> 00:00:26,080
+Two sensors, each black or white, give only four cases.
 
 7
-00:00:31,463 --> 00:00:34,138
-Right sees black: turn right.
+00:00:26,130 --> 00:00:30,881
+Both white: the line is between them, go straight.
 
 8
-00:00:34,188 --> 00:00:38,650
-Both black: a cross line or the finish, so stop.
+00:00:30,931 --> 00:00:35,777
+Left sees black: the line is going left, turn left.
 
 9
-00:00:39,300 --> 00:00:43,281
-Here is the same idea as a flowchart.
+00:00:35,827 --> 00:00:38,562
+Right sees black: turn right.
 
 10
-00:00:43,331 --> 00:00:49,926
-Read the sensors, check the cases one by one, set the motors,
+00:00:38,612 --> 00:00:43,170
+Both black: a cross line or the finish, so stop.
 
 11
-00:00:49,976 --> 00:00:52,650
-and go back to the start.
+00:00:44,550 --> 00:00:47,616
+Here is the same idea as a flowchart.
 
 12
-00:00:53,300 --> 00:00:57,117
-In code, we use if, else if and else.
+00:00:47,666 --> 00:00:52,754
+Read the sensors, check the cases one by one, set the motors,
 
 13
-00:00:57,167 --> 00:01:01,297
-Each block matches one row of the table.
+00:00:52,804 --> 00:00:54,860
+and go back to the start.
 
 14
-00:01:01,347 --> 00:01:07,150
-Turning left means slowing the left wheel to TURN_SPEED.
+00:00:56,250 --> 00:00:59,341
+In code, we use if, else if and else.
 
 15
-00:01:07,800 --> 00:01:14,395
-Here is the algorithm running in the simulator on an S-shaped track.
+00:00:59,391 --> 00:01:02,736
+Each block matches one row of the table.
 
 16
-00:01:14,445 --> 00:01:20,650
-Watch the decision panel switch between forward, left and right.
+00:01:02,786 --> 00:01:07,490
+Turning left means slowing the left wheel to TURN_SPEED.
 
 17
-00:01:21,300 --> 00:01:29,643
-Now watch what happens if the left and right rules are swapped by mistake.
+00:01:08,850 --> 00:01:13,838
+Here is the algorithm running in the simulator on an S-shaped track.
 
 18
-00:01:29,693 --> 00:01:35,201
-The robot turns away from the line and gets lost.
+00:01:13,888 --> 00:01:18,580
+Watch the decision panel switch between forward, left and right.
 
 19
-00:01:35,251 --> 00:01:38,150
-This is a very common bug.
+00:01:22,350 --> 00:01:28,061
+Now watch what happens if the left and right rules are swapped by mistake.
 
 20
-00:01:38,800 --> 00:01:45,000
+00:01:28,111 --> 00:01:31,876
+The robot turns away from the line and gets lost.
+
+21
+00:01:31,926 --> 00:01:33,900
+This is a very common bug.
+
+22
+00:01:40,000 --> 00:01:41,228
+Let us recap.
+
+23
+00:01:41,278 --> 00:01:44,373
+Four sensor cases, four actions.
+
+24
+00:01:44,423 --> 00:01:48,304
+Turn towards the sensor that sees black.
+
+25
+00:01:48,354 --> 00:01:51,056
+if / else if / else in code.
+
+26
+00:01:51,106 --> 00:01:55,380
 Next: Uploading and testing on a real track.
