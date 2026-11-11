@@ -159,8 +159,11 @@ describe('Robotics 101 content sync plan', () => {
 
   it('is idempotent: a second run matches by slug and changes nothing', () => {
     const first = planSync(modules, existing, NO_MEDIA)
+    // Postgres JSONB hands back objects with their keys in a different order.
+    const reorder = (v: unknown): unknown =>
+      Array.isArray(v) ? v.map(reorder) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).reverse().map(([k, x]) => [k, reorder(x)])) : v
     const after: ExistingLesson[] = first.lessonOps.map((l, i) =>
-      lesson(l.existingId ?? `new-${i}`, l.def.title, 'm', { slug: l.def.slug, content: JSON.parse(JSON.stringify(l.content)) }),
+      lesson(l.existingId ?? `new-${i}`, l.def.title, 'm', { slug: l.def.slug, content: reorder(JSON.parse(JSON.stringify(l.content))) }),
     )
     const renamed = first.moduleOps.map((m, i) => ({ id: m.existingId ?? `mod-${i}`, title: m.title, position: m.position }))
     const second = planSync(renamed, [...after, lesson('l2', 'Quick check', 'm-a', { archivedAt: new Date() })], NO_MEDIA)

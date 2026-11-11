@@ -74,7 +74,7 @@ export function planSync(modules: ExistingModule[], lessons: ExistingLesson[], m
         moduleKey: m.key,
         position: i + 1,
         content,
-        contentChanged: !existing || JSON.stringify(existing.content ?? null) !== JSON.stringify(content),
+        contentChanged: !existing || canonical(existing.content ?? null) !== canonical(content),
       })
     })
   }
@@ -82,6 +82,13 @@ export function planSync(modules: ExistingModule[], lessons: ExistingLesson[], m
   const archive = lessons.filter((l) => !claimed.has(l.id) && !l.archivedAt).map((l) => l.id)
   const unusedModules = modules.filter((m) => !claimedModules.has(m.id)).map((m) => m.id)
   return { moduleOps, lessonOps, archive, unusedModules }
+}
+
+/** JSON with sorted keys: Postgres JSONB does not keep key order, so plain stringify always differs. */
+export function canonical(value: unknown): string {
+  const sort = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sort) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort((v as Record<string, unknown>)[k])])) : v
+  return JSON.stringify(sort(JSON.parse(JSON.stringify(value))))
 }
 
 export function lessonFields(def: LessonDef) {
