@@ -10,6 +10,8 @@ import {
   tenantHomeUrlForUser,
 } from '@/server/auth/login-redirect'
 import { env } from '@/lib/env'
+import Link from 'next/link'
+import { isAcademy } from '@/server/modules/lms/academy-tenant'
 
 export const metadata = { title: 'Sign in' }
 
@@ -53,13 +55,16 @@ export default async function LoginPage({
   }
 
   const school = tenant?.school
+  const academy = isAcademy(tenant)
   const title = school?.name ?? env().APP_NAME
   const headline = school?.loginHeadline ?? `Welcome to ${title}`
   const subtext =
     school?.loginSubtext ??
-    (tenant
-      ? 'Sign in to view attendance, homework, fees and results.'
-      : 'Platform administration console.')
+    (academy
+      ? 'Sign in to continue your courses and live classes.'
+      : tenant
+        ? 'Sign in to view attendance, homework, fees and results.'
+        : 'Platform administration console.')
   const bannerUrl = school?.loginBannerUrl ?? null
   const notice = LOGIN_NOTICES[params.notice ?? '']
 
@@ -150,6 +155,23 @@ export default async function LoginPage({
             ) : null}
 
             <LoginForm next={params.next} showForgotPassword={!!tenant} />
+
+            {academy ? (
+              <p className="mt-5 text-sm text-ink-muted">
+                New here?{' '}
+                <Link
+                  href={params.next ? `/academy/join?next=${encodeURIComponent(params.next)}` : '/academy/join'}
+                  className="font-medium text-[var(--brand-600)] hover:underline"
+                >
+                  Create a free account
+                </Link>{' '}
+                or{' '}
+                <Link href="/academy" className="font-medium text-[var(--brand-600)] hover:underline">
+                  browse courses
+                </Link>
+                .
+              </p>
+            ) : null}
           </div>
 
           <p className="mt-8 text-xs text-ink-subtle flex items-center gap-1.5">
@@ -190,7 +212,9 @@ export default async function LoginPage({
         ) : null}
         <div className="relative max-w-md">
           <p className="text-xl leading-snug">
-            Attendance, fees, homework, results and transport in one record system.
+            {academy
+              ? 'Robotics, AI and coding: lessons at your pace, live classes and certificates.'
+              : 'Attendance, fees, homework, results and transport in one record system.'}
           </p>
           {tenant ? (
             <p className="mt-3 text-base text-white/70">

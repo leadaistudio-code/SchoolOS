@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Award } from 'lucide-react'
 import { ApiException } from '@/server/api/response'
 import { requireLms } from '@/server/modules/lms/access'
+import { issueCertificateFor } from '@/server/modules/lms/certificates'
 import { courseForLearner } from '@/server/modules/lms/learning'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,6 +30,7 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
   const category = lmsCategory(course.category)
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
   const doneCount = lessons.filter((l) => completed.has(l.id)).length
+  const certificate = enrollment.completedAt ? await issueCertificateFor(ctx, enrollment.id) : null
 
   return (
     <div className="space-y-4">
@@ -76,6 +78,11 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
               </p>
               {enrollment.completedAt ? (
                 <Notice tone="success" title="Course complete">Well done! You can go back over any lesson.</Notice>
+              ) : null}
+              {certificate && !certificate.revokedAt ? (
+                <Link href={`/my/learning/certificates/${certificate.id}`} className={buttonVariants({ block: true, variant: 'subtle' })}>
+                  <Award /> View your certificate
+                </Link>
               ) : null}
               {resumeLessonId ? (
                 <Link href={`/my/learning/${course.id}/${resumeLessonId}`} className={buttonVariants({ block: true, size: 'lg' })}>

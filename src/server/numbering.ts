@@ -13,7 +13,7 @@ export type DocumentKind =
   | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
   | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
   | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT' | 'EXPENSE_VOUCHER'
-  | 'FIXED_ASSET' | 'DEPRECIATION_RUN' | 'EXPENSE_REQUEST'
+  | 'FIXED_ASSET' | 'DEPRECIATION_RUN' | 'EXPENSE_REQUEST' | 'LMS_CERTIFICATE' | 'ACADEMY_ORDER'
 
 const PREFIX: Record<DocumentKind, string> = {
   EXPENSE_VOUCHER: 'EXP',
@@ -34,6 +34,8 @@ const PREFIX: Record<DocumentKind, string> = {
   STORE_SALE: 'STR',
   STORE_PURCHASE: 'GRN',
   TC: 'TC',
+  LMS_CERTIFICATE: 'LMS',
+  ACADEMY_ORDER: 'ACD',
 }
 
 const TABLE: Record<DocumentKind, string> = {
@@ -55,6 +57,8 @@ const TABLE: Record<DocumentKind, string> = {
   STORE_SALE: 'StoreSale',
   STORE_PURCHASE: 'StorePurchase',
   TC: 'TransferCertificate',
+  LMS_CERTIFICATE: 'LmsCertificate',
+  ACADEMY_ORDER: 'LmsAcademyOrder',
 }
 
 const COLUMN: Partial<Record<DocumentKind, string>> = {

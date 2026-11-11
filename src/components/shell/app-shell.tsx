@@ -42,6 +42,8 @@ export function AppShell({
   navigation,
   schoolName,
   logoUrl,
+  caption,
+  showPromo,
   user,
   unreadCount,
   unreadMessages,
@@ -54,6 +56,8 @@ export function AppShell({
   navigation: NavItem[]
   schoolName: string
   logoUrl: string | null
+  caption?: string
+  showPromo?: boolean
   user: TopbarUser
   unreadCount: number
   unreadMessages: number
@@ -126,6 +130,8 @@ export function AppShell({
             items={navigation}
             schoolName={schoolName}
             logoUrl={logoUrl}
+            caption={caption}
+            showPromo={showPromo}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
           />
@@ -150,6 +156,8 @@ export function AppShell({
                 items={navigation}
                 schoolName={schoolName}
                 logoUrl={logoUrl}
+                caption={caption}
+                showPromo={showPromo}
                 onNavigate={() => setDrawerOpen(false)}
               />
             </div>

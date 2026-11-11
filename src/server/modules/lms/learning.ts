@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '@/server/api/response'
 import { FEATURE, assertWithinLimit } from '@/server/entitlements'
 import { gradeQuiz, publicQuiz, type Quiz, type QuizResult } from '@/lib/lms/options'
 import { assertLms } from './access'
+import { issueCertificateFor } from './certificates'
 
 /**
  * The student's side: which courses are open to them, the lesson player, and
@@ -192,6 +193,7 @@ export async function finishIfDone(ctx: AppContext, enrollmentId: string, course
       completedAt: complete ? (enrollment.completedAt ?? new Date()) : null,
     },
   })
+  if (complete) await issueCertificateFor(ctx, enrollmentId)
   return { complete, done, total }
 }
 

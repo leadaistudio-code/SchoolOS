@@ -1,4 +1,7 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
+import { isAcademy } from '@/server/modules/lms/academy-tenant'
+import { isPortalOnlyRole } from '@/server/scope'
 import { requireContext } from '@/server/context'
 import { AdminDashboard } from './dashboard-admin'
 import { SelfDashboard } from './dashboard-self'
@@ -10,7 +13,9 @@ import { DashboardSkeleton } from '@/components/dashboard/skeletons'
 export const metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
-  const ctx = await requireContext('dashboard.view')
+  const ctx = await requireContext()
+  if (isAcademy(ctx.tenant) && isPortalOnlyRole(ctx.user.roleKeys)) redirect('/my/learning')
+  if (!ctx.can('dashboard.view')) redirect('/403')
 
   // Students and parents get a fundamentally different page, not a cut-down
   // version of the staff dashboard.

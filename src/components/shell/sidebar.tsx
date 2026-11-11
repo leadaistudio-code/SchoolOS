@@ -42,6 +42,8 @@ export function Sidebar({
   items,
   schoolName,
   logoUrl,
+  caption = 'School management',
+  showPromo = true,
   collapsed = false,
   onNavigate,
   onToggleCollapse,
@@ -49,6 +51,8 @@ export function Sidebar({
   items: NavItem[]
   schoolName: string
   logoUrl: string | null
+  caption?: string
+  showPromo?: boolean
   collapsed?: boolean
   onNavigate?: () => void
   /**
@@ -90,7 +94,7 @@ export function Sidebar({
                 {schoolName}
               </span>
               <span className="block truncate text-[11px] text-[var(--sidebar-caption)]">
-                School management
+                {caption}
               </span>
             </span>
             {onToggleCollapse ? (
@@ -136,7 +140,7 @@ export function Sidebar({
         ))}
       </div>
 
-      {!collapsed ? <PromoCard /> : null}
+      {!collapsed && showPromo ? <PromoCard /> : null}
 
       {onToggleCollapse ? (
         <div

@@ -5,6 +5,7 @@ import { istDateTime } from '@/lib/ist-clock'
 import { isHttpsUrl, liveState, JOIN_EARLY_MINUTES } from '@/lib/lms/live'
 import { assertLms, actorOf, auditLms } from './access'
 import { requireLearner, type Learner } from './learning'
+import { isAcademy } from './academy-tenant'
 
 /**
  * Live, instructor-led classes. The school schedules classes for a batch and
@@ -77,8 +78,9 @@ async function audienceLabels(ctx: AppContext, rows: { classLevelId: string | nu
   ])
   const c = new Map(classes.map((x) => [x.id, x.name]))
   const s = new Map(sections.map((x) => [x.id, x.name]))
-  return (r: { classLevelId: string | null; sectionId: string | null }) =>
-    !r.classLevelId ? 'Whole school' : r.sectionId ? `${c.get(r.classLevelId) ?? 'Class'} – ${s.get(r.sectionId) ?? ''}` : c.get(r.classLevelId) ?? 'Class'
+  const everyone = isAcademy(ctx.tenant) ? 'All learners' : 'Whole school'
+  return (r: { classLevelId: string | null; sectionId: string | null; courseId?: string | null }) =>
+    isAcademy(ctx.tenant) && r.courseId ? 'Learners of the course' : !r.classLevelId ? everyone : r.sectionId ? `${c.get(r.classLevelId) ?? 'Class'} – ${s.get(r.sectionId) ?? ''}` : c.get(r.classLevelId) ?? 'Class'
 }
 
 /** Current students a batch reaches. */
@@ -88,6 +90,22 @@ function audienceWhere(b: { classLevelId: string | null; sectionId: string | nul
     student: { deletedAt: null, status: 'ACTIVE' as const },
     ...(b.sectionId ? { sectionId: b.sectionId } : b.classLevelId ? { classLevelId: b.classLevelId } : {}),
   }
+}
+
+/** Academy learners have no class: a batch reaches whoever bought its course, or every learner. */
+function academyAudienceWhere(b: { courseId: string | null }) {
+  return {
+    deletedAt: null,
+    status: 'ACTIVE' as const,
+    userId: { not: null },
+    ...(b.courseId ? { lmsEnrollments: { some: { courseId: b.courseId } } } : {}),
+  }
+}
+
+async function audienceSizeOf(ctx: AppContext, b: { classLevelId: string | null; sectionId: string | null; courseId: string | null }) {
+  return isAcademy(ctx.tenant)
+    ? ctx.db.student.count({ where: academyAudienceWhere(b) })
+    : ctx.db.enrollment.count({ where: audienceWhere(b) })
 }
 
 export async function listBatches(ctx: AppContext) {
@@ -205,7 +223,7 @@ export async function getBatch(ctx: AppContext, id: string) {
       orderBy: { startsAt: 'asc' },
       include: { _count: { select: { attendance: true } } },
     }),
-    ctx.db.enrollment.count({ where: audienceWhere(batch) }),
+    audienceSizeOf(ctx, batch),
   ])
   return {
     batch: { ...batch, audience: label(batch) },
@@ -291,15 +309,29 @@ export async function liveClassAttendance(ctx: AppContext, id: string) {
   await require(ctx, 'lms.view')
   const row = await getClassRow(ctx, id)
   const [audience, joined] = await Promise.all([
-    ctx.db.enrollment.findMany({
-      where: audienceWhere(row.batch),
-      select: {
-        studentId: true,
-        student: { select: { firstName: true, lastName: true, admissionNo: true } },
-        classLevel: { select: { name: true, numeric: true } },
-        section: { select: { name: true } },
-      },
-    }),
+    isAcademy(ctx.tenant)
+      ? ctx.db.student
+          .findMany({
+            where: academyAudienceWhere(row.batch),
+            select: { id: true, firstName: true, lastName: true, admissionNo: true },
+          })
+          .then((list) =>
+            list.map((s) => ({
+              studentId: s.id,
+              student: s,
+              classLevel: { name: 'Academy', numeric: 0 },
+              section: null as { name: string } | null,
+            })),
+          )
+      : ctx.db.enrollment.findMany({
+          where: audienceWhere(row.batch),
+          select: {
+            studentId: true,
+            student: { select: { firstName: true, lastName: true, admissionNo: true } },
+            classLevel: { select: { name: true, numeric: true } },
+            section: { select: { name: true } },
+          },
+        }),
     ctx.db.lmsLiveAttendance.findMany({ where: { liveClassId: id } }),
   ])
   const byStudent = new Map(joined.map((j) => [j.studentId, j]))
@@ -324,7 +356,14 @@ export async function liveClassAttendance(ctx: AppContext, id: string) {
 
 /* ------------------------------------------------------------ students */
 
-function learnerBatchWhere(learner: Learner) {
+export async function learnerBatchWhere(ctx: AppContext, learner: Learner) {
+  if (isAcademy(ctx.tenant)) {
+    const owned = await ctx.db.lmsEnrollment.findMany({ where: { studentId: learner.id }, select: { courseId: true } })
+    return {
+      archivedAt: null,
+      OR: [{ courseId: null }, { courseId: { in: owned.map((o) => o.courseId) } }],
+    }
+  }
   const p = learner.placement
   return {
     archivedAt: null,
@@ -338,7 +377,7 @@ function learnerBatchWhere(learner: Learner) {
 export async function myLiveClasses(ctx: AppContext) {
   const learner = await requireLearner(ctx)
   const batches = await ctx.db.lmsBatch.findMany({
-    where: learnerBatchWhere(learner),
+    where: await learnerBatchWhere(ctx, learner),
     select: { id: true, title: true, meetingUrl: true, instructorName: true, course: { select: { id: true, title: true } } },
   })
   const classes = await ctx.db.lmsLiveClass.findMany({
@@ -372,7 +411,7 @@ export async function myLiveClasses(ctx: AppContext) {
 
 async function learnerClass(ctx: AppContext, learner: Learner, id: string) {
   const row = await ctx.db.lmsLiveClass.findFirst({
-    where: { id, batch: learnerBatchWhere(learner) },
+    where: { id, batch: await learnerBatchWhere(ctx, learner) },
     include: { batch: { select: { title: true, meetingUrl: true, instructorName: true, course: { select: { id: true, title: true } } } } },
   })
   if (!row) throw notFound('Live class')

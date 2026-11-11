@@ -157,6 +157,17 @@ const serverSchema = z.object({
   PAYMENT_KEY_SECRET: z.string().optional(),
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
 
+  /** Subdomain of the platform-run school that public learners join. */
+  ACADEMY_SLUG: z.string().default('academy'),
+  /**
+   * The platform's own Razorpay account, used only for Academy course sales.
+   * Without the key pair, development and tests use a simulated checkout;
+   * production refuses to sell.
+   */
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+
   MAPS_DRIVER: z.enum(['none', 'google', 'mapbox']).default('none'),
   MAPS_API_KEY: z.string().optional(),
 

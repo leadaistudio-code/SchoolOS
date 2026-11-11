@@ -1,4 +1,7 @@
+import Link from 'next/link'
+import { ChartColumn, Store } from 'lucide-react'
 import { requirePlatformContext } from '@/server/context'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { listOwnCourses } from '@/server/modules/lms/content'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
@@ -28,7 +31,17 @@ export default async function PlatformLmsPage() {
       <PageHeader
         title="Robotics & AI courses"
         description={`${courses.length} course${courses.length === 1 ? '' : 's'} · ${published} published to every school with the add-on`}
-        actions={<NewCourseButton createCourse={createCourseAction} builderPath="/platform/lms/:id" />}
+        actions={
+          <>
+            <Link href="/platform/lms/usage" className={buttonVariants({ variant: 'secondary' })}>
+              <ChartColumn /> Usage by school
+            </Link>
+            <Link href="/platform/lms/academy" className={buttonVariants({ variant: 'secondary' })}>
+              <Store /> Academy
+            </Link>
+            <NewCourseButton createCourse={createCourseAction} builderPath="/platform/lms/:id" />
+          </>
+        }
       />
       {courses.length === 0 ? (
         <Card>

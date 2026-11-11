@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { getContext } from '@/server/context'
 import { getEntitlements } from '@/server/entitlements'
-import { NAVIGATION, visibleNavigation, visibleQuickActions } from '@/lib/navigation'
+import { ACADEMY_LEARNER_NAVIGATION, NAVIGATION, visibleNavigation, visibleQuickActions } from '@/lib/navigation'
+import { isAcademy } from '@/server/modules/lms/academy-tenant'
 import { AppShell } from '@/components/shell/app-shell'
 import { ROLE_BY_KEY } from '@/lib/rbac/roles'
 import { unreadThreadCount } from '@/server/modules/messages/service'
@@ -29,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ) {
       redirect('/suspended')
     }
-    redirect('/login')
+    redirect(isAcademy(tenant) && !user ? '/academy' : '/login')
   }
 
   const [entitlements, accountingFlags, groupOwner] = await Promise.all([
@@ -38,7 +39,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     isGroupOwner(ctx),
   ])
 
-  const navigation = visibleNavigation(NAVIGATION, {
+  const portal = isPortalOnlyRole(ctx.user.roleKeys)
+  const academy = isAcademy(ctx.tenant)
+  const navigation = visibleNavigation(portal && academy ? ACADEMY_LEARNER_NAVIGATION : NAVIGATION, {
     can: ctx.can,
     hasFeature: (feature) => entitlements[feature]?.enabled ?? false,
     isPortal: isPortalOnlyRole(ctx.user.roleKeys),
@@ -74,6 +77,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       navigation={navigation}
       schoolName={ctx.tenant.school?.name ?? ctx.tenant.name}
       logoUrl={ctx.tenant.school?.logoUrl ?? null}
+      caption={academy ? 'Robotics & AI courses' : undefined}
+      showPromo={!academy}
       unreadCount={unreadCount}
       unreadMessages={unreadMessages}
       sessionName={session?.name ?? null}

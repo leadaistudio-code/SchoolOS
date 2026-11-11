@@ -2368,6 +2368,26 @@ async function seedLmsStarterCourse() {
   }
 }
 
+async function seedLmsDemoKit() {
+  const demo = await prisma.tenant.findUnique({ where: { slug: 'demo' } })
+  const course = await prisma.lmsCourse.findFirst({ where: { tenantId: null, title: 'Robotics 101: Build a line-follower', deletedAt: null } })
+  if (!demo || !course) return
+  const name = 'Arduino line-follower kit'
+  if (await prisma.lmsKit.findFirst({ where: { tenantId: demo.id, name } })) return
+  console.log('  robotics kit register')
+  await prisma.lmsKit.create({
+    data: {
+      tenantId: demo.id,
+      name,
+      code: 'LF-01',
+      courseId: course.id,
+      quantity: 20,
+      description: '1 × Arduino Uno and USB cable\n2 × IR line sensors\n1 × L298N motor driver\n2 × DC gear motors with wheels\n1 × Chassis, castor wheel and battery holder',
+      createdByLabel: 'Demo setup',
+    },
+  })
+}
+
 /* ------------------------------------------------------------------- main */
 
 async function main() {
@@ -2443,6 +2463,7 @@ async function main() {
   }
   await seedSchoolGroup()
   await seedLmsStarterCourse()
+  await seedLmsDemoKit()
 
   const counts = {
     tenants: await prisma.tenant.count(),

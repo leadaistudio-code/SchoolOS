@@ -8356,17 +8356,21 @@ model LmsCourse {
   outcomes       String[]        @default([])
   status         LmsCourseStatus @default(DRAFT)
   publishedAt    DateTime?
+  /// Price on the public Academy, in paise. Null: not sold there; 0: free.
+  academyPriceMinor Int?
   createdById    String?
   createdByLabel String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   deletedAt      DateTime?
 
-  modules     LmsModule[]
-  lessons     LmsLesson[]
-  assignments LmsCourseAssignment[]
-  enrollments LmsEnrollment[]
-  batches     LmsBatch[]
+  modules       LmsModule[]
+  lessons       LmsLesson[]
+  assignments   LmsCourseAssignment[]
+  enrollments   LmsEnrollment[]
+  batches       LmsBatch[]
+  kits          LmsKit[]
+  academyOrders LmsAcademyOrder[]
 
   @@index([tenantId, status])
 }
@@ -8455,6 +8459,7 @@ model LmsEnrollment {
   progress    LmsLessonProgress[]
   attempts    LmsQuizAttempt[]
   submissions LmsProjectSubmission[]
+  certificate LmsCertificate?
 
   @@unique([tenantId, courseId, studentId])
   @@index([tenantId, studentId])
@@ -8592,4 +8597,124 @@ model LmsProjectSubmission {
 
   @@unique([enrollmentId, lessonId])
   @@index([tenantId, status, submittedAt])
+}
+
+/// Issued automatically when a student finishes a course. Names are copied in
+/// so the public verification page still reads right if the course changes.
+model LmsCertificate {
+  id             String    @id @default(cuid())
+  tenantId       String
+  enrollmentId   String    @unique
+  courseId       String
+  studentId      String
+  /// LMS-2627-00001
+  number         String
+  verifyToken    String    @unique
+  studentName    String
+  courseTitle    String
+  courseCategory String
+  courseLevel    LmsLevel
+  lessons        Int
+  minutes        Int
+  /// Average best score across the course's quizzes and scored projects.
+  scorePercent   Int?
+  issuedAt       DateTime  @default(now())
+  revokedAt      DateTime?
+  revokedReason  String?
+  revokedByLabel String?
+
+  enrollment LmsEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, number])
+  @@index([tenantId, studentId])
+  @@index([tenantId, issuedAt])
+}
+
+enum LmsKitCondition {
+  GOOD
+  DAMAGED
+  PARTS_MISSING
+  LOST
+}
+
+/// A type of robotics kit the school lends out, with how many it holds.
+model LmsKit {
+  id             String    @id @default(cuid())
+  tenantId       String
+  name           String
+  code           String?
+  description    String?
+  courseId       String?
+  quantity       Int
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  course LmsCourse?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  loans  LmsKitLoan[]
+
+  @@index([tenantId, name])
+}
+
+/// Kits handed to a student. Open until returnedAt is set; a LOST return
+/// takes the kits out of the school's stock.
+model LmsKitLoan {
+  id              String           @id @default(cuid())
+  tenantId        String
+  kitId           String
+  studentId       String
+  quantity        Int              @default(1)
+  issuedAt        DateTime         @default(now())
+  dueOn           DateTime?        @db.Date
+  note            String?
+  issuedById      String?
+  issuedByLabel   String?
+  returnedAt      DateTime?
+  returnCondition LmsKitCondition?
+  returnNote      String?
+  returnedByLabel String?
+
+  kit LmsKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, returnedAt, dueOn])
+  @@index([kitId, returnedAt])
+}
+
+enum LmsOrderStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
+/// A public learner buying a course on the Academy. The row exists before the
+/// learner reaches Razorpay, so a payment that never returns is still traceable.
+model LmsAcademyOrder {
+  id                String         @id @default(cuid())
+  tenantId          String
+  /// ACD-2627-00001, given when the payment is confirmed.
+  number            String?
+  courseId          String
+  studentId         String
+  userId            String
+  amountMinor       Int
+  currency          String         @default("INR")
+  status            LmsOrderStatus @default(CREATED)
+  /// "razorpay" or "simulated".
+  provider          String
+  providerOrderId   String?        @unique
+  providerPaymentId String?
+  failureReason     String?
+  paidAt            DateTime?
+  raw               Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  course LmsCourse @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, studentId])
 }

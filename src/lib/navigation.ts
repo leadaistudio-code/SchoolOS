@@ -152,9 +152,13 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: 'My courses', href: '/my/learning', icon: 'GraduationCap', permission: 'lms.learn', portalOnly: true },
       { label: 'Live classes', href: '/my/learning/live', icon: 'Video', permission: 'lms.learn', portalOnly: true },
+      { label: 'My certificates', href: '/my/learning/certificates', icon: 'Award', permission: 'lms.learn', portalOnly: true },
+      { label: 'Progress', href: '/lms/insights', icon: 'ChartColumn', permission: 'lms.view', staffOnly: true },
       { label: 'Course catalogue', href: '/lms', icon: 'LibraryBig', permission: 'lms.view', staffOnly: true },
       { label: 'Live classes', href: '/lms/live', icon: 'Video', permission: 'lms.view', staffOnly: true },
       { label: 'Project reviews', href: '/lms/reviews', icon: 'ClipboardCheck', permission: 'lms.teach', staffOnly: true },
+      { label: 'Certificates', href: '/lms/certificates', icon: 'Award', permission: 'lms.view', staffOnly: true },
+      { label: 'Robotics kits', href: '/lms/kits', icon: 'Package', permission: 'lms.view', staffOnly: true },
     ],
   },
   {
@@ -572,6 +576,15 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Help & Support', href: '/help/tickets', icon: 'LifeBuoy', permission: 'support.view' },
     ],
   },
+]
+
+/** What a public learner on the Academy sees: their courses, nothing of school life. */
+export const ACADEMY_LEARNER_NAVIGATION: NavItem[] = [
+  { label: 'My courses', href: '/my/learning', icon: 'GraduationCap', section: 'MAIN' as const, permission: 'lms.learn', mobile: true },
+  { label: 'Live classes', href: '/my/learning/live', icon: 'Video', section: 'MAIN' as const, permission: 'lms.learn', mobile: true },
+  { label: 'My certificates', href: '/my/learning/certificates', icon: 'Award', section: 'MAIN' as const, permission: 'lms.learn', mobile: true },
+  { label: 'Purchases', href: '/my/learning/purchases', icon: 'ReceiptText', section: 'MAIN' as const, permission: 'lms.learn' },
+  { label: 'Browse courses', href: '/academy', icon: 'LibraryBig', section: 'MAIN' as const, mobile: true },
 ]
 
 export type NavPredicate = {

@@ -5,6 +5,7 @@ import { getSessionUser, type SessionUser } from '@/server/auth/session'
 import { resolveTenant, type ResolvedTenant } from '@/server/tenant'
 import { tenantDb, type TenantClient } from '@/server/db/tenant-client'
 import { prisma } from '@/server/db/prisma'
+import { isAcademy } from '@/server/modules/lms/academy-tenant'
 
 export class AuthError extends Error {
   status = 401
@@ -78,7 +79,7 @@ export async function requireContext(permission?: string): Promise<AppContext> {
   }
 
   const ctx = await getContext()
-  if (!ctx) redirect('/login')
+  if (!ctx) redirect(!user && isAcademy(tenant) ? '/academy' : '/login')
   if (ctx.user.mustChangePassword) {
     const h = await headers()
     const path = h.get('x-pathname') ?? ''
