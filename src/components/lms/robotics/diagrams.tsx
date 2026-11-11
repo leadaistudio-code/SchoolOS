@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { AI_DIAGRAM_PARTS, AI_DIAGRAM_TITLES, type AiDiagramName } from './ai-diagrams'
+import { AMBER, Arrow, BLUE, BLUE_INK, GREEN, INK, Label, MUTED, PAPER, RED, show, type Part } from './diagram-kit'
 
 /**
  * Robotics 101 diagrams. Plain SVG with no app dependencies, so the lesson
@@ -7,14 +9,7 @@ import * as React from 'react'
  * illustrations.
  */
 
-export const INK = '#0b0b0d'
-export const PAPER = '#f4f3ef'
-export const AMBER = '#f0a63c'
-export const BLUE = '#dbe7f6'
-export const BLUE_INK = '#2f5fb3'
-export const GREEN = '#2e9e6a'
-export const RED = '#d0473f'
-const MUTED = '#5b5f68'
+export { AMBER, BLUE, BLUE_INK, GREEN, INK, PAPER, RED } from './diagram-kit'
 
 export type DiagramName =
   | 'sense-think-act'
@@ -27,8 +22,10 @@ export type DiagramName =
   | 'pwm'
   | 'flowchart'
   | 'loop'
+  | AiDiagramName
 
 const TITLES: Record<DiagramName, string> = {
+  ...AI_DIAGRAM_TITLES,
   'sense-think-act': 'The Sense, Think, Act loop: IR sensors sense, the Arduino thinks, the motors act, then the loop repeats.',
   'ir-reflect': 'An IR sensor over white floor and over black tape. White reflects the infrared light back to the receiver; black absorbs it.',
   differential: 'Three robots seen from above: equal wheel speeds go straight, a slower left wheel curves left, opposite directions spin on the spot.',
@@ -55,39 +52,6 @@ export function Diagram({ name, className, step }: { name: DiagramName; classNam
 
 export function diagramDescription(name: DiagramName) {
   return TITLES[name]
-}
-
-type Part = { step: number }
-const show = (step: number, at: number) => ({ opacity: step >= at ? 1 : 0, transition: 'opacity 300ms' })
-
-function Label({ x, y, children, size = 15, weight = 600, fill = INK, anchor = 'middle' as 'start' | 'middle' | 'end' }: {
-  x: number
-  y: number
-  children: React.ReactNode
-  size?: number
-  weight?: number
-  fill?: string
-  anchor?: 'start' | 'middle' | 'end'
-}) {
-  return (
-    <text x={x} y={y} fontSize={size} fontWeight={weight} fill={fill} textAnchor={anchor} fontFamily="Manrope, Inter, system-ui, sans-serif">
-      {children}
-    </text>
-  )
-}
-
-function Arrow({ d, color = INK, width = 2.5, dashed }: { d: string; color?: string; width?: number; dashed?: boolean }) {
-  const id = `ah-${color.replace('#', '')}`
-  return (
-    <>
-      <defs>
-        <marker id={id} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill={color} />
-        </marker>
-      </defs>
-      <path d={d} fill="none" stroke={color} strokeWidth={width} markerEnd={`url(#${id})`} strokeDasharray={dashed ? '6 6' : undefined} strokeLinecap="round" />
-    </>
-  )
 }
 
 /* ------------------------------------------------------------ components */
@@ -562,6 +526,7 @@ function LoopDiagram({ step }: Part) {
 }
 
 const DIAGRAMS: Record<DiagramName, (p: Part) => React.ReactElement> = {
+  ...AI_DIAGRAM_PARTS,
   'sense-think-act': SenseThinkAct,
   'ir-reflect': IrReflect,
   differential: Differential,

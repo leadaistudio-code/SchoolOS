@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { Eye, FileText, Pencil } from 'lucide-react'
 import { requireLms } from '@/server/modules/lms/access'
 import { classOptions, courseAssignments, courseLessonBreakdown, courseProgress } from '@/server/modules/lms/school'
-import { BADGES, MEDIA_BASE, RESOURCES, earnedBadges, isRobotics101 } from '@/lib/lms/robotics101'
+import { earnedBadges } from '@/lib/lms/curriculum'
+import { curriculumFor } from '@/lib/lms/curricula'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
@@ -48,9 +49,9 @@ export default async function LmsCoursePage({
   const category = lmsCategory(course.category)
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
   const tab = query.tab === 'outline' || query.tab === 'lessons' ? query.tab : 'progress'
-  const robotics = isRobotics101(lessons.map((l) => l.slug))
+  const curriculum = curriculumFor(lessons.map((l) => l.slug))
   const badgeCount = (studentId: string) =>
-    earnedBadges(breakdown.completedSlugsByStudent.get(studentId) ?? new Set()).filter((b) => b.earned).length
+    earnedBadges(curriculum?.badges ?? [], breakdown.completedSlugsByStudent.get(studentId) ?? new Set()).filter((b) => b.earned).length
   const classNames = [...new Set(rows.map((r) => r.className).filter(Boolean))]
   const visibleRows = query.class ? rows.filter((r) => r.className === query.class) : rows
   const firstLesson = lessons[0]
@@ -125,17 +126,17 @@ export default async function LmsCoursePage({
         </Card>
       ) : null}
 
-      {robotics ? (
+      {curriculum ? (
         <Card>
           <CardHeader>
             <CardTitle>Teacher resources</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {RESOURCES.map((r) => (
+              {curriculum.resources.map((r) => (
                 <li key={r.id}>
                   <a
-                    href={`${MEDIA_BASE}/${r.file}`}
+                    href={`${curriculum.mediaBase}/${r.file}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-start gap-2 rounded-lg border border-line p-2.5 text-sm hover:bg-surface-2"
@@ -198,7 +199,7 @@ export default async function LmsCoursePage({
                     <TH>Class</TH>
                     <TH className="w-56">Progress</TH>
                     <TH align="right">Quiz average</TH>
-                    {robotics ? <TH align="right">Badges</TH> : null}
+                    {curriculum ? <TH align="right">Badges</TH> : null}
                     <TH align="right">Last active</TH>
                   </tr>
                 </THead>
@@ -226,7 +227,7 @@ export default async function LmsCoursePage({
                         )}
                       </TD>
                       <TD align="right">{r.quizAverage !== null ? `${r.quizAverage}%` : '—'}</TD>
-                      {robotics ? <TD align="right" className="tnum">{badgeCount(r.studentId)}/{BADGES.length}</TD> : null}
+                      {curriculum ? <TD align="right" className="tnum">{badgeCount(r.studentId)}/{curriculum.badges.length}</TD> : null}
                       <TD align="right">
                         {r.completedAt ? (
                           <span className="text-success">Finished {shortDate(r.completedAt)}</span>

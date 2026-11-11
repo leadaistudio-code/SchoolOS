@@ -1,0 +1,119 @@
+1
+00:00:00,600 --> 00:00:02,908
+MyCampusView Academy.
+
+2
+00:00:02,958 --> 00:00:06,390
+AI for Young Builders, video 8.
+
+3
+00:00:06,440 --> 00:00:10,770
+Decision trees: AI that asks questions.
+
+4
+00:00:11,950 --> 00:00:17,555
+Remember the game where you guess an animal by asking yes or no questions?
+
+5
+00:00:17,605 --> 00:00:21,070
+A decision tree is an AI that plays that game.
+
+6
+00:00:22,450 --> 00:00:28,926
+It starts with one question at the top, called the root.
+
+7
+00:00:28,976 --> 00:00:30,441
+Has feathers?
+
+8
+00:00:30,491 --> 00:00:32,539
+Yes: it is a bird.
+
+9
+00:00:32,589 --> 00:00:33,938
+No: has fur?
+
+10
+00:00:33,988 --> 00:00:35,336
+Yes: mammal.
+
+11
+00:00:35,386 --> 00:00:36,385
+No: fish.
+
+12
+00:00:36,435 --> 00:00:41,280
+The answers at the ends are called leaves.
+
+13
+00:00:42,650 --> 00:00:45,590
+The skill is choosing good questions.
+
+14
+00:00:45,640 --> 00:00:49,145
+Has feathers splits out the birds perfectly.
+
+15
+00:00:49,195 --> 00:00:55,043
+Is it brown is useless, because birds, fish and mammals can all be brown.
+
+16
+00:00:55,093 --> 00:01:01,830
+Computers build trees by trying every question and keeping the one that splits best.
+
+17
+00:01:03,150 --> 00:01:06,354
+Now test your tree on tricky animals.
+
+18
+00:01:06,404 --> 00:01:09,783
+A whale lives in water but is a mammal.
+
+19
+00:01:09,833 --> 00:01:12,949
+A penguin is a bird that cannot fly.
+
+20
+00:01:12,999 --> 00:01:15,411
+A bat flies but is a mammal.
+
+21
+00:01:15,461 --> 00:01:21,830
+A tree that is perfect on its training animals can still trip over these.
+
+22
+00:01:23,150 --> 00:01:27,666
+Decision trees have a superpower: you can read every step.
+
+23
+00:01:27,716 --> 00:01:32,310
+That means people can check them and spot unfair questions.
+
+24
+00:01:32,360 --> 00:01:38,292
+So they are used where decisions affect people, like deciding which patients
+
+25
+00:01:38,342 --> 00:01:40,260
+a nurse should see first.
+
+26
+00:01:41,800 --> 00:01:42,997
+Let us recap.
+
+27
+00:01:43,047 --> 00:01:46,929
+A decision tree asks yes-or-no questions.
+
+28
+00:01:46,979 --> 00:01:51,437
+Good questions split examples into pure groups.
+
+29
+00:01:51,487 --> 00:01:54,698
+You can read and check every step.
+
+30
+00:01:54,748 --> 00:01:59,110
+Next: Teaching AI to read: words and feelings.

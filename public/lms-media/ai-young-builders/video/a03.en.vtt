@@ -1,0 +1,109 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.032
+MyCampusView Academy.
+
+2
+00:00:03.082 --> 00:00:06.697
+AI for Young Builders, video 3.
+
+3
+00:00:06.747 --> 00:00:09.770
+Data: features and labels.
+
+4
+00:00:10.950 --> 00:00:15.487
+An AI is only as good as the examples it learns from.
+
+5
+00:00:15.537 --> 00:00:19.900
+So let us look closely at those examples: the data.
+
+6
+00:00:21.250 --> 00:00:23.868
+Here is some data about fruit.
+
+7
+00:00:23.918 --> 00:00:26.002
+Each row is one example.
+
+8
+00:00:26.052 --> 00:00:31.159
+Colour, size and shape are features: clues we can measure.
+
+9
+00:00:31.209 --> 00:00:36.850
+The fruit name is the label: the answer we want the AI to learn.
+
+10
+00:00:38.150 --> 00:00:40.973
+Good features connect to the label.
+
+11
+00:00:41.023 --> 00:00:44.502
+Colour is a great clue for apple or orange.
+
+12
+00:00:44.552 --> 00:00:47.457
+Ear shape helps tell cats from dogs.
+
+13
+00:00:47.507 --> 00:00:52.054
+But the date a photo was taken tells you nothing at all,
+
+14
+00:00:52.104 --> 00:00:54.270
+so it is a useless feature.
+
+15
+00:00:55.650 --> 00:00:57.582
+Watch out for this trap.
+
+16
+00:00:57.632 --> 00:01:01.960
+If every dog photo shows a brown dog on grass, the AI
+
+17
+00:01:02.010 --> 00:01:06.090
+might learn that a brown thing on grass means dog.
+
+18
+00:01:06.140 --> 00:01:10.220
+Then it gets a white dog indoors completely wrong.
+
+19
+00:01:11.550 --> 00:01:14.419
+So good data has three things.
+
+20
+00:01:14.469 --> 00:01:16.072
+Lots of examples.
+
+21
+00:01:16.122 --> 00:01:23.466
+Lots of variety: different colours, sizes, angles, lighting and backgrounds.
+
+22
+00:01:23.516 --> 00:01:26.190
+And labels that are correct.
+
+23
+00:01:27.700 --> 00:01:29.061
+Let us recap.
+
+24
+00:01:29.111 --> 00:01:31.884
+Data is a set of examples.
+
+25
+00:01:31.934 --> 00:01:37.095
+Features are the clues; the label is the answer.
+
+26
+00:01:37.145 --> 00:01:42.306
+More examples, and more variety, make better AI.
+
+27
+00:01:42.356 --> 00:01:45.780
+Next: How computers see: pixels.

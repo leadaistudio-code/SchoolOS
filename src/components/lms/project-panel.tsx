@@ -39,6 +39,7 @@ export function ProjectPanel({
   upload,
   capstone,
   virtualReady,
+  uploadLabel,
 }: {
   submission: ProjectSubmissionView | null
   submit: (input: ProjectInput) => Promise<LmsResult>
@@ -48,6 +49,8 @@ export function ProjectPanel({
   capstone?: boolean
   /** The simulator challenge tracks are finished (virtual pathway allowed). */
   virtualReady?: boolean
+  /** Outside the capstone: invites screenshots under this heading. */
+  uploadLabel?: string
 }) {
   const router = useRouter()
   const { push } = useToast()
@@ -65,7 +68,7 @@ export function ProjectPanel({
 
   function send() {
     startTransition(async () => {
-      const result = await submit(capstone ? form : { note: form.note, linkUrl: form.linkUrl })
+      const result = await submit(capstone ? form : { note: form.note, linkUrl: form.linkUrl, ...(uploadLabel ? { fileKeys: form.fileKeys } : {}) })
       push({ tone: result.ok ? 'success' : 'error', title: result.message })
       if (result.ok) {
         setEditing(false)
@@ -145,9 +148,9 @@ export function ProjectPanel({
             <Field label={capstone ? 'Tell your teacher about it' : 'What did you build?'} htmlFor="p-note" hint="What works, what was hard, and one problem you fixed">
               <Textarea id="p-note" rows={5} value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
             </Field>
-            {capstone && upload && form.pathway !== 'VIRTUAL' ? (
+            {upload && (capstone ? form.pathway !== 'VIRTUAL' : !!uploadLabel) ? (
               <div>
-                <p className="text-sm font-medium text-ink">Photos of your robot and track</p>
+                <p className="text-sm font-medium text-ink">{capstone ? 'Photos of your robot and track' : uploadLabel}</p>
                 <p className="text-xs text-ink-muted">Up to 4 photos (JPG, PNG, WebP) or a PDF. Only you and your teachers can see them.</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {(form.fileKeys ?? []).map((k) => (
@@ -175,7 +178,11 @@ export function ProjectPanel({
             <Field
               label={capstone ? 'Video link (optional)' : 'Link to your work'}
               htmlFor="p-link"
-              hint="A video of it working (Google Drive or unlisted YouTube), or your code on GitHub / Tinkercad. Make sure your teacher can open it."
+              hint={
+                capstone
+                  ? 'A video of it working (Google Drive or unlisted YouTube), or your code on GitHub / Tinkercad. Make sure your teacher can open it.'
+                  : 'A video or slides showing your work (Google Drive or unlisted YouTube). Make sure your teacher can open it.'
+              }
             >
               <Input id="p-link" value={form.linkUrl} onChange={(e) => setForm((f) => ({ ...f, linkUrl: e.target.value }))} placeholder="https://" />
             </Field>

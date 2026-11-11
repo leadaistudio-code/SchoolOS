@@ -8,7 +8,7 @@ import { LessonPlayer } from '@/components/lms/lesson-player'
 import { RichLesson } from '@/components/lms/robotics/rich-lesson'
 import { lessonKind, publicQuiz, type Quiz } from '@/lib/lms/options'
 import { readRichContent, videoForViewer } from '@/lib/lms/rich'
-import { resourcesFor } from '@/lib/lms/robotics101'
+import { lessonResourcesFor, playerOptionsFor } from '@/lib/lms/curricula'
 import { previewCatalogueQuizAction } from '../../../../actions'
 
 export const metadata = { title: 'Preview lesson · Platform' }
@@ -79,7 +79,9 @@ export default async function PlatformLessonPreviewPage({
             nextHref={next ? href(next) : null}
             finishHref={`/platform/lms/${id}`}
             preview
-            resources={resourcesFor(lesson.slug, { teacher: true })}
+            resources={lessonResourcesFor(lesson.slug, { teacher: true })}
+            courseTitle={course.title}
+            player={playerOptionsFor(lesson.slug)}
           />
         ) : (
           <LessonPlayer

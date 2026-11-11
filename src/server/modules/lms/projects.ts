@@ -37,6 +37,12 @@ export function projectFolder(tenantId: string, studentId: string) {
 export const VIRTUAL_TRACKS = ['s-curve', 'sharp'] as const
 
 type SimState = { finished?: Record<string, { seconds: number; baseSpeed: number; at: string }> }
+type ModelState = {
+  counts?: unknown[]
+  trainedOn?: number
+  tests?: { truth?: unknown; predicted?: unknown }[]
+  rounds?: { examples?: unknown; tested?: unknown; accuracy?: unknown }[]
+}
 
 /** Ticked items are counted only against checklist items that exist in the lesson, so state cannot inflate them. */
 export function virtualEvidence(state: unknown, content: unknown) {
@@ -59,8 +65,28 @@ export function virtualEvidence(state: unknown, content: unknown) {
   const simulator = Object.entries(finished)
     .filter(([, r]) => typeof r?.seconds === 'number')
     .map(([track, r]) => ({ track, seconds: r.seconds, baseSpeed: typeof r.baseSpeed === 'number' ? r.baseSpeed : undefined }))
+  const labs = ((content as { blocks?: { type: string; id?: string; title?: string; labels?: string[] }[] } | null)?.blocks ?? []).filter(
+    (b) => b.type === 'classifier-lab' && b.id,
+  )
+  const models = labs.flatMap((lab) => {
+    const m = s[`model:${lab.id}`] as ModelState | undefined
+    if (!m || !Array.isArray(m.counts) || !m.trainedOn) return []
+    const tests = Array.isArray(m.tests) ? m.tests.filter((t) => typeof t?.truth === 'number' && typeof t?.predicted === 'number') : []
+    const rounds = Array.isArray(m.rounds) ? m.rounds.filter((r) => typeof r?.accuracy === 'number').slice(-10) : []
+    return [
+      {
+        title: lab.title ?? 'Model',
+        labels: (lab.labels ?? []).slice(0, 4),
+        examples: (lab.labels ?? []).map((_, i) => Math.max(0, Math.round(Number(m.counts?.[i]) || 0))),
+        tested: tests.length,
+        accuracy: tests.length ? Math.round((tests.filter((t) => t.truth === t.predicted).length / tests.length) * 100) : undefined,
+        rounds: rounds.map((r) => ({ examples: Number(r.examples) || 0, tested: Number(r.tested) || 0, accuracy: Number(r.accuracy) })),
+      },
+    ]
+  })
   return {
     simulator,
+    models,
     checklist: total ? { done, total } : undefined,
     complete: VIRTUAL_TRACKS.every((t) => simulator.some((r) => r.track === t)),
   }
@@ -104,7 +130,7 @@ export async function submitProject(ctx: AppContext, courseId: string, lessonId:
     code: data.code ?? null,
     pathway: data.pathway ?? null,
     fileKeys,
-    evidence: JSON.parse(JSON.stringify({ simulator: evidence.simulator, checklist: evidence.checklist })) as object,
+    evidence: JSON.parse(JSON.stringify({ simulator: evidence.simulator, models: evidence.models, checklist: evidence.checklist })) as object,
     status: 'SUBMITTED' as const,
     submittedAt: new Date(),
   }

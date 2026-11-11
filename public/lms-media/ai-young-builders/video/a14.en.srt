@@ -1,0 +1,127 @@
+1
+00:00:00,600 --> 00:00:02,838
+MyCampusView Academy.
+
+2
+00:00:02,888 --> 00:00:06,324
+AI for Young Builders, video 14.
+
+3
+00:00:06,374 --> 00:00:10,790
+Final project: build and present your AI.
+
+4
+00:00:11,950 --> 00:00:13,391
+This is your moment.
+
+5
+00:00:13,441 --> 00:00:17,864
+Use everything you have learned to build an AI that solves a
+
+6
+00:00:17,914 --> 00:00:19,280
+problem you choose.
+
+7
+00:00:20,650 --> 00:00:26,705
+Every AI project goes round the same loop.
+
+8
+00:00:26,755 --> 00:00:27,431
+Plan.
+
+9
+00:00:27,481 --> 00:00:29,321
+Collect data.
+
+10
+00:00:29,371 --> 00:00:30,193
+Train.
+
+11
+00:00:30,243 --> 00:00:30,920
+Test.
+
+12
+00:00:30,970 --> 00:00:32,083
+Improve.
+
+13
+00:00:32,133 --> 00:00:32,955
+Share.
+
+14
+00:00:33,005 --> 00:00:37,170
+And then, often, round again.
+
+15
+00:00:38,550 --> 00:00:39,785
+Need an idea?
+
+16
+00:00:39,835 --> 00:00:44,530
+A recycling sorter for paper, plastic and metal.
+
+17
+00:00:44,580 --> 00:00:48,485
+Hand signals for a no-touch quiz buzzer.
+
+18
+00:00:48,535 --> 00:00:50,066
+Weather doodles.
+
+19
+00:00:50,116 --> 00:00:53,625
+Or a reader for handwritten numbers.
+
+20
+00:00:53,675 --> 00:00:55,800
+Or your very own idea.
+
+21
+00:00:57,150 --> 00:01:00,698
+Your model’s results are attached automatically.
+
+22
+00:01:00,748 --> 00:01:05,345
+Then write about the problem and who it helps, your data, your
+
+23
+00:01:05,395 --> 00:01:11,192
+test accuracy and biggest mix-up, one improvement with its accuracy before and
+
+24
+00:01:11,242 --> 00:01:14,040
+after, and who your AI might fail for.
+
+25
+00:01:15,350 --> 00:01:19,348
+Here is a secret: your accuracy itself is not graded.
+
+26
+00:01:19,398 --> 00:01:25,686
+An honest seventy percent with good reasoning beats an unexplained hundred percent.
+
+27
+00:01:25,736 --> 00:01:31,490
+Your teacher reviews your project, and you can improve it and send it again.
+
+28
+00:01:33,000 --> 00:01:34,210
+Let us recap.
+
+29
+00:01:34,260 --> 00:01:38,088
+Choose a problem and two to four groups.
+
+30
+00:01:38,138 --> 00:01:40,996
+Collect, train, test, improve.
+
+31
+00:01:41,046 --> 00:01:45,843
+Report accuracy honestly and think about fairness.
+
+32
+00:01:45,893 --> 00:01:51,660
+Next: The final assessment, your badge and your certificate.

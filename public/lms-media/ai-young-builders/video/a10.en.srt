@@ -1,0 +1,123 @@
+1
+00:00:00,600 --> 00:00:02,714
+MyCampusView Academy.
+
+2
+00:00:02,764 --> 00:00:06,012
+AI for Young Builders, video 10.
+
+3
+00:00:06,062 --> 00:00:10,650
+How chatbots write: predicting the next word.
+
+4
+00:00:11,750 --> 00:00:13,471
+Chatbots seem to think.
+
+5
+00:00:13,521 --> 00:00:18,016
+But at their heart they do one simple thing, over and over:
+
+6
+00:00:18,066 --> 00:00:19,710
+predict the next word.
+
+7
+00:00:21,050 --> 00:00:26,248
+Give a language model the words: the cat sat on the.
+
+8
+00:00:26,298 --> 00:00:30,587
+It gives every possible next word a chance.
+
+9
+00:00:30,637 --> 00:00:32,504
+Mat is very likely.
+
+10
+00:00:32,554 --> 00:00:35,330
+Floor and sofa are possible.
+
+11
+00:00:35,380 --> 00:00:37,752
+Banana is very unlikely.
+
+12
+00:00:37,802 --> 00:00:41,990
+It picks one, adds it, and predicts again.
+
+13
+00:00:43,350 --> 00:00:45,638
+Where do the chances come from?
+
+14
+00:00:45,688 --> 00:00:50,162
+The model read a huge amount of text and learned which words
+
+15
+00:00:50,212 --> 00:00:51,746
+tend to follow which.
+
+16
+00:00:51,796 --> 00:00:58,080
+Big chatbots learned from billions of sentences, so their predictions are very good.
+
+17
+00:00:59,450 --> 00:01:04,383
+In your lesson you will train a tiny model on one short story.
+
+18
+00:01:04,433 --> 00:01:09,446
+Start it with the monsoon, and it writes a sentence using words
+
+19
+00:01:09,496 --> 00:01:10,651
+from its story.
+
+20
+00:01:10,701 --> 00:01:14,830
+It sounds sensible, but it has no idea what rain is.
+
+21
+00:01:16,150 --> 00:01:18,223
+Here is the big lesson.
+
+22
+00:01:18,273 --> 00:01:22,561
+A language model picks words that sound likely.
+
+23
+00:01:22,611 --> 00:01:26,252
+It does not check whether they are true.
+
+24
+00:01:26,302 --> 00:01:31,882
+That is why chatbots sometimes invent facts, books or quotes.
+
+25
+00:01:31,932 --> 00:01:34,743
+People call this hallucination.
+
+26
+00:01:34,793 --> 00:01:37,420
+Always check important facts.
+
+27
+00:01:38,900 --> 00:01:40,064
+Let us recap.
+
+28
+00:01:40,114 --> 00:01:45,384
+A language model predicts the next word, again and again.
+
+29
+00:01:45,434 --> 00:01:50,799
+It learns which words follow which from its training text.
+
+30
+00:01:50,849 --> 00:01:55,093
+Sounding likely is not the same as being true.
+
+31
+00:01:55,143 --> 00:01:58,080
+Next: Talk to a real AI, safely.

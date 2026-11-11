@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { VideoFrame } from '@/components/lms/robotics/video-frame'
-import { VIDEOS } from '@/lib/lms/robotics101/videos'
+import { CURRICULA } from '@/lib/lms/curricula'
 
 declare global {
   interface Window {
@@ -12,6 +12,7 @@ declare global {
 }
 
 const root = createRoot(document.getElementById('root')!)
+const VIDEOS = CURRICULA.flatMap((c) => c.videos)
 
 window.__frame = async (id, t) => {
   const video = VIDEOS.find((v) => v.id === id)

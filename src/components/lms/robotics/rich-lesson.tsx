@@ -48,6 +48,15 @@ import { CodeLab, CodeView, IrSimulator, KitExplorer, MotorLab } from './labs'
 import { LessonStateProvider, useLessonState, type SaveState } from './lesson-state'
 import { LineSimulator, type SimRecord } from './line-sim'
 import { LessonVideo } from './video-player'
+import type { PlayerOptions } from '@/lib/lms/curriculum'
+import { AiChat } from '../ai/ai-chat'
+import { AskAiProvider, type AskAi } from '../ai/chat-context'
+import { ClassifierLab } from '../ai/classifier-lab'
+import { NextWordLab } from '../ai/next-word-lab'
+import { PixelLab } from '../ai/pixel-lab'
+import { ScatterLab } from '../ai/scatter-lab'
+import { TreeLab } from '../ai/tree-lab'
+import { WordLab } from '../ai/word-lab'
 
 const STAGES: Record<NonNullable<RichContent['stage']>, string> = {
   watch: 'Watch',
@@ -80,12 +89,18 @@ export type RichLessonProps = {
   resources?: { title: string; href: string; note?: string }[]
   /** Rendered in the right-hand column on wide screens, below the lesson on narrow ones. */
   aside?: React.ReactNode
+  courseTitle?: string
+  player?: PlayerOptions
+  /** The lesson's study helper (AI chat); absent where it cannot run. */
+  askAi?: AskAi
 }
 
 export function RichLesson(props: RichLessonProps) {
   return (
     <LessonStateProvider lessonId={props.lesson.id} initial={props.saved.state} save={props.preview ? undefined : props.saveState}>
-      <RichLessonBody {...props} />
+      <AskAiProvider ask={props.askAi}>
+        <RichLessonBody {...props} />
+      </AskAiProvider>
     </LessonStateProvider>
   )
 }
@@ -107,6 +122,8 @@ function RichLessonBody({
   preview,
   resources,
   aside,
+  courseTitle,
+  player,
 }: RichLessonProps) {
   const router = useRouter()
   const { push } = useToast()
@@ -181,13 +198,19 @@ function RichLessonBody({
           submitProject && !preview ? (
             <>
               {lesson.body ? <LessonText text={lesson.body} className="max-w-3xl" /> : null}
-              <ProjectPanel submission={project ?? null} submit={submitProject} upload={uploadProjectFile} capstone virtualReady={virtualReady} />
+              {player?.capstone ? (
+                <ProjectPanel submission={project ?? null} submit={submitProject} upload={uploadProjectFile} capstone virtualReady={virtualReady} />
+              ) : (
+                <ProjectPanel submission={project ?? null} submit={submitProject} upload={uploadProjectFile} uploadLabel={player?.projectUploads} />
+              )}
             </>
           ) : (
             <>
               {lesson.body ? <LessonText text={lesson.body} className="max-w-3xl" /> : null}
               <Notice tone="info" title="Final challenge">
-                Students hand in photos, code and a video link, a teacher-verified run, or their simulator results. A teacher approves it under Project reviews, which completes the lesson.
+                {player?.capstone
+                  ? 'Students hand in photos, code and a video link, a teacher-verified run, or their simulator results. A teacher approves it under Project reviews, which completes the lesson.'
+                  : 'Students hand in a note about their project, with optional screenshots and a link. A teacher approves it under Project reviews, which completes the lesson.'}
               </Notice>
             </>
           )
@@ -238,7 +261,7 @@ function RichLessonBody({
         {courseDone ? (
           <Notice tone="success" title="Course complete">
             <p className="flex items-center gap-2">
-              <PartyPopper className="size-4" aria-hidden /> You finished Robotics 101. Your certificate is ready on the course page.
+              <PartyPopper className="size-4" aria-hidden /> You finished {courseTitle ?? 'the course'}. Your certificate is ready on the course page.
             </p>
           </Notice>
         ) : null}
@@ -269,7 +292,7 @@ function RichLessonBody({
 
       <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start" aria-label="Notes and resources">
         <LessonProgressCard activities={activities.length} finished={finished} preview={preview} />
-        <NotesCard />
+        <NotesCard hint={player?.notesHint ?? 'Write what you learned or questions to ask.'} />
         {resources?.length ? (
           <div className="rounded-[var(--radius-lg)] border border-line p-4">
             <p className="text-sm font-semibold text-ink">Downloads</p>
@@ -331,7 +354,7 @@ function LessonProgressCard({ activities, finished, preview }: { activities: num
   )
 }
 
-function NotesCard() {
+function NotesCard({ hint }: { hint: string }) {
   const { get, set, readOnly } = useLessonState()
   const [value, setValue] = React.useState(() => get<string>('notes', ''))
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -345,7 +368,7 @@ function NotesCard() {
         rows={6}
         maxLength={4000}
         value={value}
-        placeholder="Write what you learned, questions to ask, or your sensor readings."
+        placeholder={hint}
         onChange={(e) => {
           const v = e.target.value
           setValue(v)
@@ -440,5 +463,19 @@ function Block({ block }: { block: RichBlock }) {
       return <MissionsActivity block={block} />
     case 'resources':
       return <ResourcesBlock block={block} />
+    case 'pixel-lab':
+      return <PixelLab block={block} />
+    case 'classifier-lab':
+      return <ClassifierLab block={block} />
+    case 'scatter-lab':
+      return <ScatterLab block={block} />
+    case 'tree-lab':
+      return <TreeLab block={block} />
+    case 'word-lab':
+      return <WordLab block={block} />
+    case 'next-word-lab':
+      return <NextWordLab block={block} />
+    case 'ai-chat':
+      return <AiChat block={block} />
   }
 }

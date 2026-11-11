@@ -1,9 +1,11 @@
 /**
- * Robotics 101 video pipeline.
+ * Academy course video pipeline (Robotics 101, AI for Young Builders, …).
  *
- *   npx tsx scripts/robotics101-videos.ts            scripts, storyboards, captions only
- *   npx tsx scripts/robotics101-videos.ts --render   ...and render + verify MP4s and posters
- *   npx tsx scripts/robotics101-videos.ts --render v04 v11
+ *   npx tsx scripts/lms-videos.ts [--course ai-young-builders]            scripts, storyboards, captions only
+ *   npx tsx scripts/lms-videos.ts [--course ai-young-builders] --render   ...and render + verify MP4s and posters
+ *   npx tsx scripts/lms-videos.ts --render v04 v11
+ *
+ * --course defaults to robotics-101.
  *
  * Rendering draws every frame with the VideoFrame React component in headless
  * Chrome (driven over the DevTools protocol, no extra packages), pipes the
@@ -12,7 +14,7 @@
  * only those are marked ready by the content sync.
  *
  * Needs: Chrome or Edge (CHROME_PATH), ffmpeg and ffprobe (FFMPEG, FFPROBE or on PATH).
- * Narration: run scripts/robotics101-narration.ts first. Videos with measured
+ * Narration: run scripts/lms-narration.ts first. Videos with measured
  * narration get a voice track built from the cached clips, placed where the
  * timeline expects each line; videos without it render silent.
  */
@@ -23,20 +25,22 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
-import { narrationSegments } from '../src/lib/lms/robotics101/narration'
-import { FPS, VIDEOS, VOICE_LEAD, narrationScript, narrationVoice, sceneSeconds, timeline, toSrt, toVtt, voiceTiming, type VideoDef } from '../src/lib/lms/robotics101/videos'
+import { FPS, VOICE_LEAD, narrationScript, narrationVoice, sceneSeconds, timeline, toSrt, toVtt, voiceTiming, type VideoDef } from '../src/lib/lms/video/engine'
+import { narrationSegments } from '../src/lib/lms/video/narration'
+import { courseFromArgs } from './video/courses'
 import { SAMPLE_RATE, clipPath, readWav, writeWav } from './video/narration-audio'
 
 const ROOT = path.resolve(__dirname, '..')
-const PUBLIC_DIR = path.join(ROOT, 'public/lms-media/robotics-101/video')
-const DOCS_DIR = path.join(ROOT, 'docs/lms/robotics-101/videos')
-const BUILD_DIR = path.join(ROOT, '.tmp-diag/video-build')
-const URL_BASE = '/lms-media/robotics-101/video'
-
 const args = process.argv.slice(2)
+const course = courseFromArgs(args)
+const VIDEOS = course.videos
+const PUBLIC_DIR = course.publicDir
+const DOCS_DIR = course.docsDir
+const BUILD_DIR = path.join(ROOT, '.tmp-diag/video-build')
+const URL_BASE = course.urlBase
+
 const render = args.includes('--render')
-const only = args.filter((a) => /^v\d\d$/.test(a))
-const selected = only.length ? VIDEOS.filter((v) => only.includes(v.id)) : VIDEOS
+const selected = course.only.length ? VIDEOS.filter((v) => course.only.includes(v.id)) : VIDEOS
 const CONCURRENCY = Number(process.env.VIDEO_WORKERS ?? 3)
 
 function chromePath() {
@@ -67,6 +71,8 @@ const KIND: Record<string, string> = {
   truth: 'Truth table; rows highlight one at a time',
   parts: 'Component cards slide in',
   serial: 'Serial Monitor; lines print one by one',
+  chat: 'Chat window; messages appear one by one',
+  bars: 'Bar chart; bars grow in one at a time',
 }
 
 const mmss = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`
@@ -92,6 +98,10 @@ function storyboard(video: VideoDef) {
         return `${s.title}: ${s.lines.join(' / ')}`
       case 'truth':
         return s.title
+      case 'chat':
+        return `${s.title}: ${s.messages.map((m) => `${m.from === 'you' ? 'You' : 'AI'}: ${m.text}`).join(' / ')}`
+      case 'bars':
+        return `${s.title}: ${s.bars.map((b) => `${b.label} ${b.value}`).join(' · ')}`
     }
   }
   const rows = tl.scenes.map(
@@ -106,7 +116,7 @@ function storyboard(video: VideoDef) {
     '',
     '| # | Time | Chapter | On-screen text | Visual / animation | Narration |',
     '|---|------|---------|----------------|--------------------|-----------|',
-    `| 0 | 0:00–${mmss(tl.introSeconds)} | Introduction | MyCampusView Academy · Robotics 101 · ${video.title} | Branded intro: logo fades up, title slides in | ${narrationSegments(video)[0]} |`,
+    `| 0 | 0:00–${mmss(tl.introSeconds)} | Introduction | MyCampusView Academy · ${video.series.name} · ${video.title} | Branded intro: logo fades up, title slides in | ${narrationSegments(video)[0]} |`,
     ...rows,
     `| ${rows.length + 1} | ${mmss(tl.scenes.at(-1)!.end)}–${mmss(tl.duration)} | Recap | ${video.summary.join(' · ')} · Next: ${video.next} | Branded outro: recap bullets, logo, academy URL | ${narrationSegments(video).at(-1)} |`,
     '',
@@ -116,7 +126,7 @@ function storyboard(video: VideoDef) {
     '',
     '## Narration script',
     '',
-    'Clear, friendly, slow Indian English for Classes 5–8. Pronounce: Arduino (aar-DWEE-no), L298N (L-two-nine-eight-N), PWM (P-W-M), infrared (in-fra-red).',
+    `Clear, friendly, slow Indian English for Classes 5–8.${video.series.pronounce ? ` Pronounce: ${video.series.pronounce}.` : ''}`,
     '',
     '```text',
     narrationScript(video),
@@ -128,7 +138,7 @@ function storyboard(video: VideoDef) {
 function writeDocuments() {
   mkdirSync(PUBLIC_DIR, { recursive: true })
   mkdirSync(DOCS_DIR, { recursive: true })
-  const index = ['# Robotics 101 videos', '', '| Video | Lesson | Length | Scenes | Checkpoints |', '|---|---|---|---|---|']
+  const index = [`# ${course.series.name} videos`, '', '| Video | Lesson | Length | Scenes | Checkpoints |', '|---|---|---|---|---|']
   let total = 0
   for (const v of VIDEOS) {
     const tl = timeline(v)
@@ -178,7 +188,7 @@ class Cdp {
 }
 
 async function launchChrome() {
-  const profile = mkdtempSync(path.join(tmpdir(), 'r101-chrome-'))
+  const profile = mkdtempSync(path.join(tmpdir(), 'lms-chrome-'))
   const proc = spawn(
     chromePath(),
     ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--mute-audio', '--force-device-scale-factor=1', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'],
@@ -258,8 +268,8 @@ function voiceTrack(video: VideoDef) {
   const starts = [VOICE_LEAD.intro, ...tl.scenes.map((s) => s.start + VOICE_LEAD.scene), tl.duration - tl.outroSeconds + VOICE_LEAD.outro]
   const out = new Int16Array(Math.ceil(tl.duration * SAMPLE_RATE))
   lines.forEach((line, i) => {
-    const file = clipPath(line)
-    if (!existsSync(file)) throw new Error(`${video.id}: narration clip missing for "${line.slice(0, 40)}…". Run scripts/robotics101-narration.ts.`)
+    const file = clipPath(line, video.series)
+    if (!existsSync(file)) throw new Error(`${video.id}: narration clip missing for "${line.slice(0, 40)}…". Run scripts/lms-narration.ts --course ${course.key}.`)
     const clip = readWav(file)
     const at = Math.round(starts[i]! * SAMPLE_RATE)
     if (at + clip.length > out.length) throw new Error(`${video.id}: line ${i} runs past the end of the video`)
@@ -360,7 +370,7 @@ async function verify(video: VideoDef): Promise<ManifestEntry> {
     width: stream.width,
     height: stream.height,
     codec: stream.codec_name,
-    audio: audio ? `${audio.codec_name}, ${voiceTiming(video) ? narrationVoice() : 'unknown'}` : null,
+    audio: audio ? `${audio.codec_name}, ${voiceTiming(video) ? narrationVoice(video.series) : 'unknown'}` : null,
     renderedAt: new Date().toISOString(),
     verified: true,
   }
@@ -374,7 +384,7 @@ async function renderAll() {
     : { narration: 'none', videos: {} }
   const voiced = VIDEOS.filter((v) => voiceTiming(v)).length
   manifest.narration = voiced
-    ? `Azure Neural TTS ${narrationVoice()} (Indian English), synthesised narration; English captions${voiced < VIDEOS.length ? `; ${VIDEOS.length - voiced} video(s) still silent` : ''}`
+    ? `Azure Neural TTS ${narrationVoice(course.series)} (Indian English), synthesised narration; English captions${voiced < VIDEOS.length ? `; ${VIDEOS.length - voiced} video(s) still silent` : ''}`
     : 'none: silent with English captions'
   const queue = [...selected]
   const failures: string[] = []

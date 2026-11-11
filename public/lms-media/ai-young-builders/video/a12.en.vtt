@@ -1,0 +1,109 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.073
+MyCampusView Academy.
+
+2
+00:00:03.123 --> 00:00:06.916
+AI for Young Builders, video 12.
+
+3
+00:00:06.966 --> 00:00:10.400
+Fair AI: when data is unfair.
+
+4
+00:00:11.550 --> 00:00:18.144
+An AI learns exactly what its data teaches it, including the unfair parts.
+
+5
+00:00:18.194 --> 00:00:19.940
+This is called bias.
+
+6
+00:00:21.250 --> 00:00:27.426
+Imagine a face-unlock AI trained on eighteen adults and only two children.
+
+7
+00:00:27.476 --> 00:00:34.747
+It works well for adults, ninety-six percent, but only fifty-five percent for children.
+
+8
+00:00:34.797 --> 00:00:37.187
+Nobody meant it to be unfair.
+
+9
+00:00:37.237 --> 00:00:40.300
+The data simply had too few children.
+
+10
+00:00:41.650 --> 00:00:43.605
+This has really happened.
+
+11
+00:00:43.655 --> 00:00:51.222
+Researchers found face recognition systems that made far more mistakes on darker-skinned faces.
+
+12
+00:00:51.272 --> 00:00:54.990
+Voice assistants struggled with Indian accents.
+
+13
+00:00:55.040 --> 00:00:59.400
+Companies improved them by collecting more varied data.
+
+14
+00:01:00.750 --> 00:01:02.889
+Here is a sneaky problem.
+
+15
+00:01:02.939 --> 00:01:09.107
+This model is ninety-five percent accurate overall, which sounds great.
+
+16
+00:01:09.157 --> 00:01:12.698
+But for group B it is only sixty percent.
+
+17
+00:01:12.748 --> 00:01:18.390
+An overall score can hide unfairness, so always check each group.
+
+18
+00:01:19.750 --> 00:01:22.549
+So how do we make AI fairer?
+
+19
+00:01:22.599 --> 00:01:25.601
+Collect data from every group.
+
+20
+00:01:25.651 --> 00:01:27.636
+Balance the numbers.
+
+21
+00:01:27.686 --> 00:01:30.383
+Test each group separately.
+
+22
+00:01:30.433 --> 00:01:34.860
+And always ask: who might this AI leave out?
+
+23
+00:01:36.400 --> 00:01:37.625
+Let us recap.
+
+24
+00:01:37.675 --> 00:01:42.726
+Bias means AI treats some people or things unfairly.
+
+25
+00:01:42.776 --> 00:01:48.122
+Unbalanced data makes a model bad at the smaller group.
+
+26
+00:01:48.172 --> 00:01:53.223
+Check accuracy for each group, and balance the data.
+
+27
+00:01:53.273 --> 00:01:58.030
+Next: Responsible AI: privacy, deepfakes and you.

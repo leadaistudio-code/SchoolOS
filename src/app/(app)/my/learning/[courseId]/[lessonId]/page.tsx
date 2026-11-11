@@ -9,10 +9,11 @@ import { LessonPlayer } from '@/components/lms/lesson-player'
 import { RichLesson } from '@/components/lms/robotics/rich-lesson'
 import { lessonKind } from '@/lib/lms/options'
 import { readRichContent, videoForViewer } from '@/lib/lms/rich'
-import { resourcesFor } from '@/lib/lms/robotics101'
+import { lessonResourcesFor, playerOptionsFor } from '@/lib/lms/curricula'
 import { mySubmission } from '@/server/modules/lms/projects'
 import {
   completeLessonAction,
+  lessonChatAction,
   saveLessonStateAction,
   submitProjectAction,
   submitQuizAction,
@@ -78,7 +79,10 @@ export default async function LearnerLessonPage({ params }: { params: Promise<{ 
             uploadProjectFile={uploadProjectFileAction.bind(null, course.id, lesson.id)}
             nextHref={nextHref}
             finishHref={finishHref}
-            resources={resourcesFor(lesson.slug)}
+            resources={lessonResourcesFor(lesson.slug)}
+            courseTitle={course.title}
+            player={playerOptionsFor(lesson.slug)}
+            askAi={lessonChatAction.bind(null, course.id, lesson.id)}
           />
         </div>
       ) : (

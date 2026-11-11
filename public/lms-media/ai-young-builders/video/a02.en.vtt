@@ -1,0 +1,141 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.168
+MyCampusView Academy.
+
+2
+00:00:03.218 --> 00:00:07.031
+AI for Young Builders, video 2.
+
+3
+00:00:07.081 --> 00:00:09.275
+Rules or learning?
+
+4
+00:00:09.325 --> 00:00:11.020
+How AI learns.
+
+5
+00:00:12.150 --> 00:00:16.122
+There are two ways to make a computer smart.
+
+6
+00:00:16.172 --> 00:00:17.584
+One is very old.
+
+7
+00:00:17.634 --> 00:00:21.880
+The other powers almost every AI you use today.
+
+8
+00:00:23.250 --> 00:00:24.973
+The old way is rules.
+
+9
+00:00:25.023 --> 00:00:31.392
+A person writes exact instructions, like: if the temperature is above thirty
+
+10
+00:00:31.442 --> 00:00:33.672
+degrees, switch on the fan.
+
+11
+00:00:33.722 --> 00:00:39.330
+The program takes an input, follows the rules, and gives an answer.
+
+12
+00:00:40.650 --> 00:00:44.891
+Now try writing rules for: is this a photo of a cat?
+
+13
+00:00:44.941 --> 00:00:50.256
+Cats can be big or small, orange or striped, sleeping, jumping or
+
+14
+00:00:50.306 --> 00:00:52.236
+hiding behind a curtain.
+
+15
+00:00:52.286 --> 00:00:55.620
+You would never finish writing the rules.
+
+16
+00:00:56.950 --> 00:00:59.739
+So machine learning flips it around.
+
+17
+00:00:59.789 --> 00:01:05.810
+You give the computer lots of examples, and the right answers, called labels.
+
+18
+00:01:05.860 --> 00:01:09.595
+It finds the patterns itself and builds a model.
+
+19
+00:01:09.645 --> 00:01:14.720
+Then you give the model something new, and it makes a prediction.
+
+20
+00:01:16.050 --> 00:01:20.476
+Machine learning always follows five steps.
+
+21
+00:01:20.526 --> 00:01:22.246
+Collect examples.
+
+22
+00:01:22.296 --> 00:01:23.391
+Label them.
+
+23
+00:01:23.441 --> 00:01:24.849
+Train a model.
+
+24
+00:01:24.899 --> 00:01:28.805
+Test it on examples it has never seen.
+
+25
+00:01:28.855 --> 00:01:30.470
+And then use it.
+
+26
+00:01:30.520 --> 00:01:36.300
+If the test goes badly, go back and collect better data.
+
+27
+00:01:37.650 --> 00:01:39.607
+So which should you use?
+
+28
+00:01:39.657 --> 00:01:44.793
+Ringing the school bell at nine o’clock needs one simple rule.
+
+29
+00:01:44.843 --> 00:01:50.731
+But reading handwriting, or spotting spam, is messy and keeps changing.
+
+30
+00:01:50.781 --> 00:01:53.240
+That is where learning shines.
+
+31
+00:01:54.700 --> 00:01:55.963
+Let us recap.
+
+32
+00:01:56.013 --> 00:02:00.406
+Normal programs follow rules a person wrote.
+
+33
+00:02:00.456 --> 00:02:06.062
+Machine learning finds the rules from labelled examples.
+
+34
+00:02:06.112 --> 00:02:10.808
+The steps are collect, label, train, test, use.
+
+35
+00:02:10.858 --> 00:02:14.040
+Next: Data: features and labels.

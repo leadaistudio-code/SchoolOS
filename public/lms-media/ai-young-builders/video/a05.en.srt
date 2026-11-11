@@ -1,0 +1,123 @@
+1
+00:00:00,600 --> 00:00:02,911
+MyCampusView Academy.
+
+2
+00:00:02,961 --> 00:00:06,397
+AI for Young Builders, video 5.
+
+3
+00:00:06,447 --> 00:00:09,320
+Train your first AI model.
+
+4
+00:00:10,450 --> 00:00:11,526
+Time to build!
+
+5
+00:00:11,576 --> 00:00:16,433
+In this lesson you will train an image classifier: an AI that
+
+6
+00:00:16,483 --> 00:00:19,490
+sorts drawings into groups you choose.
+
+7
+00:00:20,850 --> 00:00:22,735
+There are four steps.
+
+8
+00:00:22,785 --> 00:00:27,619
+Choose your groups, like circle, triangle and square.
+
+9
+00:00:27,669 --> 00:00:30,936
+Draw at least five examples of each.
+
+10
+00:00:30,986 --> 00:00:32,042
+Press Train.
+
+11
+00:00:32,092 --> 00:00:37,110
+Then draw something new and see what your model thinks.
+
+12
+00:00:38,450 --> 00:00:42,013
+Here is the secret to a smart model: variety.
+
+13
+00:00:42,063 --> 00:00:46,990
+Draw some shapes big and some small, some neat and some messy,
+
+14
+00:00:47,040 --> 00:00:49,720
+in different places on the canvas.
+
+15
+00:00:49,770 --> 00:00:55,580
+The more kinds of example it sees, the better it copes with new drawings.
+
+16
+00:00:56,950 --> 00:01:01,184
+When you test a drawing, the model shows its confidence.
+
+17
+00:01:01,234 --> 00:01:05,392
+Here it is sixty-seven percent sure this is a triangle.
+
+18
+00:01:05,442 --> 00:01:12,200
+Low confidence means the drawing sits between groups, and your model needs more examples.
+
+19
+00:01:13,550 --> 00:01:18,946
+If your model mixes two groups up, add more examples of both,
+
+20
+00:01:18,996 --> 00:01:23,500
+especially the kind it got wrong, then train again.
+
+21
+00:01:23,550 --> 00:01:27,607
+Test, find mistakes, add better data, retrain.
+
+22
+00:01:27,657 --> 00:01:32,250
+That loop is exactly what AI engineers do every day.
+
+23
+00:01:33,550 --> 00:01:38,513
+Your model trains right in your browser, so your drawings are not
+
+24
+00:01:38,563 --> 00:01:40,518
+sent anywhere to train it.
+
+25
+00:01:40,568 --> 00:01:45,376
+Big image AIs work the same way, just with millions of examples
+
+26
+00:01:45,426 --> 00:01:47,150
+and much bigger models.
+
+27
+00:01:48,600 --> 00:01:49,828
+Let us recap.
+
+28
+00:01:49,878 --> 00:01:53,858
+Choose groups and draw labelled examples.
+
+29
+00:01:53,908 --> 00:01:57,299
+Press Train, then try new drawings.
+
+30
+00:01:57,349 --> 00:02:02,508
+Low confidence means the model needs better examples.
+
+31
+00:02:02,558 --> 00:02:07,030
+Next: How your AI decides: nearest neighbours.

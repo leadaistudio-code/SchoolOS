@@ -1,13 +1,7 @@
-import type { VideoDef } from './videos'
+import type { NarrationTiming, VideoSeries } from '@/lib/lms/video/narration'
+import narrationTiming from './narration-timing.json'
 
-/**
- * Narration for the Robotics 101 videos. Captions show the written script;
- * the voice reads `spoken()`, which spells out pins, part numbers and code
- * names so a text-to-speech voice says them the way a teacher would.
- */
-
-export const NARRATION_VOICE = 'en-IN-NeerjaNeural'
-
+/** Robotics 101 pronunciation: pins, part numbers and code names spelled the way a teacher says them. */
 const SAY: [RegExp, string][] = [
   [/\bMyCampusView\b/g, 'My Campus View'],
   [/\bRobotics 101\b/g, 'Robotics one oh one'],
@@ -37,20 +31,9 @@ const SAY: [RegExp, string][] = [
   [/(\d+)\s*[–-]\s*(\d+)\s*mm\b/g, '$1 to $2 millimetres'],
 ]
 
-export function spoken(text: string) {
-  return SAY.reduce((s, [pattern, replacement]) => s.replace(pattern, replacement), text)
-}
-
-export function introLine(video: VideoDef) {
-  return `MyCampusView Academy. Robotics 101, video ${video.number}. ${video.title}.`
-}
-
-export function outroLine(video: VideoDef) {
-  const recap = video.summary.map((s) => s.replace(/[.!?]?$/, '.')).join(' ')
-  return `Let us recap. ${recap} Next: ${video.next}`
-}
-
-/** Everything the voice says in a video, in order: intro, each scene, outro. */
-export function narrationSegments(video: VideoDef) {
-  return [introLine(video), ...video.scenes.map((s) => s.say), outroLine(video)]
+export const ROBOTICS_SERIES: VideoSeries = {
+  name: 'Robotics 101',
+  say: SAY,
+  timing: narrationTiming as NarrationTiming,
+  pronounce: 'Arduino (aar-DWEE-no), L298N (L-two-nine-eight-N), PWM (P-W-M), infrared (in-fra-red)',
 }

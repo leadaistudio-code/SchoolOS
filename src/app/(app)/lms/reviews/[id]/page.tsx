@@ -22,12 +22,13 @@ const TRACK: Record<string, string> = { straight: 'Straight', curve: 'Gentle cur
 type EvidenceShape = {
   simulator?: { track: string; seconds: number; baseSpeed?: number }[]
   checklist?: { done: number; total: number }
+  models?: { title: string; labels: string[]; examples: number[]; tested: number; accuracy?: number; rounds: { examples: number; tested: number; accuracy: number }[] }[]
 }
 
-/** Recorded on the server from the student's saved simulator runs and checklist, not typed in by them. */
+/** Recorded on the server from the student's saved simulator runs, models and checklist, not typed in by them. */
 function Evidence({ evidence }: { evidence: unknown }) {
   const e = (evidence ?? {}) as EvidenceShape
-  if (!e.simulator?.length && !e.checklist) return null
+  if (!e.simulator?.length && !e.checklist && !e.models?.length) return null
   return (
     <div className="rounded-[var(--radius)] bg-surface-2 p-3 text-sm">
       <p className="font-medium text-ink">Recorded in the course</p>
@@ -36,6 +37,17 @@ function Evidence({ evidence }: { evidence: unknown }) {
           {e.simulator.map((r) => (
             <li key={r.track}>
               Simulator: finished {TRACK[r.track] ?? r.track} in {r.seconds.toFixed(1)} s{r.baseSpeed ? ` at speed ${r.baseSpeed}` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {e.models?.length ? (
+        <ul className="mt-1 space-y-0.5 text-ink-muted">
+          {e.models.map((m) => (
+            <li key={m.title}>
+              {m.title}: trained on {m.labels.map((l, i) => `${m.examples[i] ?? 0} ${l}`).join(', ')}
+              {m.tested ? `; tested ${m.tested} times, ${m.accuracy ?? 0}% right` : '; not tested yet'}
+              {m.rounds.length > 1 ? ` (test rounds: ${m.rounds.map((r) => `${r.accuracy}%`).join(' → ')})` : ''}
             </li>
           ))}
         </ul>

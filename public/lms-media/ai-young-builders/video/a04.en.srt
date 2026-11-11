@@ -1,0 +1,127 @@
+1
+00:00:00,600 --> 00:00:03,011
+MyCampusView Academy.
+
+2
+00:00:03,061 --> 00:00:06,643
+AI for Young Builders, video 4.
+
+3
+00:00:06,693 --> 00:00:09,690
+How computers see: pixels.
+
+4
+00:00:10,850 --> 00:00:13,032
+You see a smiley face.
+
+5
+00:00:13,082 --> 00:00:16,481
+A computer sees a grid of numbers.
+
+6
+00:00:16,531 --> 00:00:18,510
+Let us find out why.
+
+7
+00:00:19,850 --> 00:00:24,478
+Zoom in far enough on any digital picture and you find tiny
+
+8
+00:00:24,528 --> 00:00:26,223
+squares called pixels.
+
+9
+00:00:26,273 --> 00:00:31,456
+In a black-and-white picture each pixel can be stored as a number:
+
+10
+00:00:31,506 --> 00:00:33,835
+one for black, zero for white.
+
+11
+00:00:33,885 --> 00:00:37,720
+So this smiley face is really sixty-four numbers.
+
+12
+00:00:39,050 --> 00:00:44,415
+Grey pictures use a number from zero to two hundred and fifty-five
+
+13
+00:00:44,465 --> 00:00:45,645
+for each pixel.
+
+14
+00:00:45,695 --> 00:00:51,224
+Colour pictures use three numbers per pixel: how much red, green and
+
+15
+00:00:51,274 --> 00:00:52,701
+blue light to mix.
+
+16
+00:00:52,751 --> 00:00:54,260
+That is called RGB.
+
+17
+00:00:55,650 --> 00:00:57,653
+The numbers add up fast.
+
+18
+00:00:57,703 --> 00:01:00,475
+Our smiley is sixty-four numbers.
+
+19
+00:01:00,525 --> 00:01:08,173
+A small handwritten digit, twenty-eight by twenty-eight, is seven hundred and eighty-four.
+
+20
+00:01:08,223 --> 00:01:13,646
+A tiny colour photo, a hundred by a hundred, is thirty thousand.
+
+21
+00:01:13,696 --> 00:01:15,870
+A phone photo is millions.
+
+22
+00:01:17,250 --> 00:01:19,141
+Why does this matter?
+
+23
+00:01:19,191 --> 00:01:23,024
+Computers can only calculate with numbers.
+
+24
+00:01:23,074 --> 00:01:25,151
+An AI never sees a cat.
+
+25
+00:01:25,201 --> 00:01:31,714
+It sees numbers, and learns which patterns of numbers usually mean cat.
+
+26
+00:01:31,764 --> 00:01:35,227
+Similar pictures have similar numbers.
+
+27
+00:01:35,277 --> 00:01:39,480
+Remember that, because your model will use it.
+
+28
+00:01:41,000 --> 00:01:42,253
+Let us recap.
+
+29
+00:01:42,303 --> 00:01:45,258
+A picture is a grid of pixels.
+
+30
+00:01:45,308 --> 00:01:48,565
+Each pixel is stored as a number.
+
+31
+00:01:48,615 --> 00:01:53,274
+Colour pixels have red, green and blue numbers.
+
+32
+00:01:53,324 --> 00:01:56,480
+Next: Train your first AI model.

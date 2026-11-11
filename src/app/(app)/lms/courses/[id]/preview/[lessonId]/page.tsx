@@ -8,8 +8,8 @@ import { LessonPlayer } from '@/components/lms/lesson-player'
 import { RichLesson } from '@/components/lms/robotics/rich-lesson'
 import { lessonKind, publicQuiz, type Quiz } from '@/lib/lms/options'
 import { readRichContent, videoForViewer } from '@/lib/lms/rich'
-import { resourcesFor } from '@/lib/lms/robotics101'
-import { previewQuizAction } from '../../../../actions'
+import { lessonResourcesFor, playerOptionsFor } from '@/lib/lms/curricula'
+import { previewLessonChatAction, previewQuizAction } from '../../../../actions'
 
 export const metadata = { title: 'Preview · Robotics & AI' }
 
@@ -80,7 +80,10 @@ export default async function PreviewLessonPage({
             nextHref={next ? `/lms/courses/${id}/preview/${next}` : null}
             finishHref={`/lms/courses/${id}`}
             preview
-            resources={resourcesFor(lesson.slug, { teacher: true })}
+            resources={lessonResourcesFor(lesson.slug, { teacher: true })}
+            courseTitle={course.title}
+            player={playerOptionsFor(lesson.slug)}
+            askAi={previewLessonChatAction.bind(null, id, lesson.id)}
           />
         </div>
       ) : (

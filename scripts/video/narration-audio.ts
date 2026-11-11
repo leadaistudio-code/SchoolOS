@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { NARRATION_VOICE, spoken } from '../../src/lib/lms/robotics101/narration'
+import { NARRATION_VOICE, spoken, type VideoSeries } from '../../src/lib/lms/video/narration'
 
 export const SAMPLE_RATE = 24_000
 export const RATE = '-8%'
 export const CLIP_DIR = path.resolve(__dirname, '../../.tmp-diag/narration')
 
 /** Cached clip for one narration line; the key covers everything that changes the audio. */
-export function clipPath(text: string) {
-  const key = createHash('sha1').update(`${NARRATION_VOICE}|${RATE}|${spoken(text)}`).digest('hex').slice(0, 16)
+export function clipPath(text: string, series: VideoSeries) {
+  const key = createHash('sha1').update(`${NARRATION_VOICE}|${RATE}|${spoken(text, series)}`).digest('hex').slice(0, 16)
   return path.join(CLIP_DIR, `${key}.wav`)
 }
 

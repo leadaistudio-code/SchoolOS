@@ -22,7 +22,7 @@ Status key: `done` (completed and verified), `built` (implemented, not verified)
 - `LmsProjectSubmission.fileKeys`, `code` and `pathway` extend project hand-in with
   private photo uploads, pasted code and the physical / virtual pathway.
 - Curriculum content is data, in `src/lib/lms/robotics101/` (module1–4.ts, videos.ts),
-  synced by `scripts/robotics101-sync.ts`. The sync never deletes rows and never
+  synced by `scripts/lms-sync.ts`. The sync never deletes rows and never
   touches the course row (title, slug, description, SEO metadata, pricing).
 - `LmsLesson.draftContent` holds unpublished edits; "Publish to students" copies it to
   `content` and bumps `contentVersion`.
@@ -47,7 +47,7 @@ Verified locally on 11 Nov 2026 (dev server, demo school, student and teacher lo
 | 5 | Video player: speed, captions, fullscreen, PiP, resume, keyboard, chapters, checkpoints, transcript | done |
 | 4 | 14 branded videos (logo top-right, intro, outro), storyboards, scripts, VTT/SRT, posters; ffprobe-verified H.264 1280×720 | done |
 | 4 | Video length: 1:36–2:38 each (27:26 total), shorter than the preferred 3–6 min | known gap |
-| 4 | Narration: Azure Neural TTS `en-IN-NeerjaNeural` (synthesised Indian English, not a human voice artist). `scripts/robotics101-narration.ts` measures every line; scene lengths and captions follow the voice; each line starts within 0.05 s of its scene (checked with ffmpeg silence detection) | done |
+| 4 | Narration: Azure Neural TTS `en-IN-NeerjaNeural` (synthesised Indian English, not a human voice artist). `scripts/lms-narration.ts` measures every line; scene lengths and captions follow the voice; each line starts within 0.05 s of its scene (checked with ffmpeg silence detection) | done |
 | 11 | 12 PDF resources + 4 `.ino` downloads; teacher guide hidden from students | done |
 | 12 | Capstone: photo/PDF upload (private), code, video link, physical / teacher-verified / virtual pathways, server-recorded evidence, teacher review | done (form verified in browser; review page verified by typecheck and earlier tests, not with a live submission) |
 | 9 | Six badges derived from completed lessons; shown to learners and as a count to teachers | done |
@@ -69,10 +69,10 @@ motors" archived with their progress rows kept, second run idempotent. Re-run st
    new enum value, a unique index on `(courseId, slug)` which existing rows satisfy
    because `slug` starts null).
 3. Dry run against production (read only):
-   `R101_SYNC_CONFIRM=cmwc4bzg20000vjz0na1cuo68 npx tsx scripts/robotics101-sync.ts --remote`
+   `LMS_SYNC_CONFIRM=cmwc4bzg20000vjz0na1cuo68 npx tsx scripts/lms-sync.ts --remote`
    with `DATABASE_URL` set to the production URL. Check: course id `cmwc4bzg20000vjz0na1cuo68`, reused lesson ids,
    progress rows on any lesson to be archived.
-4. Apply: `R101_SYNC_CONFIRM=cmwc4bzg20000vjz0na1cuo68 npx tsx scripts/robotics101-sync.ts --remote --apply`.
+4. Apply: `LMS_SYNC_CONFIRM=cmwc4bzg20000vjz0na1cuo68 npx tsx scripts/lms-sync.ts --remote --apply`.
    Runs in one transaction; archives (never deletes) retired lessons and keeps their progress.
 5. Re-run the dry run: every row should read "reuses", nothing new or archived.
 6. Spot-check as a student: a lesson video plays, a knowledge check passes, the course

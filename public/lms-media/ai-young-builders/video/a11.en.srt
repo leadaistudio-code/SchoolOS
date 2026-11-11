@@ -1,0 +1,107 @@
+1
+00:00:00,600 --> 00:00:03,043
+MyCampusView Academy.
+
+2
+00:00:03,093 --> 00:00:06,843
+AI for Young Builders, video 11.
+
+3
+00:00:06,893 --> 00:00:09,930
+Talk to a real AI, safely.
+
+4
+00:00:11,050 --> 00:00:15,262
+Now you know how chatbots work, it is time to use one,
+
+5
+00:00:15,312 --> 00:00:16,840
+safely and cleverly.
+
+6
+00:00:18,150 --> 00:00:21,285
+Here is what happens to your message.
+
+7
+00:00:21,335 --> 00:00:25,503
+First, a safety check looks for personal details.
+
+8
+00:00:25,553 --> 00:00:30,238
+Then the language model predicts a reply, word by word.
+
+9
+00:00:30,288 --> 00:00:34,543
+Then the reply is checked again before you see it.
+
+10
+00:00:34,593 --> 00:00:37,900
+Blocked messages never reach the model.
+
+11
+00:00:39,250 --> 00:00:42,623
+The message you send is called a prompt.
+
+12
+00:00:42,673 --> 00:00:45,104
+Tell me about space is vague.
+
+13
+00:00:45,154 --> 00:00:50,324
+Explain in three short points why Mars looks red, for a Class
+
+14
+00:00:50,374 --> 00:00:52,036
+7 student, is clear.
+
+15
+00:00:52,086 --> 00:00:56,400
+It says what you want, how long, and who it is for.
+
+16
+00:00:57,750 --> 00:01:02,397
+If the answer is too hard, ask it to explain more simply.
+
+17
+00:01:02,447 --> 00:01:03,963
+Ask for an example.
+
+18
+00:01:04,013 --> 00:01:08,166
+And when it tells you a fact you will use, check it
+
+19
+00:01:08,216 --> 00:01:11,050
+in a textbook or a trusted website.
+
+20
+00:01:12,350 --> 00:01:13,528
+And stay safe.
+
+21
+00:01:13,578 --> 00:01:19,228
+Never type your name, address, phone number, school or passwords.
+
+22
+00:01:19,278 --> 00:01:24,490
+If anything the AI says worries you, stop and tell an adult.
+
+23
+00:01:26,000 --> 00:01:27,169
+Let us recap.
+
+24
+00:01:27,219 --> 00:01:30,825
+A prompt is the message you give an AI.
+
+25
+00:01:30,875 --> 00:01:35,231
+Say what you want, how long, and who it is for.
+
+26
+00:01:35,281 --> 00:01:39,169
+Keep personal details out and check facts.
+
+27
+00:01:39,219 --> 00:01:42,450
+Next: Fair AI: when data is unfair.

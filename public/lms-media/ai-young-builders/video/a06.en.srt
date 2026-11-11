@@ -1,0 +1,123 @@
+1
+00:00:00,600 --> 00:00:02,871
+MyCampusView Academy.
+
+2
+00:00:02,921 --> 00:00:06,298
+AI for Young Builders, video 6.
+
+3
+00:00:06,348 --> 00:00:10,720
+How your AI decides: nearest neighbours.
+
+4
+00:00:11,850 --> 00:00:13,900
+How did your model decide?
+
+5
+00:00:13,950 --> 00:00:18,584
+It used one of the oldest and simplest ideas in AI, called
+
+6
+00:00:18,634 --> 00:00:20,280
+k nearest neighbours.
+
+7
+00:00:21,650 --> 00:00:25,042
+Imagine every example as a dot on a map.
+
+8
+00:00:25,092 --> 00:00:29,000
+Here, fruits are placed by sweetness and size.
+
+9
+00:00:29,050 --> 00:00:36,830
+Mangoes gather in one corner, lemons in another, because similar things sit close together.
+
+10
+00:00:38,150 --> 00:00:39,980
+A new fruit arrives.
+
+11
+00:00:40,030 --> 00:00:45,807
+The model measures how far it is from every example, picks the
+
+12
+00:00:45,857 --> 00:00:49,002
+three closest, and lets them vote.
+
+13
+00:00:49,052 --> 00:00:51,446
+Two mangoes and one lemon.
+
+14
+00:00:51,496 --> 00:00:52,480
+Mango wins!
+
+15
+00:00:53,850 --> 00:00:57,804
+The letter k is just how many neighbours get a vote.
+
+16
+00:00:57,854 --> 00:01:02,579
+With two groups, people pick an odd number like three or five,
+
+17
+00:01:02,629 --> 00:01:04,581
+so the vote can never tie.
+
+18
+00:01:04,631 --> 00:01:09,740
+And changing k can change the answer, so it is worth experimenting.
+
+19
+00:01:11,050 --> 00:01:13,740
+Your drawing model did exactly this.
+
+20
+00:01:13,790 --> 00:01:19,144
+Each drawing became two hundred and fifty-six pixel numbers, which is a
+
+21
+00:01:19,194 --> 00:01:23,482
+dot in a space with two hundred and fifty-six directions.
+
+22
+00:01:23,532 --> 00:01:27,820
+We cannot picture that, but the maths works the same way.
+
+23
+00:01:29,150 --> 00:01:31,527
+Where does the model go wrong?
+
+24
+00:01:31,577 --> 00:01:36,299
+Deep inside a group, every neighbour agrees, so it is easy.
+
+25
+00:01:36,349 --> 00:01:42,608
+Near the border between groups the neighbours are mixed and the vote is close.
+
+26
+00:01:42,658 --> 00:01:46,410
+Adding examples near the border helps the most.
+
+27
+00:01:47,900 --> 00:01:49,188
+Let us recap.
+
+28
+00:01:49,238 --> 00:01:52,893
+Similar examples sit close together.
+
+29
+00:01:52,943 --> 00:01:55,775
+The k nearest examples vote.
+
+30
+00:01:55,825 --> 00:02:01,128
+Mistakes happen most near the border between groups.
+
+31
+00:02:01,178 --> 00:02:04,730
+Next: Testing: is your AI any good?

@@ -1,5 +1,5 @@
-import { Code, Compass, Eye, Lock, Trophy, Wrench, Zap, type LucideIcon } from 'lucide-react'
-import { earnedBadges } from '@/lib/lms/robotics101'
+import { Bot, Brain, Code, Compass, Eye, Lock, MessageCircle, Scale, Shapes, Trophy, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { earnedBadges, type Badge } from '@/lib/lms/curriculum'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<string, LucideIcon> = {
@@ -9,10 +9,16 @@ const ICONS: Record<string, LucideIcon> = {
   'code-creator': Code,
   'robot-engineer': Wrench,
   'line-follower-champion': Trophy,
+  'ai-explorer': Compass,
+  'data-detective': Shapes,
+  'model-trainer': Brain,
+  'language-lab': MessageCircle,
+  'fairness-champion': Scale,
+  'ai-builder': Bot,
 }
 
-export function BadgeShelf({ completedSlugs }: { completedSlugs: Set<string> }) {
-  const badges = earnedBadges(completedSlugs)
+export function BadgeShelf({ badges: all, completedSlugs }: { badges: Badge[]; completedSlugs: Set<string> }) {
+  const badges = earnedBadges(all, completedSlugs)
   const earned = badges.filter((b) => b.earned).length
   return (
     <section aria-labelledby="badges-heading" className="space-y-2">

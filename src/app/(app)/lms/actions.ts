@@ -7,6 +7,7 @@ import { authoring, lmsFail } from '@/server/modules/lms/authoring'
 import { assignCourse, removeAssignment, visibleCourse } from '@/server/modules/lms/school'
 import { completeLesson, quizAnswersSchema, saveLessonState, submitQuiz } from '@/server/modules/lms/learning'
 import { submitProject, uploadProjectFile } from '@/server/modules/lms/projects'
+import { lessonChat, type AiChatReply } from '@/server/modules/lms/ai-chat'
 import { gradeQuiz, type Quiz } from '@/lib/lms/options'
 import type { LmsResult, QuizActionResult } from '@/components/lms/types'
 
@@ -162,6 +163,23 @@ export async function saveLessonStateAction(
   } catch {
     return { ok: false }
   }
+}
+
+async function chat(mode: 'learner' | 'preview', courseId: string, lessonId: string, input: unknown): Promise<AiChatReply> {
+  const ctx = await requireContext(mode === 'learner' ? 'lms.learn' : 'lms.view')
+  try {
+    return await lessonChat(ctx, courseId, lessonId, mode, input)
+  } catch (err) {
+    return { ok: false, reason: 'error', message: lmsFail(err, 'The study helper could not answer').message ?? 'The study helper could not answer' }
+  }
+}
+
+export async function lessonChatAction(courseId: string, lessonId: string, input: unknown): Promise<AiChatReply> {
+  return chat('learner', courseId, lessonId, input)
+}
+
+export async function previewLessonChatAction(courseId: string, lessonId: string, input: unknown): Promise<AiChatReply> {
+  return chat('preview', courseId, lessonId, input)
 }
 
 /** Staff trying a quiz in preview: graded, never saved. */

@@ -2,7 +2,9 @@ import { MODULE_1 } from './module1'
 import { MODULE_2 } from './module2'
 import { MODULE_3 } from './module3'
 import { MODULE_4 } from './module4'
+import { earnedBadges as earned, lessonResources, type Badge, type Curriculum, type Resource } from '@/lib/lms/curriculum'
 import type { LessonDef, ModuleDef } from './types'
+import { VIDEOS, videoById } from './videos'
 
 export type { LessonDef, ModuleDef } from './types'
 
@@ -23,7 +25,7 @@ export function lessonBySlug(slug: string | null | undefined) {
 
 export const MEDIA_BASE = '/lms-media/robotics-101'
 
-export type Resource = { id: string; title: string; file: string; note: string; audience: 'student' | 'teacher' }
+export type { Resource } from '@/lib/lms/curriculum'
 
 export const RESOURCES: Resource[] = [
   { id: 'handbook', title: 'Student handbook', file: 'resources/robotics-101-student-handbook.pdf', note: 'Every lesson in one booklet', audience: 'student' },
@@ -40,11 +42,13 @@ export const RESOURCES: Resource[] = [
   { id: 'rubric', title: 'Assessment rubric', file: 'resources/robotics-101-assessment-rubric.pdf', note: 'How the final challenge is judged', audience: 'teacher' },
 ]
 
-export const CODE_FILES: Record<string, { title: string; file: string }> = {
-  first_program: { title: 'first_program.ino', file: 'code/first_program.ino' },
-  ir_sensor_test: { title: 'ir_sensor_test.ino', file: 'code/ir_sensor_test.ino' },
-  motor_test: { title: 'motor_test.ino', file: 'code/motor_test.ino' },
-  line_follower: { title: 'line_follower.ino', file: 'code/line_follower.ino' },
+const SKETCH = 'Arduino sketch, compiled and checked'
+
+export const CODE_FILES: Record<string, { title: string; file: string; note: string }> = {
+  first_program: { title: 'first_program.ino', file: 'code/first_program.ino', note: SKETCH },
+  ir_sensor_test: { title: 'ir_sensor_test.ino', file: 'code/ir_sensor_test.ino', note: SKETCH },
+  motor_test: { title: 'motor_test.ino', file: 'code/motor_test.ino', note: SKETCH },
+  line_follower: { title: 'line_follower.ino', file: 'code/line_follower.ino', note: SKETCH },
 }
 
 const LESSON_RESOURCES: Record<string, string[]> = {
@@ -62,22 +66,10 @@ const LESSON_RESOURCES: Record<string, string[]> = {
   'r101-15-final-assessment': ['handbook'],
 }
 
-export function resourcesFor(slug: string | null | undefined, opts: { teacher?: boolean } = {}) {
-  if (!slug) return []
-  return (LESSON_RESOURCES[slug] ?? []).flatMap((id) => {
-    if (id.startsWith('code:')) {
-      const c = CODE_FILES[id.slice(5)]
-      return c ? [{ title: `Code: ${c.title}`, href: `${MEDIA_BASE}/${c.file}`, note: 'Arduino sketch, compiled and checked' }] : []
-    }
-    const r = RESOURCES.find((x) => x.id === id)
-    if (!r || (r.audience === 'teacher' && !opts.teacher && r.id !== 'rubric')) return []
-    return [{ title: r.title, href: `${MEDIA_BASE}/${r.file}`, note: r.note }]
-  })
-}
+export const resourcesFor = lessonResources(MEDIA_BASE, RESOURCES, LESSON_RESOURCES, CODE_FILES)
 
-export type Badge = { id: string; name: string; description: string; lessons: string[] }
+export type { Badge } from '@/lib/lms/curriculum'
 
-/** Awarded only when every listed lesson is complete (projects: approved; quizzes: passed). */
 export const BADGES: Badge[] = [
   { id: 'robot-explorer', name: 'Robot Explorer', description: 'Finished Meet your robot', lessons: MODULE_1.lessons.map((l) => l.slug) },
   { id: 'sensor-detective', name: 'Sensor Detective', description: 'Mastered IR sensing and reading sensors in code', lessons: ['r101-04-ir-sensors', 'r101-09-read-sensors'] },
@@ -93,7 +85,20 @@ export function isRobotics101(slugs: (string | null | undefined)[]) {
 }
 
 export function earnedBadges(completedSlugs: Set<string>) {
-  return BADGES.map((b) => ({ ...b, earned: b.lessons.every((s) => completedSlugs.has(s)), done: b.lessons.filter((s) => completedSlugs.has(s)).length }))
+  return earned(BADGES, completedSlugs)
 }
 
 export const NEXT_COURSE_SUGGESTION = 'AI for Young Builders'
+
+export const ROBOTICS_101: Curriculum = {
+  key: 'robotics-101',
+  courseTitle: COURSE_TITLE,
+  modules: MODULES,
+  videos: VIDEOS,
+  videoById,
+  mediaBase: MEDIA_BASE,
+  resources: RESOURCES,
+  resourcesFor,
+  badges: BADGES,
+  player: { capstone: true, notesHint: 'Write what you learned, questions to ask, or your sensor readings.' },
+}

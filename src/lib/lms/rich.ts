@@ -61,6 +61,22 @@ const codeTask = z.object({
 
 const checklistItem = z.object({ id, text: short(300), detail: z.string().max(600).optional() })
 
+export const AI_DIAGRAMS = [
+  'ai-everywhere',
+  'rules-vs-learning',
+  'features-labels',
+  'pixels',
+  'train-test',
+  'nearest-neighbour',
+  'confusion-matrix',
+  'decision-tree',
+  'sentiment',
+  'next-word',
+  'chatbot-flow',
+  'bias-data',
+  'ai-pipeline',
+] as const
+
 export const blockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), heading: z.string().max(140).optional(), body }),
   z.object({
@@ -72,7 +88,19 @@ export const blockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('figure'), src: short(500), alt: short(400), caption: z.string().max(300).optional() }),
   z.object({
     type: z.literal('diagram'),
-    name: z.enum(['sense-think-act', 'ir-reflect', 'differential', 'pin-map', 'wiring', 'h-bridge', 'chassis', 'pwm', 'flowchart', 'loop']),
+    name: z.enum([
+      'sense-think-act',
+      'ir-reflect',
+      'differential',
+      'pin-map',
+      'wiring',
+      'h-bridge',
+      'chassis',
+      'pwm',
+      'flowchart',
+      'loop',
+      ...AI_DIAGRAMS,
+    ]),
     caption: z.string().max(300).optional(),
   }),
   z.object({ type: z.literal('check'), id, prompt: short(500), options: z.array(option).min(2).max(5), hint: z.string().max(400).optional(), explanation: short(800) }),
@@ -123,6 +151,24 @@ export const blockSchema = z.discriminatedUnion('type', [
     tutorial: z.boolean().default(false),
   }),
   z.object({ type: z.literal('truth-table'), id }),
+  z.object({ type: z.literal('pixel-lab'), id }),
+  z.object({
+    type: z.literal('classifier-lab'),
+    id,
+    title: short(120),
+    /** `camera` adds the webcam as a second way to give examples; drawing always works. */
+    input: z.enum(['draw', 'camera']).default('draw'),
+    /** Suggested classes; the learner can rename them. */
+    labels: z.array(short(24)).min(2).max(4),
+    minExamples: z.number().int().min(2).max(20).default(5),
+    /** Adds the test stage: a fresh test set, accuracy and a confusion matrix. */
+    test: z.boolean().default(false),
+  }),
+  z.object({ type: z.literal('scatter-lab'), id, mode: z.enum(['knn', 'bias']) }),
+  z.object({ type: z.literal('tree-lab'), id }),
+  z.object({ type: z.literal('word-lab'), id }),
+  z.object({ type: z.literal('next-word-lab'), id }),
+  z.object({ type: z.literal('ai-chat'), id }),
   z.object({ type: z.literal('wiring'), id }),
   z.object({ type: z.literal('code-lab'), id, title: short(120), tasks: z.array(codeTask).min(1).max(12) }),
   z.object({

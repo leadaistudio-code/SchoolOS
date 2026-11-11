@@ -1,0 +1,147 @@
+1
+00:00:00,600 --> 00:00:02,947
+MyCampusView Academy.
+
+2
+00:00:02,997 --> 00:00:06,486
+AI for Young Builders, video 7.
+
+3
+00:00:06,536 --> 00:00:09,910
+Testing: is your AI any good?.
+
+4
+00:00:11,050 --> 00:00:15,320
+A model that only works on the examples it was trained on
+
+5
+00:00:15,370 --> 00:00:19,261
+is like a student who memorised last year’s answers.
+
+6
+00:00:19,311 --> 00:00:21,080
+Let us test it properly.
+
+7
+00:00:22,450 --> 00:00:24,620
+Keep some examples back.
+
+8
+00:00:24,670 --> 00:00:26,284
+Train on the rest.
+
+9
+00:00:26,334 --> 00:00:31,556
+Then test on the ones the model has never seen, just like
+
+10
+00:00:31,606 --> 00:00:33,960
+an exam has new questions.
+
+11
+00:00:34,010 --> 00:00:35,810
+That is a fair test.
+
+12
+00:00:37,150 --> 00:00:41,343
+Accuracy is the share of test examples it gets right.
+
+13
+00:00:41,393 --> 00:00:46,628
+Sixteen right out of twenty is sixteen divided by twenty, which is
+
+14
+00:00:46,678 --> 00:00:49,510
+zero point eight, or eighty percent.
+
+15
+00:00:50,850 --> 00:00:55,058
+Accuracy does not say which mistakes it makes.
+
+16
+00:00:55,108 --> 00:00:57,280
+A confusion matrix does.
+
+17
+00:00:57,330 --> 00:01:02,187
+Rows are the real answer, columns are the prediction.
+
+18
+00:01:02,237 --> 00:01:05,612
+The diagonal shows the right answers.
+
+19
+00:01:05,662 --> 00:01:09,685
+Here, two squares were mistaken for circles.
+
+20
+00:01:09,735 --> 00:01:12,740
+Now you know exactly what to fix.
+
+21
+00:01:14,050 --> 00:01:17,881
+In this lesson you can also train with your camera.
+
+22
+00:01:17,931 --> 00:01:22,295
+Pictures are shrunk to a tiny twelve by nine grid and used
+
+23
+00:01:22,345 --> 00:01:23,893
+only inside the page.
+
+24
+00:01:23,943 --> 00:01:30,210
+Lighting changes the pixel numbers, so give your model examples in different light.
+
+25
+00:01:31,550 --> 00:01:33,451
+Be a model doctor.
+
+26
+00:01:33,501 --> 00:01:37,462
+Perfect on training but poor on test?
+
+27
+00:01:37,512 --> 00:01:40,606
+It memorised, so add variety.
+
+28
+00:01:40,656 --> 00:01:42,991
+One group often wrong?
+
+29
+00:01:43,041 --> 00:01:45,593
+Add more examples of it.
+
+30
+00:01:45,643 --> 00:01:47,653
+Fails in new light?
+
+31
+00:01:47,703 --> 00:01:50,255
+Train in that light too.
+
+32
+00:01:50,305 --> 00:01:53,290
+Then retrain and test again.
+
+33
+00:01:54,800 --> 00:01:56,036
+Let us recap.
+
+34
+00:01:56,086 --> 00:02:00,191
+Test on examples the model has never seen.
+
+35
+00:02:00,241 --> 00:02:03,753
+Accuracy is the share it gets right.
+
+36
+00:02:03,803 --> 00:02:08,798
+A confusion matrix shows which groups get mixed up.
+
+37
+00:02:08,848 --> 00:02:13,250
+Next: Decision trees: AI that asks questions.

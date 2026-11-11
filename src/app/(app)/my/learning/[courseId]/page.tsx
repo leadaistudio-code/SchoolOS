@@ -14,7 +14,7 @@ import { CourseOutline } from '@/components/lms/course-outline'
 import { LessonText } from '@/components/lms/lesson-text'
 import { BadgeShelf } from '@/components/lms/robotics/badge-shelf'
 import { gradeRange, lmsCategory, lmsLevelLabel } from '@/lib/lms/options'
-import { isRobotics101 } from '@/lib/lms/robotics101'
+import { curriculumFor } from '@/lib/lms/curricula'
 
 export const metadata = { title: 'Course' }
 
@@ -33,7 +33,7 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
   const doneCount = lessons.filter((l) => completed.has(l.id)).length
   const certificate = enrollment.completedAt ? await issueCertificateFor(ctx, enrollment.id) : null
-  const robotics = isRobotics101(lessons.map((l) => l.slug))
+  const curriculum = curriculumFor(lessons.map((l) => l.slug))
   const completedSlugs = new Set(lessons.filter((l) => completed.has(l.id) && l.slug).map((l) => l.slug!))
 
   return (
@@ -95,10 +95,10 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
               ) : null}
             </CardContent>
           </Card>
-          {robotics ? (
+          {curriculum ? (
             <Card className="mt-4">
               <CardContent>
-                <BadgeShelf completedSlugs={completedSlugs} />
+                <BadgeShelf badges={curriculum.badges} completedSlugs={completedSlugs} />
               </CardContent>
             </Card>
           ) : null}

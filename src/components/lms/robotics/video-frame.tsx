@@ -13,11 +13,11 @@ import {
   type SimSettings,
   type StepResult,
 } from '@/lib/lms/robot'
-import { timeline, type TimedScene, type VideoDef } from '@/lib/lms/robotics101/videos'
+import { timeline, type TimedScene, type VideoDef } from '@/lib/lms/video/engine'
 import { AMBER, BLUE, BLUE_INK, Diagram, GREEN, INK, PAPER, RED } from './diagrams'
 
 /**
- * One frame of a Robotics 101 video at time `t` (seconds). Pure: the same
+ * One frame of an Academy course video at time `t` (seconds). Pure: the same
  * inputs always draw the same picture, which is what lets the renderer
  * capture frames one by one. Inline styles only, because the renderer page
  * has no Tailwind.
@@ -58,7 +58,7 @@ export function VideoFrame({ video, t, logoDark, logoLight }: { video: VideoDef;
   return (
     <div style={box}>
       <div style={{ position: 'absolute', left: SAFE, top: SAFE - 8, fontSize: 15, fontWeight: 700, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(11,11,13,0.55)' }}>
-        Robotics 101 · Video {video.number}
+        {video.series.name} · Video {video.number}
         {chapter && chapter.at > 0 ? <span style={{ color: BLUE_INK }}> · {chapter.title}</span> : null}
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -83,7 +83,7 @@ function Intro({ video, t, length, logo }: { video: VideoDef; t: number; length:
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt="" style={{ height: 64, width: 'auto', opacity: a, transform: `translateY(${(1 - a) * 20}px)` }} />
         <div style={{ marginTop: 22, fontSize: 22, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: AMBER, opacity: b }}>MyCampusView Academy</div>
-        <div style={{ marginTop: 34, fontSize: 20, color: 'rgba(255,255,255,0.65)', opacity: c }}>Robotics 101 · Video {video.number}</div>
+        <div style={{ marginTop: 34, fontSize: 20, color: 'rgba(255,255,255,0.65)', opacity: c }}>{video.series.name} · Video {video.number}</div>
         <div style={{ marginTop: 8, fontSize: 52, fontWeight: 800, letterSpacing: -1, maxWidth: 1000, lineHeight: 1.08, opacity: c, transform: `translateX(${(1 - c) * -30}px)` }}>{video.title}</div>
         <div style={{ marginTop: 28, height: 6, width: 220 * c, background: AMBER, borderRadius: 3 }} />
       </div>
@@ -276,6 +276,50 @@ function SceneView({ scene, local, length }: { scene: TimedScene; local: number;
     }
     case 'sim':
       return <SimScene scene={scene} local={local} />
+    case 'chat':
+      return (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Heading>{scene.title}</Heading>
+          <div style={{ flex: 1, background: 'white', borderRadius: 22, padding: '26px 32px', boxShadow: '0 12px 34px rgba(11,11,13,0.08)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {scene.messages.map((m, i) => {
+              const r = ease((local - revealAt(i, scene.messages.length, length)) / 0.5)
+              const you = m.from === 'you'
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: you ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 14, opacity: r, transform: `translateY(${(1 - r) * 16}px)` }}>
+                  <span style={{ flex: 'none', width: 46, height: 46, borderRadius: 23, background: you ? INK : BLUE_INK, color: 'white', display: 'grid', placeItems: 'center', fontSize: 17, fontWeight: 800 }}>{you ? 'You' : 'AI'}</span>
+                  <div style={{ maxWidth: '78%', padding: '14px 20px', borderRadius: 18, fontSize: 27, lineHeight: 1.3, fontWeight: 500, background: you ? INK : '#eef3fb', color: you ? 'white' : INK }}>{m.text}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    case 'bars': {
+      const max = Math.max(...scene.bars.map((b) => b.value), 1)
+      return (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Heading>{scene.title}</Heading>
+          <div style={{ background: 'white', borderRadius: 22, padding: '28px 34px', boxShadow: '0 12px 34px rgba(11,11,13,0.08)' }}>
+            {scene.bars.map((b, i) => {
+              const r = ease((local - revealAt(i, scene.bars.length, length)) / 0.8)
+              return (
+                <div key={b.label} style={{ display: 'grid', gridTemplateColumns: '300px 1fr 140px', alignItems: 'center', gap: 20, marginTop: i ? 18 : 0, fontSize: 29, fontWeight: 700 }}>
+                  <span>{b.label}</span>
+                  <div style={{ height: 34, background: '#efede8', borderRadius: 17, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.max(b.value ? 1.5 : 0, (b.value / max) * 100) * r}%`, background: i % 2 ? BLUE_INK : AMBER, borderRadius: 17 }} />
+                  </div>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', opacity: r }}>
+                    {Math.round(b.value * r).toLocaleString('en-IN')}
+                    {scene.unit ?? ''}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          {scene.caption ? <div style={{ marginTop: 22, fontSize: 26, color: 'rgba(11,11,13,0.7)' }}>{scene.caption}</div> : null}
+        </div>
+      )
+    }
   }
 }
 
