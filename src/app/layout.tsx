@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Golos_Text } from 'next/font/google'
+import localFont from 'next/font/local'
 import Script from 'next/script'
 import '@/styles/globals.css'
 import { resolveTenant } from '@/server/tenant'
@@ -8,12 +8,16 @@ import { ThemeScript } from '@/components/theme-toggle'
 import { env } from '@/lib/env'
 
 /**
- * Loaded through next/font so the file is self-hosted and there is no
- * render-blocking request to a third-party font CDN.
+ * Self-hosted through next/font, so there is no render-blocking request to a
+ * third-party font CDN. The file is committed rather than fetched through
+ * `next/font/google` for the same reason as the display face: the Google
+ * loader in Next 15.5 crashes when Google returns a file URL without an
+ * extension, which fails the production build. Golos Text's variable latin
+ * subset, so one file covers 400–700.
  */
-const golos = Golos_Text({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const golos = localFont({
+  src: '../lib/fonts/golos-latin.woff2',
+  weight: '400 700',
   variable: '--font-golos',
   display: 'swap',
 })
