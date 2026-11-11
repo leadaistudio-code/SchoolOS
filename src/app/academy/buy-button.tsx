@@ -29,7 +29,17 @@ function loadCheckout(): Promise<boolean> {
   })
 }
 
-export function BuyButton({ courseId, label, simulated }: { courseId: string; label: string; simulated: boolean }) {
+export function BuyButton({
+  courseId,
+  label,
+  simulated,
+  className,
+}: {
+  courseId: string
+  label: string
+  simulated: boolean
+  className?: string
+}) {
   const router = useRouter()
   const { push } = useToast()
   const [pending, setPending] = React.useState(false)
@@ -93,7 +103,7 @@ export function BuyButton({ courseId, label, simulated }: { courseId: string; la
 
   return (
     <>
-      <Button block size="lg" loading={pending} onClick={buy}>
+      <Button block size="lg" loading={pending} onClick={buy} className={className}>
         <ShoppingCart /> {label}
       </Button>
       {simulated ? <p className="text-xs text-warning">Test mode: payments are simulated on this server.</p> : null}

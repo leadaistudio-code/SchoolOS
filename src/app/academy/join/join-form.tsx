@@ -51,7 +51,7 @@ export function JoinForm({ next }: { next: string }) {
       <Field label="Password" required htmlFor="j-password" hint="At least 8 characters" error={fieldError('password')}>
         <Input id="j-password" type="password" autoComplete="new-password" value={form.password} onChange={set('password')} />
       </Field>
-      <Button type="submit" block size="lg" loading={pending}>
+      <Button type="submit" block size="lg" loading={pending} className="h-12 rounded-full text-[15.5px]">
         Create account
       </Button>
       <p className="text-xs text-ink-subtle">

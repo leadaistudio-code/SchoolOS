@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import { Manrope } from 'next/font/google'
 import '@/styles/site.css'
 import { SiteNav } from '@/components/site/nav'
 import { SiteFooter } from '@/components/site/footer'
 import { Reveal } from '@/components/site/reveal'
 import { SmoothScroll } from '@/components/site/motion/provider'
 import { env } from '@/lib/env'
+import { displayFont as display } from '@/lib/fonts/display'
 
 /**
  * One display face, headlines only.
@@ -15,13 +15,8 @@ import { env } from '@/lib/env'
  * the pairing is deliberate: a slightly tighter, geometric face for headlines
  * against a neutral face for reading. Both are self-hosted by next/font, so
  * there is no third-party request in the critical path and no layout shift.
+ * Declared in `@/lib/fonts/display` because the Academy uses it too.
  */
-const display = Manrope({
-  subsets: ['latin'],
-  weight: ['600', '700'],
-  variable: '--font-display',
-  display: 'swap',
-})
 
 const DESCRIPTION =
   'MyCampusView runs student records, attendance, fees, examinations, communication and transport on one database, so information entered once is correct everywhere.'

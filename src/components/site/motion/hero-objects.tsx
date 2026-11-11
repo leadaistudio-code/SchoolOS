@@ -22,7 +22,7 @@ import { useReducedMotion } from './provider'
  */
 
 type Piece = {
-  geometry: 'torus' | 'capsule' | 'sphere' | 'ring' | 'cross'
+  geometry: 'torus' | 'capsule' | 'sphere' | 'ring' | 'cross' | 'gear' | 'wheel' | 'board'
   position: [number, number, number]
   rotation: [number, number, number]
   scale: number
@@ -65,10 +65,69 @@ const CLOSING_PIECES: Piece[] = [
   { geometry: 'torus', position: [-1.7, 0.35, 0], rotation: [0.55, 0.35, 0], scale: 0.78, color: 0x7fd6bd, depth: 0.5, spin: 0.14, bob: 0.6 },
 ]
 
-const ARRANGEMENTS = { hero: PIECES, closing: CLOSING_PIECES }
+/*
+ * The Academy's fold: the same glass, cut into the parts of a small robot — two
+ * gears of different sizes, a wheel, a board and one sensor bead. Kept to the
+ * outer thirds for the same reason as `PIECES`: the headline runs down the
+ * middle.
+ */
+const ACADEMY_PIECES: Piece[] = [
+  { geometry: 'gear', position: [-4.0, 1.5, -0.8], rotation: [0.35, 0.5, 0.2], scale: 0.62, color: 0xf0a63c, depth: 0.5, spin: 0.2, bob: 0.7 },
+  { geometry: 'wheel', position: [3.9, 1.8, -1.6], rotation: [0.2, 1.1, 0.4], scale: 0.5, color: 0x4ea3f5, depth: 0.34, spin: 0.18, bob: 0.9 },
+  { geometry: 'board', position: [4.2, -1.7, -0.3], rotation: [0.3, -0.45, -0.25], scale: 0.42, color: 0x7fd6bd, depth: 0.74, spin: 0.16, bob: 1.1 },
+  { geometry: 'gear', position: [-3.1, -2.0, 0.4], rotation: [0.8, 0.1, 0.5], scale: 0.36, color: 0xb57ff0, depth: 0.86, spin: -0.3, bob: 1.3 },
+  { geometry: 'sphere', position: [-4.8, -0.6, -2.4], rotation: [0, 0, 0], scale: 0.26, color: 0xef5ba8, depth: 0.22, spin: 0.13, bob: 0.5 },
+]
+
+const ARRANGEMENTS = { hero: PIECES, closing: CLOSING_PIECES, academy: ACADEMY_PIECES }
+
+/** A spur gear: teeth on a disc, a bore through the middle, extruded and bevelled. */
+function gearGeometry(): THREE.BufferGeometry {
+  const teeth = 10
+  const outer = 1.15
+  const root = 0.9
+  const shape = new THREE.Shape()
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2
+    const step = (Math.PI * 2) / teeth
+    const points: [number, number][] = [
+      [root, a],
+      [outer, a + step * 0.18],
+      [outer, a + step * 0.48],
+      [root, a + step * 0.66],
+    ]
+    points.forEach(([r, t], j) => {
+      const x = Math.cos(t) * r
+      const y = Math.sin(t) * r
+      if (i === 0 && j === 0) shape.moveTo(x, y)
+      else shape.lineTo(x, y)
+    })
+  }
+  shape.closePath()
+  const bore = new THREE.Path()
+  bore.absarc(0, 0, 0.36, 0, Math.PI * 2, true)
+  shape.holes.push(bore)
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.42,
+    bevelEnabled: true,
+    bevelThickness: 0.06,
+    bevelSize: 0.05,
+    bevelSegments: 3,
+    curveSegments: 18,
+  })
+  geometry.center()
+  return geometry
+}
 
 function buildGeometry(kind: Piece['geometry']): THREE.BufferGeometry {
   switch (kind) {
+    case 'gear':
+      return gearGeometry()
+    case 'wheel':
+      // A tyre: thick and short, so it reads as a wheel rather than a ring.
+      return new THREE.TorusGeometry(0.95, 0.5, 22, 48)
+    case 'board':
+      return new THREE.BoxGeometry(2.3, 1.5, 0.16)
     case 'torus':
       return new THREE.TorusGeometry(1, 0.42, 20, 48)
     case 'capsule':
@@ -210,12 +269,19 @@ export function HeroObjects({
       })
       materials.push(material)
 
+      // A portrait phone shows almost none of the width the pieces are spread
+      // across. The Academy's parts move above and below the headline instead
+      // of disappearing off the sides.
+      const [px, py, pz] = piece.position
+      const position: [number, number, number] =
+        narrow && arrangement === 'academy' ? [px * 0.42, py >= 0 ? py + 3 : py - 2.2, pz] : piece.position
+
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set(...piece.position)
+      mesh.position.set(...position)
       mesh.rotation.set(...piece.rotation)
       mesh.scale.setScalar(piece.scale)
       group.add(mesh)
-      meshes.push({ mesh, piece, base: new THREE.Vector3(...piece.position) })
+      meshes.push({ mesh, piece, base: new THREE.Vector3(...position) })
     }
 
     // Document-absolute top of the canvas. Re-measured on resize, and once

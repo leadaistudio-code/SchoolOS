@@ -1,6 +1,7 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowRight, Award, CheckCircle2, Clock, Layers, Video } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import {
   academyCourse,
   academyVisitor,
@@ -8,11 +9,10 @@ import {
   paymentMode,
   requireAcademyHost,
 } from '@/server/modules/lms/academy'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { Notice } from '@/components/ui/states'
 import { LessonText } from '@/components/lms/lesson-text'
 import { KindIcon } from '@/components/lms/kind-icon'
+import { courseArt, formatDuration } from '@/components/academy/art'
 import { gradeRange, lessonKind, lmsCategory, lmsLevelLabel } from '@/lib/lms/options'
 import { BuyButton } from '../../buy-button'
 
@@ -22,6 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const course = await academyCourse(tenant.id, id)
   return { title: course?.title ?? 'Course', description: course?.subtitle ?? undefined }
 }
+
+const PILL =
+  'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-[15.5px] font-medium transition-transform duration-300 hover:scale-[1.015]'
 
 export default async function AcademyCoursePage({ params }: { params: Promise<{ id: string }> }) {
   const tenant = await requireAcademyHost()
@@ -36,120 +39,193 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
   const owned = visitor?.owned.has(course.id) ?? false
   const free = course.priceMinor === 0
   const here = `/academy/courses/${course.id}`
+  const art = courseArt(course.category)
+  const kinds = new Set(lessons.map((l) => l.kind))
+
+  const facts = [
+    { label: 'Lessons', value: `${lessons.length} in ${course.modules.length} part${course.modules.length === 1 ? '' : 's'}` },
+    minutes ? { label: 'Lesson time', value: formatDuration(minutes)! } : null,
+    { label: 'Level', value: lmsLevelLabel(course.level) },
+    grades ? { label: 'Suits', value: grades } : null,
+  ].filter((f): f is { label: string; value: string } => !!f)
+
+  const includes = [
+    kinds.has('VIDEO') ? 'Video lessons with notes' : null,
+    kinds.has('CODE') ? 'Code you can copy and change' : null,
+    kinds.has('QUIZ') ? 'Quizzes that explain each answer' : null,
+    kinds.has('PROJECT') ? 'Projects reviewed by an instructor' : null,
+    course.hasLiveClasses ? 'Live online classes, with recordings' : null,
+    'A certificate anyone can verify',
+  ].filter((s): s is string => !!s)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <nav className="text-sm text-ink-muted mb-4">
-        <Link href="/academy" className="hover:text-ink">Courses</Link> <span aria-hidden>/</span> {category.label}
-      </nav>
+    <>
+      <section className="border-b border-[var(--rule)] bg-white px-[var(--gutter)] pb-16 pt-10 sm:pb-20 sm:pt-14">
+        <div className="mx-auto max-w-[78rem]">
+          <Link
+            href="/academy#courses"
+            className="inline-flex items-center gap-1.5 text-[14px] text-[var(--text-muted)] transition-colors hover:text-[var(--ed-ink)]"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden /> All courses
+          </Link>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-5 order-2 lg:order-1">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: category.colour }}>
-              {category.label} · {lmsLevelLabel(course.level)}
-              {grades ? ` · ${grades}` : ''}
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold text-ink text-balance">{course.title}</h1>
-            {course.subtitle ? <p className="mt-2 text-lg text-ink-muted">{course.subtitle}</p> : null}
+          <div className="mt-10 grid items-center gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-16">
+            <div className="reveal">
+              <p className="text-[14px] font-medium text-[var(--text-muted)]">
+                <span className="mr-2 inline-block size-2 rounded-full align-middle" style={{ background: category.colour }} />
+                {category.label}
+              </p>
+              <h1 className="ed-display mt-5 text-[clamp(2.4rem,5.2vw,4.4rem)]">{course.title}</h1>
+              {course.subtitle ? (
+                <p className="mt-6 max-w-[44ch] text-[clamp(1.05rem,1.4vw,1.25rem)] leading-[1.55] text-[var(--text-muted)]">
+                  {course.subtitle}
+                </p>
+              ) : null}
+              <dl className="mt-10 grid grid-cols-2 gap-x-8 gap-y-5 border-t border-[var(--rule)] pt-6 sm:grid-cols-4">
+                {facts.map((f) => (
+                  <div key={f.label}>
+                    <dt className="text-[13px] text-[var(--text-subtle)]">{f.label}</dt>
+                    <dd className="mt-1 text-[15.5px] font-medium text-[var(--ed-ink)]">{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <Image
+              src={art.src}
+              alt={art.alt}
+              width={1024}
+              height={768}
+              priority
+              sizes="(min-width: 1024px) 480px, 100vw"
+              className="reveal aspect-[4/3] w-full rounded-xl border border-[var(--rule)] bg-[var(--page)] object-cover"
+            />
           </div>
+        </div>
+      </section>
 
-          {course.outcomes.length ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>What you will learn</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {course.outcomes.map((o) => (
-                    <li key={o} className="flex gap-2 text-sm text-ink">
-                      <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-success" aria-hidden />
+      <div className="bg-white px-[var(--gutter)] py-16 sm:py-20">
+        <div className="mx-auto grid max-w-[78rem] gap-14 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-20">
+          <div className="order-2 space-y-16 lg:order-1">
+            {course.outcomes.length ? (
+              <section data-reveal>
+                <h2 className="ed-display text-[clamp(1.6rem,2.6vw,2.2rem)]">What you will be able to do</h2>
+                <ol className="mt-8 grid gap-x-10 sm:grid-cols-2">
+                  {course.outcomes.map((o, i) => (
+                    <li key={o} className="flex gap-4 border-t border-[var(--rule)] py-4 text-[16px] leading-[1.5] text-[var(--ed-ink)]">
+                      <span className="w-6 shrink-0 pt-px text-[13px] tabular-nums text-[var(--text-subtle)]">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
                       {o}
                     </li>
                   ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ) : null}
+                </ol>
+              </section>
+            ) : null}
 
-          {course.description ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>About the course</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <LessonText text={course.description} />
-              </CardContent>
-            </Card>
-          ) : null}
+            {course.description ? (
+              <section data-reveal>
+                <h2 className="ed-display text-[clamp(1.6rem,2.6vw,2.2rem)]">About the course</h2>
+                <LessonText
+                  text={course.description}
+                  className="mt-6 max-w-[64ch] text-[16.5px] leading-[1.7] text-[color:var(--text-muted)]"
+                />
+              </section>
+            ) : null}
 
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-ink">Course content</h2>
-            {course.modules.map((m, mi) => (
-              <Card key={m.id}>
-                <CardHeader>
-                  <CardTitle>
-                    <span className="text-ink-subtle font-normal mr-1.5">{mi + 1}.</span>
-                    {m.title}
-                  </CardTitle>
-                </CardHeader>
-                <ul className="divide-y divide-[var(--border)]">
-                  {m.lessons.map((l) => (
-                    <li key={l.id} className="flex items-center gap-3 px-4 py-2 text-sm">
-                      <KindIcon kind={l.kind} className="text-ink-subtle" />
-                      <span className="flex-1 min-w-0 truncate text-ink">{l.title}</span>
-                      <span className="text-xs text-ink-subtle whitespace-nowrap">
-                        {lessonKind(l.kind).label}
-                        {l.durationMinutes ? ` · ${l.durationMinutes} min` : ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
+            <section data-reveal>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="ed-display text-[clamp(1.6rem,2.6vw,2.2rem)]">What is inside</h2>
+                <p className="text-[14px] text-[var(--text-subtle)]">
+                  {lessons.length} lessons{minutes ? ` · ${formatDuration(minutes)}` : ''}
+                </p>
+              </div>
+              <div className="mt-8 space-y-10">
+                {course.modules.map((m, mi) => (
+                  <div key={m.id}>
+                    <h3 className="flex items-baseline gap-3 text-[18px] font-semibold">
+                      <span className="text-[13px] font-medium tabular-nums text-[var(--text-subtle)]">Part {mi + 1}</span>
+                      {m.title}
+                    </h3>
+                    <ul className="mt-3 border-b border-[var(--rule)]">
+                      {m.lessons.map((l) => (
+                        <li key={l.id} className="flex items-center gap-4 border-t border-[var(--rule)] py-3.5 text-[15.5px]">
+                          <KindIcon kind={l.kind} className="text-[var(--text-subtle)]" />
+                          <span className="min-w-0 flex-1 text-[var(--ed-ink)]">{l.title}</span>
+                          <span className="whitespace-nowrap text-[13.5px] text-[var(--text-subtle)]">
+                            {lessonKind(l.kind).label}
+                            {l.durationMinutes ? ` · ${l.durationMinutes} min` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
-        </div>
 
-        <aside className="order-1 lg:order-2 lg:sticky lg:top-20 self-start">
-          <Card variant="elevated">
-            <CardContent className="space-y-4">
-              <p className="text-3xl font-semibold text-ink tnum">{free ? 'Free' : formatRupees(course.priceMinor)}</p>
-              <ul className="space-y-1.5 text-sm text-ink-muted">
-                <li className="flex items-center gap-2"><Layers className="size-4" aria-hidden /> {course.modules.length} modules · {lessons.length} lessons</li>
-                {minutes ? <li className="flex items-center gap-2"><Clock className="size-4" aria-hidden /> {minutes < 120 ? `${minutes} min` : `About ${Math.round(minutes / 60)} hours`} of lessons</li> : null}
-                {course.hasLiveClasses ? <li className="flex items-center gap-2"><Video className="size-4" aria-hidden /> Live online classes included</li> : null}
-                <li className="flex items-center gap-2"><Award className="size-4" aria-hidden /> Certificate when you finish</li>
+          <aside className="order-1 self-start lg:sticky lg:top-24 lg:order-2">
+            <div className="rounded-2xl border border-[var(--rule)] bg-white p-7">
+              <p className="text-[13px] text-[var(--text-subtle)]">{owned ? 'In your account' : free ? 'Price' : 'One payment'}</p>
+              <p className="mt-1 text-[2.6rem] font-semibold leading-none tracking-[-0.03em] text-[var(--ed-ink)] tabular-nums">
+                {owned ? 'Enrolled' : free ? 'Free' : formatRupees(course.priceMinor)}
+              </p>
+
+              <ul className="mt-7 space-y-2.5 border-t border-[var(--rule)] pt-6 text-[15px] text-[var(--text-muted)]">
+                {includes.map((item) => (
+                  <li key={item} className="flex gap-3">
+                    <span aria-hidden className="mt-[0.6em] h-px w-3 shrink-0 bg-[var(--ed-amber)]" />
+                    {item}
+                  </li>
+                ))}
               </ul>
 
-              {owned ? (
-                <Link href={`/my/learning/${course.id}`} className={buttonVariants({ block: true, size: 'lg' })}>
-                  Go to the course <ArrowRight />
-                </Link>
-              ) : visitor?.isLearner ? (
-                paymentMode() === 'off' && !free ? (
-                  <Notice tone="warning">Online payments open soon. Please check back shortly.</Notice>
+              <div className="mt-8 space-y-3">
+                {owned ? (
+                  <Link href={`/my/learning/${course.id}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
+                    Go to the course <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                ) : visitor?.isLearner ? (
+                  paymentMode() === 'off' && !free ? (
+                    <Notice tone="warning">Online payments open soon. Please check back shortly.</Notice>
+                  ) : (
+                    <BuyButton
+                      courseId={course.id}
+                      label={free ? 'Enrol for free' : `Buy for ${formatRupees(course.priceMinor)}`}
+                      simulated={paymentMode() === 'simulated'}
+                      className="h-12 rounded-full text-[15.5px]"
+                    />
+                  )
+                ) : visitor ? (
+                  <Notice tone="info">This account is not a learner account. Sign in with your Academy account to enrol.</Notice>
                 ) : (
-                  <BuyButton courseId={course.id} label={free ? 'Enrol for free' : `Buy for ${formatRupees(course.priceMinor)}`} simulated={paymentMode() === 'simulated'} />
-                )
-              ) : visitor ? (
-                <Notice tone="info">This account is not a learner account. Sign in with your Academy account to enrol.</Notice>
-              ) : (
-                <div className="space-y-2">
-                  <Link href={`/academy/join?next=${encodeURIComponent(here)}`} className={buttonVariants({ block: true, size: 'lg' })}>
-                    {free ? 'Join free to start' : 'Create an account to buy'}
-                  </Link>
-                  <Link href={`/login?next=${encodeURIComponent(here)}`} className={buttonVariants({ block: true, variant: 'secondary' })}>
-                    I already have an account
-                  </Link>
-                </div>
-              )}
+                  <>
+                    <Link href={`/academy/join?next=${encodeURIComponent(here)}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
+                      {free ? 'Join free to start' : 'Create an account to buy'}
+                    </Link>
+                    <Link
+                      href={`/login?next=${encodeURIComponent(here)}`}
+                      className={`${PILL} border border-[var(--rule-strong)] text-[var(--ed-ink)] hover:border-[var(--ed-ink)]`}
+                    >
+                      I already have an account
+                    </Link>
+                  </>
+                )}
+              </div>
+
               {!free && !owned ? (
-                <p className="text-xs text-ink-subtle">Pay with UPI, card, net banking or wallet. Pay once; the course stays in your account.</p>
+                <p className="mt-5 text-[13px] leading-[1.55] text-[var(--text-subtle)]">
+                  Pay with UPI, card, net banking or a wallet. Changed your mind? See the{' '}
+                  <Link href="/academy/terms" className="underline underline-offset-2 hover:text-[var(--ed-ink)]">
+                    refund policy
+                  </Link>
+                  .
+                </p>
               ) : null}
-            </CardContent>
-          </Card>
-        </aside>
+            </div>
+          </aside>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
