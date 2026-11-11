@@ -1,0 +1,8 @@
+Board: arduino:avr:uno
+arduino-cli  Version: 1.6.0 Commit: 50a0e80da Date: 2026-11-10T15:30:44Z
+Date: 2026-11-11T14:51:41.406Z
+
+ok     first_program (2288 bytes of program storage)
+ok     ir_sensor_test (2122 bytes of program storage)
+ok     motor_test (2570 bytes of program storage)
+ok     line_follower (2430 bytes of program storage)

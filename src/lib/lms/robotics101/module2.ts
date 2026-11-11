@@ -1,0 +1,447 @@
+import type { ModuleDef } from './types'
+
+export const MODULE_2: ModuleDef = {
+  key: 'm2',
+  title: 'How the robot works',
+  summary: 'How IR sensors see the line, how motors steer the robot, and how to build and wire it safely.',
+  replaces: 'Build the robot',
+  lessons: [
+    {
+      slug: 'r101-04-ir-sensors',
+      title: 'How IR sensors detect a line',
+      kind: 'INTERACTIVE',
+      minutes: 18,
+      replaces: ['Video: How a robot sees the line'],
+      videoId: 'r101-v04',
+      content: {
+        version: 1,
+        stage: 'experiment',
+        intro:
+          'Your robot cannot see colours like you do. Instead, each IR sensor shines invisible infrared light at the floor and measures how much bounces back. That is enough to find a black line.',
+        objectives: [
+          'Explain how an IR sensor uses reflected light',
+          'Predict what a sensor reads over black and over white',
+          'Understand HIGH and LOW, and why some sensors are the other way round',
+          'Know why sensor height and calibration matter',
+        ],
+        blocks: [
+          { type: 'diagram', name: 'ir-reflect', caption: 'The IR LED sends light down. The receiver measures what comes back.' },
+          {
+            type: 'text',
+            heading: 'Light that bounces',
+            body: 'Each sensor module has two tiny parts facing the floor: an **IR LED** that sends out infrared light, and an **IR receiver** that measures it.\n\n- A **white** or shiny floor **reflects** most of the light back. The receiver gets a lot.\n- **Black** tape **absorbs** most of the light. Very little comes back.\n\nThe module compares the amount of light with a set level, called the **threshold**, and sends out a simple answer on its OUT pin: HIGH or LOW.',
+          },
+          {
+            type: 'callout',
+            tone: 'word',
+            title: 'HIGH and LOW',
+            body: '**HIGH** means about 5 volts on the pin, which the Arduino reads as 1. **LOW** means about 0 volts, read as 0. A digital pin only ever reports one of these two.',
+          },
+          { type: 'ir-sim', id: 'ir-sim' },
+          {
+            type: 'callout',
+            tone: 'mistake',
+            title: 'Polarity: not every sensor agrees',
+            body: 'Many IR modules send **LOW over white** (lots of reflection) and **HIGH over black**. Some do the opposite. Neither is wrong. That is why in Lesson 9 you will hold each sensor over your tape and **check what it actually reads** before trusting your program.',
+          },
+          {
+            type: 'text',
+            heading: 'Calibration',
+            body: 'The small blue knob on the module (a **potentiometer**) sets the threshold. Turn it slowly with a small screwdriver while the sensor is over the tape and then over the floor, until the little indicator LED changes exactly when it crosses the edge of the line.\n\nHeight matters too. Mount the sensors about **5 to 10 mm** above the floor. Too high and both colours look alike; too low and the sensor scrapes.',
+          },
+          {
+            type: 'check',
+            id: 'ir-predict',
+            prompt: 'A sensor is moved from white floor onto black tape. What happens to the light reaching its receiver?',
+            options: [
+              { id: 'a', text: 'It drops, because black absorbs IR light', correct: true, feedback: 'Correct. Less reflection means less light at the receiver.' },
+              { id: 'b', text: 'It rises, because black is darker', correct: false, feedback: 'Dark surfaces absorb light, so less comes back, not more.' },
+              { id: 'c', text: 'It stays the same', correct: false, feedback: 'The whole trick depends on black and white reflecting different amounts.' },
+            ],
+            explanation: 'White reflects, black absorbs. The receiver sees the difference.',
+          },
+          {
+            type: 'callout',
+            tone: 'life',
+            title: 'Sunlight can confuse it',
+            body: 'Sunlight contains lots of infrared. Bright sun on the track can make a sensor read wrongly. Test indoors, away from direct sunlight.',
+          },
+        ],
+        summary: [
+          'An IR sensor shines invisible light down and measures what bounces back.',
+          'White reflects a lot; black absorbs most of it.',
+          'The module turns this into HIGH or LOW. Some modules are reversed, so always check.',
+          'Calibrate with the blue knob and mount sensors 5 to 10 mm above the floor.',
+        ],
+        next: 'Next, find out how two motors can make a robot go straight, turn and spin.',
+      },
+      quiz: {
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'Why does black tape look different to an IR sensor than a white floor?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'Black absorbs IR light, so little bounces back', correct: true, feedback: 'Right. The receiver gets less light over black.' },
+              { id: 'b', text: 'Black tape is warmer', correct: false, feedback: 'The sensor measures reflected light, not temperature.' },
+              { id: 'c', text: 'The sensor sees colours like a camera', correct: false, feedback: 'It only measures how much IR light returns.' },
+            ],
+            explanation: 'IR sensors measure reflected light. Dark surfaces absorb it.',
+          },
+          {
+            id: 'q2',
+            prompt: 'Your sensor reads LOW over black tape, but your friend’s reads HIGH. What is going on?',
+            multiple: false,
+            hint: 'Remember the polarity note.',
+            options: [
+              { id: 'a', text: 'Different modules use opposite polarity, so each must be checked', correct: true, feedback: 'Yes. Calibrate and set ON_LINE to match your sensor.' },
+              { id: 'b', text: 'One sensor is broken', correct: false, feedback: 'Not necessarily. Reversed output is normal for some modules.' },
+              { id: 'c', text: 'Black tape changes colour', correct: false, feedback: 'The tape is fine. The module design differs.' },
+            ],
+            explanation: 'Polarity varies between modules. Always test what yours reads over black.',
+          },
+          {
+            id: 'q3',
+            prompt: 'What does the small blue knob on an IR module adjust?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'The threshold between black and white', correct: true, feedback: 'Correct. It sets when the output flips.' },
+              { id: 'b', text: 'The motor speed', correct: false, feedback: 'The sensor has nothing to do with motor speed.' },
+              { id: 'c', text: 'The colour of the LED', correct: false, feedback: 'It changes sensitivity, not colour.' },
+            ],
+          },
+          {
+            id: 'q4',
+            prompt: 'About how high above the floor should the sensors be?',
+            multiple: false,
+            options: [
+              { id: 'a', text: '5 to 10 mm', correct: true, feedback: 'Right: close enough to see the difference, without scraping.' },
+              { id: 'b', text: '5 to 10 cm', correct: false, feedback: 'Too high. Black and white would look the same.' },
+              { id: 'c', text: 'Touching the floor', correct: false, feedback: 'It would scrape and the reading would be unreliable.' },
+            ],
+          },
+        ],
+      },
+      passPercent: 80,
+    },
+    {
+      slug: 'r101-05-motors',
+      title: 'How motors move a robot',
+      kind: 'INTERACTIVE',
+      minutes: 15,
+      replaces: ['Video: Driving the motors'],
+      videoId: 'r101-v05',
+      content: {
+        version: 1,
+        stage: 'experiment',
+        intro:
+          'Your robot has no steering wheel. It turns by running its two wheels at different speeds. This is called differential drive, and it is how most small robots move.',
+        objectives: [
+          'Explain how a DC motor turns a wheel',
+          'Make a robot go forward, turn and spin using two wheel speeds',
+          'Explain why the Arduino needs a motor driver',
+        ],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'DC gear motors',
+            body: 'A **DC motor** spins when current flows through it. Swap the two wires and it spins the other way. The yellow motors in your kit have a **gearbox** that trades speed for strength, so the wheels turn slower but can push the robot.',
+          },
+          { type: 'diagram', name: 'differential', caption: 'Equal speeds go straight. A slower wheel is on the inside of the turn.' },
+          { type: 'motor-lab', id: 'motor-lab' },
+          {
+            type: 'text',
+            heading: 'Why a motor driver?',
+            body: 'An Arduino pin can safely give about **20 milliamps**. A small motor can need **several hundred**. Connect a motor straight to a pin and you can damage the Arduino.\n\nThe **L298N** solves this. The Arduino sends it small signals (which direction, how fast), and it switches the much bigger battery current to the motors. Inside it is a circuit called an **H-bridge** that can reverse the current, so the motor can run backwards too.',
+          },
+          { type: 'diagram', name: 'h-bridge', caption: 'An H-bridge: closing opposite switches sends current one way or the other.' },
+          {
+            type: 'check',
+            id: 'turn-left',
+            prompt: 'The left wheel is slow and the right wheel is fast. Which way does the robot go?',
+            options: [
+              { id: 'a', text: 'It curves left', correct: true, feedback: 'Yes. The robot curves towards the slower wheel.' },
+              { id: 'b', text: 'It curves right', correct: false, feedback: 'The faster right wheel pushes the robot round towards the left.' },
+              { id: 'c', text: 'Straight ahead', correct: false, feedback: 'Only equal speeds go straight.' },
+            ],
+            explanation: 'A robot curves towards its slower wheel.',
+          },
+        ],
+        summary: [
+          'A DC motor spins one way or the other depending on which way current flows.',
+          'Equal wheel speeds go straight; a slower wheel turns the robot towards that side.',
+          'Opposite directions spin the robot on the spot.',
+          'Arduino pins are too weak for motors, so the L298N driver supplies the current.',
+        ],
+        next: 'Next, put the robot’s body together, step by step.',
+      },
+      quiz: {
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'How can a two-wheeled robot turn? Choose all that are correct.',
+            multiple: true,
+            options: [
+              { id: 'a', text: 'Run one wheel slower than the other', correct: true, feedback: 'Yes, it curves towards the slow side.' },
+              { id: 'b', text: 'Run the wheels in opposite directions', correct: true, feedback: 'Yes, it spins on the spot.' },
+              { id: 'c', text: 'Run both wheels forward at the same speed', correct: false, feedback: 'Equal speeds go straight.' },
+            ],
+            explanation: 'Different speeds curve; opposite directions spin.',
+          },
+          {
+            id: 'q2',
+            prompt: 'Why do we need an L298N motor driver?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'The Arduino cannot supply enough current to run motors', correct: true, feedback: 'Correct. The driver handles the big current.' },
+              { id: 'b', text: 'It makes the motors quieter', correct: false, feedback: 'Noise is not the reason.' },
+              { id: 'c', text: 'It replaces the battery', correct: false, feedback: 'The driver needs the battery. It switches battery power.' },
+            ],
+          },
+          {
+            id: 'q3',
+            prompt: 'What makes a DC motor spin backwards?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'Reversing the direction of the current', correct: true, feedback: 'Right. The H-bridge does exactly that.' },
+              { id: 'b', text: 'Using a bigger battery', correct: false, feedback: 'That changes speed, not direction.' },
+              { id: 'c', text: 'Turning the wheel by hand', correct: false, feedback: 'The motor’s direction comes from the current.' },
+            ],
+          },
+        ],
+      },
+      passPercent: 80,
+    },
+    {
+      slug: 'r101-06-build-body',
+      title: 'Build the robot body',
+      kind: 'INTERACTIVE',
+      minutes: 16,
+      videoId: 'r101-v06',
+      content: {
+        version: 1,
+        stage: 'build',
+        intro: 'Time to build. Follow each step, tick it off, and check your work before moving on. Take your time: a solid body makes everything later easier.',
+        objectives: [
+          'Mount the motors, wheels and castor on the chassis',
+          'Fix the Arduino, motor driver, sensors and battery holder',
+          'Check the build before any wiring',
+        ],
+        blocks: [
+          {
+            type: 'callout',
+            tone: 'teacher',
+            title: 'For the teacher',
+            body: 'Allow 15 to 25 minutes. Students in pairs work best: one reads, one builds. Batteries stay out of the holder for the whole of this lesson.',
+          },
+          {
+            type: 'steps',
+            title: 'Assembly guide',
+            steps: [
+              { title: 'Lay out every part', body: 'Check everything on the kit list is there before you start. Keep screws in a small bowl.' },
+              { title: 'Fix the two motors', body: 'Screw each motor to the underside of the chassis at the back, shafts pointing outwards. The wires should face inwards.', tip: 'Tighten until firm, not as hard as you can. Plastic brackets crack.' },
+              { title: 'Push on the wheels', body: 'Line up the flat side of the shaft with the wheel’s hole and press straight on.' },
+              { title: 'Mount the castor', body: 'Fix the castor wheel under the front so the chassis sits level.' },
+              { title: 'Fix the sensors', body: 'Mount both IR modules at the front edge, facing down, about 5 to 10 mm above the floor and about 3 cm apart, one either side of where the line will be.', tip: 'Your black tape should fit between the two sensors with a little gap on each side.' },
+              { title: 'Mount the Arduino and driver', body: 'Fix the Arduino Uno on spacers on top of the chassis, with the USB port reachable. Fix the L298N next to it.' },
+              { title: 'Fit the battery holder', body: 'Fix the holder where it balances the robot, usually over the back wheels. Do not put batteries in yet.' },
+            ],
+          },
+          { type: 'diagram', name: 'chassis', caption: 'Top view: sensors at the front, Arduino and driver in the middle, battery at the back.' },
+          {
+            type: 'sequence',
+            id: 'build-order',
+            title: 'Put the build in order',
+            prompt: 'A friend wrote the build steps on cards and dropped them. Put them back in a safe, sensible order.',
+            steps: [
+              { id: 's1', text: 'Check every part from the kit list is there' },
+              { id: 's2', text: 'Fix the two motors to the chassis' },
+              { id: 's3', text: 'Push the wheels onto the motor shafts' },
+              { id: 's4', text: 'Fix the castor under the front' },
+              { id: 's5', text: 'Mount the sensors, Arduino and motor driver' },
+              { id: 's6', text: 'Ask an adult to check the wiring' },
+              { id: 's7', text: 'Put the batteries in and switch on' },
+            ],
+            explanation: 'Body first, then electronics, and power always last, after an adult has checked the wiring.',
+          },
+          {
+            type: 'checklist',
+            id: 'build-check',
+            title: 'Build check',
+            items: [
+              { id: 'b1', text: 'Both motors are firmly fixed and do not wobble' },
+              { id: 'b2', text: 'Both wheels spin freely by hand without rubbing' },
+              { id: 'b3', text: 'The robot sits level on its wheels and castor' },
+              { id: 'b4', text: 'Both IR sensors face down, 5 to 10 mm above the floor' },
+              { id: 'b5', text: 'The Arduino’s USB port can be reached' },
+              { id: 'b6', text: 'No batteries are in the holder yet' },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'tip',
+            title: 'No kit? Build it virtually',
+            body: 'Open the simulator in Lesson 11 and change the sensor spacing and line width to see why sensor placement matters.',
+          },
+        ],
+        summary: [
+          'Motors at the back, castor at the front, sensors at the front edge facing down.',
+          'Sensors sit 5 to 10 mm above the floor, either side of the line.',
+          'Batteries stay out until the wiring has been checked.',
+        ],
+        next: 'Next, connect the electronics: sensors and motor driver to the Arduino, with a common ground.',
+      },
+      quiz: {
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'Where should the IR sensors go?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'At the front, facing down, either side of the line', correct: true, feedback: 'Right. They need to see the line ahead of the wheels.' },
+              { id: 'b', text: 'On top, facing up', correct: false, feedback: 'They must face the floor to see the line.' },
+              { id: 'c', text: 'At the back, behind the wheels', correct: false, feedback: 'Too late: the robot would already have drifted off.' },
+            ],
+          },
+          {
+            id: 'q2',
+            prompt: 'When do the batteries go into the holder?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'Only after an adult has checked the wiring', correct: true, feedback: 'Correct. Power last, after checking.' },
+              { id: 'b', text: 'Before building, to test parts', correct: false, feedback: 'Never build with power connected.' },
+              { id: 'c', text: 'Whenever you like', correct: false, feedback: 'Power goes in last, after a wiring check.' },
+            ],
+          },
+          {
+            id: 'q3',
+            prompt: 'Your black tape is 2 cm wide. How far apart should the two sensors be?',
+            multiple: false,
+            hint: 'The line should fit between the sensors.',
+            options: [
+              { id: 'a', text: 'A little wider than the tape, about 3 cm', correct: true, feedback: 'Yes. Both see white when the robot is centred.' },
+              { id: 'b', text: 'Touching each other, 0 cm', correct: false, feedback: 'Then both would see black at once, all the time.' },
+              { id: 'c', text: 'As far apart as possible, 15 cm', correct: false, feedback: 'Too wide: the robot would wobble a long way before noticing a turn.' },
+            ],
+          },
+        ],
+      },
+      passPercent: 80,
+    },
+    {
+      slug: 'r101-07-electronics',
+      title: 'Connect the electronics',
+      kind: 'INTERACTIVE',
+      minutes: 18,
+      videoId: 'r101-v07',
+      content: {
+        version: 1,
+        stage: 'build',
+        intro:
+          'Now connect the parts so they can talk. The sensors send signals to the Arduino, the Arduino sends signals to the motor driver, and the battery powers the motors through the driver.',
+        objectives: [
+          'Connect both IR sensors and the L298N to the correct Arduino pins',
+          'Explain why every part must share a common ground',
+          'Pass a wiring check with an adult before connecting power',
+        ],
+        blocks: [
+          {
+            type: 'callout',
+            tone: 'safety',
+            title: 'Before you start',
+            body: 'Batteries out. USB cable unplugged. You will connect power only at the very end, after an adult has checked every wire.',
+          },
+          { type: 'diagram', name: 'pin-map', caption: 'The reference pin map used in every sketch in this course.' },
+          { type: 'diagram', name: 'wiring', caption: 'Full wiring. Red: power. Black: ground. Other colours: signals.' },
+          {
+            type: 'text',
+            heading: 'Power and ground',
+            body: '- Battery **+** goes to the L298N **12V** (or VS) terminal through the switch. Battery **−** goes to the L298N **GND** terminal.\n- Run a wire from the L298N **GND** to an Arduino **GND** pin. This is the **common ground**.\n- Each IR module: **VCC to 5V**, **GND to GND**, **OUT to its Arduino pin**.\n- Left motor wires go to L298N **OUT1/OUT2** (motor A); right motor to **OUT3/OUT4** (motor B).\n- Remove the jumper caps on **ENA** and **ENB** so the Arduino can control speed through them.',
+          },
+          {
+            type: 'callout',
+            tone: 'word',
+            title: 'Common ground',
+            body: 'A voltage is always measured between two points. If the Arduino and the driver do not share the same ground wire, a 5V signal from the Arduino means nothing to the driver, and the motors behave randomly or not at all. **Connect all the grounds together.**',
+          },
+          {
+            type: 'callout',
+            tone: 'mistake',
+            title: 'Powering the Arduino',
+            body: 'Many L298N boards have a 5V regulator and a 5V terminal. Whether you can use it to power the Arduino depends on your board and battery. For this course, power the Arduino from **USB while programming and testing**, and follow your kit’s instructions for running on battery. Never connect a battery above 12 V.',
+          },
+          { type: 'wiring', id: 'wiring-match' },
+          {
+            type: 'checklist',
+            id: 'wiring-check',
+            title: 'Adult wiring check (before power)',
+            teacher: true,
+            items: [
+              { id: 'w1', text: 'Left IR OUT to D2, right IR OUT to D3' },
+              { id: 'w2', text: 'Both IR VCC to 5V and GND to GND' },
+              { id: 'w3', text: 'ENA to D5, ENB to D6 (jumper caps removed)' },
+              { id: 'w4', text: 'IN1 D8, IN2 D9, IN3 D10, IN4 D11' },
+              { id: 'w5', text: 'L298N GND connected to Arduino GND (common ground)' },
+              { id: 'w6', text: 'Battery + to L298N 12V/VS through the switch, battery − to L298N GND' },
+              { id: 'w7', text: 'No motor wire goes to any Arduino pin' },
+              { id: 'w8', text: 'No bare wire ends touching each other' },
+            ],
+          },
+        ],
+        summary: [
+          'Sensors: VCC 5V, GND, OUT to D2 (left) and D3 (right).',
+          'Driver: ENA D5, ENB D6, IN1–IN4 on D8–D11. Motors on OUT1–OUT4.',
+          'All grounds connect together: battery, driver and Arduino.',
+          'An adult checks the wiring before the battery goes in.',
+        ],
+        next: 'Next, write your very first Arduino program.',
+      },
+      quiz: {
+        questions: [
+          {
+            id: 'q1',
+            prompt: 'Which pin does the left IR sensor’s OUT connect to?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'D2', correct: true, feedback: 'Correct.' },
+              { id: 'b', text: 'D5', correct: false, feedback: 'D5 is ENA, the left motor’s speed pin.' },
+              { id: 'c', text: '5V', correct: false, feedback: '5V powers the sensor (VCC). OUT is the signal, on D2.' },
+            ],
+          },
+          {
+            id: 'q2',
+            prompt: 'Why must the Arduino GND be connected to the L298N GND?',
+            multiple: false,
+            hint: 'Voltages are measured between two points.',
+            options: [
+              { id: 'a', text: 'So both boards agree what 0 V is and signals make sense', correct: true, feedback: 'Exactly. That is the common ground.' },
+              { id: 'b', text: 'To make the battery last longer', correct: false, feedback: 'It is about signals, not battery life.' },
+              { id: 'c', text: 'It is optional', correct: false, feedback: 'Without it the motors may not respond correctly.' },
+            ],
+          },
+          {
+            id: 'q3',
+            prompt: 'Which pins control the speed of the motors?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'ENA (D5) and ENB (D6)', correct: true, feedback: 'Right. They are PWM pins.' },
+              { id: 'b', text: 'IN1 and IN2', correct: false, feedback: 'Those set the left motor’s direction.' },
+              { id: 'c', text: 'D2 and D3', correct: false, feedback: 'Those read the sensors.' },
+            ],
+          },
+          {
+            id: 'q4',
+            prompt: 'Where should a motor’s wires be connected?',
+            multiple: false,
+            options: [
+              { id: 'a', text: 'To the L298N output terminals', correct: true, feedback: 'Correct. Never to the Arduino.' },
+              { id: 'b', text: 'To Arduino pin 5V and GND', correct: false, feedback: 'This can damage the Arduino.' },
+              { id: 'c', text: 'To an Arduino digital pin', correct: false, feedback: 'A pin cannot supply motor current.' },
+            ],
+          },
+        ],
+      },
+      passPercent: 80,
+    },
+  ],
+}

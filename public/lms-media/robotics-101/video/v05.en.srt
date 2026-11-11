@@ -1,0 +1,95 @@
+1
+00:00:00,500 --> 00:00:04,200
+MyCampusView Academy. Robotics 101, video 5: How motors and the motor driver work.
+
+2
+00:00:04,800 --> 00:00:09,124
+Our robot has two motors, one for each wheel.
+
+3
+00:00:09,174 --> 00:00:15,150
+Let us see how the Arduino controls their direction and speed.
+
+4
+00:00:15,800 --> 00:00:20,895
+Inside the L298N are switches arranged like the letter H.
+
+5
+00:00:20,945 --> 00:00:23,332
+That is called an H-bridge.
+
+6
+00:00:23,382 --> 00:00:29,650
+Two control pins decide which way the current flows through the motor.
+
+7
+00:00:30,300 --> 00:00:36,114
+If IN1 is HIGH and IN2 is LOW, the motor spins forward.
+
+8
+00:00:36,164 --> 00:00:39,632
+Swap them, and it spins backward.
+
+9
+00:00:39,682 --> 00:00:43,150
+If both are LOW, the motor stops.
+
+10
+00:00:43,800 --> 00:00:46,971
+The enable pin sets the speed.
+
+11
+00:00:47,021 --> 00:00:51,803
+The Arduino switches it on and off very fast.
+
+12
+00:00:51,853 --> 00:00:53,843
+This is called PWM.
+
+13
+00:00:53,893 --> 00:00:57,171
+On most of the time means fast.
+
+14
+00:00:57,221 --> 00:01:01,466
+On only a little of the time means slow.
+
+15
+00:01:01,516 --> 00:01:04,150
+Speed goes from 0 to 255.
+
+16
+00:01:04,800 --> 00:01:07,493
+Our robot has no steering wheel.
+
+17
+00:01:07,543 --> 00:01:11,864
+It turns by driving its wheels at different speeds.
+
+18
+00:01:11,914 --> 00:01:15,550
+Both wheels the same speed: straight ahead.
+
+19
+00:01:15,600 --> 00:01:19,064
+Left wheel slower: the robot curves left.
+
+20
+00:01:19,114 --> 00:01:22,150
+Right wheel slower: it curves right.
+
+21
+00:01:22,800 --> 00:01:28,466
+Watch the left and right motor numbers on the panel.
+
+22
+00:01:28,516 --> 00:01:35,281
+When the line curves, one wheel slows down and the robot turns
+
+23
+00:01:35,331 --> 00:01:37,150
+towards the line.
+
+24
+00:01:37,800 --> 00:01:44,000
+Next: Building the robot body.

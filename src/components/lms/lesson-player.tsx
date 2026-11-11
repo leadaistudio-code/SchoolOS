@@ -160,6 +160,19 @@ export function LessonPlayer({
   )
 }
 
+function QuizHint({ hint }: { hint: string }) {
+  const [open, setOpen] = React.useState(false)
+  return open ? (
+    <p className="mt-2 rounded-[var(--radius-sm)] bg-surface-2 px-2.5 py-1.5 text-xs text-ink" role="status">
+      Hint: {hint}
+    </p>
+  ) : (
+    <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs text-ink-muted underline-offset-4 hover:text-ink hover:underline">
+      Need a hint?
+    </button>
+  )
+}
+
 function CodeBlock({ code, language }: { code: string; language: string | null }) {
   const [copied, setCopied] = React.useState(false)
   return (
@@ -187,7 +200,7 @@ function CodeBlock({ code, language }: { code: string; language: string | null }
   )
 }
 
-function QuizRunner({
+export function QuizRunner({
   lesson,
   bestScore,
   submitQuiz,
@@ -292,7 +305,15 @@ function QuizRunner({
                   )
                 })}
               </div>
+              {graded?.feedback
+                ? Object.entries(graded.feedback).map(([id, text]) => (
+                    <p key={id} className={cn('mt-2 text-xs', graded.correct ? 'text-success' : 'text-[var(--danger)]')}>
+                      {text}
+                    </p>
+                  ))
+                : null}
               {graded?.explanation ? <p className="mt-2 text-xs text-ink-muted">{graded.explanation}</p> : null}
+              {!graded && q.hint ? <QuizHint hint={q.hint} /> : null}
             </li>
           )
         })}

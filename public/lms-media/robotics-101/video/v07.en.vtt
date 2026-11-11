@@ -1,0 +1,89 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 7: Wiring the electronics safely.
+
+2
+00:00:04.800 --> 00:00:10.297
+Before you touch a single wire, switch the battery off.
+
+3
+00:00:10.347 --> 00:00:16.650
+Ask an adult to check your wiring before you turn the power on.
+
+4
+00:00:17.300 --> 00:00:20.120
+Here are the pins we use.
+
+5
+00:00:20.170 --> 00:00:27.007
+The left sensor goes to pin 2 and the right sensor to pin 3.
+
+6
+00:00:27.057 --> 00:00:33.206
+The motor driver uses pins 5 and 6 for speed, and pins
+
+7
+00:00:33.256 --> 00:00:36.650
+8, 9, 10 and 11 for direction.
+
+8
+00:00:37.300 --> 00:00:40.277
+Each sensor has three pins.
+
+9
+00:00:40.327 --> 00:00:46.218
+VCC goes to 5 volts, GND goes to ground, and OUT goes
+
+10
+00:00:46.268 --> 00:00:51.150
+to its Arduino pin: left to D2, right to D3.
+
+11
+00:00:51.800 --> 00:00:54.309
+Now the motor driver.
+
+12
+00:00:54.359 --> 00:00:57.233
+ENA to D5 and ENB to D6.
+
+13
+00:00:57.283 --> 00:01:03.082
+IN1 to D8, IN2 to D9, IN3 to D10 and IN4 to D11.
+
+14
+00:01:03.132 --> 00:01:10.150
+Motor A is the left motor, and motor B is the right motor.
+
+15
+00:01:10.800 --> 00:01:16.575
+The battery goes to the motor driver through the switch: red to
+
+16
+00:01:16.625 --> 00:01:18.979
+12 volts, black to ground.
+
+17
+00:01:19.029 --> 00:01:23.880
+Then connect the driver ground to the Arduino ground.
+
+18
+00:01:23.930 --> 00:01:29.150
+All grounds must be joined, or the signals will not work.
+
+19
+00:01:29.800 --> 00:01:35.479
+Now ask an adult to check four things: the battery wires are
+
+20
+00:01:35.529 --> 00:01:41.971
+the right way round, no bare wires touch, every ground is connected,
+
+21
+00:01:42.021 --> 00:01:46.650
+and the switch stays off until the check is done.
+
+22
+00:01:47.300 --> 00:01:53.500
+Next: Your first Arduino program.

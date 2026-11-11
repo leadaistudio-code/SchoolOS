@@ -22,7 +22,7 @@ export async function listCatalogue(ctx: AppContext) {
       OR: [{ tenantId: null, status: 'PUBLISHED' }, { tenantId: ctx.tenant.id }],
     },
     orderBy: [{ category: 'asc' }, { title: 'asc' }],
-    include: { _count: { select: { lessons: true, modules: true } } },
+    include: { _count: { select: { lessons: { where: { archivedAt: null } }, modules: true } } },
   })
   const ids = courses.map((c) => c.id)
   const [assigned, started, finished] = await Promise.all([
@@ -56,8 +56,9 @@ export async function visibleCourse(ctx: AppContext, id: string) {
         orderBy: { position: 'asc' },
         include: {
           lessons: {
+            where: { archivedAt: null },
             orderBy: { position: 'asc' },
-            select: { id: true, title: true, kind: true, durationMinutes: true },
+            select: { id: true, title: true, kind: true, durationMinutes: true, slug: true },
           },
         },
       },
@@ -161,7 +162,7 @@ export async function courseProgress(ctx: AppContext, courseId: string) {
   await assertLms(ctx)
   const course = await visibleCourse(ctx, courseId)
   const lessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id))
-  const quizIds = new Set(course.modules.flatMap((m) => m.lessons.filter((l) => l.kind === 'QUIZ').map((l) => l.id)))
+  const quizIds = new Set(course.modules.flatMap((m) => m.lessons.filter((l) => l.kind === 'QUIZ' || l.kind === 'INTERACTIVE').map((l) => l.id)))
 
   const assignments = await ctx.db.lmsCourseAssignment.findMany({ where: { courseId } })
   const wholeSchool = assignments.some((a) => !a.classLevelId)
@@ -252,6 +253,94 @@ export async function courseProgress(ctx: AppContext, courseId: string) {
       averagePercent: list.length ? Math.round(list.reduce((s, r) => s + r.percent, 0) / list.length) : 0,
     },
   }
+}
+
+const STALLED_DAYS = 7
+const STRUGGLING_ATTEMPTS = 3
+
+/**
+ * Lesson-by-lesson view of a course for teachers: where students stall, which
+ * knowledge checks they keep failing, projects waiting for review, and badges.
+ */
+export async function courseLessonBreakdown(ctx: AppContext, courseId: string) {
+  ctx.require('lms.view')
+  await assertLms(ctx)
+  const course = await visibleCourse(ctx, courseId)
+  const lessons = course.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, moduleTitle: m.title })))
+  const lessonIds = lessons.map((l) => l.id)
+
+  const [progress, enrollments, submissions] = await Promise.all([
+    ctx.db.lmsLessonProgress.findMany({
+      where: { lessonId: { in: lessonIds }, enrollment: { courseId } },
+      select: { lessonId: true, studentId: true, completedAt: true, bestScorePercent: true, attempts: true },
+    }),
+    ctx.db.lmsEnrollment.findMany({
+      where: { courseId, completedAt: null },
+      select: { studentId: true, lastActivityAt: true, student: { select: { firstName: true, lastName: true } } },
+    }),
+    ctx.db.lmsProjectSubmission.findMany({
+      where: { lessonId: { in: lessonIds }, enrollment: { courseId } },
+      select: { id: true, lessonId: true, studentId: true, status: true, pathway: true },
+    }),
+  ])
+
+  const rows = lessons.map((l) => {
+    const mine = progress.filter((p) => p.lessonId === l.id)
+    const scored = mine.filter((p) => p.bestScorePercent != null)
+    const tried = mine.filter((p) => p.attempts > 0)
+    return {
+      id: l.id,
+      title: l.title,
+      kind: l.kind,
+      moduleTitle: l.moduleTitle,
+      started: mine.length,
+      completed: mine.filter((p) => p.completedAt).length,
+      averageScore: scored.length ? Math.round(scored.reduce((s, p) => s + p.bestScorePercent!, 0) / scored.length) : null,
+      averageAttempts: tried.length ? Math.round((tried.reduce((s, p) => s + p.attempts, 0) / tried.length) * 10) / 10 : null,
+      submissions: submissions.filter((s) => s.lessonId === l.id).length,
+      awaitingReview: submissions.filter((s) => s.lessonId === l.id && s.status === 'SUBMITTED').length,
+    }
+  })
+
+  const names = new Map(enrollments.map((e) => [e.studentId, `${e.student.firstName} ${e.student.lastName}`.trim()]))
+  const titles = new Map(lessons.map((l) => [l.id, l.title]))
+  const stalledBefore = Date.now() - STALLED_DAYS * 86_400_000
+  const attention: { studentId: string; name: string; reason: string }[] = []
+  for (const e of enrollments) {
+    if (e.lastActivityAt && e.lastActivityAt.getTime() < stalledBefore) {
+      const days = Math.floor((Date.now() - e.lastActivityAt.getTime()) / 86_400_000)
+      attention.push({ studentId: e.studentId, name: names.get(e.studentId)!, reason: `No activity for ${days} days` })
+    }
+  }
+  for (const p of progress) {
+    if (!p.completedAt && p.attempts >= STRUGGLING_ATTEMPTS && names.has(p.studentId)) {
+      attention.push({
+        studentId: p.studentId,
+        name: names.get(p.studentId)!,
+        reason: `${p.attempts} tries on “${titles.get(p.lessonId)}” without passing`,
+      })
+    }
+  }
+
+  return {
+    rows,
+    attention,
+    completedSlugsByStudent: groupCompletedSlugs(progress, new Map(lessons.map((l) => [l.id, l.slug]))),
+    awaitingReview: submissions.filter((s) => s.status === 'SUBMITTED').map((s) => ({ id: s.id, lessonId: s.lessonId })),
+  }
+}
+
+function groupCompletedSlugs(
+  progress: { lessonId: string; studentId: string; completedAt: Date | null }[],
+  slugs: Map<string, string | null>,
+) {
+  const out = new Map<string, Set<string>>()
+  for (const p of progress) {
+    const slug = slugs.get(p.lessonId)
+    if (!p.completedAt || !slug) continue
+    out.set(p.studentId, (out.get(p.studentId) ?? new Set()).add(slug))
+  }
+  return out
 }
 
 export async function classOptions(ctx: AppContext) {

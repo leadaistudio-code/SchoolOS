@@ -4,6 +4,7 @@ import { prisma } from '@/server/db/prisma'
 import { badRequest, conflict, notFound } from '@/server/api/response'
 import { CODE_LANGUAGES, LMS_CATEGORIES, LMS_LESSON_KINDS, type Quiz } from '@/lib/lms/options'
 import { isHttpUrl, videoEmbedUrl, videoFileUrl } from '@/lib/lms/media'
+import { readRichContent, type RichContent } from '@/lib/lms/rich'
 
 /**
  * Course authoring, shared by the platform console (owner tenantId null: the
@@ -51,10 +52,18 @@ const quizSchema = z.object({
         prompt: text(1000).min(1, 'Every question needs a question'),
         multiple: z.boolean().default(false),
         options: z
-          .array(z.object({ id: z.string().min(1).max(40), text: text(300).min(1, 'Options cannot be blank'), correct: z.boolean() }))
+          .array(
+            z.object({
+              id: z.string().min(1).max(40),
+              text: text(300).min(1, 'Options cannot be blank'),
+              correct: z.boolean(),
+              feedback: optionalText(500),
+            }),
+          )
           .min(2, 'Every question needs at least two options')
           .max(6),
         explanation: optionalText(1000),
+        hint: optionalText(500),
       }),
     )
     .min(1, 'Add at least one question')
@@ -73,8 +82,22 @@ export const lessonSchema = z
     code: z.string().max(20000).optional().or(z.literal('').transform(() => undefined)),
     quiz: quizSchema.optional(),
     passPercent: z.coerce.number().int().min(0).max(100).default(60),
+    /** Interactive lessons: the structured content as JSON text. Saved as a draft unless `publish` is set. */
+    content: z.string().max(400_000).optional(),
+    publish: z.boolean().optional(),
   })
   .superRefine((v, issue) => {
+    if (v.content !== undefined && v.content.trim()) {
+      const parsed = parseContentJson(v.content)
+      if (parsed.error) issue.addIssue({ code: 'custom', path: ['content'], message: parsed.error })
+    }
+    if (v.kind === 'INTERACTIVE' && v.quiz) {
+      v.quiz.questions.forEach((q, i) => {
+        if (!q.options.some((o) => o.correct)) {
+          issue.addIssue({ code: 'custom', path: ['quiz', 'questions', i], message: `Mark the correct answer for question ${i + 1}` })
+        }
+      })
+    }
     if (v.kind === 'VIDEO' && !videoEmbedUrl(v.videoUrl) && !videoFileUrl(v.videoUrl)) {
       issue.addIssue({ code: 'custom', path: ['videoUrl'], message: 'Paste a YouTube or Vimeo link, or a link to an .mp4 file' })
     }
@@ -101,6 +124,26 @@ export const lessonSchema = z
   })
 
 export type LessonInput = z.input<typeof lessonSchema>
+
+export function parseContentJson(raw: string): { content: RichContent | null; error: string | null } {
+  let json: unknown
+  try {
+    json = JSON.parse(raw)
+  } catch (err) {
+    return { content: null, error: `The content is not valid JSON: ${(err as Error).message}` }
+  }
+  const { content, error } = readRichContent(json)
+  return content ? { content, error: null } : { content: null, error: error ?? 'Lesson content is empty' }
+}
+
+/** Draft unless publishing; publishing replaces what learners see and bumps the version. */
+function contentChange(data: z.infer<typeof lessonSchema>, current?: { contentVersion: number }) {
+  if (data.kind !== 'INTERACTIVE' || !data.content?.trim()) return {}
+  const { content } = parseContentJson(data.content)
+  const json = content as unknown as Prisma.InputJsonValue
+  if (!data.publish) return { draftContent: json }
+  return { content: json, draftContent: Prisma.DbNull, contentVersion: (current?.contentVersion ?? 0) + 1 }
+}
 
 function outcomeLines(raw: string) {
   return raw
@@ -136,7 +179,7 @@ export async function listOwnCourses(owner: CourseOwner) {
   return prisma.lmsCourse.findMany({
     where: { tenantId: owner.tenantId, deletedAt: null },
     orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-    include: { _count: { select: { lessons: true, modules: true } } },
+    include: { _count: { select: { lessons: { where: { archivedAt: null } }, modules: true } } },
   })
 }
 
@@ -183,7 +226,7 @@ export async function updateCourse(owner: CourseOwner, id: string, input: Course
 export async function setCourseStatus(owner: CourseOwner, id: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') {
   const course = await ownCourse(owner, id)
   if (status === 'PUBLISHED') {
-    const lessons = await prisma.lmsLesson.count({ where: { courseId: id } })
+    const lessons = await prisma.lmsLesson.count({ where: { courseId: id, archivedAt: null } })
     if (lessons === 0) throw badRequest('Add at least one lesson before publishing')
   }
   return prisma.lmsCourse.update({
@@ -208,6 +251,7 @@ export async function getCourseForEditing(owner: CourseOwner, id: string) {
         orderBy: { position: 'asc' },
         include: {
           lessons: {
+            where: { archivedAt: null },
             orderBy: { position: 'asc' },
             select: { id: true, title: true, kind: true, durationMinutes: true, position: true },
           },
@@ -287,7 +331,7 @@ function lessonData(data: z.infer<typeof lessonSchema>) {
     documentUrl: kind === 'DOCUMENT' ? data.documentUrl ?? null : null,
     codeLanguage: kind === 'CODE' ? data.codeLanguage ?? 'python' : null,
     code: kind === 'CODE' ? data.code ?? null : null,
-    quiz: kind === 'QUIZ' && data.quiz ? (data.quiz as Quiz as unknown as Prisma.InputJsonValue) : undefined,
+    quiz: (kind === 'QUIZ' || kind === 'INTERACTIVE') && data.quiz ? (data.quiz as Quiz as unknown as Prisma.InputJsonValue) : undefined,
     passPercent: data.passPercent,
   }
 }
@@ -295,10 +339,12 @@ function lessonData(data: z.infer<typeof lessonSchema>) {
 export async function createLesson(owner: CourseOwner, moduleId: string, input: LessonInput) {
   const module = await ownModule(owner, moduleId)
   const data = lessonSchema.parse(input)
+  if (data.kind === 'INTERACTIVE' && !data.content?.trim()) throw badRequest('Paste the interactive lesson content')
   const last = await prisma.lmsLesson.aggregate({ where: { moduleId }, _max: { position: true } })
   return prisma.lmsLesson.create({
     data: {
       ...lessonData(data),
+      ...contentChange({ ...data, publish: true }),
       tenantId: owner.tenantId,
       courseId: module.courseId,
       moduleId,
@@ -316,12 +362,12 @@ export async function getLessonForEditing(owner: CourseOwner, id: string) {
 }
 
 export async function updateLesson(owner: CourseOwner, id: string, input: LessonInput) {
-  await ownLesson(owner, id)
+  const current = await ownLesson(owner, id)
   const data = lessonSchema.parse(input)
   const values = lessonData(data)
   return prisma.lmsLesson.update({
     where: { id },
-    data: { ...values, quiz: values.quiz ?? Prisma.DbNull },
+    data: { ...values, quiz: values.quiz ?? Prisma.DbNull, ...contentChange(data, current) },
     select: { id: true, title: true, courseId: true },
   })
 }
@@ -329,7 +375,7 @@ export async function updateLesson(owner: CourseOwner, id: string, input: Lesson
 export async function moveLesson(owner: CourseOwner, id: string, direction: 'up' | 'down') {
   const lesson = await ownLesson(owner, id)
   const rows = await prisma.lmsLesson.findMany({
-    where: { moduleId: lesson.moduleId },
+    where: { moduleId: lesson.moduleId, archivedAt: null },
     orderBy: { position: 'asc' },
     select: { id: true, position: true },
   })

@@ -1,0 +1,93 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 4: How an IR sensor sees the line.
+
+2
+00:00:04.800 --> 00:00:08.135
+How can a robot see a black line?
+
+3
+00:00:08.185 --> 00:00:12.239
+It uses invisible light called infrared.
+
+4
+00:00:12.289 --> 00:00:16.650
+Your TV remote uses the same kind of light.
+
+5
+00:00:17.300 --> 00:00:20.912
+Each sensor module has two small parts.
+
+6
+00:00:20.962 --> 00:00:26.265
+One is an infrared light, which shines down at the floor.
+
+7
+00:00:26.315 --> 00:00:32.650
+The other is a receiver, which measures how much light bounces back.
+
+8
+00:00:33.300 --> 00:00:38.488
+Over a white floor, most of the light bounces back.
+
+9
+00:00:38.538 --> 00:00:44.650
+The receiver sees a lot of light, so the sensor says: white.
+
+10
+00:00:45.300 --> 00:00:51.650
+Over a black line, the black surface soaks up most of the light.
+
+11
+00:00:51.700 --> 00:00:56.650
+Very little comes back, so the sensor says: black.
+
+12
+00:00:57.300 --> 00:01:04.019
+The module turns this into a simple digital signal, either HIGH or LOW.
+
+13
+00:01:04.069 --> 00:01:09.167
+On many modules, black gives HIGH and white gives LOW.
+
+14
+00:01:09.217 --> 00:01:15.650
+Some are the other way round, so you will test yours in lesson nine.
+
+15
+00:01:16.300 --> 00:01:19.461
+Each module has a small blue knob.
+
+16
+00:01:19.511 --> 00:01:24.183
+Turning it changes how much light counts as white.
+
+17
+00:01:24.233 --> 00:01:30.322
+Hold the sensor about five to ten millimetres above the floor and
+
+18
+00:01:30.372 --> 00:01:36.178
+turn the knob until the LED changes exactly when you cross the
+
+19
+00:01:36.228 --> 00:01:36.650
+line.
+
+20
+00:01:37.300 --> 00:01:43.332
+Our robot uses two sensors, one either side of the line.
+
+21
+00:01:43.382 --> 00:01:49.088
+When both see white, the line is safely between them.
+
+22
+00:01:49.138 --> 00:01:53.650
+Watch the sensor dots as the robot drives.
+
+23
+00:01:54.300 --> 00:02:00.500
+Next: How motors and the motor driver work.

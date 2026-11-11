@@ -67,7 +67,7 @@ export async function myCourses(ctx: AppContext) {
   const ids = [...new Set([...assigned, ...enrollments.map((e) => e.courseId)])]
   const courses = await ctx.db.lmsCourse.findMany({
     where: { id: { in: ids }, ...openCourseWhere(ctx) },
-    include: { lessons: { select: { id: true, durationMinutes: true } } },
+    include: { lessons: { where: { archivedAt: null }, select: { id: true, durationMinutes: true } } },
   })
   const done = await ctx.db.lmsLessonProgress.findMany({
     where: { studentId: learner.id, enrollmentId: { in: enrollments.map((e) => e.id) }, completedAt: { not: null } },
@@ -113,7 +113,7 @@ async function openCourse(ctx: AppContext, learner: Learner, courseId: string) {
     include: {
       modules: {
         orderBy: { position: 'asc' },
-        include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, title: true, kind: true, durationMinutes: true } } },
+        include: { lessons: { where: { archivedAt: null }, orderBy: { position: 'asc' }, select: { id: true, title: true, kind: true, durationMinutes: true, slug: true } } },
       },
     },
   })
@@ -161,7 +161,7 @@ export async function courseForLearner(ctx: AppContext, courseId: string) {
 /** The lesson as a learner sees it: quiz answers are never sent. */
 export async function lessonForLearner(ctx: AppContext, courseId: string, lessonId: string) {
   const outline = await courseForLearner(ctx, courseId)
-  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId } })
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null } })
   if (!lesson) throw notFound('Lesson')
   await ctx.db.lmsEnrollment.update({
     where: { id: outline.enrollment.id },
@@ -170,9 +170,19 @@ export async function lessonForLearner(ctx: AppContext, courseId: string, lesson
   const order = outline.course.modules.flatMap((m) => m.lessons.map((l) => l.id))
   const at = order.indexOf(lessonId)
   const { quiz, ...rest } = lesson
+  const mine = await ctx.db.lmsLessonProgress.findFirst({
+    where: { enrollmentId: outline.enrollment.id, lessonId },
+    select: { state: true, videoSeconds: true, bestScorePercent: true, attempts: true, completedAt: true },
+  })
   return {
     ...outline,
     lesson: { ...rest, quiz: publicQuiz(quiz as Quiz | null) },
+    saved: {
+      state: (mine?.state as Record<string, unknown> | null) ?? {},
+      videoSeconds: mine?.videoSeconds ?? 0,
+      bestScorePercent: mine?.bestScorePercent ?? null,
+      attempts: mine?.attempts ?? 0,
+    },
     previousLessonId: at > 0 ? order[at - 1]! : null,
     nextLessonId: at >= 0 && at < order.length - 1 ? order[at + 1]! : null,
   }
@@ -181,8 +191,8 @@ export async function lessonForLearner(ctx: AppContext, courseId: string, lesson
 /** Sets or clears the course's completion. `byLearner` false: a teacher's action, not student activity. */
 export async function finishIfDone(ctx: AppContext, enrollmentId: string, courseId: string, byLearner = true) {
   const [total, done, enrollment] = await Promise.all([
-    ctx.db.lmsLesson.count({ where: { courseId } }),
-    ctx.db.lmsLessonProgress.count({ where: { enrollmentId, completedAt: { not: null }, lesson: { courseId } } }),
+    ctx.db.lmsLesson.count({ where: { courseId, archivedAt: null } }),
+    ctx.db.lmsLessonProgress.count({ where: { enrollmentId, completedAt: { not: null }, lesson: { courseId, archivedAt: null } } }),
     ctx.db.lmsEnrollment.findFirstOrThrow({ where: { id: enrollmentId }, select: { completedAt: true } }),
   ])
   const complete = total > 0 && done >= total
@@ -200,9 +210,10 @@ export async function finishIfDone(ctx: AppContext, enrollmentId: string, course
 export async function completeLesson(ctx: AppContext, courseId: string, lessonId: string) {
   const learner = await requireLearner(ctx)
   const { enrollment } = await openCourse(ctx, learner, courseId)
-  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId }, select: { id: true, kind: true } })
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { id: true, kind: true, quiz: true } })
   if (!lesson) throw notFound('Lesson')
   if (lesson.kind === 'QUIZ') throw badRequest('Pass the quiz to complete this lesson')
+  if (lesson.kind === 'INTERACTIVE' && hasQuestions(lesson.quiz)) throw badRequest('Pass the knowledge check to complete this lesson')
   if (lesson.kind === 'PROJECT') throw badRequest('Submit your project; it is complete once your teacher approves it')
   const existing = await ctx.db.lmsLessonProgress.findFirst({ where: { enrollmentId: enrollment.id, lessonId } })
   if (!existing) {
@@ -215,6 +226,55 @@ export async function completeLesson(ctx: AppContext, courseId: string, lessonId
   return finishIfDone(ctx, enrollment.id, courseId)
 }
 
+function hasQuestions(quiz: unknown) {
+  const questions = (quiz as Quiz | null)?.questions
+  return Array.isArray(questions) && questions.length > 0
+}
+
+/** What a learner may save against a lesson: notes, code, ticks and activity results. Bounded so a client cannot bloat the row. */
+export const lessonStateSchema = z
+  .record(z.string().max(60), z.unknown())
+  .refine((v) => JSON.stringify(v).length <= 64_000, 'Saved lesson state is too large')
+
+export async function saveLessonState(
+  ctx: AppContext,
+  courseId: string,
+  lessonId: string,
+  input: { patch?: unknown; videoSeconds?: number | null },
+) {
+  const learner = await requireLearner(ctx)
+  const { enrollment } = await openCourse(ctx, learner, courseId)
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { id: true } })
+  if (!lesson) throw notFound('Lesson')
+  const patch = input.patch === undefined ? {} : lessonStateSchema.parse(input.patch)
+  const seconds =
+    input.videoSeconds == null ? undefined : Math.max(0, Math.min(6 * 3600, Math.round(Number(input.videoSeconds) || 0)))
+  const existing = await ctx.db.lmsLessonProgress.findFirst({
+    where: { enrollmentId: enrollment.id, lessonId },
+    select: { id: true, state: true },
+  })
+  const merged = { ...((existing?.state as Record<string, unknown> | null) ?? {}), ...patch }
+  if (JSON.stringify(merged).length > 64_000) throw badRequest('Saved lesson state is too large')
+  if (existing) {
+    await ctx.db.lmsLessonProgress.update({
+      where: { id: existing.id },
+      data: { state: merged as object, ...(seconds !== undefined ? { videoSeconds: seconds } : {}) },
+    })
+  } else {
+    await ctx.db.lmsLessonProgress.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        enrollmentId: enrollment.id,
+        lessonId,
+        studentId: learner.id,
+        state: merged as object,
+        videoSeconds: seconds ?? null,
+      },
+    })
+  }
+  return { ok: true as const }
+}
+
 export const quizAnswersSchema = z.record(z.string().max(40), z.array(z.string().max(40)).max(6))
 
 export async function submitQuiz(
@@ -225,8 +285,8 @@ export async function submitQuiz(
 ): Promise<QuizResult & { courseComplete: boolean }> {
   const learner = await requireLearner(ctx)
   const { enrollment } = await openCourse(ctx, learner, courseId)
-  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId } })
-  if (!lesson || lesson.kind !== 'QUIZ' || !lesson.quiz) throw notFound('Quiz')
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null } })
+  if (!lesson || (lesson.kind !== 'QUIZ' && lesson.kind !== 'INTERACTIVE') || !hasQuestions(lesson.quiz)) throw notFound('Quiz')
   const answers = quizAnswersSchema.parse(rawAnswers)
   const result = gradeQuiz(lesson.quiz as unknown as Quiz, answers, lesson.passPercent)
 

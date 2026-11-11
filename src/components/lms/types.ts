@@ -17,6 +17,8 @@ export type PlayerLesson = {
   code: string | null
   passPercent: number
   quiz: PublicQuizQuestion[]
+  /** Structured lesson content (validated server-side before it reaches the player). */
+  content?: unknown
 }
 
 /** Server actions a course builder calls; the console and schools each bind their own owner. */
@@ -66,4 +68,8 @@ export type EditableLesson = {
   code: string | null
   quiz: unknown
   passPercent: number
+  /** Interactive lessons: what learners see, and an unpublished edit if there is one. */
+  content?: unknown
+  draftContent?: unknown
+  contentVersion?: number
 }

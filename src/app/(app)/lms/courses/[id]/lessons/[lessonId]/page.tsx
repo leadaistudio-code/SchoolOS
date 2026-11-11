@@ -51,6 +51,7 @@ export default async function SchoolLessonPage({
         createLesson={createLessonAction}
         updateLesson={updateLessonAction}
         lessonPath="/lms/courses/:course/lessons/:lesson"
+        previewPath="/lms/courses/:course/preview/:lesson"
         backHref={back}
       />
     </div>

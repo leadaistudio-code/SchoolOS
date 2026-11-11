@@ -62,6 +62,43 @@ function blocks(text: string): React.ReactNode[] {
       )
       continue
     }
+    if (/^\s*\|/.test(line)) {
+      const rows: string[][] = []
+      while (i < lines.length && /^\s*\|/.test(lines[i]!)) {
+        const cells = lines[i++]!.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+        if (!cells.every((c) => /^:?-{2,}:?$/.test(c))) rows.push(cells)
+      }
+      const [head, ...rest] = rows
+      out.push(
+        <div key={key++} className="overflow-x-auto">
+          <table className="min-w-[16rem] border-collapse text-sm">
+            {head ? (
+              <thead>
+                <tr>
+                  {head.map((c, j) => (
+                    <th key={j} scope="col" className="border-b border-line px-3 py-1.5 text-left font-semibold">
+                      {inline(c)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            ) : null}
+            <tbody>
+              {rest.map((r, ri) => (
+                <tr key={ri}>
+                  {r.map((c, j) => (
+                    <td key={j} className="border-b border-line px-3 py-1.5 font-mono text-[13px]">
+                      {inline(c)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
+    }
     if (!line.trim()) {
       i++
       continue
@@ -70,7 +107,7 @@ function blocks(text: string): React.ReactNode[] {
     while (
       i < lines.length &&
       lines[i]!.trim() &&
-      !/^(#{1,3}\s|\s*[-*]\s|\s*\d+[.)]\s|\s*```)/.test(lines[i]!)
+      !/^(#{1,3}\s|\s*[-*]\s|\s*\d+[.)]\s|\s*```|\s*\|)/.test(lines[i]!)
     ) {
       para.push(lines[i++]!)
     }

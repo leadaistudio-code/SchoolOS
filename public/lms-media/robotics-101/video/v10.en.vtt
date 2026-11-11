@@ -1,0 +1,81 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 10: Programming the motors.
+
+2
+00:00:04.800 --> 00:00:08.057
+Now let us make the robot move.
+
+3
+00:00:08.107 --> 00:00:15.097
+Before you upload, lift the robot so the wheels are off the table.
+
+4
+00:00:15.147 --> 00:00:19.150
+That way it cannot drive off the edge.
+
+5
+00:00:19.800 --> 00:00:22.370
+This helper drives one motor.
+
+6
+00:00:22.420 --> 00:00:27.158
+A positive speed sets the direction pins for forward.
+
+7
+00:00:27.208 --> 00:00:29.959
+A negative speed reverses them.
+
+8
+00:00:30.009 --> 00:00:31.856
+Zero stops the motor.
+
+9
+00:00:31.906 --> 00:00:35.650
+analogWrite then sets the speed using PWM.
+
+10
+00:00:36.300 --> 00:00:41.901
+setMotors drives both wheels with one line of code.
+
+11
+00:00:41.951 --> 00:00:47.220
+Motor A, on ENA, IN1 and IN2, is the left wheel.
+
+12
+00:00:47.270 --> 00:00:52.650
+Motor B, on ENB, IN3 and IN4, is the right wheel.
+
+13
+00:00:53.300 --> 00:00:57.613
+Try setMotors 150, 150 to go straight.
+
+14
+00:00:57.663 --> 00:01:00.598
+Try 40, 150 to curve left.
+
+15
+00:01:00.648 --> 00:01:03.698
+Try 150, 40 to curve right.
+
+16
+00:01:03.748 --> 00:01:05.650
+And 0, 0 to stop.
+
+17
+00:01:06.300 --> 00:01:12.280
+If a wheel spins backwards when it should go forward, swap that
+
+18
+00:01:12.330 --> 00:01:18.310
+motor's two wires at the motor driver, then test again with the
+
+19
+00:01:18.360 --> 00:01:19.650
+wheels lifted.
+
+20
+00:01:20.300 --> 00:01:26.500
+Next: The line-following algorithm.

@@ -1,0 +1,77 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 9: Reading the IR sensors.
+
+2
+00:00:04.800 --> 00:00:10.623
+Before the robot can follow a line, we must be sure it
+
+3
+00:00:10.673 --> 00:00:12.472
+can see the line.
+
+4
+00:00:12.522 --> 00:00:19.650
+In this video, you will read both sensors and print what they see.
+
+5
+00:00:20.300 --> 00:00:23.390
+First we give the pins names.
+
+6
+00:00:23.440 --> 00:00:27.612
+LEFT_IR is pin 2 and RIGHT_IR is pin 3.
+
+7
+00:00:27.662 --> 00:00:31.618
+ON_LINE says which value means black.
+
+8
+00:00:31.668 --> 00:00:34.650
+For many sensors it is HIGH.
+
+9
+00:00:35.300 --> 00:00:40.126
+digitalRead reads a pin and gives HIGH or LOW.
+
+10
+00:00:40.176 --> 00:00:44.896
+Then we print BLACK or WHITE for each sensor.
+
+11
+00:00:44.946 --> 00:00:51.150
+The short delay slows the printing down so you can read it.
+
+12
+00:00:51.800 --> 00:00:57.464
+Upload the sketch and open the Serial Monitor at 9600 baud.
+
+13
+00:00:57.514 --> 00:01:01.242
+Slide the robot slowly across the line.
+
+14
+00:01:01.292 --> 00:01:07.150
+You should see the left sensor say BLACK, then the right one.
+
+15
+00:01:07.800 --> 00:01:13.567
+If black shows as WHITE, your module is the other way round:
+
+16
+00:01:13.617 --> 00:01:15.700
+change ON_LINE to LOW.
+
+17
+00:01:15.750 --> 00:01:19.869
+If a sensor never changes, adjust its knob.
+
+18
+00:01:19.919 --> 00:01:23.650
+If nothing prints, check the baud rate.
+
+19
+00:01:24.300 --> 00:01:30.500
+Next: Controlling the motors in code.

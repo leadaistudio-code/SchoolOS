@@ -1,0 +1,137 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 1: Welcome to Robotics 101.
+
+2
+00:00:04.800 --> 00:00:06.642
+Hello and welcome!
+
+3
+00:00:06.692 --> 00:00:12.842
+In this course you will build a small robot that can follow
+
+4
+00:00:12.892 --> 00:00:17.150
+a black line on the floor, all by itself.
+
+5
+00:00:17.800 --> 00:00:23.751
+Here is the robot you will build, shown in our simulator.
+
+6
+00:00:23.801 --> 00:00:29.016
+It has two eyes underneath that look at the floor.
+
+7
+00:00:29.066 --> 00:00:34.280
+When the line bends, the robot turns to follow it.
+
+8
+00:00:34.330 --> 00:00:36.597
+Nobody is steering it.
+
+9
+00:00:36.647 --> 00:00:39.650
+The robot decides on its own.
+
+10
+00:00:40.300 --> 00:00:43.695
+Robots like this are used in real life.
+
+11
+00:00:43.745 --> 00:00:47.846
+Warehouse robots follow lines to carry parcels.
+
+12
+00:00:47.896 --> 00:00:54.117
+Some hospitals use them to deliver medicines, and factories use them to
+
+13
+00:00:54.167 --> 00:00:57.650
+move parts from one machine to the next.
+
+14
+00:00:58.300 --> 00:01:00.916
+The course has four modules.
+
+15
+00:01:00.966 --> 00:01:03.487
+First, you meet your robot.
+
+16
+00:01:03.537 --> 00:01:06.819
+Next, you learn how its parts work.
+
+17
+00:01:06.869 --> 00:01:09.390
+Then you write the program.
+
+18
+00:01:09.440 --> 00:01:14.150
+Finally, you build it, test it and make it better.
+
+19
+00:01:14.800 --> 00:01:18.297
+Every lesson follows the same pattern.
+
+20
+00:01:18.347 --> 00:01:24.270
+You watch a short video, try an activity or the simulator, check
+
+21
+00:01:24.320 --> 00:01:30.150
+what you learned with a few questions, and then build and test.
+
+22
+00:01:30.800 --> 00:01:35.402
+Do not worry if you do not have a robot kit yet.
+
+23
+00:01:35.452 --> 00:01:41.896
+Every lesson works in your browser, and the simulator lets you test
+
+24
+00:01:41.946 --> 00:01:43.350
+the same ideas.
+
+25
+00:01:43.400 --> 00:01:49.650
+You can even complete the final challenge on the virtual pathway.
+
+26
+00:01:50.300 --> 00:01:51.402
+Safety first.
+
+27
+00:01:51.452 --> 00:01:55.388
+Always ask an adult before you use batteries.
+
+28
+00:01:55.438 --> 00:01:59.374
+Never let the battery wires touch each other.
+
+29
+00:01:59.424 --> 00:02:05.309
+Unplug the power before you change any wires, and keep your fingers
+
+30
+00:02:05.359 --> 00:02:09.650
+away from the wheels when the motors are running.
+
+31
+00:02:10.300 --> 00:02:16.572
+By the end, you will have a working robot, a certificate, and
+
+32
+00:02:16.622 --> 00:02:20.303
+six badges to collect along the way.
+
+33
+00:02:20.353 --> 00:02:21.650
+Let us begin!
+
+34
+00:02:22.300 --> 00:02:28.500
+Next: Understanding robots: sense, think, act.

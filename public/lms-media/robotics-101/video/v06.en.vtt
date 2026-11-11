@@ -1,0 +1,93 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 6: Building the robot body.
+
+2
+00:00:04.800 --> 00:00:06.201
+Time to build.
+
+3
+00:00:06.251 --> 00:00:12.212
+Clear your table, keep the screws in a small bowl, and ask
+
+4
+00:00:12.262 --> 00:00:16.150
+an adult to help with the screwdriver.
+
+5
+00:00:16.800 --> 00:00:19.737
+Here is the plan from above.
+
+6
+00:00:19.787 --> 00:00:22.937
+The two motors go at the back.
+
+7
+00:00:22.987 --> 00:00:26.030
+The castor goes at the front.
+
+8
+00:00:26.080 --> 00:00:31.150
+The sensors sit at the very front, looking down.
+
+9
+00:00:31.800 --> 00:00:35.586
+First fix both motors with their brackets.
+
+10
+00:00:35.636 --> 00:00:38.508
+Push the wheels onto the shafts.
+
+11
+00:00:38.558 --> 00:00:41.522
+Screw the castor under the front.
+
+12
+00:00:41.572 --> 00:00:46.910
+Mount the Arduino and the motor driver on top, then fix the
+
+13
+00:00:46.960 --> 00:00:49.650
+battery holder and the switch.
+
+14
+00:00:50.300 --> 00:00:56.015
+Mount the two sensors at the front, facing down, about five to
+
+15
+00:00:56.065 --> 00:00:58.990
+ten millimetres above the floor.
+
+16
+00:00:59.040 --> 00:01:04.476
+Space them a little wider than your black line, so the line
+
+17
+00:01:04.526 --> 00:01:06.150
+fits between them.
+
+18
+00:01:06.800 --> 00:01:13.896
+If the sensors are too close together, both see the line at once.
+
+19
+00:01:13.946 --> 00:01:21.593
+If they are too far apart, the robot wobbles before it notices a turn.
+
+20
+00:01:21.643 --> 00:01:26.650
+A gap a little wider than the line works well.
+
+21
+00:01:27.300 --> 00:01:33.658
+Before you wire anything, check that the wheels spin freely, the robot
+
+22
+00:01:33.708 --> 00:01:39.150
+sits level, nothing is loose, and the battery switch is off.
+
+23
+00:01:39.800 --> 00:01:46.000
+Next: Wiring the electronics safely.

@@ -38,7 +38,10 @@ export function LessonEditor({
   updateLesson,
   lessonPath,
   backHref,
+  previewPath,
 }: {
+  /** Lesson preview route, `:course` and `:lesson`. */
+  previewPath?: string
   lesson: EditableLesson
   courseId: string
   /** Required when adding a new lesson. */
@@ -67,6 +70,22 @@ export function LessonEditor({
     () => (lesson.quiz as Quiz | null)?.questions ?? [blankQuestion()],
   )
   const [showPreview, setShowPreview] = React.useState(false)
+  const hasDraft = lesson.draftContent != null
+  const [contentJson, setContentJson] = React.useState(() => {
+    const source = lesson.draftContent ?? lesson.content
+    return source ? JSON.stringify(source, null, 2) : ''
+  })
+  const contentDirty = React.useRef(false)
+  const contentError = React.useMemo(() => {
+    if (form.kind !== 'INTERACTIVE' || !contentJson.trim()) return null
+    try {
+      JSON.parse(contentJson)
+      return null
+    } catch (err) {
+      return (err as Error).message
+    }
+  }, [contentJson, form.kind])
+  const quizKind = form.kind === 'QUIZ' || form.kind === 'INTERACTIVE'
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -88,19 +107,24 @@ export function LessonEditor({
     )
   }
 
-  function save(andNew: boolean) {
+  function save(andNew: boolean, publish = false) {
+    const interactiveQuiz = form.kind === 'INTERACTIVE' && questions.some((q) => q.prompt.trim())
     const payload = {
       ...form,
       quiz:
-        form.kind === 'QUIZ'
+        form.kind === 'QUIZ' || interactiveQuiz
           ? {
-              questions: questions.map((q) => ({
-                ...q,
-                explanation: q.explanation || undefined,
-                options: q.options.map((o) => ({ ...o, text: o.text })),
-              })),
+              questions: questions
+                .filter((q) => form.kind === 'QUIZ' || q.prompt.trim())
+                .map((q) => ({
+                  ...q,
+                  explanation: q.explanation || undefined,
+                  hint: q.hint || undefined,
+                  options: q.options.map((o) => ({ ...o, text: o.text, feedback: o.feedback || undefined })),
+                })),
             }
           : undefined,
+      ...(form.kind === 'INTERACTIVE' && (contentDirty.current || publish || !lesson.id) ? { content: contentJson, publish } : {}),
     }
     startTransition(async () => {
       const result = lesson.id ? await updateLesson(lesson.id, payload) : await createLesson(moduleId!, payload)
@@ -194,7 +218,48 @@ export function LessonEditor({
             </>
           ) : null}
 
-          {form.kind !== 'QUIZ' ? (
+          {form.kind === 'INTERACTIVE' ? (
+            <div className="space-y-2">
+              {hasDraft ? (
+                <Notice tone="warning" title="Unpublished changes">
+                  Students still see the published version (v{lesson.contentVersion ?? 1}). Preview the lesson, then publish when it is ready.
+                </Notice>
+              ) : null}
+              {previewPath && lesson.id ? (
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <a className="text-[var(--brand-600)] hover:underline" href={fillPath(previewPath, { course: courseId, lesson: lesson.id })} target="_blank" rel="noreferrer">
+                    Preview published version
+                  </a>
+                  {hasDraft ? (
+                    <a className="text-[var(--brand-600)] hover:underline" href={`${fillPath(previewPath, { course: courseId, lesson: lesson.id })}?draft=1`} target="_blank" rel="noreferrer">
+                      Preview saved draft
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+              <Field
+                label="Interactive content (JSON)"
+                required
+                htmlFor="l-content"
+                hint="Intro, objectives, video, activity blocks, summary. Saving keeps it as a draft; students only see it after you publish."
+                error={contentError ? `Not valid JSON: ${contentError}` : undefined}
+              >
+                <Textarea
+                  id="l-content"
+                  rows={18}
+                  value={contentJson}
+                  onChange={(e) => {
+                    contentDirty.current = true
+                    setContentJson(e.target.value)
+                  }}
+                  className="font-mono text-xs"
+                  spellCheck={false}
+                />
+              </Field>
+            </div>
+          ) : null}
+
+          {form.kind !== 'QUIZ' && form.kind !== 'INTERACTIVE' ? (
             <Field
               label={form.kind === 'PROJECT' ? 'Project brief' : form.kind === 'TEXT' ? 'Lesson' : 'Notes for students'}
               required={form.kind === 'TEXT' || form.kind === 'PROJECT'}
@@ -204,7 +269,7 @@ export function LessonEditor({
               <Textarea id="l-body" rows={form.kind === 'TEXT' || form.kind === 'PROJECT' ? 14 : 5} value={form.body} onChange={set('body')} />
             </Field>
           ) : null}
-          {form.body && form.kind !== 'QUIZ' ? (
+          {form.body && form.kind !== 'QUIZ' && form.kind !== 'INTERACTIVE' ? (
             <div>
               <Button variant="ghost" size="sm" onClick={() => setShowPreview((v) => !v)}>
                 {showPreview ? 'Hide preview' : 'Preview text'}
@@ -219,10 +284,10 @@ export function LessonEditor({
         </CardContent>
       </Card>
 
-      {form.kind === 'QUIZ' ? (
+      {quizKind ? (
         <Card>
           <CardHeader>
-            <CardTitle>Questions</CardTitle>
+            <CardTitle>{form.kind === 'INTERACTIVE' ? 'Knowledge check (graded)' : 'Questions'}</CardTitle>
             <div className="flex items-center gap-2">
               <label htmlFor="l-pass" className="text-sm text-ink-muted">Pass mark %</label>
               <Input id="l-pass" type="number" min={0} max={100} value={form.passPercent} onChange={set('passPercent')} className="w-20" />
@@ -267,6 +332,15 @@ export function LessonEditor({
                         }
                         placeholder={`Option ${oi + 1}`}
                         className={cn(o.correct && 'border-[var(--success)]')}
+                      />
+                      <Input
+                        value={o.feedback ?? ''}
+                        onChange={(e) =>
+                          updateQuestion(qi, { options: q.options.map((x, j) => (j === oi ? { ...x, feedback: e.target.value } : x)) })
+                        }
+                        placeholder="Feedback if chosen (optional)"
+                        aria-label={`Feedback for option ${oi + 1}`}
+                        className="hidden md:block"
                       />
                       <IconButton
                         small
@@ -314,6 +388,11 @@ export function LessonEditor({
                     onChange={(e) => updateQuestion(qi, { explanation: e.target.value })}
                     placeholder="Explanation shown after submitting (optional)"
                   />
+                  <Input
+                    value={q.hint ?? ''}
+                    onChange={(e) => updateQuestion(qi, { hint: e.target.value })}
+                    placeholder="Hint students can open before answering (optional)"
+                  />
                 </div>
               </div>
             ))}
@@ -325,7 +404,14 @@ export function LessonEditor({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-        <Button loading={pending} onClick={() => save(false)}>Save lesson</Button>
+        {form.kind === 'INTERACTIVE' && lesson.id ? (
+          <>
+            <Button loading={pending} disabled={!!contentError} onClick={() => save(false, true)}>Publish to students</Button>
+            <Button variant="secondary" disabled={pending || !!contentError} onClick={() => save(false)}>Save draft</Button>
+          </>
+        ) : (
+          <Button loading={pending} disabled={!!contentError} onClick={() => save(false)}>Save lesson</Button>
+        )}
         {!lesson.id ? (
           <Button variant="secondary" disabled={pending} onClick={() => save(true)}>Save and add another</Button>
         ) : null}

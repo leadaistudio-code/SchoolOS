@@ -1,0 +1,91 @@
+1
+00:00:00,500 --> 00:00:04,200
+MyCampusView Academy. Robotics 101, video 2: Understanding robots: sense, think, act.
+
+2
+00:00:04,800 --> 00:00:11,639
+A fan spins and a toaster gets hot, but they are not robots.
+
+3
+00:00:11,689 --> 00:00:15,313
+So what makes a machine a robot?
+
+4
+00:00:15,363 --> 00:00:17,150
+Let us find out.
+
+5
+00:00:17,800 --> 00:00:20,489
+Every robot does three things.
+
+6
+00:00:20,539 --> 00:00:25,692
+First it senses: it collects information about the world.
+
+7
+00:00:25,742 --> 00:00:30,439
+Then it thinks: a small computer decides what to do.
+
+8
+00:00:30,489 --> 00:00:34,911
+Then it acts: it moves or makes something happen.
+
+9
+00:00:34,961 --> 00:00:37,650
+And then it does it all again.
+
+10
+00:00:38,300 --> 00:00:40,614
+You do this every day.
+
+11
+00:00:40,664 --> 00:00:46,737
+When a friend throws you a ball, your eyes sense it, your
+
+12
+00:00:46,787 --> 00:00:53,183
+brain thinks about where it will land, and your hands act to
+
+13
+00:00:53,233 --> 00:00:54,150
+catch it.
+
+14
+00:00:54,800 --> 00:00:58,005
+Our line-follower works the same way.
+
+15
+00:00:58,055 --> 00:01:01,260
+Its infrared sensors sense the floor.
+
+16
+00:01:01,310 --> 00:01:05,571
+The Arduino board thinks and chooses a direction.
+
+17
+00:01:05,621 --> 00:01:08,650
+The motors act and turn the wheels.
+
+18
+00:01:09,300 --> 00:01:16,134
+The robot repeats this loop very fast, hundreds of times every second.
+
+19
+00:01:16,184 --> 00:01:21,150
+That is why it can react the moment the line bends.
+
+20
+00:01:21,800 --> 00:01:22,573
+Try this.
+
+21
+00:01:22,623 --> 00:01:29,611
+An automatic door senses you, decides, and opens, so it behaves like a robot.
+
+22
+00:01:29,661 --> 00:01:36,650
+A remote-control car is different, because a person does the thinking for it.
+
+23
+00:01:37,300 --> 00:01:43,500
+Next: Exploring the hardware in your kit.

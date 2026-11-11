@@ -89,7 +89,7 @@ export async function academyCatalogue(academyId: string, filter: { q?: string; 
         : {}),
     },
     orderBy: [{ publishedAt: 'desc' }, { title: 'asc' }],
-    include: { lessons: { select: { durationMinutes: true } } },
+    include: { lessons: { where: { archivedAt: null }, select: { durationMinutes: true } } },
   })
   const learners = await prisma.lmsEnrollment.groupBy({
     by: ['courseId'],
@@ -118,7 +118,7 @@ export async function academyCourse(academyId: string, courseId: string) {
     include: {
       modules: {
         orderBy: { position: 'asc' },
-        include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, title: true, kind: true, durationMinutes: true } } },
+        include: { lessons: { where: { archivedAt: null }, orderBy: { position: 'asc' }, select: { id: true, title: true, kind: true, durationMinutes: true } } },
       },
     },
   })

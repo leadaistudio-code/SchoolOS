@@ -12,7 +12,9 @@ import { Progress } from '@/components/ui/progress'
 import { Notice } from '@/components/ui/states'
 import { CourseOutline } from '@/components/lms/course-outline'
 import { LessonText } from '@/components/lms/lesson-text'
+import { BadgeShelf } from '@/components/lms/robotics/badge-shelf'
 import { gradeRange, lmsCategory, lmsLevelLabel } from '@/lib/lms/options'
+import { isRobotics101 } from '@/lib/lms/robotics101'
 
 export const metadata = { title: 'Course' }
 
@@ -31,6 +33,8 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
   const doneCount = lessons.filter((l) => completed.has(l.id)).length
   const certificate = enrollment.completedAt ? await issueCertificateFor(ctx, enrollment.id) : null
+  const robotics = isRobotics101(lessons.map((l) => l.slug))
+  const completedSlugs = new Set(lessons.filter((l) => completed.has(l.id) && l.slug).map((l) => l.slug!))
 
   return (
     <div className="space-y-4">
@@ -41,7 +45,7 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="space-y-4 order-2 lg:order-1">
+        <div className="min-w-0 space-y-4 order-2 lg:order-1">
           {course.subtitle || course.description || course.outcomes.length ? (
             <Card>
               <CardContent className="space-y-3">
@@ -66,7 +70,7 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
           />
         </div>
 
-        <aside className="order-1 lg:order-2 lg:sticky lg:top-4 self-start">
+        <aside className="min-w-0 order-1 lg:order-2 lg:sticky lg:top-4 self-start">
           <Card variant="elevated">
             <CardContent className="space-y-3">
               <div className="flex items-center gap-2">
@@ -91,6 +95,13 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
               ) : null}
             </CardContent>
           </Card>
+          {robotics ? (
+            <Card className="mt-4">
+              <CardContent>
+                <BadgeShelf completedSlugs={completedSlugs} />
+              </CardContent>
+            </Card>
+          ) : null}
         </aside>
       </div>
     </div>

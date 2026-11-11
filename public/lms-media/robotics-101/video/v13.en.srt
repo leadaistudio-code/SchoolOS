@@ -1,0 +1,91 @@
+1
+00:00:00,500 --> 00:00:04,200
+MyCampusView Academy. Robotics 101, video 13: Troubleshooting like an engineer.
+
+2
+00:00:04,800 --> 00:00:09,425
+Real engineers spend a lot of time fixing things.
+
+3
+00:00:09,475 --> 00:00:10,856
+That is normal.
+
+4
+00:00:10,906 --> 00:00:15,150
+Here is how to troubleshoot like an engineer.
+
+5
+00:00:15,800 --> 00:00:19,711
+First observe carefully: what exactly happens?
+
+6
+00:00:19,761 --> 00:00:22,639
+Then make a guess about the cause.
+
+7
+00:00:22,689 --> 00:00:28,150
+Change only one thing, test again, and write down what happened.
+
+8
+00:00:28,800 --> 00:00:34,110
+If the robot does nothing at all, check the battery and the
+
+9
+00:00:34,160 --> 00:00:40,470
+switch, check that every ground is connected, and make sure the upload
+
+10
+00:00:40,520 --> 00:00:42,650
+finished without errors.
+
+11
+00:00:43,300 --> 00:00:49,671
+If the robot spins in circles, one motor is probably wired backwards.
+
+12
+00:00:49,721 --> 00:00:56,650
+Swap that motor's two wires and test each wheel with the motor test sketch.
+
+13
+00:00:57,300 --> 00:01:03,684
+If the robot turns away from the line, the left and right
+
+14
+00:01:03,734 --> 00:01:06,958
+sensors or rules are swapped.
+
+15
+00:01:07,008 --> 00:01:12,715
+Swap the sensor wires on D2 and D3, or swap the two
+
+16
+00:01:12,765 --> 00:01:15,650
+turning rules in the code.
+
+17
+00:01:16,300 --> 00:01:22,642
+If the robot stops on a plain curve, both sensors may think
+
+18
+00:01:22,692 --> 00:01:24,267
+they see black.
+
+19
+00:01:24,317 --> 00:01:26,758
+They are too sensitive.
+
+20
+00:01:26,808 --> 00:01:33,150
+Turn the knobs until white reads as white, then test again.
+
+21
+00:01:33,800 --> 00:01:37,206
+The Serial Monitor is your best friend.
+
+22
+00:01:37,256 --> 00:01:44,650
+If both sensors say BLACK over white paper, you have found the problem: calibration.
+
+23
+00:01:45,300 --> 00:01:51,500
+Next: The final challenge.

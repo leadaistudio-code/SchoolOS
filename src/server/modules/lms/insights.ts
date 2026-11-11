@@ -28,7 +28,7 @@ export async function schoolInsights(ctx: AppContext) {
       select: { id: true, courseId: true, studentId: true, lastActivityAt: true, completedAt: true },
     }),
     ctx.db.lmsCourseAssignment.findMany({ select: { courseId: true } }),
-    ctx.db.lmsLessonProgress.groupBy({ by: ['enrollmentId'], where: { completedAt: { not: null } }, _count: { _all: true } }),
+    ctx.db.lmsLessonProgress.groupBy({ by: ['enrollmentId'], where: { completedAt: { not: null }, lesson: { archivedAt: null } }, _count: { _all: true } }),
   ])
   const courseIds = [...new Set([...enrollments.map((e) => e.courseId), ...assignments.map((a) => a.courseId)])]
   const studentIds = [...new Set(enrollments.map((e) => e.studentId))]
@@ -37,7 +37,7 @@ export async function schoolInsights(ctx: AppContext) {
   const [courses, lessonCounts, placements, classSizes, recent, quiz, certificates, pendingReviews, kitsOut, kitsLate, liveClasses] =
     await Promise.all([
       ctx.db.lmsCourse.findMany({ where: { id: { in: courseIds } }, select: { id: true, title: true, tenantId: true, deletedAt: true } }),
-      ctx.db.lmsLesson.groupBy({ by: ['courseId'], where: { courseId: { in: courseIds } }, _count: { _all: true } }),
+      ctx.db.lmsLesson.groupBy({ by: ['courseId'], where: { courseId: { in: courseIds }, archivedAt: null }, _count: { _all: true } }),
       ctx.db.enrollment.findMany({
         where: { isCurrent: true, studentId: { in: studentIds } },
         select: {

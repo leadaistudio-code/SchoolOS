@@ -1,0 +1,87 @@
+1
+00:00:00,500 --> 00:00:04,200
+MyCampusView Academy. Robotics 101, video 8: Your first Arduino program.
+
+2
+00:00:04,800 --> 00:00:08,283
+Now you will write your first program.
+
+3
+00:00:08,333 --> 00:00:12,095
+Programs for Arduino are called sketches.
+
+4
+00:00:12,145 --> 00:00:16,650
+You write them in the Arduino IDE, which is free.
+
+5
+00:00:17,300 --> 00:00:23,664
+Install the Arduino IDE and plug in the board with the USB cable.
+
+6
+00:00:23,714 --> 00:00:30,275
+Under Tools, choose the board Arduino Uno, and then choose the port
+
+7
+00:00:30,325 --> 00:00:32,150
+your Arduino is on.
+
+8
+00:00:32,800 --> 00:00:35,211
+Every sketch has two parts.
+
+9
+00:00:35,261 --> 00:00:39,221
+setup runs once, when the robot switches on.
+
+10
+00:00:39,271 --> 00:00:42,411
+loop runs again and again, forever.
+
+11
+00:00:42,461 --> 00:00:44,872
+Remember sense, think, act?
+
+12
+00:00:44,922 --> 00:00:47,150
+That happens inside loop.
+
+13
+00:00:47,800 --> 00:00:50,037
+Here is a tiny program.
+
+14
+00:00:50,087 --> 00:00:53,120
+pinMode makes pin 13 an output.
+
+15
+00:00:53,170 --> 00:00:58,689
+In the loop, we switch the light on, wait half a second,
+
+16
+00:00:58,739 --> 00:01:01,672
+switch it off, and wait again.
+
+17
+00:01:01,722 --> 00:01:05,650
+Every instruction ends with a semicolon.
+
+18
+00:01:06,300 --> 00:01:09,592
+Click the tick to check your code.
+
+19
+00:01:09,642 --> 00:01:14,901
+If you see a red error, read it carefully: it is often
+
+20
+00:01:14,951 --> 00:01:17,948
+a missing semicolon or bracket.
+
+21
+00:01:17,998 --> 00:01:23,650
+Then click the arrow to upload, and watch the light blink.
+
+22
+00:01:24,300 --> 00:01:30,500
+Next: Reading the IR sensors in code.

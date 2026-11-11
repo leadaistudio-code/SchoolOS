@@ -14,12 +14,57 @@ import { finishIfDone, openCourseFor, requireLearner } from './learning'
 const optionalText = (max: number) =>
   z.string().trim().max(max).optional().or(z.literal('').transform(() => undefined))
 
+export const PROJECT_PATHWAYS = ['PHYSICAL', 'TEACHER_VERIFIED', 'VIRTUAL'] as const
+
 export const submissionSchema = z
   .object({
     note: optionalText(4000),
     linkUrl: optionalText(500).refine((v) => !v || isHttpsUrl(v), { message: 'Paste the full https:// link to your work' }),
+    code: z.string().max(20000).optional().or(z.literal('').transform(() => undefined)),
+    pathway: z.enum(PROJECT_PATHWAYS).optional(),
+    fileKeys: z.array(z.string().max(300)).max(4).optional(),
   })
-  .refine((v) => v.note || v.linkUrl, { message: 'Describe what you built or add a link to it' })
+  .refine((v) => v.note || v.linkUrl || v.code || v.fileKeys?.length || v.pathway === 'VIRTUAL' || v.pathway === 'TEACHER_VERIFIED', {
+    message: 'Describe what you built, or add a photo, code or a link',
+  })
+
+/** Where a student's own project uploads live. The student id in the path is what lets them read their own files. */
+export function projectFolder(tenantId: string, studentId: string) {
+  return `${tenantId}/lms-projects/${studentId}`
+}
+
+/** The capstone's virtual pathway: simulator results saved in the lesson, read on the server. */
+export const VIRTUAL_TRACKS = ['s-curve', 'sharp'] as const
+
+type SimState = { finished?: Record<string, { seconds: number; baseSpeed: number; at: string }> }
+
+/** Ticked items are counted only against checklist items that exist in the lesson, so state cannot inflate them. */
+export function virtualEvidence(state: unknown, content: unknown) {
+  const s = (state ?? {}) as Record<string, unknown>
+  const finished: Record<string, { seconds: number; baseSpeed: number; at: string }> = {}
+  for (const [k, v] of Object.entries(s)) {
+    if (k.startsWith('sim:') && !k.endsWith(':tutorial')) Object.assign(finished, (v as SimState)?.finished ?? {})
+  }
+  const lists = ((content as { blocks?: { type: string; id?: string; items?: { id: string }[] }[] } | null)?.blocks ?? []).filter(
+    (b) => b.type === 'checklist' && b.id,
+  )
+  let done = 0
+  let total = 0
+  for (const list of lists) {
+    const ticked = s[`cl:${list.id}`]
+    const items = (list.items ?? []).map((i) => i.id)
+    total += items.length
+    if (Array.isArray(ticked)) done += items.filter((i) => ticked.includes(i)).length
+  }
+  const simulator = Object.entries(finished)
+    .filter(([, r]) => typeof r?.seconds === 'number')
+    .map(([track, r]) => ({ track, seconds: r.seconds, baseSpeed: typeof r.baseSpeed === 'number' ? r.baseSpeed : undefined }))
+  return {
+    simulator,
+    checklist: total ? { done, total } : undefined,
+    complete: VIRTUAL_TRACKS.every((t) => simulator.some((r) => r.track === t)),
+  }
+}
 
 export const reviewSchema = z.object({
   decision: z.enum(['APPROVED', 'CHANGES_REQUESTED']),
@@ -37,13 +82,32 @@ export async function mySubmission(ctx: AppContext, courseId: string, lessonId: 
 export async function submitProject(ctx: AppContext, courseId: string, lessonId: string, input: z.input<typeof submissionSchema>) {
   const learner = await requireLearner(ctx)
   const { enrollment } = await openCourseFor(ctx, learner, courseId)
-  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId }, select: { id: true, kind: true } })
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { id: true, kind: true, content: true } })
   if (!lesson || lesson.kind !== 'PROJECT') throw notFound('Project')
   const data = submissionSchema.parse(input)
 
+  const folder = `${projectFolder(ctx.tenant.id, learner.id)}/`
+  const fileKeys = [...new Set(data.fileKeys ?? [])]
+  if (fileKeys.some((k) => !k.startsWith(folder) || k.includes('..'))) throw badRequest('One of the photos could not be attached. Upload it again.')
+
+  const progress = await ctx.db.lmsLessonProgress.findFirst({ where: { enrollmentId: enrollment.id, lessonId }, select: { state: true } })
+  const evidence = virtualEvidence(progress?.state, lesson.content)
+  if (data.pathway === 'VIRTUAL' && !evidence.complete) {
+    throw badRequest('Finish both challenge tracks (S-curve and sharp turns) in the simulator first')
+  }
+
   const existing = await ctx.db.lmsProjectSubmission.findFirst({ where: { enrollmentId: enrollment.id, lessonId } })
   if (existing?.status === 'APPROVED') throw badRequest('This project is already approved')
-  const values = { note: data.note ?? null, linkUrl: data.linkUrl ?? null, status: 'SUBMITTED' as const, submittedAt: new Date() }
+  const values = {
+    note: data.note ?? null,
+    linkUrl: data.linkUrl ?? null,
+    code: data.code ?? null,
+    pathway: data.pathway ?? null,
+    fileKeys,
+    evidence: JSON.parse(JSON.stringify({ simulator: evidence.simulator, checklist: evidence.checklist })) as object,
+    status: 'SUBMITTED' as const,
+    submittedAt: new Date(),
+  }
   const saved = existing
     ? await ctx.db.lmsProjectSubmission.update({ where: { id: existing.id }, data: { ...values, version: existing.version + 1 } })
     : await ctx.db.lmsProjectSubmission.create({
@@ -51,6 +115,24 @@ export async function submitProject(ctx: AppContext, courseId: string, lessonId:
       })
   await ctx.db.lmsEnrollment.update({ where: { id: enrollment.id }, data: { lastActivityAt: new Date() } })
   return saved
+}
+
+/** A photo or PDF for the student's own project. Stored privately; returns the key to attach. */
+export async function uploadProjectFile(ctx: AppContext, courseId: string, lessonId: string, file: File) {
+  const learner = await requireLearner(ctx)
+  await openCourseFor(ctx, learner, courseId)
+  const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { kind: true } })
+  if (!lesson || lesson.kind !== 'PROJECT') throw notFound('Project')
+  const { validateUpload } = await import('@/server/files')
+  const { storageProvider } = await import('@/server/providers')
+  const { randomToken } = await import('@/server/crypto')
+  const upload = await validateUpload(file)
+  if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(upload.mimeType)) {
+    throw badRequest('Upload a photo (JPG, PNG, WebP) or a PDF')
+  }
+  const key = `${projectFolder(ctx.tenant.id, learner.id)}/${randomToken(12)}.${upload.extension}`
+  await storageProvider().put(key, upload.buffer, upload.mimeType)
+  return { key, name: upload.safeName, mimeType: upload.mimeType }
 }
 
 export type ReviewFilter = 'SUBMITTED' | 'CHANGES_REQUESTED' | 'APPROVED'

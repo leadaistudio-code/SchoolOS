@@ -1,4 +1,4 @@
-import { Code2, FileStack, FileText, ListChecks, PlayCircle, Wrench, type LucideIcon } from 'lucide-react'
+import { Code2, FileStack, FileText, ListChecks, PlayCircle, Sparkles, Wrench, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<string, LucideIcon> = {
@@ -8,6 +8,7 @@ const ICONS: Record<string, LucideIcon> = {
   CODE: Code2,
   QUIZ: ListChecks,
   PROJECT: Wrench,
+  INTERACTIVE: Sparkles,
 }
 
 export function KindIcon({ kind, className }: { kind: string; className?: string }) {

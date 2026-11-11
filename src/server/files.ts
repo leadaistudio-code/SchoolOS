@@ -181,6 +181,23 @@ export async function readFileForCaller(
     return { body: await storageProvider().get(storageKey), mimeType, fileName: 'signature' }
   }
 
+  if (storageKey.startsWith(`${ctx.tenant.id}/lms-projects/`)) {
+    // {tenant}/lms-projects/{studentId}/{token}.ext: the student who uploaded it, or a reviewer once it is handed in.
+    const studentId = storageKey.split('/')[2]
+    const own = studentId
+      ? await ctx.db.student.findFirst({ where: { id: studentId, userId: ctx.user.userId }, select: { id: true } })
+      : null
+    if (!own) {
+      if (!ctx.can('lms.teach')) throw new ApiException(403, 'FORBIDDEN', 'You cannot view this file')
+      const submitted = await ctx.db.lmsProjectSubmission.findFirst({ where: { fileKeys: { has: storageKey } }, select: { id: true } })
+      if (!submitted) throw new ApiException(404, 'NOT_FOUND', 'File not found')
+    }
+    const ext = storageKey.split('.').pop()?.toLowerCase()
+    const mimeType =
+      ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream'
+    return { body: await storageProvider().get(storageKey), mimeType, fileName: `project.${ext}` }
+  }
+
   if (storageKey.startsWith(`${ctx.tenant.id}/labs/`)) {
     if (!ctx.can('labs.view')) throw new ApiException(403, 'FORBIDDEN', 'You cannot view this file')
     const [item, inspection, incident] = await Promise.all([

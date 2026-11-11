@@ -50,6 +50,7 @@ export default async function PlatformLessonPage({
         createLesson={createLessonAction}
         updateLesson={updateLessonAction}
         lessonPath="/platform/lms/:course/lessons/:lesson"
+        previewPath="/platform/lms/:course/lessons/:lesson/preview"
         backHref={back}
       />
     </div>

@@ -5,8 +5,8 @@ import { requireContext } from '@/server/context'
 import { assertLms, actorOf } from '@/server/modules/lms/access'
 import { authoring, lmsFail } from '@/server/modules/lms/authoring'
 import { assignCourse, removeAssignment, visibleCourse } from '@/server/modules/lms/school'
-import { completeLesson, quizAnswersSchema, submitQuiz } from '@/server/modules/lms/learning'
-import { submitProject } from '@/server/modules/lms/projects'
+import { completeLesson, quizAnswersSchema, saveLessonState, submitQuiz } from '@/server/modules/lms/learning'
+import { submitProject, uploadProjectFile } from '@/server/modules/lms/projects'
 import { gradeQuiz, type Quiz } from '@/lib/lms/options'
 import type { LmsResult, QuizActionResult } from '@/components/lms/types'
 
@@ -134,13 +134,43 @@ export async function submitProjectAction(courseId: string, lessonId: string, in
   }
 }
 
+export async function uploadProjectFileAction(
+  courseId: string,
+  lessonId: string,
+  form: FormData,
+): Promise<{ ok: true; key: string; name: string } | { ok: false; message: string }> {
+  const ctx = await requireContext('lms.learn')
+  try {
+    const file = form.get('file')
+    if (!(file instanceof File)) return { ok: false, message: 'Choose a file to upload' }
+    const saved = await uploadProjectFile(ctx, courseId, lessonId, file)
+    return { ok: true, key: saved.key, name: saved.name }
+  } catch (err) {
+    return lmsFail(err, 'The file could not be uploaded') as { ok: false; message: string }
+  }
+}
+
+/** Notes, activity results, saved code and video position. Called often, so no revalidation. */
+export async function saveLessonStateAction(
+  courseId: string,
+  lessonId: string,
+  input: { patch?: Record<string, unknown>; videoSeconds?: number | null },
+): Promise<{ ok: boolean }> {
+  const ctx = await requireContext('lms.learn')
+  try {
+    return await saveLessonState(ctx, courseId, lessonId, input)
+  } catch {
+    return { ok: false }
+  }
+}
+
 /** Staff trying a quiz in preview: graded, never saved. */
 export async function previewQuizAction(courseId: string, lessonId: string, answers: unknown): Promise<QuizActionResult> {
   const ctx = await requireContext('lms.view')
   try {
     await assertLms(ctx)
     const course = await visibleCourse(ctx, courseId)
-    const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId: course.id } })
+    const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId: course.id, archivedAt: null } })
     if (!lesson?.quiz) return { ok: false, message: 'Quiz not found' }
     const result = gradeQuiz(lesson.quiz as unknown as Quiz, quizAnswersSchema.parse(answers), lesson.passPercent)
     return { ok: true, result, courseComplete: false }

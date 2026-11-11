@@ -16,6 +16,38 @@ import { ReviewForm } from './review-form'
 export const metadata = { title: 'Review project · Robotics & AI' }
 
 const LABEL = { SUBMITTED: 'Waiting for review', CHANGES_REQUESTED: 'Sent back', APPROVED: 'Approved' } as const
+const PATHWAY = { PHYSICAL: 'Built the robot', TEACHER_VERIFIED: 'Teacher watched it run', VIRTUAL: 'Virtual (simulator)' } as const
+const TRACK: Record<string, string> = { straight: 'Straight', curve: 'Gentle curve', 's-curve': 'S-curve', sharp: 'Sharp turns', oval: 'Oval', custom: 'Own track' }
+
+type EvidenceShape = {
+  simulator?: { track: string; seconds: number; baseSpeed?: number }[]
+  checklist?: { done: number; total: number }
+}
+
+/** Recorded on the server from the student's saved simulator runs and checklist, not typed in by them. */
+function Evidence({ evidence }: { evidence: unknown }) {
+  const e = (evidence ?? {}) as EvidenceShape
+  if (!e.simulator?.length && !e.checklist) return null
+  return (
+    <div className="rounded-[var(--radius)] bg-surface-2 p-3 text-sm">
+      <p className="font-medium text-ink">Recorded in the course</p>
+      {e.simulator?.length ? (
+        <ul className="mt-1 space-y-0.5 text-ink-muted">
+          {e.simulator.map((r) => (
+            <li key={r.track}>
+              Simulator: finished {TRACK[r.track] ?? r.track} in {r.seconds.toFixed(1)} s{r.baseSpeed ? ` at speed ${r.baseSpeed}` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {e.checklist ? (
+        <p className="mt-1 text-ink-muted">
+          Build checklist: {e.checklist.done} of {e.checklist.total} steps ticked
+        </p>
+      ) : null}
+    </div>
+  )
+}
 
 export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireLms('lms.teach')
@@ -41,7 +73,41 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
               <CardTitle>The student&apos;s work</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {s.pathway ? (
+                <p className="text-sm">
+                  <span className="font-medium text-ink">Pathway: </span>
+                  {PATHWAY[s.pathway as keyof typeof PATHWAY] ?? s.pathway}
+                </p>
+              ) : null}
+              {s.pathway === 'TEACHER_VERIFIED' ? (
+                <Notice tone="warning" title="Teacher-verified run">
+                  Approve only after you (or a colleague) have watched this robot follow the track.
+                </Notice>
+              ) : null}
               {s.note ? <LessonText text={s.note} /> : <p className="text-sm text-ink-subtle">No note.</p>}
+              {s.fileKeys.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {s.fileKeys.map((k, i) =>
+                    k.endsWith('.pdf') ? (
+                      <a key={k} href={`/api/v1/files/${encodeURIComponent(k)}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                        Download PDF {i + 1}
+                      </a>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={k} src={`/api/v1/files/${encodeURIComponent(k)}`} alt={`Project photo ${i + 1}`} className="max-h-64 rounded-[var(--radius)] border border-line object-contain" />
+                    ),
+                  )}
+                </div>
+              ) : null}
+              {s.code ? (
+                <details className="rounded-[var(--radius)] border border-line">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-ink">Their code ({s.code.split('\n').length} lines)</summary>
+                  <pre className="max-h-96 overflow-auto border-t border-line bg-[#0b0b0d] p-3 text-xs text-white">
+                    <code>{s.code}</code>
+                  </pre>
+                </details>
+              ) : null}
+              <Evidence evidence={s.evidence} />
               {s.linkUrl ? (
                 embeddable ? (
                   <RecordingView url={s.linkUrl} title="Project" />

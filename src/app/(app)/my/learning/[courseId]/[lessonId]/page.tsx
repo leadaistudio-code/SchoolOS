@@ -6,9 +6,18 @@ import { PageHeader } from '@/components/page-header'
 import { Progress } from '@/components/ui/progress'
 import { CourseOutline } from '@/components/lms/course-outline'
 import { LessonPlayer } from '@/components/lms/lesson-player'
+import { RichLesson } from '@/components/lms/robotics/rich-lesson'
 import { lessonKind } from '@/lib/lms/options'
+import { readRichContent, videoForViewer } from '@/lib/lms/rich'
+import { resourcesFor } from '@/lib/lms/robotics101'
 import { mySubmission } from '@/server/modules/lms/projects'
-import { completeLessonAction, submitProjectAction, submitQuizAction } from '../../../../lms/actions'
+import {
+  completeLessonAction,
+  saveLessonStateAction,
+  submitProjectAction,
+  submitQuizAction,
+  uploadProjectFileAction,
+} from '../../../../lms/actions'
 
 export const metadata = { title: 'Lesson' }
 
@@ -20,15 +29,28 @@ export default async function LearnerLessonPage({ params }: { params: Promise<{ 
     throw err
   })
   if (!data) notFound()
-  const { course, lesson, completed, scores, percent, nextLessonId } = data
+  const { course, lesson, completed, scores, percent, nextLessonId, saved } = data
   const project = lesson.kind === 'PROJECT' ? await mySubmission(ctx, course.id, lesson.id) : null
   const order = course.modules.flatMap((m) => m.lessons.map((l) => l.id))
   const at = order.indexOf(lesson.id)
+  const { content } = readRichContent(lesson.content)
+  const nextHref = nextLessonId ? `/my/learning/${course.id}/${nextLessonId}` : null
+  const finishHref = `/my/learning/${course.id}`
+
+  const outline = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Progress value={percent} tone={percent >= 100 ? 'success' : 'brand'} />
+        <span className="text-xs font-semibold tnum">{percent}%</span>
+      </div>
+      <CourseOutline compact modules={course.modules} completed={completed} currentLessonId={lesson.id} lessonHref={(l) => `/my/learning/${course.id}/${l}`} />
+    </div>
+  )
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title={lesson.title}
+        title={content ? `${at + 1}. ${lesson.title}` : lesson.title}
         description={`${lessonKind(lesson.kind).label}${lesson.durationMinutes ? ` · ${lesson.durationMinutes} min` : ''} · lesson ${at + 1} of ${order.length}`}
         breadcrumbs={[
           { label: 'My courses', href: '/my/learning' },
@@ -36,33 +58,46 @@ export default async function LearnerLessonPage({ params }: { params: Promise<{ 
           { label: lesson.title },
         ]}
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <LessonPlayer
-          key={lesson.id}
-          lesson={lesson}
-          completed={completed.has(lesson.id)}
-          bestScore={scores.get(lesson.id) ?? null}
-          markDone={completeLessonAction.bind(null, course.id, lesson.id)}
-          submitQuiz={submitQuizAction.bind(null, course.id, lesson.id)}
-          nextHref={nextLessonId ? `/my/learning/${course.id}/${nextLessonId}` : null}
-          finishHref={`/my/learning/${course.id}`}
-          project={project}
-          submitProject={submitProjectAction.bind(null, course.id, lesson.id)}
-        />
-        <aside className="lg:sticky lg:top-4 self-start space-y-3">
-          <div className="flex items-center gap-2">
-            <Progress value={percent} tone={percent >= 100 ? 'success' : 'brand'} />
-            <span className="text-xs font-semibold tnum">{percent}%</span>
-          </div>
-          <CourseOutline
-            compact
-            modules={course.modules}
-            completed={completed}
-            currentLessonId={lesson.id}
-            lessonHref={(l) => `/my/learning/${course.id}/${l}`}
+      {content ? (
+        <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+          <nav aria-label="Course outline" className="order-last lg:order-first lg:sticky lg:top-4 lg:self-start">
+            {outline}
+          </nav>
+          <RichLesson
+            key={lesson.id}
+            lesson={lesson}
+            content={content}
+            video={videoForViewer(content.video, false)}
+            saved={saved}
+            completed={completed.has(lesson.id)}
+            markDone={completeLessonAction.bind(null, course.id, lesson.id)}
+            submitQuiz={submitQuizAction.bind(null, course.id, lesson.id)}
+            saveState={saveLessonStateAction.bind(null, course.id, lesson.id)}
+            project={project}
+            submitProject={submitProjectAction.bind(null, course.id, lesson.id)}
+            uploadProjectFile={uploadProjectFileAction.bind(null, course.id, lesson.id)}
+            nextHref={nextHref}
+            finishHref={finishHref}
+            resources={resourcesFor(lesson.slug)}
           />
-        </aside>
-      </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <LessonPlayer
+            key={lesson.id}
+            lesson={lesson}
+            completed={completed.has(lesson.id)}
+            bestScore={scores.get(lesson.id) ?? null}
+            markDone={completeLessonAction.bind(null, course.id, lesson.id)}
+            submitQuiz={submitQuizAction.bind(null, course.id, lesson.id)}
+            nextHref={nextHref}
+            finishHref={finishHref}
+            project={project}
+            submitProject={submitProjectAction.bind(null, course.id, lesson.id)}
+          />
+          <aside className="lg:sticky lg:top-4 self-start">{outline}</aside>
+        </div>
+      )}
     </div>
   )
 }

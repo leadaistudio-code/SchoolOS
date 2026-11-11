@@ -1,0 +1,81 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:04.200
+MyCampusView Academy. Robotics 101, video 11: The line-following algorithm.
+
+2
+00:00:04.800 --> 00:00:10.450
+An algorithm is a set of clear steps to solve a problem.
+
+3
+00:00:10.500 --> 00:00:16.150
+Our robot needs one simple algorithm to follow the line.
+
+4
+00:00:16.800 --> 00:00:21.920
+Two sensors, each black or white, give only four cases.
+
+5
+00:00:21.970 --> 00:00:26.619
+Both white: the line is between them, go straight.
+
+6
+00:00:26.669 --> 00:00:31.413
+Left sees black: the line is going left, turn left.
+
+7
+00:00:31.463 --> 00:00:34.138
+Right sees black: turn right.
+
+8
+00:00:34.188 --> 00:00:38.650
+Both black: a cross line or the finish, so stop.
+
+9
+00:00:39.300 --> 00:00:43.281
+Here is the same idea as a flowchart.
+
+10
+00:00:43.331 --> 00:00:49.926
+Read the sensors, check the cases one by one, set the motors,
+
+11
+00:00:49.976 --> 00:00:52.650
+and go back to the start.
+
+12
+00:00:53.300 --> 00:00:57.117
+In code, we use if, else if and else.
+
+13
+00:00:57.167 --> 00:01:01.297
+Each block matches one row of the table.
+
+14
+00:01:01.347 --> 00:01:07.150
+Turning left means slowing the left wheel to TURN_SPEED.
+
+15
+00:01:07.800 --> 00:01:14.395
+Here is the algorithm running in the simulator on an S-shaped track.
+
+16
+00:01:14.445 --> 00:01:20.650
+Watch the decision panel switch between forward, left and right.
+
+17
+00:01:21.300 --> 00:01:29.643
+Now watch what happens if the left and right rules are swapped by mistake.
+
+18
+00:01:29.693 --> 00:01:35.201
+The robot turns away from the line and gets lost.
+
+19
+00:01:35.251 --> 00:01:38.150
+This is a very common bug.
+
+20
+00:01:38.800 --> 00:01:45.000
+Next: Uploading and testing on a real track.

@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Eye, Pencil } from 'lucide-react'
+import { Eye, FileText, Pencil } from 'lucide-react'
 import { requireLms } from '@/server/modules/lms/access'
-import { classOptions, courseAssignments, courseProgress } from '@/server/modules/lms/school'
+import { classOptions, courseAssignments, courseLessonBreakdown, courseProgress } from '@/server/modules/lms/school'
+import { BADGES, MEDIA_BASE, RESOURCES, earnedBadges, isRobotics101 } from '@/lib/lms/robotics101'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/badge'
@@ -16,6 +17,7 @@ import { CourseOutline } from '@/components/lms/course-outline'
 import { LessonText } from '@/components/lms/lesson-text'
 import { gradeRange, lmsCategory, lmsLevelLabel } from '@/lib/lms/options'
 import { AssignPanel } from './assign-panel'
+import { LessonBreakdown } from './lesson-breakdown'
 
 export const metadata = { title: 'Course · Robotics & AI' }
 
@@ -33,7 +35,11 @@ export default async function LmsCoursePage({
   const progress = await courseProgress(ctx, id).catch(() => null)
   if (!progress) notFound()
   const { course, rows, totals } = progress
-  const [assignments, classes] = await Promise.all([courseAssignments(ctx, id), classOptions(ctx)])
+  const [assignments, classes, breakdown] = await Promise.all([
+    courseAssignments(ctx, id),
+    classOptions(ctx),
+    courseLessonBreakdown(ctx, id),
+  ])
 
   const own = course.tenantId === ctx.tenant.id
   const canManage = ctx.can('lms.manage')
@@ -41,7 +47,10 @@ export default async function LmsCoursePage({
   const minutes = lessons.reduce((s, l) => s + (l.durationMinutes ?? 0), 0)
   const category = lmsCategory(course.category)
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
-  const tab = query.tab === 'outline' ? 'outline' : 'progress'
+  const tab = query.tab === 'outline' || query.tab === 'lessons' ? query.tab : 'progress'
+  const robotics = isRobotics101(lessons.map((l) => l.slug))
+  const badgeCount = (studentId: string) =>
+    earnedBadges(breakdown.completedSlugsByStudent.get(studentId) ?? new Set()).filter((b) => b.earned).length
   const classNames = [...new Set(rows.map((r) => r.className).filter(Boolean))]
   const visibleRows = query.class ? rows.filter((r) => r.className === query.class) : rows
   const firstLesson = lessons[0]
@@ -116,15 +125,49 @@ export default async function LmsCoursePage({
         </Card>
       ) : null}
 
+      {robotics ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Teacher resources</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {RESOURCES.map((r) => (
+                <li key={r.id}>
+                  <a
+                    href={`${MEDIA_BASE}/${r.file}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-start gap-2 rounded-lg border border-line p-2.5 text-sm hover:bg-surface-2"
+                  >
+                    <FileText className="mt-0.5 size-4 shrink-0 text-ink-subtle" aria-hidden />
+                    <span>
+                      <span className="block font-medium text-ink">
+                        {r.title}
+                        {r.audience === 'teacher' ? <span className="ml-1.5 text-xs font-normal text-ink-subtle">(teachers)</span> : null}
+                      </span>
+                      <span className="block text-xs text-ink-muted">{r.note}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <LinkTabs
         label="Course sections"
         items={[
           { label: 'Student progress', href: `/lms/courses/${id}`, active: tab === 'progress', count: rows.length },
+          { label: 'Lesson by lesson', href: `/lms/courses/${id}?tab=lessons`, active: tab === 'lessons', count: breakdown.attention.length || undefined },
           { label: 'Lessons', href: `/lms/courses/${id}?tab=outline`, active: tab === 'outline', count: lessons.length },
         ]}
       />
 
-      {tab === 'outline' ? (
+      {tab === 'lessons' ? (
+        <LessonBreakdown courseId={id} breakdown={breakdown} />
+      ) : tab === 'outline' ? (
         <CourseOutline modules={course.modules} lessonHref={(lessonId) => `/lms/courses/${id}/preview/${lessonId}`} />
       ) : (
         <Card className="overflow-hidden">
@@ -155,6 +198,7 @@ export default async function LmsCoursePage({
                     <TH>Class</TH>
                     <TH className="w-56">Progress</TH>
                     <TH align="right">Quiz average</TH>
+                    {robotics ? <TH align="right">Badges</TH> : null}
                     <TH align="right">Last active</TH>
                   </tr>
                 </THead>
@@ -182,6 +226,7 @@ export default async function LmsCoursePage({
                         )}
                       </TD>
                       <TD align="right">{r.quizAverage !== null ? `${r.quizAverage}%` : '—'}</TD>
+                      {robotics ? <TD align="right" className="tnum">{badgeCount(r.studentId)}/{BADGES.length}</TD> : null}
                       <TD align="right">
                         {r.completedAt ? (
                           <span className="text-success">Finished {shortDate(r.completedAt)}</span>

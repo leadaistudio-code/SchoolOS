@@ -31,10 +31,10 @@ export async function issueCertificateFor(ctx: AppContext, enrollmentId: string)
   if (!enrollment) return null
   const [course, lessons, student, scores] = await Promise.all([
     ctx.db.lmsCourse.findFirst({ where: { id: enrollment.courseId }, select: { title: true, category: true, level: true } }),
-    ctx.db.lmsLesson.findMany({ where: { courseId: enrollment.courseId }, select: { durationMinutes: true } }),
+    ctx.db.lmsLesson.findMany({ where: { courseId: enrollment.courseId, archivedAt: null }, select: { durationMinutes: true } }),
     ctx.db.student.findFirst({ where: { id: enrollment.studentId }, select: { firstName: true, lastName: true } }),
     ctx.db.lmsLessonProgress.findMany({
-      where: { enrollmentId, completedAt: { not: null }, bestScorePercent: { not: null } },
+      where: { enrollmentId, completedAt: { not: null }, bestScorePercent: { not: null }, lesson: { archivedAt: null } },
       select: { bestScorePercent: true },
     }),
   ])

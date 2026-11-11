@@ -31,6 +31,7 @@ export const LMS_LESSON_KINDS = [
   { value: 'CODE', label: 'Code', icon: 'Code2' },
   { value: 'QUIZ', label: 'Quiz', icon: 'ListChecks' },
   { value: 'PROJECT', label: 'Project', icon: 'Wrench' },
+  { value: 'INTERACTIVE', label: 'Interactive lesson', icon: 'Sparkles' },
 ] as const
 
 export type LmsLessonKind = (typeof LMS_LESSON_KINDS)[number]['value']
@@ -64,12 +65,13 @@ export function gradeRange(from: number | null, to: number | null) {
   return null
 }
 
-export type QuizOption = { id: string; text: string; correct: boolean }
-export type QuizQuestion = { id: string; prompt: string; multiple: boolean; options: QuizOption[]; explanation?: string }
+/** `feedback`: why this choice is right or wrong, shown after marking. */
+export type QuizOption = { id: string; text: string; correct: boolean; feedback?: string }
+export type QuizQuestion = { id: string; prompt: string; multiple: boolean; options: QuizOption[]; explanation?: string; hint?: string }
 export type Quiz = { questions: QuizQuestion[] }
 
-/** What a learner is sent before answering: no correct flags, no explanations. */
-export type PublicQuizQuestion = { id: string; prompt: string; multiple: boolean; options: { id: string; text: string }[] }
+/** What a learner is sent before answering: no correct flags, no explanations, no feedback. Hints are fine. */
+export type PublicQuizQuestion = { id: string; prompt: string; multiple: boolean; options: { id: string; text: string }[]; hint?: string }
 
 export function publicQuiz(quiz: Quiz | null | undefined): PublicQuizQuestion[] {
   return (quiz?.questions ?? []).map((q) => ({
@@ -77,6 +79,7 @@ export function publicQuiz(quiz: Quiz | null | undefined): PublicQuizQuestion[] 
     prompt: q.prompt,
     multiple: q.multiple,
     options: q.options.map((o) => ({ id: o.id, text: o.text })),
+    ...(q.hint ? { hint: q.hint } : {}),
   }))
 }
 
@@ -85,7 +88,8 @@ export type QuizResult = {
   totalCount: number
   scorePercent: number
   passed: boolean
-  questions: { id: string; correct: boolean; correctOptionIds: string[]; explanation?: string }[]
+  passPercent?: number
+  questions: { id: string; correct: boolean; correctOptionIds: string[]; explanation?: string; feedback?: Record<string, string> }[]
 }
 
 /** A question is right only when exactly its correct options were chosen. */
@@ -94,10 +98,19 @@ export function gradeQuiz(quiz: Quiz, answers: Record<string, string[]>, passPer
     const want = q.options.filter((o) => o.correct).map((o) => o.id).sort()
     const got = [...new Set(answers[q.id] ?? [])].sort()
     const correct = want.length > 0 && want.length === got.length && want.every((id, i) => id === got[i])
-    return { id: q.id, correct, correctOptionIds: want, explanation: q.explanation }
+    const feedback = Object.fromEntries(
+      q.options.filter((o) => o.feedback && got.includes(o.id)).map((o) => [o.id, o.feedback!]),
+    )
+    return {
+      id: q.id,
+      correct,
+      correctOptionIds: want,
+      explanation: q.explanation,
+      ...(Object.keys(feedback).length ? { feedback } : {}),
+    }
   })
   const correctCount = questions.filter((q) => q.correct).length
   const totalCount = questions.length
   const scorePercent = totalCount ? Math.round((correctCount / totalCount) * 100) : 0
-  return { correctCount, totalCount, scorePercent, passed: scorePercent >= passPercent, questions }
+  return { correctCount, totalCount, scorePercent, passed: scorePercent >= passPercent, passPercent, questions }
 }
