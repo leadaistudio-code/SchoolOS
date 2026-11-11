@@ -3,6 +3,7 @@ import { BADGES, LESSONS, MODULES, RESOURCES, earnedBadges, resourcesFor } from 
 import { lessonContent, planSync, type ExistingLesson } from '@/lib/lms/robotics101/plan'
 import { gradeQuiz, publicQuiz } from '@/lib/lms/options'
 import { activityIds, blankIsRight, videoForViewer } from '@/lib/lms/rich'
+import { HOTSPOT_BOARDS, hotspotSpot } from '@/lib/lms/robotics101/hotspots'
 
 const NO_MEDIA = { videos: {} }
 
@@ -61,6 +62,30 @@ describe('Robotics 101 curriculum', () => {
             expect(task.code, `${task.id} uses {{${blank.id}}}`).toContain(`{{${blank.id}}}`)
             expect(blankIsRight(blank.answers, blank.answers[0]!)).toBe(true)
           }
+        }
+      }
+    }
+  })
+
+  it('hotspot answers are real spots, and no two spots overlap', () => {
+    const boards = new Set<string>()
+    for (const def of LESSONS) {
+      for (const block of lessonContent(def, NO_MEDIA).blocks) {
+        if (block.type !== 'hotspot') continue
+        boards.add(block.board)
+        for (const q of block.questions) for (const s of q.spots) expect(hotspotSpot(block.board, s), `${block.id} ${q.id} → ${s}`).toBeDefined()
+      }
+    }
+    expect([...boards].sort()).toEqual(['ir-module', 'l298n', 'uno'])
+    for (const [board, { spots, view }] of Object.entries(HOTSPOT_BOARDS)) {
+      const [vx, vy, vw, vh] = view
+      expect(new Set(spots.map((s) => s.id)).size, board).toBe(spots.length)
+      for (const a of spots) {
+        expect(a.x >= vx && a.y >= vy && a.x + a.w <= vx + vw && a.y + a.h <= vy + vh, `${board} ${a.id} inside the view`).toBe(true)
+        for (const b of spots) {
+          if (a === b) continue
+          const overlap = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0
+          expect(overlap, `${board}: ${a.id} overlaps ${b.id}`).toBe(false)
         }
       }
     }

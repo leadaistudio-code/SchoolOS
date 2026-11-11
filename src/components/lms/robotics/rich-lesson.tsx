@@ -43,6 +43,7 @@ import {
   WiringActivity,
 } from './activities'
 import { Diagram } from './diagrams'
+import { HotspotActivity } from './hotspot'
 import { CodeLab, CodeView, IrSimulator, KitExplorer, MotorLab } from './labs'
 import { LessonStateProvider, useLessonState, type SaveState } from './lesson-state'
 import { LineSimulator, type SimRecord } from './line-sim'
@@ -415,6 +416,8 @@ function Block({ block }: { block: RichBlock }) {
       return <MatchActivity block={block} />
     case 'kit':
       return <KitExplorer block={block} />
+    case 'hotspot':
+      return <HotspotActivity block={block} />
     case 'ir-sim':
       return <IrSimulator block={block} />
     case 'motor-lab':

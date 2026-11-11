@@ -102,6 +102,18 @@ export const blockSchema = z.discriminatedUnion('type', [
     explanation: short(600),
   }),
   z.object({ type: z.literal('kit'), id, title: short(120), prompt: short(400), quiz: z.boolean().default(true) }),
+  z.object({
+    type: z.literal('hotspot'),
+    id,
+    title: short(120),
+    prompt: short(400),
+    board: z.enum(['uno', 'l298n', 'ir-module']),
+    /** Asked in order. `spots` lists every right answer, e.g. all three GND pins. */
+    questions: z
+      .array(z.object({ id, ask: short(200), spots: z.array(id).min(1).max(4), hint: z.string().max(300).optional(), explain: short(400) }))
+      .min(1)
+      .max(10),
+  }),
   z.object({ type: z.literal('ir-sim'), id }),
   z.object({ type: z.literal('motor-lab'), id }),
   z.object({

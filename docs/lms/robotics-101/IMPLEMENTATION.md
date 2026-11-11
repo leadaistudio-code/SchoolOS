@@ -39,7 +39,7 @@ Verified locally on 11 Nov 2026 (dev server, demo school, student and teacher lo
 | 3 | Content sync script, idempotent, no deletes (second run: all rows reused, nothing created or archived) | done (local) |
 | 5/10 | Rich lesson renderer; three-column desktop layout (outline, lesson, progress/notes/downloads); mobile single column | done |
 | 9 | Formative activities: quick check, sort, sequence, match, checklist, missions, truth table, wiring, steps | done |
-| 9 | Hotspot activity | todo (not built; kit explorer covers part identification) |
+| 9 | Hotspot activity: find pins and parts on drawn boards (IR module in Lesson 4, L298N in Lesson 5, Arduino Uno in Lesson 7); wrong clicks name the part and give a hint; first-try score saved; explore mode afterwards; keyboard operable | done (full Uno run and wrong/right clicks on the other two checked in the browser, desktop and phone width) |
 | 6 | Line-following simulator: 6 tracks incl. draw-your-own, decision panel, guided tour, 5 experiments | done |
 | 4/5 | IR sensor simulator, motor lab, kit explorer | done |
 | 7 | Arduino code lab: levels, fill-the-blank tasks, explanation, hints, download | done |
