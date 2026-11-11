@@ -185,5 +185,5 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Everything except static assets; the passthrough list above handles the
   // rest, where the decision needs the pathname rather than a pattern.
-  matcher: ['/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|mp4|webm)$).*)'],
 }

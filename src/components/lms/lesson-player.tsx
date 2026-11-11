@@ -9,7 +9,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { Checkbox } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
-import { documentEmbedUrl, videoEmbedUrl } from '@/lib/lms/media'
+import { documentEmbedUrl, videoEmbedUrl, videoFileUrl } from '@/lib/lms/media'
 import type { QuizResult } from '@/lib/lms/options'
 import { cn } from '@/lib/utils'
 import { LessonText } from './lesson-text'
@@ -62,10 +62,16 @@ export function LessonPlayer({
   }
 
   const video = lesson.kind === 'VIDEO' ? videoEmbedUrl(lesson.videoUrl) : null
+  const videoFile = lesson.kind === 'VIDEO' && !video ? videoFileUrl(lesson.videoUrl) : null
   const doc = lesson.kind === 'DOCUMENT' ? documentEmbedUrl(lesson.documentUrl) : null
 
   return (
     <div className="space-y-5">
+      {videoFile ? (
+        <div className="aspect-video w-full overflow-hidden rounded-[var(--radius-lg)] border border-line bg-black">
+          <video src={videoFile} title={lesson.title} className="size-full" controls playsInline preload="metadata" />
+        </div>
+      ) : null}
       {video ? (
         <div className="aspect-video w-full overflow-hidden rounded-[var(--radius-lg)] border border-line bg-black">
           <iframe

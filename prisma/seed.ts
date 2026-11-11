@@ -8,6 +8,7 @@ import { SYSTEM_ROLES, ROLE } from '../src/lib/rbac/roles'
 import { FEATURE } from '../src/server/entitlements'
 import { ensureExamDefaults } from '../src/server/modules/exams/defaults'
 import { compositeScience, roboticsAi } from '../src/lib/labs/templates'
+import { addStarterVideoLessons } from './lms-starter-videos'
 import {
   ASSET_ITEMS,
   BLOOD_GROUPS,
@@ -2463,6 +2464,7 @@ async function main() {
   }
   await seedSchoolGroup()
   await seedLmsStarterCourse()
+  await addStarterVideoLessons(prisma)
   await seedLmsDemoKit()
 
   const counts = {

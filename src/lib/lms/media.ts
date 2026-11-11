@@ -1,7 +1,8 @@
 /**
  * Lesson media is hosted elsewhere (YouTube, Vimeo, Google Drive) and shown in
  * an iframe. Only these hosts are turned into embeds; anything else is refused
- * for videos and opened as a plain link for documents.
+ * for videos (unless it is a plain .mp4/.webm file) and opened as a plain link
+ * for documents.
  */
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/
@@ -46,6 +47,22 @@ export function videoEmbedUrl(raw: string | null | undefined): string | null {
     return `https://player.vimeo.com/video/${id}${hash ? `?h=${hash}` : ''}`
   }
   return null
+}
+
+const VIDEO_FILE = /\.(mp4|webm)$/i
+
+/**
+ * A video file the browser plays itself: an http(s) link to an .mp4/.webm, or
+ * a path on this site such as /lms-media/clip.mp4. Null for anything else.
+ */
+export function videoFileUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const value = raw.trim()
+  if (value.startsWith('/') && !value.startsWith('//')) {
+    return VIDEO_FILE.test(value.split(/[?#]/)[0]!) ? value : null
+  }
+  const url = parse(value)
+  return url && VIDEO_FILE.test(url.pathname) ? url.toString() : null
 }
 
 /** Inline preview for Google Drive / Docs / Slides links; otherwise null (show a link instead). */

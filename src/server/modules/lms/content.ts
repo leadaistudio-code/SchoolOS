@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/server/db/prisma'
 import { badRequest, conflict, notFound } from '@/server/api/response'
 import { CODE_LANGUAGES, LMS_CATEGORIES, LMS_LESSON_KINDS, type Quiz } from '@/lib/lms/options'
-import { isHttpUrl, videoEmbedUrl } from '@/lib/lms/media'
+import { isHttpUrl, videoEmbedUrl, videoFileUrl } from '@/lib/lms/media'
 
 /**
  * Course authoring, shared by the platform console (owner tenantId null: the
@@ -75,8 +75,8 @@ export const lessonSchema = z
     passPercent: z.coerce.number().int().min(0).max(100).default(60),
   })
   .superRefine((v, issue) => {
-    if (v.kind === 'VIDEO' && !videoEmbedUrl(v.videoUrl)) {
-      issue.addIssue({ code: 'custom', path: ['videoUrl'], message: 'Paste a YouTube or Vimeo link' })
+    if (v.kind === 'VIDEO' && !videoEmbedUrl(v.videoUrl) && !videoFileUrl(v.videoUrl)) {
+      issue.addIssue({ code: 'custom', path: ['videoUrl'], message: 'Paste a YouTube or Vimeo link, or a link to an .mp4 file' })
     }
     if (v.kind === 'DOCUMENT' && !(v.documentUrl && isHttpUrl(v.documentUrl))) {
       issue.addIssue({ code: 'custom', path: ['documentUrl'], message: 'Paste a link to the PDF, Google Drive file or slides' })

@@ -9,7 +9,7 @@ import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/input'
 import { Notice } from '@/components/ui/states'
 import { useToast } from '@/components/ui/toast'
 import { CODE_LANGUAGES, LMS_LESSON_KINDS, type Quiz, type QuizQuestion } from '@/lib/lms/options'
-import { documentEmbedUrl, videoEmbedUrl } from '@/lib/lms/media'
+import { documentEmbedUrl, videoEmbedUrl, videoFileUrl } from '@/lib/lms/media'
 import { cn } from '@/lib/utils'
 import { KindIcon, fillPath } from './kind-icon'
 import { LessonText } from './lesson-text'
@@ -116,6 +116,7 @@ export function LessonEditor({
   }
 
   const embed = form.kind === 'VIDEO' ? videoEmbedUrl(form.videoUrl) : null
+  const videoFile = form.kind === 'VIDEO' && !embed ? videoFileUrl(form.videoUrl) : null
   const docEmbed = form.kind === 'DOCUMENT' ? documentEmbedUrl(form.documentUrl) : null
 
   return (
@@ -157,8 +158,8 @@ export function LessonEditor({
               label="YouTube or Vimeo link"
               required
               htmlFor="l-video"
-              hint="Unlisted YouTube videos work well: students can watch, but the video is not searchable."
-              error={form.videoUrl && !embed ? 'This does not look like a YouTube or Vimeo link' : undefined}
+              hint="Unlisted YouTube videos work well: students can watch, but the video is not searchable. A direct link to an .mp4 file also works."
+              error={form.videoUrl && !embed && !videoFile ? 'This does not look like a YouTube, Vimeo or .mp4 link' : undefined}
             >
               <Input id="l-video" value={form.videoUrl} onChange={set('videoUrl')} placeholder="https://youtu.be/…" />
             </Field>
@@ -166,6 +167,11 @@ export function LessonEditor({
           {embed ? (
             <div className="aspect-video max-w-2xl overflow-hidden rounded-[var(--radius)] border border-line bg-black">
               <iframe src={embed} title="Video preview" className="size-full" allow="encrypted-media; picture-in-picture" allowFullScreen />
+            </div>
+          ) : null}
+          {videoFile ? (
+            <div className="aspect-video max-w-2xl overflow-hidden rounded-[var(--radius)] border border-line bg-black">
+              <video src={videoFile} title="Video preview" className="size-full" controls playsInline preload="metadata" />
             </div>
           ) : null}
 

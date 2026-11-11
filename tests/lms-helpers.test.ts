@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { gradeQuiz, publicQuiz, type Quiz } from '../src/lib/lms/options'
-import { documentEmbedUrl, videoEmbedUrl } from '../src/lib/lms/media'
+import { documentEmbedUrl, videoEmbedUrl, videoFileUrl } from '../src/lib/lms/media'
 
 const quiz: Quiz = {
   questions: [
@@ -72,6 +72,15 @@ describe('video and document links', () => {
     expect(videoEmbedUrl('javascript:alert(1)')).toBeNull()
     expect(videoEmbedUrl('https://youtube.com/watch?v=short')).toBeNull()
     expect(videoEmbedUrl('')).toBeNull()
+  })
+
+  it('plays .mp4/.webm files from a link or a path on this site', () => {
+    expect(videoFileUrl('/lms-media/clip.mp4')).toBe('/lms-media/clip.mp4')
+    expect(videoFileUrl('https://cdn.example.com/a/b.webm?x=1')).toBe('https://cdn.example.com/a/b.webm?x=1')
+    expect(videoFileUrl('//evil.example.com/clip.mp4')).toBeNull()
+    expect(videoFileUrl('javascript:alert(1)//.mp4')).toBeNull()
+    expect(videoFileUrl('https://example.com/page.html')).toBeNull()
+    expect(videoFileUrl('')).toBeNull()
   })
 
   it('previews Google Drive and Slides, and leaves other documents as links', () => {
