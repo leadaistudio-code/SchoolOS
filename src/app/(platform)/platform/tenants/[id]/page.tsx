@@ -40,9 +40,10 @@ const MODULE_LABELS: Record<string, string> = {
   [FEATURE.MODULE_AI_ASSIST]: 'AI assist',
   [FEATURE.MODULE_FEEDBACK]: 'Feedback',
   [FEATURE.MODULE_SCIENCE_LAB]: 'Labs (Science, Robotics & AI)',
+  [FEATURE.MODULE_ROBOTICS_LMS]: 'Robotics & AI courses (LMS)',
 }
 
-const ADD_ON_MODULES = new Set<string>([FEATURE.MODULE_SCIENCE_LAB])
+const ADD_ON_MODULES = new Set<string>([FEATURE.MODULE_SCIENCE_LAB, FEATURE.MODULE_ROBOTICS_LMS])
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

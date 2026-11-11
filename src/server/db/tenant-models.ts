@@ -246,6 +246,16 @@ export const TENANT_SCOPED_MODELS = [
   'LabInspection',
   'LabIncident',
   'LabWasteLog',
+
+  // Robotics & AI LMS (add-on): a school's assignments and its students' progress
+  'LmsCourseAssignment',
+  'LmsEnrollment',
+  'LmsLessonProgress',
+  'LmsQuizAttempt',
+  'LmsBatch',
+  'LmsLiveClass',
+  'LmsLiveAttendance',
+  'LmsProjectSubmission',
 ] as const
 
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number]
@@ -290,6 +300,12 @@ export const TENANT_OWNED_OPTIONAL_MODELS = new Set<string>([
 export const TENANT_SHARED_OPTIONAL_MODELS = new Set<string>([
   'Role',
   'NotificationTemplate',
+  // The MyCampusView course catalogue (null tenant) plus a school's own
+  // courses. Reads are narrowed; writes go through src/server/modules/lms/content.ts,
+  // which pins the owner explicitly so a school cannot edit a catalogue course.
+  'LmsCourse',
+  'LmsModule',
+  'LmsLesson',
 ])
 
 /** Every model with an optional tenantId, whichever way it is filtered. */

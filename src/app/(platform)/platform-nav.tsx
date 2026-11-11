@@ -12,6 +12,7 @@ import {
   Camera,
   CreditCard,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   LifeBuoy,
   Mail,
@@ -41,6 +42,7 @@ const ICONS = {
   billing: CreditCard,
   support: LifeBuoy,
   tapasya: Timer,
+  lms: GraduationCap,
   blog: Newspaper,
   health: Activity,
 } satisfies Record<string, LucideIcon>

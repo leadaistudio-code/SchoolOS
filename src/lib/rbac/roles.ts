@@ -114,6 +114,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'transport.view', 'transport.track',
       ...all('sports'),
       ...all('labs'),
+      'lms.view', 'lms.manage', 'lms.teach',
       ...all('events'),
       ...all('reports'),
       ...all('score'),
@@ -187,6 +188,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       // Science teachers book and run practicals; the module itself is a paid add-on.
       'labs.view',
       'labs.sessions',
+      'lms.view',
+      'lms.teach',
     ],
   },
   {
@@ -294,6 +297,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'labs.stock',
       'labs.sessions',
       'labs.safety',
+      'lms.view',
+      'lms.teach',
       'notices.view',
       'staff_attendance.mark',
       'leave.view', 'leave.apply',
@@ -328,6 +333,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
       'transport.track',
       'documents.view',
       'tapasya.use',
+      'lms.learn',
     ],
   },
   {

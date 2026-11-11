@@ -1524,6 +1524,7 @@ model Student {
   tapasyaSessions      TapasyaFocusSession[]
   tapasyaUnlocks       TapasyaUnlockRequest[]
   tapasyaXpEvents      TapasyaXpEvent[]
+  lmsEnrollments       LmsEnrollment[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])
@@ -5621,18 +5622,18 @@ model CrmReminderSend {
 /// A salesperson who gets the daily Growth CRM reminders. Platform-only.
 /// TEAM sees every open follow-up; MINE only those assigned to `userId`.
 model CrmReminderRecipient {
-  id        String   @id @default(cuid())
-  name      String
-  whatsapp  String?
-  email     String?
-  userId    String?
-  user      User?    @relation("CrmReminderRecipientUser", fields: [userId], references: [id], onDelete: SetNull)
-  scope     String   @default("TEAM")
-  morning   Boolean  @default(true)
-  evening   Boolean  @default(true)
-  meetings  Boolean  @default(true)
-  weekly    Boolean  @default(true)
-  isActive  Boolean  @default(true)
+  id          String    @id @default(cuid())
+  name        String
+  whatsapp    String?
+  email       String?
+  userId      String?
+  user        User?     @relation("CrmReminderRecipientUser", fields: [userId], references: [id], onDelete: SetNull)
+  scope       String    @default("TEAM")
+  morning     Boolean   @default(true)
+  evening     Boolean   @default(true)
+  meetings    Boolean   @default(true)
+  weekly      Boolean   @default(true)
+  isActive    Boolean   @default(true)
   /// Follow-up ids behind the numbers in the last WhatsApp list, so "done 2" resolves.
   lastListIds String[]  @default([])
   lastListAt  DateTime?
@@ -6472,24 +6473,24 @@ model LedgerAccount {
 
 /// A balanced voucher. Posted entries are never edited; corrections post a reversal.
 model JournalEntry {
-  id             String             @id @default(cuid())
+  id             String                @id @default(cuid())
   tenantId       String
   number         String
-  voucherType    JournalVoucherType @default(JOURNAL)
-  date           DateTime           @db.Date
+  voucherType    JournalVoucherType    @default(JOURNAL)
+  date           DateTime              @db.Date
   reference      String?
   narration      String?
-  sourceType     JournalSourceType  @default(MANUAL)
+  sourceType     JournalSourceType     @default(MANUAL)
   sourceId       String?
   /// Makes automatic posting idempotent, e.g. FEE_PAYMENT:<id>:v1.
   postingKey     String?
   totalMinor     Int
-  isReversal     Boolean            @default(false)
+  isReversal     Boolean               @default(false)
   reversalOfId   String?
   reversedAt     DateTime?
   createdById    String?
   createdByLabel String?
-  createdAt      DateTime           @default(now())
+  createdAt      DateTime              @default(now())
   /// Only APPROVED entries count in P&L, balance sheet, ledgers and books.
   /// Cost entries wait at PENDING_* while the school's approval workflow is on.
   approvalStatus JournalApprovalStatus @default(APPROVED)
@@ -6640,23 +6641,23 @@ model AccountingAuditEvent {
 /// Per-school switches for the accounting expansion. A missing row means
 /// everything is off.
 model AccountingSettings {
-  id                      String                @id @default(cuid())
-  tenantId                String                @unique
+  id                        String                @id @default(cuid())
+  tenantId                  String                @unique
   /// Fees card on Student 360 opens the statement of account.
-  studentLedgerEnabled    Boolean               @default(false)
+  studentLedgerEnabled      Boolean               @default(false)
   /// Multi-tier expense approval before posting.
-  approvalWorkflowEnabled Boolean               @default(false)
+  approvalWorkflowEnabled   Boolean               @default(false)
   /// Adds a department-head sign-off between Checker and Accountant.
-  departmentApprovalEnabled Boolean             @default(false)
+  departmentApprovalEnabled Boolean               @default(false)
   /// Queue WhatsApp receipt notifications after a fee receipt is posted.
-  whatsappReceiptsEnabled Boolean               @default(false)
+  whatsappReceiptsEnabled   Boolean               @default(false)
   /// 1-12; Indian schools use 4 (April-March).
-  fiscalYearStartMonth    Int                   @default(4)
+  fiscalYearStartMonth      Int                   @default(4)
   /// How often depreciation runs are proposed (phase 5).
-  depreciationFrequency   DepreciationFrequency @default(YEARLY)
-  updatedById             String?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
+  depreciationFrequency     DepreciationFrequency @default(YEARLY)
+  updatedById               String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -8076,25 +8077,25 @@ enum LabWasteCategory {
 }
 
 model Lab {
-  id               String    @id @default(cuid())
-  tenantId         String
-  name             String
-  type             LabType
+  id                String    @id @default(cuid())
+  tenantId          String
+  name              String
+  type              LabType
   /// Template code from src/lib/labs/templates, or null for a custom lab.
-  templateCode     String?
-  room             String?
-  inChargeStaffId  String?
-  assistantStaffId String?
+  templateCode      String?
+  room              String?
+  inChargeStaffId   String?
+  assistantStaffId  String?
   /// Emergency numbers printed on the display board: [{ label, phone }].
-  emergencyContacts Json     @default("[]")
+  emergencyContacts Json      @default("[]")
   /// Answers to the template's infrastructure checklist:
   /// { [code]: { ok: boolean, value?: number, note?: string } }.
-  infrastructure   Json      @default("{}")
-  notes            String?
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime?
+  infrastructure    Json      @default("{}")
+  notes             String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   items       LabItem[]
   movements   LabStockMovement[]
@@ -8227,17 +8228,17 @@ model LabSession {
 
 /// One student's attendance and record marks for a practical session.
 model LabSessionStudent {
-  id          String   @id @default(cuid())
-  tenantId    String
-  sessionId   String
-  studentId   String
-  present     Boolean  @default(true)
+  id         String   @id @default(cuid())
+  tenantId   String
+  sessionId  String
+  studentId  String
+  present    Boolean  @default(true)
   /// Practical-record (file) checked by the teacher.
-  recordDone  Boolean  @default(false)
-  marks       Float?
-  remarks     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  recordDone Boolean  @default(false)
+  marks      Float?
+  remarks    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   session LabSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -8310,4 +8311,285 @@ model LabWasteLog {
   lab Lab @relation(fields: [labId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, labId, disposedOn])
+}
+
+// ===========================================================================
+// ROBOTICS & AI LMS (add-on)
+// ===========================================================================
+
+enum LmsCourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LmsLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum LmsLessonKind {
+  VIDEO
+  TEXT
+  DOCUMENT
+  CODE
+  QUIZ
+  PROJECT
+}
+
+/// A self-paced course. tenantId null: the MyCampusView catalogue, offered to
+/// every school with the add-on. tenantId set: a school's own course.
+model LmsCourse {
+  id             String          @id @default(cuid())
+  tenantId       String?
+  title          String
+  subtitle       String?
+  description    String?
+  /// ROBOTICS, AI, CODING, ELECTRONICS, IOT, DRONES or OTHER.
+  category       String          @default("ROBOTICS")
+  level          LmsLevel        @default(BEGINNER)
+  /// Suggested classes, e.g. 6 to 8. Advisory only.
+  gradeFrom      Int?
+  gradeTo        Int?
+  /// What a learner can do after the course, one line each.
+  outcomes       String[]        @default([])
+  status         LmsCourseStatus @default(DRAFT)
+  publishedAt    DateTime?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  modules     LmsModule[]
+  lessons     LmsLesson[]
+  assignments LmsCourseAssignment[]
+  enrollments LmsEnrollment[]
+  batches     LmsBatch[]
+
+  @@index([tenantId, status])
+}
+
+model LmsModule {
+  id        String   @id @default(cuid())
+  /// Same as the course's.
+  tenantId  String?
+  courseId  String
+  title     String
+  summary   String?
+  position  Int
+  createdAt DateTime @default(now())
+
+  course  LmsCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons LmsLesson[]
+
+  @@index([courseId, position])
+}
+
+model LmsLesson {
+  id              String        @id @default(cuid())
+  /// Same as the course's.
+  tenantId        String?
+  courseId        String
+  moduleId        String
+  title           String
+  kind            LmsLessonKind
+  position        Int
+  durationMinutes Int?
+  /// YouTube or Vimeo link for VIDEO lessons.
+  videoUrl        String?
+  /// Lesson text, notes under a video, or the project brief. Light markdown.
+  body            String?
+  /// Link to a PDF, Google Drive file or slides for DOCUMENT lessons.
+  documentUrl     String?
+  codeLanguage    String?
+  code            String?
+  /// QUIZ lessons: { questions: [{ id, prompt, multiple, options: [{ id, text, correct }], explanation }] }.
+  quiz            Json?
+  /// Score needed to pass a quiz and complete the lesson.
+  passPercent     Int           @default(60)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  course       LmsCourse              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module       LmsModule              @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress     LmsLessonProgress[]
+  quizAttempts LmsQuizAttempt[]
+  submissions  LmsProjectSubmission[]
+
+  @@index([courseId])
+  @@index([moduleId, position])
+}
+
+/// A course opened to a class, a section, or (both null) the whole school.
+model LmsCourseAssignment {
+  id              String   @id @default(cuid())
+  tenantId        String
+  courseId        String
+  classLevelId    String?
+  sectionId       String?
+  assignedById    String?
+  assignedByLabel String?
+  createdAt       DateTime @default(now())
+
+  course LmsCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, courseId])
+  @@index([tenantId, classLevelId])
+}
+
+/// Created the first time a student opens a course.
+model LmsEnrollment {
+  id             String    @id @default(cuid())
+  tenantId       String
+  courseId       String
+  studentId      String
+  startedAt      DateTime  @default(now())
+  lastActivityAt DateTime  @default(now())
+  lastLessonId   String?
+  completedAt    DateTime?
+
+  course      LmsCourse              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student     Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  progress    LmsLessonProgress[]
+  attempts    LmsQuizAttempt[]
+  submissions LmsProjectSubmission[]
+
+  @@unique([tenantId, courseId, studentId])
+  @@index([tenantId, studentId])
+}
+
+model LmsLessonProgress {
+  id               String    @id @default(cuid())
+  tenantId         String
+  enrollmentId     String
+  lessonId         String
+  studentId        String
+  completedAt      DateTime?
+  bestScorePercent Int?
+  attempts         Int       @default(0)
+  updatedAt        DateTime  @updatedAt
+
+  enrollment LmsEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     LmsLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([tenantId, lessonId])
+}
+
+model LmsQuizAttempt {
+  id           String   @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  lessonId     String
+  studentId    String
+  /// { [questionId]: optionId[] }
+  answers      Json
+  correctCount Int
+  totalCount   Int
+  scorePercent Int
+  passed       Boolean
+  submittedAt  DateTime @default(now())
+
+  enrollment LmsEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     LmsLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, lessonId, studentId])
+}
+
+/// A group of students taught live online (Zoom / Google Meet links), usually
+/// alongside a course. Audience: a class, a section, or (both null) the whole school.
+model LmsBatch {
+  id             String    @id @default(cuid())
+  tenantId       String
+  title          String
+  description    String?
+  courseId       String?
+  classLevelId   String?
+  sectionId      String?
+  instructorName String?
+  /// Default meeting link for its classes; a class can override it.
+  meetingUrl     String?
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+
+  course      LmsCourse?     @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  liveClasses LmsLiveClass[]
+
+  @@index([tenantId, classLevelId])
+}
+
+model LmsLiveClass {
+  id              String    @id @default(cuid())
+  tenantId        String
+  batchId         String
+  title           String
+  agenda          String?
+  startsAt        DateTime
+  durationMinutes Int       @default(60)
+  meetingUrl      String?
+  /// YouTube / Vimeo / Drive link added after the class.
+  recordingUrl    String?
+  cancelledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  batch      LmsBatch            @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  attendance LmsLiveAttendance[]
+
+  @@index([tenantId, startsAt])
+  @@index([batchId, startsAt])
+}
+
+/// A student pressed Join. The meeting itself happens on Zoom/Meet.
+model LmsLiveAttendance {
+  id            String   @id @default(cuid())
+  tenantId      String
+  liveClassId   String
+  studentId     String
+  firstJoinedAt DateTime @default(now())
+  lastJoinedAt  DateTime @default(now())
+  joins         Int      @default(1)
+
+  liveClass LmsLiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+
+  @@unique([liveClassId, studentId])
+  @@index([tenantId, studentId])
+}
+
+enum LmsSubmissionStatus {
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+}
+
+/// A student's work for a PROJECT lesson. Approval completes the lesson.
+model LmsProjectSubmission {
+  id              String              @id @default(cuid())
+  tenantId        String
+  enrollmentId    String
+  lessonId        String
+  studentId       String
+  note            String?
+  /// Video, photos or code, shared as a link (Drive, YouTube, GitHub, Tinkercad…).
+  linkUrl         String?
+  status          LmsSubmissionStatus @default(SUBMITTED)
+  version         Int                 @default(1)
+  submittedAt     DateTime            @default(now())
+  score           Int?
+  feedback        String?
+  reviewedById    String?
+  reviewedByLabel String?
+  reviewedAt      DateTime?
+  updatedAt       DateTime            @updatedAt
+
+  enrollment LmsEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     LmsLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([tenantId, status, submittedAt])
 }

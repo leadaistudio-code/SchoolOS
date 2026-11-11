@@ -251,6 +251,12 @@ export const PERMISSIONS: PermissionDef[] = [
     ['sessions', 'Book and conduct practical sessions'],
     ['safety', 'Record inspections, incidents and waste disposal'],
   ]),
+  ...mod('lms', [
+    ['view', 'Browse Robotics & AI courses and see student progress'],
+    ['manage', 'Create school courses and assign courses to classes'],
+    ['teach', 'Run live classes and review student projects'],
+    ['learn', 'Take assigned Robotics & AI courses (students)'],
+  ]),
   ...mod('sports', [['view', 'View sports'], ['manage', 'Manage sports and teams']]),
   ...mod('events', [['view', 'View events'], ['manage', 'Manage events']]),
   ...mod('website', [['view', 'View website CMS'], ['manage', 'Manage website content']]),
@@ -308,6 +314,7 @@ export const PERMISSIONS: PermissionDef[] = [
     ['crm_assign', 'Assign Growth CRM owners'],
     ['crm_comms', 'Send Growth CRM WhatsApp, SMS and email'],
     ['tapasya', 'Configure global XP scoring, seasons and the global leaderboard'],
+    ['lms', 'Build the Robotics & AI course catalogue'],
   ]),
 ]
 

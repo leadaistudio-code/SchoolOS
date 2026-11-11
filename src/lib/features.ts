@@ -28,6 +28,8 @@ export const FEATURE = {
   MODULE_FEEDBACK: 'module.feedback',
   /** Paid add-on, switched on per school from the platform console. */
   MODULE_SCIENCE_LAB: 'module.science_lab',
+  /** Paid add-on: the Robotics & AI course catalogue and learning portal. */
+  MODULE_ROBOTICS_LMS: 'module.robotics_lms',
 
   LIMIT_STUDENTS: 'limit.students',
   LIMIT_STAFF: 'limit.staff',
@@ -40,6 +42,8 @@ export const FEATURE = {
   LIMIT_AI_EVAL_PAGES_PER_MONTH: 'limit.ai_eval_pages_month',
   /** Draft questions kept from AI generate per calendar month. */
   LIMIT_AI_GENERATE_PER_MONTH: 'limit.ai_generate_month',
+  /** Students who may start Robotics & AI courses. Unset: no cap. */
+  LIMIT_LMS_STUDENTS: 'limit.lms_students',
 } as const
 
 export type FeatureKey = (typeof FEATURE)[keyof typeof FEATURE]

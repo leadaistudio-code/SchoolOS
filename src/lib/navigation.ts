@@ -144,6 +144,20 @@ export const NAVIGATION: NavItem[] = [
     mobile: true,
   },
   {
+    label: 'Robotics & AI',
+    href: '/lms',
+    icon: 'Bot',
+    section: 'ACADEMICS' as const,
+    feature: FEATURE.MODULE_ROBOTICS_LMS,
+    children: [
+      { label: 'My courses', href: '/my/learning', icon: 'GraduationCap', permission: 'lms.learn', portalOnly: true },
+      { label: 'Live classes', href: '/my/learning/live', icon: 'Video', permission: 'lms.learn', portalOnly: true },
+      { label: 'Course catalogue', href: '/lms', icon: 'LibraryBig', permission: 'lms.view', staffOnly: true },
+      { label: 'Live classes', href: '/lms/live', icon: 'Video', permission: 'lms.view', staffOnly: true },
+      { label: 'Project reviews', href: '/lms/reviews', icon: 'ClipboardCheck', permission: 'lms.teach', staffOnly: true },
+    ],
+  },
+  {
     label: 'Tapasya Mode',
     href: '/tapasya',
     icon: 'Timer',

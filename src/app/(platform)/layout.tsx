@@ -49,6 +49,9 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     ...(ctx.user.permissions.has('platform.tapasya')
       ? ([{ label: 'Tapasya', href: '/platform/tapasya', icon: 'tapasya' }] satisfies PlatformNavItem[])
       : []),
+    ...(ctx.user.permissions.has('platform.lms')
+      ? ([{ label: 'Courses', href: '/platform/lms', icon: 'lms' }] satisfies PlatformNavItem[])
+      : []),
     { label: 'Health', href: '/platform/health', icon: 'health' },
   ]
   const canCapture = ctx.user.permissions.has('platform.crm_create')
