@@ -43,11 +43,17 @@ export type SavedModel = {
 
 const blank = (labels: string[], input: SavedModel['input']): SavedModel => ({ input, labels, examples: [], counts: labels.map(() => 0), trainedOn: 0, tests: [], rounds: [] })
 
+/** A camera lab's labels name things to show, not to draw, so drawing mode gets its own pair. */
+const DRAW_LABELS = ['Happy face', 'Sad face']
+
+const sameLabels = (a: string[], b: string[]) => a.length === b.length && a.every((l, i) => l === b[i])
+
 export function ClassifierLab({ block }: { block: Of<'classifier-lab'> }) {
   const { result, record } = useResult(block.id)
   const { get, set, readOnly } = useLessonState()
   const key = `model:${block.id}`
-  const [model, setModelState] = React.useState<SavedModel>(() => get<SavedModel | null>(key, null) ?? blank(block.labels, 'draw'))
+  const defaultLabels = (input: SavedModel['input']) => (block.input === 'camera' && input === 'draw' ? DRAW_LABELS : block.labels)
+  const [model, setModelState] = React.useState<SavedModel>(() => get<SavedModel | null>(key, null) ?? blank(defaultLabels('draw'), 'draw'))
   const [camExamples, setCamExamples] = React.useState<Example[]>([])
   const [active, setActive] = React.useState(0)
   const [stage, setStage] = React.useState<'collect' | 'try' | 'test'>(model.trainedOn ? 'try' : 'collect')
@@ -110,7 +116,8 @@ export function ClassifierLab({ block }: { block: Of<'classifier-lab'> }) {
     setCamExamples([])
     setActive(0)
     setStage('collect')
-    save(blank(model.labels, input))
+    const renamed = !sameLabels(model.labels, defaultLabels(model.input))
+    save(blank(renamed ? model.labels : defaultLabels(input), input))
   }
 
   function rename(i: number, name: string) {
@@ -644,8 +651,8 @@ function CameraPad({ actionLabel, onCapture, burst, live, disabled }: { actionLa
       <canvas ref={canvas} className="hidden" />
       <div className="mt-2 flex flex-wrap gap-2">
         {status !== 'on' ? (
-          <Button size="sm" onClick={start} loading={status === 'starting'}>
-            <Camera /> Turn on camera
+          <Button size="sm" onClick={start} loading={status === 'starting'} disabled={status === 'unsupported'}>
+            <Camera /> {status === 'denied' ? 'Try camera again' : 'Turn on camera'}
           </Button>
         ) : (
           <>
