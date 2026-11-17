@@ -12,7 +12,7 @@ import { writeConsent } from './service'
  */
 
 export type WebhookResult =
-  | { http: 200; statuses: number; applied: number; replies: number; recognised: boolean }
+  | { http: 200; statuses: number; applied: number; replies: number; assistant: number; recognised: boolean }
   | { http: 403 | 404 }
 
 async function configForKey(key: string) {
@@ -43,10 +43,10 @@ export async function handleStatusWebhook(key: string, rawBody: string, signatur
   try {
     body = JSON.parse(rawBody)
   } catch {
-    return { http: 200, statuses: 0, applied: 0, replies: 0, recognised: false }
+    return { http: 200, statuses: 0, applied: 0, replies: 0, assistant: 0, recognised: false }
   }
   const parsed = config.provider === 'META_CLOUD' ? parseMetaWebhook(body, config.phoneNumberId) : parseAiSensyWebhook(body)
-  if (!parsed) return { http: 200, statuses: 0, applied: 0, replies: 0, recognised: false }
+  if (!parsed) return { http: 200, statuses: 0, applied: 0, replies: 0, assistant: 0, recognised: false }
 
   let applied = 0
   for (const s of parsed.statuses) {
@@ -69,20 +69,41 @@ export async function handleStatusWebhook(key: string, rawBody: string, signatur
     applied += updated.count
   }
 
+  let assistant = 0
   for (const reply of parsed.replies) {
     const intent = consentIntent(reply.text)
-    if (!intent) continue
-    const status = intent === 'opt_out' ? 'OPTED_OUT' : 'OPTED_IN'
-    await writeConsent(tenantId, reply.from, status, intent === 'opt_out' ? 'reply_stop' : 'reply_start', null, null)
-    await audit({
-      tenantId,
-      actorLabel: 'WhatsApp reply',
-      action: status === 'OPTED_IN' ? 'whatsapp_receipts.consent.opt_in' : 'whatsapp_receipts.consent.opt_out',
-      module: 'accounting',
-      entityType: 'WhatsAppConsent',
-      summary: `${maskNumber(reply.from)} replied ${intent === 'opt_out' ? 'STOP' : 'START'} to WhatsApp receipts`,
-    })
+    if (intent) {
+      const status = intent === 'opt_out' ? 'OPTED_OUT' : 'OPTED_IN'
+      await writeConsent(tenantId, reply.from, status, intent === 'opt_out' ? 'reply_stop' : 'reply_start', null, null)
+      await audit({
+        tenantId,
+        actorLabel: 'WhatsApp reply',
+        action: status === 'OPTED_IN' ? 'whatsapp_receipts.consent.opt_in' : 'whatsapp_receipts.consent.opt_out',
+        module: 'accounting',
+        entityType: 'WhatsAppConsent',
+        summary: `${maskNumber(reply.from)} replied ${intent === 'opt_out' ? 'STOP' : 'START'} to WhatsApp receipts`,
+      })
+      continue
+    }
+
+    // Meta's phone-number webhook is pointed at this receipts URL, so parent
+    // assistant traffic arrives here too. Forward anything that is not a
+    // receipts STOP/START keyword to the shared inbound handler.
+    try {
+      const { handleInbound } = await import('@/server/modules/whatsapp-bot/service')
+      const answered = await handleInbound({ from: reply.from, text: reply.text })
+      if (answered) assistant++
+    } catch (error) {
+      console.error('[whatsapp-receipts] parent assistant forward failed', error instanceof Error ? error.message : error)
+    }
   }
 
-  return { http: 200, statuses: parsed.statuses.length, applied, replies: parsed.replies.length, recognised: true }
+  return {
+    http: 200,
+    statuses: parsed.statuses.length,
+    applied,
+    replies: parsed.replies.length,
+    assistant,
+    recognised: true,
+  }
 }
