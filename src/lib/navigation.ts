@@ -132,6 +132,12 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Substitutions', href: '/academics/timetable/substitutions', icon: 'UserRoundCog', permission: 'timetable.view', staffOnly: true },
       { label: 'Timetable generator', href: '/academics/timetable/generator', icon: 'WandSparkles', permission: 'timetable.manage' },
       { label: 'Calendar', href: '/academics/calendar', icon: 'CalendarDays', permission: 'calendar.view' },
+      {
+        label: 'Revision schedule',
+        href: '/academics/revision',
+        icon: 'BookOpenCheck',
+        permission: 'exams.view',
+      },
     ],
   },
   {
@@ -281,6 +287,7 @@ export const NAVIGATION: NavItem[] = [
       { label: 'Student ledger', href: '/finance/students', icon: 'Users', permission: 'fees.accounts' },
       { label: 'Discounts', href: '/finance/concessions', icon: 'Percent', permission: 'fees.concession' },
       { label: 'Dues', href: '/finance/dues', icon: 'AlertCircle', permission: 'fees.accounts' },
+      { label: 'Bad debts', href: '/finance/bad-debts', icon: 'Ban', permission: 'fees.accounts' },
       { label: 'Month-wise dues', href: '/finance/dues/monthly', icon: 'CalendarRange', permission: 'fees.accounts' },
       { label: 'Day-end sheet', href: '/finance/day-end', icon: 'ClipboardList', permission: 'fees.report' },
       { label: 'Reports', href: '/finance/reports', icon: 'ReceiptText', permission: 'fees.report' },

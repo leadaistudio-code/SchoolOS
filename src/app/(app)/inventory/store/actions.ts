@@ -13,6 +13,7 @@ import {
   updateStoreItem,
   voidStoreSale,
 } from '@/server/modules/store/service'
+import { createStoreExchange, createStoreReturn } from '@/server/modules/store/returns'
 
 export type StoreActionResult =
   | { ok: true; message: string; id?: string }
@@ -131,5 +132,46 @@ export async function voidStoreSaleAction(id: string, reason: string): Promise<S
     return { ok: true, message: `Bill ${sale.number} voided and stock returned.` }
   } catch (err) {
     return fail(err, 'The bill could not be voided')
+  }
+}
+
+function requireReturnContext(ctx: Awaited<ReturnType<typeof requireContext>>) {
+  if (!ctx.canAny('store.return', 'store.void')) {
+    return { ok: false as const, message: 'You do not have permission to process returns or exchanges.' }
+  }
+  return null
+}
+
+export async function createStoreReturnAction(payload: unknown): Promise<StoreActionResult> {
+  const ctx = await requireContext()
+  const denied = requireReturnContext(ctx)
+  if (denied) return denied
+  try {
+    const row = await createStoreReturn(ctx, payload as never)
+    revalidateStore()
+    return {
+      ok: true,
+      id: row.id,
+      message: `${row.number} saved. Stock restored${row.refundMinor ? ` · refund ₹${row.refundMinor / 100}` : ''}.`,
+    }
+  } catch (err) {
+    return fail(err, 'The return could not be saved')
+  }
+}
+
+export async function createStoreExchangeAction(payload: unknown): Promise<StoreActionResult> {
+  const ctx = await requireContext()
+  const denied = requireReturnContext(ctx)
+  if (denied) return denied
+  try {
+    const { record, exchangeSale } = await createStoreExchange(ctx, payload as never)
+    revalidateStore()
+    return {
+      ok: true,
+      id: record.id,
+      message: `${record.number} saved. Replacement bill ${exchangeSale.number}.`,
+    }
+  } catch (err) {
+    return fail(err, 'The exchange could not be saved')
   }
 }

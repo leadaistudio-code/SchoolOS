@@ -101,7 +101,12 @@ export async function topDefaulters(ctx: AppContext, take = 5) {
   const today = attendanceDate(schoolToday())
   const grouped = await ctx.db.feeInvoice.groupBy({
     by: ['studentId'],
-    where: { balanceMinor: { gt: 0 }, dueOn: { lt: today }, status: { notIn: ['CANCELLED', 'DRAFT'] } },
+    where: {
+      balanceMinor: { gt: 0 },
+      dueOn: { lt: today },
+      status: { notIn: ['CANCELLED', 'DRAFT'] },
+      student: { status: 'ACTIVE', deletedAt: null },
+    },
     _sum: { balanceMinor: true },
     _count: { _all: true },
     _min: { dueOn: true },

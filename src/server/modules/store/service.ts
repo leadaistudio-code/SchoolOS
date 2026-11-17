@@ -146,7 +146,7 @@ export type StorePurchaseInput = z.input<typeof storePurchaseSchema>
 
 /* ---------------------------------------------------------------- helpers */
 
-const actorLabel = (ctx: AppContext) => `${ctx.user.firstName} ${ctx.user.lastName}`.trim()
+export const actorLabel = (ctx: AppContext) => `${ctx.user.firstName} ${ctx.user.lastName}`.trim()
 
 type LockedItem = {
   id: string
@@ -160,7 +160,7 @@ type LockedItem = {
 }
 
 /** Row-locks the items in id order so concurrent bills queue instead of overselling. */
-async function lockItems(tx: Prisma.TransactionClient, tenantId: string, ids: string[]) {
+export async function lockItems(tx: Prisma.TransactionClient, tenantId: string, ids: string[]) {
   const unique = [...new Set(ids)].sort()
   const rows = await tx.$queryRawUnsafe<LockedItem[]>(
     `SELECT id, name, variant, quantity, "avgCostMinor", "sellingPriceMinor", "taxPercent", "isActive"
@@ -176,7 +176,7 @@ async function lockItems(tx: Prisma.TransactionClient, tenantId: string, ids: st
   return map
 }
 
-async function receiveUnits(
+export async function receiveUnits(
   tx: Prisma.TransactionClient,
   tenantId: string,
   item: LockedItem,
@@ -191,7 +191,7 @@ async function receiveUnits(
   return balance
 }
 
-async function issueUnits(tx: Prisma.TransactionClient, item: LockedItem, quantity: number) {
+export async function issueUnits(tx: Prisma.TransactionClient, item: LockedItem, quantity: number) {
   if (item.quantity < quantity) {
     throw conflict(`Only ${Math.max(item.quantity, 0)} of ${itemLabel(item)} left in stock`)
   }
@@ -201,7 +201,7 @@ async function issueUnits(tx: Prisma.TransactionClient, item: LockedItem, quanti
   return balance
 }
 
-async function movement(
+export async function movement(
   tx: Prisma.TransactionClient,
   ctx: AppContext,
   data: {
@@ -212,6 +212,7 @@ async function movement(
     balanceAfter: number
     saleId?: string
     purchaseId?: string
+    returnId?: string
     reason?: string | null
   },
 ) {
@@ -233,7 +234,7 @@ async function uniqueSku(ctx: AppContext, category: StoreCategory) {
 
 type LedgerHook = 'sale' | 'purchase' | 'movement'
 
-function postLedger(tenantId: string, kind: LedgerHook, id: string) {
+export function postLedger(tenantId: string, kind: LedgerHook, id: string) {
   void import('@/server/modules/accounts/posting')
     .then((m) =>
       kind === 'sale'
@@ -245,7 +246,7 @@ function postLedger(tenantId: string, kind: LedgerHook, id: string) {
     .catch((err) => console.error('[ledger] store hook failed', err))
 }
 
-function dayBounds(from: string, to: string) {
+export function dayBounds(from: string, to: string) {
   return { gte: new Date(`${from}T00:00:00+05:30`), lte: new Date(`${to}T23:59:59.999+05:30`) }
 }
 
@@ -1308,3 +1309,4 @@ export async function exportStoreSales(ctx: AppContext, filter: SaleFilter) {
     },
   })
 }
+

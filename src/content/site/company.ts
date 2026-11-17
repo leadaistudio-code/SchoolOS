@@ -215,7 +215,7 @@ export const JOURNEY: { step: string; title: string; body: string; when: string 
   {
     step: '06',
     title: 'Support',
-    body: 'A named contact for the first term, then ongoing support. Every release is applied for you; there is nothing for your IT team to install.',
+    body: '24×7 support with a named contact for your school, and a 99.99% uptime target. Every release is applied for you; there is nothing for your IT team to install.',
     when: 'Ongoing',
   },
 ]

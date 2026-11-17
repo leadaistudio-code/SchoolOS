@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { Bell, FileDown } from 'lucide-react'
 import { sendFeeRemindersAction } from '../actions'
+import { CallNoteButton } from './call-note-button'
 import { BulkSelectionBar, downloadCsv, useBulkSelection } from '@/components/bulk-selection'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/input'
@@ -26,6 +27,11 @@ type DueRow = {
   daysOverdue: number
   balanceMinor: number
   invoiceCount: number
+  phone: string | null
+  telHref: string | null
+  contactLabel: string | null
+  lastCallAt: Date | string | null
+  lastCallNotes: string | null
 }
 
 export function DuesTable({
@@ -135,6 +141,7 @@ export function DuesTable({
                   <TH>Oldest due</TH>
                   <TH>Overdue</TH>
                   <TH align="right">Total due</TH>
+                  <TH>Call</TH>
                   <TH><span className="sr-only">Action</span></TH>
                 </tr>
               </THead>
@@ -151,12 +158,16 @@ export function DuesTable({
                       </TD>
                     ) : null}
                     <TD>
-                      <Link className="text-sm font-medium text-ink hover:text-[var(--brand-600)]" href={`/finance/students/${row.studentId}`}>
-                        {row.studentName}
-                      </Link>
-                      <p className="text-xs text-ink-subtle">
-                        {row.admissionNo} · Open breakdown
-                      </p>
+                      <div className="flex items-start gap-2">
+                        <div>
+                          <Link className="text-sm font-medium text-ink hover:text-[var(--brand-600)]" href={`/finance/students/${row.studentId}`}>
+                            {row.studentName}
+                          </Link>
+                          <p className="text-xs text-ink-subtle">
+                            {row.admissionNo} · Open breakdown
+                          </p>
+                        </div>
+                      </div>
                     </TD>
                     <TD className="text-sm">{row.className ?? '—'}</TD>
                     <TD className="text-sm tnum">
@@ -167,6 +178,17 @@ export function DuesTable({
                       {row.daysOverdue > 0 ? <Badge tone={row.daysOverdue > 30 ? 'danger' : 'warning'}>{row.daysOverdue} days</Badge> : <Badge>Upcoming</Badge>}
                     </TD>
                     <TD align="right" className="font-medium tnum">{formatMoney(row.balanceMinor, currency)}</TD>
+                    <TD>
+                      <CallNoteButton
+                        studentId={row.studentId}
+                        studentName={row.studentName}
+                        phone={row.phone}
+                        telHref={row.telHref}
+                        contactLabel={row.contactLabel}
+                        lastCallAt={row.lastCallAt}
+                        lastCallNotes={row.lastCallNotes}
+                      />
+                    </TD>
                     <TD>
                       {canCollect ? <Link className={buttonVariants({ variant: 'secondary', size: 'sm' })} href={`/finance/collect?student=${row.studentId}`}>Collect</Link> : null}
                     </TD>

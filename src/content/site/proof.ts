@@ -52,14 +52,14 @@ export const METRICS: { value: string; label: string; note: string }[] = [
     note: `${MODULE_COUNTS.inBuild} more in build, ${MODULE_COUNTS.planned} planned — each labelled as such on this site.`,
   },
   {
-    value: '1',
-    label: 'Database behind all of them',
-    note: 'A fee, an absence and a result read the same student record. Nothing is synced between systems.',
+    value: '24×7',
+    label: 'Support, every day of the year',
+    note: 'A named contact for your school, available around the clock for product questions and the occasional thing going wrong.',
   },
   {
-    value: '11',
-    label: 'Roles out of the box',
-    note: 'Administrator, principal, teacher, accountant, librarian, transport manager, driver, front desk, HR, parent, student — plus custom roles per school.',
+    value: '99.99%',
+    label: 'Uptime target',
+    note: 'Hosted with redundancy and monitored continuously. Planned maintenance is scheduled outside school hours wherever possible.',
   },
   {
     value: '100%',

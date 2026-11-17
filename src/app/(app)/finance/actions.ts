@@ -646,3 +646,17 @@ export async function updateInvoiceGroupDatesAction(payload: unknown): Promise<A
     return fail(err, 'The invoice dates could not be saved')
   }
 }
+
+export async function createFeeCallNoteAction(payload: unknown): Promise<ActionResult> {
+  const ctx = await requireContext('fees.accounts')
+  try {
+    const { createFeeCallNote, feeCallNoteSchema } = await import('@/server/modules/finance/call-notes')
+    const input = feeCallNoteSchema.parse(payload)
+    await createFeeCallNote(ctx, input)
+    revalidatePath('/finance/dues')
+    revalidatePath(`/finance/students/${input.studentId}`)
+    return { ok: true, message: 'Call note saved.' }
+  } catch (err) {
+    return fail(err, 'The call note could not be saved')
+  }
+}

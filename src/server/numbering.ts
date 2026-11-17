@@ -11,7 +11,7 @@ export type RawCapableClient = {
 
 export type DocumentKind =
   | 'INVOICE' | 'RECEIPT' | 'REFUND' | 'CERTIFICATE' | 'ADMIT_CARD' | 'LEAD' | 'JOURNAL'
-  | 'STORE_SALE' | 'STORE_PURCHASE' | 'TC'
+  | 'STORE_SALE' | 'STORE_PURCHASE' | 'STORE_RETURN' | 'TC'
   | 'PURCHASE_VOUCHER' | 'VENDOR_PAYMENT' | 'DEBIT_NOTE' | 'VENDOR_ADJUSTMENT' | 'EXPENSE_VOUCHER'
   | 'FIXED_ASSET' | 'DEPRECIATION_RUN' | 'EXPENSE_REQUEST' | 'LMS_CERTIFICATE' | 'ACADEMY_ORDER'
 
@@ -33,6 +33,7 @@ const PREFIX: Record<DocumentKind, string> = {
   JOURNAL: 'JV',
   STORE_SALE: 'STR',
   STORE_PURCHASE: 'GRN',
+  STORE_RETURN: 'SRR',
   TC: 'TC',
   LMS_CERTIFICATE: 'LMS',
   ACADEMY_ORDER: 'ACD',
@@ -56,6 +57,7 @@ const TABLE: Record<DocumentKind, string> = {
   JOURNAL: 'JournalEntry',
   STORE_SALE: 'StoreSale',
   STORE_PURCHASE: 'StorePurchase',
+  STORE_RETURN: 'StoreReturn',
   TC: 'TransferCertificate',
   LMS_CERTIFICATE: 'LmsCertificate',
   ACADEMY_ORDER: 'LmsAcademyOrder',

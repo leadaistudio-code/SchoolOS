@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ShoppingCart } from 'lucide-react'
+import { RotateCcw, ShoppingCart } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getStoreSale } from '@/server/modules/store/service'
 import { storePaymentLabel } from '@/lib/store/options'
@@ -58,6 +58,11 @@ export default async function StoreSalePage({
               {ctx.can('store.sell') ? (
                 <Link href="/inventory/store/sell" className={buttonVariants({ size: 'sm' })}>
                   <ShoppingCart aria-hidden /> New bill
+                </Link>
+              ) : null}
+              {!voided && ctx.canAny('store.return', 'store.void') ? (
+                <Link href={`/inventory/store/returns/new?sale=${sale.id}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                  <RotateCcw aria-hidden /> Return / Exchange
                 </Link>
               ) : null}
               {!voided && ctx.can('store.void') ? <VoidSaleDialog saleId={sale.id} number={sale.number} /> : null}

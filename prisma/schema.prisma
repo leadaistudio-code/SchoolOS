@@ -557,6 +557,7 @@ model AcademicSession {
   curricula             Curriculum[]
   assessments           Assessment[]
   feedbackCampaigns     FeedbackCampaign[]
+  revisionPlans         RevisionPlan[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isCurrent])
@@ -584,6 +585,8 @@ model ClassLevel {
   classwork             Classwork[]
   noticeTargets         NoticeTarget[]
   assessmentAssignments AssessmentAssignment[]
+  revisionPlans         RevisionPlan[]
+  revisionSlots         RevisionSlot[]
 
   @@unique([tenantId, sessionId, name])
   @@index([tenantId, sessionId])
@@ -611,6 +614,7 @@ model Section {
   subjects              SectionSubject[]
   substitutions         Substitution[]
   cctvCameras           CctvCamera[]
+  revisionSlots         RevisionSlot[]
 
   @@unique([tenantId, classLevelId, name])
   @@index([tenantId])
@@ -626,6 +630,7 @@ model Subject {
 
   classes             ClassSubject[]
   feedbackAssignments FeedbackAssignment[]
+  revisionSlots       RevisionSlot[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1499,6 +1504,7 @@ model Student {
   feeCredits           StudentFeeCredit[]
   feeAdjustments       FeeAdjustment[]
   feeReminderLogs      FeeReminderLog[]
+  feeCallNotes         FeeCallNote[]
   marks                Mark[]
   examAttendance       ExamAttendance[]
   results              Result[]
@@ -1525,6 +1531,7 @@ model Student {
   tapasyaUnlocks       TapasyaUnlockRequest[]
   tapasyaXpEvents      TapasyaXpEvent[]
   lmsEnrollments       LmsEnrollment[]
+  storeReturns         StoreReturn[]
 
   @@unique([tenantId, admissionNo])
   @@index([tenantId, status])
@@ -1693,6 +1700,7 @@ model Staff {
   teacherRefreshAttempts    TeacherRefreshAttempt[]
   absences                  Substitution[]             @relation("SubstitutionAbsent")
   coverDuties               Substitution[]             @relation("SubstitutionCover")
+  revisionSlots             RevisionSlot[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType])
@@ -2744,6 +2752,30 @@ model FeeReminderLog {
   @@index([tenantId, ruleId, sentAt])
 }
 
+/// A fee-chase phone call logged from the dues list or student ledger.
+model FeeCallNote {
+  id           String   @id @default(cuid())
+  tenantId     String
+  studentId    String
+  /// Number dialled (usually the primary guardian).
+  phone        String
+  /// Who was called, e.g. "Father · Rahul Sharma".
+  contactLabel String?
+  /// When the call was made.
+  calledAt     DateTime @default(now())
+  /// What was discussed.
+  notes        String
+  createdById  String?
+  createdByLabel String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, calledAt])
+  @@index([tenantId, calledAt])
+}
+
 /// Monthly transport rate read from the existing route/stop assignment.
 model TransportFeeRate {
   id            String    @id @default(cuid())
@@ -3414,6 +3446,63 @@ enum CalendarEventKind {
   OTHER
 }
 
+/// Published exam-prep revision timetable for a class (or the whole school).
+model RevisionPlan {
+  id           String    @id @default(cuid())
+  tenantId     String
+  sessionId    String
+  name         String
+  classLevelId String?
+  startsOn     DateTime  @db.Date
+  endsOn       DateTime  @db.Date
+  notes        String?
+  publishedAt  DateTime?
+  createdById  String?
+  createdByLabel String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  session    AcademicSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  classLevel ClassLevel?     @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
+  slots      RevisionSlot[]
+
+  @@index([tenantId, sessionId, startsOn])
+  @@index([tenantId, classLevelId])
+  @@index([tenantId, publishedAt])
+}
+
+model RevisionSlot {
+  id            String   @id @default(cuid())
+  tenantId      String
+  planId        String
+  date          DateTime @db.Date
+  /// Optional wall-clock start, e.g. "09:00".
+  startTime     String?
+  endTime       String?
+  /// Free-form period label, e.g. "Period 3" or "After school".
+  periodLabel   String?
+  classLevelId  String
+  sectionId     String?
+  subjectId     String
+  topic         String
+  teacherStaffId String?
+  room          String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  plan       RevisionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  classLevel ClassLevel   @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  section    Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject    Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher    Staff?       @relation(fields: [teacherStaffId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, planId, date])
+  @@index([tenantId, classLevelId, date])
+  @@index([tenantId, subjectId, date])
+  @@index([tenantId, teacherStaffId, date])
+}
+
 model CalendarEvent {
   id          String            @id @default(cuid())
   tenantId    String
@@ -3961,6 +4050,7 @@ model StoreItem {
   movements     StockMovement[]
   saleLines     StoreSaleLine[]
   purchaseLines StorePurchaseLine[]
+  returnLines   StoreReturnLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, category])
@@ -3978,6 +4068,7 @@ model StockMovement {
   balanceAfter  Int
   saleId        String?
   purchaseId    String?
+  returnId      String?
   reason        String?
   actorId       String?
   actorLabel    String?
@@ -3989,6 +4080,7 @@ model StockMovement {
   @@index([tenantId, itemId, createdAt])
   @@index([tenantId, type, createdAt])
   @@index([tenantId, saleId])
+  @@index([tenantId, returnId])
 }
 
 /// Stock received (goods receipt). Paid at the time of receipt.
@@ -4060,9 +4152,11 @@ model StoreSale {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  student  Student?           @relation(fields: [studentId], references: [id], onDelete: SetNull)
-  lines    StoreSaleLine[]
-  payments StoreSalePayment[]
+  student         Student?           @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lines           StoreSaleLine[]
+  payments        StoreSalePayment[]
+  returns         StoreReturn[]      @relation("ReturnAgainstSale")
+  exchangeOfReturn StoreReturn?      @relation("ExchangeReplacementSale")
 
   @@unique([tenantId, number])
   @@index([tenantId, soldAt])
@@ -4102,10 +4196,71 @@ model StoreSaleLine {
   amountMinor    Int
   unitCostMinor  Int    @default(0)
 
-  sale StoreSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  sale        StoreSale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  item        StoreItem         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  returnLines StoreReturnLine[]
 
   @@index([tenantId, saleId])
+  @@index([tenantId, itemId])
+}
+
+enum StoreReturnKind {
+  RETURN
+  EXCHANGE
+}
+
+/// Partial or full return of a completed store bill. An exchange also links a
+/// replacement sale for the goods taken in return.
+model StoreReturn {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  number             String
+  saleId             String
+  kind               StoreReturnKind @default(RETURN)
+  studentId          String?
+  /// Money refunded to the customer (cash/UPI/etc.). Zero when the exchange
+  /// replacement is worth at least as much as the returned goods.
+  refundMinor        Int             @default(0)
+  refundMode         String?
+  /// Extra money collected when the exchange replacements cost more.
+  collectedMinor     Int             @default(0)
+  collectedMode      String?
+  /// For EXCHANGE: the new bill for the replacement goods.
+  exchangeSaleId     String?         @unique
+  notes              String?
+  createdById        String?
+  createdByLabel     String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  sale         StoreSale         @relation("ReturnAgainstSale", fields: [saleId], references: [id], onDelete: Restrict)
+  exchangeSale StoreSale?        @relation("ExchangeReplacementSale", fields: [exchangeSaleId], references: [id], onDelete: SetNull)
+  student      Student?          @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lines        StoreReturnLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, saleId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, studentId])
+}
+
+model StoreReturnLine {
+  id            String @id @default(cuid())
+  tenantId      String
+  returnId      String
+  saleLineId    String
+  itemId        String
+  quantity      Int
+  /// Pro-rata share of the original line amount for the returned qty.
+  amountMinor   Int
+  unitCostMinor Int    @default(0)
+
+  return   StoreReturn   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  saleLine StoreSaleLine @relation(fields: [saleLineId], references: [id], onDelete: Restrict)
+  item     StoreItem     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, returnId])
+  @@index([tenantId, saleLineId])
   @@index([tenantId, itemId])
 }
 

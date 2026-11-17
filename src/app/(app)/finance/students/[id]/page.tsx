@@ -2,17 +2,23 @@ import Link from 'next/link'
 import { History, Plus, Settings2, UserRound } from 'lucide-react'
 import { requireContext } from '@/server/context'
 import { getStudentFeeAccount } from '@/server/modules/finance/simplicity'
+import { feeCallContact, listFeeCallNotes } from '@/server/modules/finance/call-notes'
 import { PageHeader } from '@/components/page-header'
 import { BackButton } from '@/components/back-button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { StudentFeeLedgerView } from '../student-fee-ledger-view'
+import { CallNotesCard } from './call-notes-card'
 
 export const metadata = { title: 'Fee ledger' }
 
 export default async function StudentFeeAccountPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = await requireContext('fees.accounts')
-  const account = await getStudentFeeAccount(ctx, id)
+  const [account, contact, callNotes] = await Promise.all([
+    getStudentFeeAccount(ctx, id),
+    feeCallContact(ctx, id),
+    listFeeCallNotes(ctx, id),
+  ])
   const currency = ctx.tenant.currency
   const enrollment = account.student.enrollments[0]
   const parent = account.student.guardians[0]?.parent
@@ -90,6 +96,22 @@ export default async function StudentFeeAccountPage({ params }: { params: Promis
             </Link>
           </>
         }
+      />
+
+      <CallNotesCard
+        studentId={id}
+        studentName={studentName}
+        phone={contact.phone}
+        telHref={contact.telHref}
+        contactLabel={contact.contactLabel}
+        notes={callNotes.map((n) => ({
+          id: n.id,
+          phone: n.phone,
+          contactLabel: n.contactLabel,
+          calledAt: n.calledAt.toISOString(),
+          notes: n.notes,
+          createdByLabel: n.createdByLabel,
+        }))}
       />
 
       <StudentFeeLedgerView

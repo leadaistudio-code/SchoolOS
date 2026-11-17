@@ -54,6 +54,11 @@ export default function ServicesPage() {
             Configuration changes as the school year turns — new sessions, new fee structures, new
             staff. Support covers that as well as the occasional thing going wrong.
           </p>
+          <p>
+            We provide <strong>24×7 support</strong> and target <strong>99.99% uptime</strong>, so
+            the school office is never left waiting for a weekday morning when something needs
+            answering outside normal hours.
+          </p>
         </Prose>
       </ProseSection>
 
@@ -79,7 +84,7 @@ export default function ServicesPage() {
               },
               {
                 heading: 'Support',
-                items: ['Product questions', 'Session rollover', 'New fee structures', 'Adding staff and roles'],
+                items: ['24×7 product support', '99.99% uptime target', 'Session rollover', 'New fee structures', 'Adding staff and roles'],
               },
               {
                 heading: 'On request',

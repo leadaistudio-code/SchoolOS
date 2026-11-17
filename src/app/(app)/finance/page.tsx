@@ -38,10 +38,17 @@ export default async function FinancePage() {
   const today = attendanceDate(new Date())
   const monthStart = startOfMonth(new Date())
 
-  const invoiceWhere = { ...invoiceScope, status: { not: 'CANCELLED' as const } }
-  const openInvoiceWhere = { ...invoiceScope, status: { not: 'CANCELLED' as const }, balanceMinor: { gt: 0 } }
+  const collectible = { student: { status: 'ACTIVE' as const, deletedAt: null } }
+  const invoiceWhere = { ...invoiceScope, ...collectible, status: { not: 'CANCELLED' as const } }
+  const openInvoiceWhere = { ...invoiceScope, ...collectible, status: { not: 'CANCELLED' as const }, balanceMinor: { gt: 0 } }
 
-  const [billed, collectedToday, collectedMonth, outstanding, overdue, byClass, recent] =
+  const badDebtWhere = {
+    ...invoiceScope,
+    status: { not: 'CANCELLED' as const },
+    balanceMinor: { gt: 0 },
+    student: { status: 'WITHDRAWN' as const },
+  }
+  const [billed, collectedToday, collectedMonth, outstanding, overdue, byClass, recent, badDebts] =
     await Promise.all([
       ctx.db.feeInvoice.aggregate({
         where: invoiceWhere,
@@ -90,6 +97,10 @@ export default async function FinancePage() {
           receipt: { select: { number: true } },
           student: { select: { firstName: true, lastName: true, admissionNo: true } },
         },
+      }),
+      ctx.db.feeInvoice.aggregate({
+        where: badDebtWhere,
+        _sum: { balanceMinor: true },
       }),
     ])
 
@@ -203,9 +214,9 @@ export default async function FinancePage() {
         <ColorTile
           label="Outstanding"
           value={formatMoney(outstandingMinor, currency)}
-          sub={`${collectionRate}% of billing collected`}
+          sub={`${collectionRate}% of billing collected · active students only`}
           tone="pending"
-          href="/finance/outstanding"
+          href="/finance/dues"
           icon={<Wallet className="size-5" aria-hidden />}
           delayMs={120}
         />
@@ -214,17 +225,17 @@ export default async function FinancePage() {
           value={formatMoney(overdue._sum.balanceMinor ?? 0, currency)}
           sub={`${formatNumber(overdue._count._all)} invoices past due`}
           tone="overdue"
-          href="/finance/outstanding"
+          href="/finance/dues"
           icon={<AlertCircle className="size-5" aria-hidden />}
           delayMs={160}
         />
         <ColorTile
-          label="Collection rate"
-          value={`${collectionRate}%`}
-          sub={`${formatMoney(billedMinor - outstandingMinor, currency)} collected`}
-          tone="fees"
-          href="/finance/reports"
-          icon={<TrendingUp className="size-5" aria-hidden />}
+          label="Bad debts"
+          value={formatMoney(badDebts._sum.balanceMinor ?? 0, currency)}
+          sub="Dropped-out students · not in outstanding"
+          tone="overdue"
+          href="/finance/bad-debts"
+          icon={<AlertCircle className="size-5" aria-hidden />}
           delayMs={200}
         />
       </div>

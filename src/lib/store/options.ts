@@ -49,7 +49,7 @@ export const MOVEMENT_LABELS: Record<string, { label: string; tone: 'success' | 
   OPENING: { label: 'Opening stock', tone: 'info' },
   PURCHASE: { label: 'Stock in', tone: 'success' },
   SALE: { label: 'Sale', tone: 'neutral' },
-  SALE_RETURN: { label: 'Bill voided', tone: 'warning' },
+  SALE_RETURN: { label: 'Sale return', tone: 'warning' },
   ADJUSTMENT_IN: { label: 'Adjustment +', tone: 'success' },
   ADJUSTMENT_OUT: { label: 'Adjustment −', tone: 'danger' },
 }

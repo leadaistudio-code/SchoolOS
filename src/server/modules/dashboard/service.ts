@@ -73,13 +73,17 @@ export async function getAdminDashboard(ctx: AppContext) {
       _sum: { amountMinor: true },
     }) : Promise.resolve({ _sum: { amountMinor: null } }),
     canSeeFinance ? db.feeInvoice.aggregate({
-      where: { status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] } },
+      where: {
+        status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
+        student: { status: 'ACTIVE', deletedAt: null },
+      },
       _sum: { balanceMinor: true },
     }) : Promise.resolve({ _sum: { balanceMinor: null } }),
     canSeeFinance ? db.feeInvoice.count({
       where: {
         status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
         dueOn: { lt: today },
+        student: { status: 'ACTIVE', deletedAt: null },
       },
     }) : Promise.resolve(0),
     db.leaveRequest.count({ where: { status: 'PENDING' } }),
@@ -132,15 +136,25 @@ export async function getAdminDashboard(ctx: AppContext) {
     // Billing split. Three slices of one billed total, so the donut adds up:
     // what has been paid, what is not due yet, and what is late.
     canSeeFinance ? db.feeInvoice.aggregate({
-      where: { cancelledAt: null },
+      where: { cancelledAt: null, student: { status: 'ACTIVE', deletedAt: null } },
       _sum: { paidMinor: true, totalMinor: true },
     }) : Promise.resolve({ _sum: { paidMinor: null, totalMinor: null } }),
     canSeeFinance ? db.feeInvoice.aggregate({
-      where: { cancelledAt: null, balanceMinor: { gt: 0 }, dueOn: { gte: today } },
+      where: {
+        cancelledAt: null,
+        balanceMinor: { gt: 0 },
+        dueOn: { gte: today },
+        student: { status: 'ACTIVE', deletedAt: null },
+      },
       _sum: { balanceMinor: true },
     }) : Promise.resolve({ _sum: { balanceMinor: null } }),
     canSeeFinance ? db.feeInvoice.aggregate({
-      where: { cancelledAt: null, balanceMinor: { gt: 0 }, dueOn: { lt: today } },
+      where: {
+        cancelledAt: null,
+        balanceMinor: { gt: 0 },
+        dueOn: { lt: today },
+        student: { status: 'ACTIVE', deletedAt: null },
+      },
       _sum: { balanceMinor: true },
     }) : Promise.resolve({ _sum: { balanceMinor: null } }),
     // The staff shown on the dashboard are the people a parent or a colleague

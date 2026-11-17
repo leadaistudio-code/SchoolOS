@@ -28,6 +28,7 @@ import { uploadStudentPhotoAction, removeStudentPhotoAction } from './photo-acti
 import { DeleteRecordButton } from '@/components/record-actions'
 import { deleteStudentAction } from '../actions'
 import { StudentLoginButton } from './student-login-button'
+import { DropOutStudentButton } from '../drop-out-button'
 
 export const metadata = { title: 'Student profile' }
 
@@ -98,6 +99,9 @@ export default async function StudentDetailPage({
               >
                 Issue TC
               </Link>
+            ) : null}
+            {ctx.can('students.edit') && student.status === 'ACTIVE' ? (
+              <DropOutStudentButton studentId={student.id} name={fullName(student)} />
             ) : null}
             {ctx.can('students.edit') ? (
               <Link

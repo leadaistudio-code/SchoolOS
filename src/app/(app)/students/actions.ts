@@ -7,6 +7,7 @@ import { requireContext } from '@/server/context'
 import {
   archiveStudent,
   createStudent,
+  markStudentDroppedOut,
   restoreStudent,
   suggestAdmissionNumber,
   updateStudent,
@@ -149,6 +150,21 @@ export async function deleteStudentAction(studentId: string, reason?: string): P
   }
   revalidatePath('/students')
   revalidatePath('/students/deleted')
+  return { ok: true }
+}
+
+export async function dropOutStudentAction(studentId: string, reason?: string): Promise<RecordActionResult> {
+  try {
+    const ctx = await requireContext('students.edit')
+    await markStudentDroppedOut(ctx, studentId, reason?.trim() || undefined)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not mark the student as dropped out' }
+  }
+  revalidatePath('/students')
+  revalidatePath(`/students/${studentId}`)
+  revalidatePath('/finance')
+  revalidatePath('/finance/dues')
+  revalidatePath('/finance/bad-debts')
   return { ok: true }
 }
 

@@ -61,6 +61,7 @@ export async function monthlyDuesGrid(ctx: AppContext, input: z.infer<typeof due
     where: {
       id: { in: [...byStudent.keys()] },
       deletedAt: null,
+      status: 'ACTIVE',
       ...(input.classLevelId ? { enrollments: { some: { isCurrent: true, classLevelId: input.classLevelId } } } : {}),
       ...(input.q
         ? {

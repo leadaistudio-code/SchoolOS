@@ -59,6 +59,7 @@ export async function outstandingBySession(ctx: AppContext, raw: unknown) {
 
   const studentWhere: Prisma.StudentWhereInput = {
     deletedAt: null,
+    status: 'ACTIVE',
     ...(allowed === null ? {} : { id: { in: allowed } }),
     ...(query.classLevelId ? { enrollments: { some: { isCurrent: true, classLevelId: query.classLevelId } } } : {}),
     ...(query.q

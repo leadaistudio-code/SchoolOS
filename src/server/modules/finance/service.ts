@@ -1281,6 +1281,11 @@ export type StudentDueRow = {
   daysOverdue: number
   balanceMinor: number
   invoiceCount: number
+  phone: string | null
+  telHref: string | null
+  contactLabel: string | null
+  lastCallAt: Date | null
+  lastCallNotes: string | null
 }
 
 export const DUES_AGES = ['overdue', 'upcoming', '30', '60', '90'] as const
@@ -1301,7 +1306,8 @@ export type DuesFilter = z.infer<typeof duesFilterSchema>
 export function duesStudentFilter(filter: DuesFilter, q?: string): Prisma.StudentWhereInput {
   const today = attendanceDate(new Date())
   const open = { balanceMinor: { gt: 0 }, status: { notIn: ['CANCELLED' as const, 'DRAFT' as const] } }
-  const and: Prisma.StudentWhereInput[] = []
+  // Dues are only for students the school still expects to collect from.
+  const and: Prisma.StudentWhereInput[] = [{ status: 'ACTIVE', deletedAt: null }]
   if (q) {
     and.push({
       OR: [
@@ -1389,24 +1395,47 @@ export async function listStudentDues(
     ctx.db.student.count({ where: studentWhere }),
   ])
 
-  const students = await ctx.db.student.findMany({
-    where: { id: { in: groups.map((group) => group.studentId) } },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      admissionNo: true,
-      enrollments: {
-        where: { isCurrent: true },
-        take: 1,
-        select: {
-          classLevel: { select: { name: true } },
-          section: { select: { name: true } },
+  const studentIds = groups.map((group) => group.studentId)
+  const [students, callNotes] = await Promise.all([
+    ctx.db.student.findMany({
+      where: { id: { in: studentIds } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        admissionNo: true,
+        whatsappPhone: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        enrollments: {
+          where: { isCurrent: true },
+          take: 1,
+          select: {
+            classLevel: { select: { name: true } },
+            section: { select: { name: true } },
+          },
+        },
+        guardians: {
+          orderBy: [{ isPrimary: 'desc' }, { isEmergencyContact: 'desc' }],
+          select: {
+            isPrimary: true,
+            relation: true,
+            parent: { select: { firstName: true, lastName: true, phone: true } },
+          },
         },
       },
-    },
-  })
+    }),
+    ctx.db.feeCallNote.findMany({
+      where: { studentId: { in: studentIds } },
+      orderBy: { calledAt: 'desc' },
+      select: { studentId: true, calledAt: true, notes: true },
+    }),
+  ])
   const studentsById = new Map(students.map((student) => [student.id, student]))
+  const lastCallByStudent = new Map<string, { calledAt: Date; notes: string }>()
+  for (const note of callNotes) {
+    if (!lastCallByStudent.has(note.studentId)) lastCallByStudent.set(note.studentId, note)
+  }
 
   return {
     total,
@@ -1415,6 +1444,17 @@ export async function listStudentDues(
       const oldestDueOn = group._min.dueOn
       if (!student || !oldestDueOn) return []
       const enrollment = student.enrollments[0]
+      const primary = student.guardians.find((g) => g.isPrimary && g.parent.phone)
+        ?? student.guardians.find((g) => g.parent.phone)
+      const phone = primary?.parent.phone ?? student.whatsappPhone ?? student.emergencyContactPhone ?? null
+      const contactLabel = primary?.parent.phone
+        ? `${primary.relation.charAt(0)}${primary.relation.slice(1).toLowerCase()} · ${primary.parent.firstName} ${primary.parent.lastName}`.trim()
+        : student.whatsappPhone
+          ? 'Student WhatsApp'
+          : student.emergencyContactPhone
+            ? (student.emergencyContactName ? `Emergency · ${student.emergencyContactName}` : 'Emergency contact')
+            : null
+      const lastCall = lastCallByStudent.get(student.id)
 
       return [{
         studentId: student.id,
@@ -1429,6 +1469,11 @@ export async function listStudentDues(
           : 0,
         balanceMinor: group._sum.balanceMinor ?? 0,
         invoiceCount: group._count._all,
+        phone,
+        telHref: phone ? `tel:${phone.replace(/\D/g, '')}` : null,
+        contactLabel,
+        lastCallAt: lastCall?.calledAt ?? null,
+        lastCallNotes: lastCall?.notes ?? null,
       }]
     }),
   }
@@ -1624,11 +1669,14 @@ export async function outstandingByClass(ctx: AppContext) {
            SUM(i."balanceMinor")::bigint AS outstanding,
            SUM(CASE WHEN i."dueOn" < ${today} THEN i."balanceMinor" ELSE 0 END)::bigint AS overdue
     FROM "FeeInvoice" i
+    JOIN "Student" s ON s.id = i."studentId"
     JOIN "Enrollment" e ON e."studentId" = i."studentId" AND e."isCurrent" = true
     JOIN "ClassLevel" cl ON cl.id = e."classLevelId"
     WHERE i."tenantId" = ${ctx.tenant.id}
       AND i."balanceMinor" > 0
       AND i.status <> 'CANCELLED'
+      AND s.status = 'ACTIVE'
+      AND s."deletedAt" IS NULL
       ${studentFilter}
     GROUP BY cl.name, cl.numeric
     ORDER BY cl.numeric ASC`

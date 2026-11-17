@@ -593,6 +593,71 @@ export async function archiveStudent(ctx: AppContext, id: string, reason?: strin
   return archived
 }
 
+/**
+ * Marks a student as dropped out (WITHDRAWN) without archiving them.
+ * Their unpaid balance leaves "outstanding" and appears under Bad debts.
+ * Existing invoices stay for history; scheduled fee billing already skips
+ * non-ACTIVE students.
+ */
+export async function markStudentDroppedOut(ctx: AppContext, id: string, reason?: string) {
+  ctx.require('students.edit')
+
+  const before = await ctx.db.student.findFirst({ where: { id, deletedAt: null } })
+  if (!before) throw notFound('Student')
+  if (before.status === 'WITHDRAWN') throw conflict('This student is already marked as dropped out')
+  if (before.status === 'TRANSFERRED') throw conflict('This student already has a transfer certificate')
+  if (before.status === 'ALUMNI') throw conflict('Alumni cannot be marked as dropped out')
+
+  const outstanding = await ctx.db.feeInvoice.aggregate({
+    where: { studentId: id, status: { notIn: ['CANCELLED', 'DRAFT'] }, balanceMinor: { gt: 0 } },
+    _sum: { balanceMinor: true },
+  })
+
+  const updated = await ctx.db.$transaction(async (tx) => {
+    await tx.enrollment.updateMany({
+      where: { studentId: id, isCurrent: true },
+      data: { isCurrent: false, leftOn: new Date() },
+    })
+    await tx.studentFeeAssignment.updateMany({
+      where: { studentId: id, status: 'ACTIVE' },
+      data: { status: 'ENDED', endedAt: new Date() },
+    })
+    if (before.userId) {
+      await tx.user.update({
+        where: { id: before.userId },
+        data: { status: 'DISABLED' },
+      })
+      await tx.session.updateMany({
+        where: { userId: before.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    }
+    return tx.student.update({
+      where: { id },
+      data: { status: 'WITHDRAWN' },
+    })
+  })
+
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+    action: 'student.dropout',
+    module: 'students',
+    entityType: 'Student',
+    entityId: id,
+    summary: `Marked ${before.firstName} ${before.lastName} as dropped out${
+      (outstanding._sum.balanceMinor ?? 0) > 0
+        ? ` — unpaid ₹${((outstanding._sum.balanceMinor ?? 0) / 100).toLocaleString('en-IN')} moves to bad debts`
+        : ''
+    }${reason ? `: ${reason}` : ''}`,
+    before: { status: before.status },
+    after: { status: updated.status, badDebtMinor: outstanding._sum.balanceMinor ?? 0 },
+  })
+
+  return { student: updated, badDebtMinor: outstanding._sum.balanceMinor ?? 0 }
+}
+
 /** Deleted (archived) students, newest first, for the restore list. */
 export async function listArchivedStudents(ctx: AppContext, q?: string) {
   ctx.require('students.delete')
