@@ -17,13 +17,14 @@ export async function workbookFromAoA(
     }
   }
   const buffer = await workbook.xlsx.writeBuffer()
-  return Buffer.from(buffer)
+  return Buffer.from(buffer as ArrayBuffer)
 }
 
 /** Read every sheet of an .xlsx into string grids (row-major). */
 export async function gridsFromXlsx(buffer: Buffer): Promise<{ sheetNames: string[]; sheets: Record<string, string[][]> }> {
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(buffer)
+  // ExcelJS typings target an older Node Buffer shape than Node 24 / @types/node.
+  await workbook.xlsx.load(Uint8Array.from(buffer))
 
   const sheetNames: string[] = []
   const sheets: Record<string, string[][]> = {}
