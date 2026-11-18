@@ -94,10 +94,19 @@ async function resendRequest<T>(key: string, path: string, init?: { method?: str
   return body as T
 }
 
+function formatMailAddress(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object') return ''
+  const entry = value as { name?: string | null; address?: string | null }
+  if (!entry.address) return ''
+  return entry.name ? `${entry.name} <${entry.address}>` : entry.address
+}
+
 function addressList(value: Mail.Options['to']): string[] {
   if (!value) return []
-  const list = Array.isArray(value) ? value : [value]
-  return list.map((a) => (typeof a === 'string' ? a : a.name ? `${a.name} <${a.address}>` : a.address))
+  const flatten = (items: unknown[]): string[] =>
+    items.flatMap((item) => (Array.isArray(item) ? flatten(item) : [formatMailAddress(item)].filter(Boolean)))
+  return flatten(Array.isArray(value) ? [...value] : [value])
 }
 
 /**

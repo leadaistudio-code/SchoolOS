@@ -23,8 +23,8 @@ export async function workbookFromAoA(
 /** Read every sheet of an .xlsx into string grids (row-major). */
 export async function gridsFromXlsx(buffer: Buffer): Promise<{ sheetNames: string[]; sheets: Record<string, string[][]> }> {
   const workbook = new ExcelJS.Workbook()
-  // ExcelJS typings target an older Node Buffer shape than Node 24 / @types/node.
-  await workbook.xlsx.load(Uint8Array.from(buffer))
+  // ExcelJS .d.ts types `load` against an older Node Buffer shape than @types/node 22+/24.
+  await workbook.xlsx.load(buffer as unknown as Parameters<ExcelJS.Xlsx['load']>[0])
 
   const sheetNames: string[] = []
   const sheets: Record<string, string[][]> = {}
@@ -37,7 +37,7 @@ export async function gridsFromXlsx(buffer: Buffer): Promise<{ sheetNames: strin
 
     worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
       while (grid.length < rowNumber) grid.push(Array.from({ length: columnCount }, () => ''))
-      const values = row.values
+      const values = (Array.isArray(row.values) ? row.values : []) as ExcelJS.CellValue[]
       const line = Array.from({ length: columnCount }, (_, i) => formatExcelCell(values[i + 1]))
       grid[rowNumber - 1] = line
     })

@@ -159,7 +159,7 @@ async function parseScheduleTable(buffer: Buffer, fileName: string, mimeType: st
 function readScheduleRow(
   row: Record<string, string>,
   line: number,
-  headers: ReturnType<typeof parseScheduleTable>,
+  headers: Awaited<ReturnType<typeof parseScheduleTable>>,
 ): ScheduleRow {
   const className = (row[headers.classHeader] ?? '').trim()
   const subjectName = (row[headers.subjectHeader] ?? '').trim()
