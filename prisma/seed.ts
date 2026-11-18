@@ -10,6 +10,7 @@ import { ensureExamDefaults } from '../src/server/modules/exams/defaults'
 import { compositeScience, roboticsAi } from '../src/lib/labs/templates'
 import { addStarterVideoLessons } from './lms-starter-videos'
 import { createStarterCourse } from './lms-starter-course'
+import { SAMPLE_TEMPLATES } from '../src/server/modules/platform/commercial-invoice-templates'
 import {
   ASSET_ITEMS,
   BLOOD_GROUPS,
@@ -184,6 +185,22 @@ const PLAN_DEFS = [
     ),
   },
 ]
+
+async function seedPlatformInvoiceTemplates() {
+  console.log('  platform commercial invoice templates')
+  for (const sample of SAMPLE_TEMPLATES) {
+    await prisma.platformInvoiceTemplate.upsert({
+      where: { code: sample.code },
+      create: {
+        name: sample.name,
+        code: sample.code,
+        isSample: true,
+        body: sample.body as object,
+      },
+      update: { name: sample.name, body: sample.body as object, isSample: true },
+    })
+  }
+}
 
 async function seedPlans() {
   console.log('  subscription plans and entitlements')
@@ -2308,6 +2325,7 @@ async function main() {
 
   await seedPermissionsAndRoles()
   const plans = await seedPlans()
+  await seedPlatformInvoiceTemplates()
 
   const superAdminRole = await prisma.role.findFirst({
     where: { tenantId: null, key: ROLE.SUPER_ADMIN },

@@ -91,13 +91,14 @@ model Tenant {
   /// Schools under one owner. Set from the platform console only.
   groupId    String?
 
-  school         School?
-  domains        TenantDomain[]
-  subscription   Subscription?
-  overrides      TenantEntitlementOverride[]
-  usageMetrics   UsageMetric[]
-  supportTickets SupportTicket[]
-  group          SchoolGroup?                @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  school            School?
+  domains           TenantDomain[]
+  subscription      Subscription?
+  overrides         TenantEntitlementOverride[]
+  usageMetrics      UsageMetric[]
+  supportTickets    SupportTicket[]
+  platformInvoices  PlatformInvoice[]
+  group             SchoolGroup?                @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([groupId])
@@ -178,6 +179,75 @@ model SubscriptionInvoice {
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, status])
+}
+
+/// Editable HTML/PDF layouts for platform commercial invoices (separate from SubscriptionInvoice).
+model PlatformInvoiceTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  isSample  Boolean  @default(false)
+  /// Layout variant + editable blocks (from defaults, colors, labels, notes boilerplate).
+  body      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices PlatformInvoice[]
+}
+
+/// Commercial / sales invoices issued by the platform owner to a school.
+model PlatformInvoice {
+  id             String    @id @default(cuid())
+  number         String    @unique
+  tenantId       String
+  templateId     String
+  status         String    @default("DUE") // DRAFT | DUE | PAID | VOID
+  issueDate      DateTime  @db.Date
+  dueAt          DateTime
+  paidAt         DateTime?
+  currency       String    @default("INR")
+  subtotalMinor  Int
+  advanceMinor   Int       @default(0)
+  balanceMinor   Int
+  billToName     String
+  billToAddress  String?
+  billToEmail    String?
+  billToAttn     String?
+  fromSnapshot   Json
+  notes          String?
+  paymentRef     String?
+  periodStart    DateTime? @db.Date
+  periodEnd      DateTime? @db.Date
+  /// When true and the school's subscription is MONTHLY, cron clones this schedule each month.
+  autoMonthly    Boolean   @default(false)
+  sourceInvoiceId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant   Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template PlatformInvoiceTemplate  @relation(fields: [templateId], references: [id])
+  lines    PlatformInvoiceLine[]
+  source   PlatformInvoice?         @relation("PlatformInvoiceClone", fields: [sourceInvoiceId], references: [id], onDelete: SetNull)
+  clones   PlatformInvoice[]        @relation("PlatformInvoiceClone")
+
+  @@index([tenantId, status])
+  @@index([tenantId, issueDate])
+  @@index([autoMonthly, status])
+  @@index([templateId])
+}
+
+model PlatformInvoiceLine {
+  id          String @id @default(cuid())
+  invoiceId   String
+  sortOrder   Int    @default(0)
+  title       String
+  description String?
+  qty         Int    @default(1)
+  amountMinor Int
+
+  invoice PlatformInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }
 
 // Per-tenant override of a plan entitlement (sales-negotiated limits).
