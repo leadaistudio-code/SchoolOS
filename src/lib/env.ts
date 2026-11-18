@@ -230,6 +230,12 @@ const serverSchema = z.object({
    * which runs with database credentials already, still works.
    */
   CRON_SECRET: z.string().min(16).optional(),
+  /**
+   * Optional dedicated secret for `/api/metrics` and detailed `/api/health`.
+   * Falls back to CRON_SECRET when unset. Without either, those detail
+   * endpoints refuse the request.
+   */
+  METRICS_SECRET: z.string().min(16).optional(),
 
   /** Authenticates the dedicated public FKWeb receiver to the web application. */
   FKWEB_GATEWAY_SECRET: z.string().min(32).optional(),

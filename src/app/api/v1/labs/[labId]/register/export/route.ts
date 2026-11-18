@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
-import * as XLSX from 'xlsx'
 import { route } from '@/server/api/handler'
 import { csvResponse } from '@/lib/csv'
+import { workbookFromAoA } from '@/lib/excel'
 import { getLab } from '@/server/modules/labs/service'
 import { registerRows, type RegisterFilter } from '@/server/modules/labs/stock'
 import { HAZARDS, ITEM_CATEGORIES, ITEM_KINDS, labelOf } from '@/lib/labs/types'
@@ -39,11 +39,13 @@ export const GET = route(
     const base = `${lab.name} register${filter === 'all' ? '' : ` ${filter}`}`.replace(/[^\w -]+/g, '').trim()
 
     if (url.searchParams.get('format') === 'xlsx') {
-      const sheet = XLSX.utils.aoa_to_sheet([headers, ...data])
-      sheet['!cols'] = [{ wch: 36 }, { wch: 16 }, { wch: 15 }, { wch: 8 }, { wch: 9 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 11 }, { wch: 22 }, { wch: 20 }, { wch: 12 }, { wch: 30 }]
-      const book = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(book, sheet, 'Register')
-      const body = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+      const body = await workbookFromAoA([
+        {
+          name: 'Register',
+          rows: [headers, ...data],
+          columnWidths: [36, 16, 15, 8, 9, 16, 10, 10, 11, 22, 20, 12, 30],
+        },
+      ])
       return new Response(new Uint8Array(body), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

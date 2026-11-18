@@ -138,7 +138,7 @@ export async function uploadStudentImport(
 
   const uploaded = await uploadFile(ctx, normalized, 'imports')
   const buffer = Buffer.from(await storageProvider().get(uploaded.storageKey))
-  const { grid, fileKind, sheetNames } = parseSpreadsheet(buffer, uploaded.fileName, uploadMime)
+  const { grid, fileKind, sheetNames } = await parseSpreadsheet(buffer, uploaded.fileName, uploadMime)
 
   const isPack =
     fileKind === 'xlsx' && sheetNames != null && isOnboardingPack(sheetNames)
@@ -636,7 +636,7 @@ export function sampleStudentCsv(): string {
   return toCsv([...SAMPLE_CSV_HEADERS], SAMPLE_CSV_ROWS)
 }
 
-export function sampleOnboardingPack(): Buffer {
+export async function sampleOnboardingPack(): Promise<Buffer> {
   return buildOnboardingWorkbook()
 }
 
@@ -1147,7 +1147,7 @@ async function readTable(
     meta.fileKind === 'xlsx'
       ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       : 'text/csv'
-  const { grid } = parseSpreadsheet(buffer, fileName, mime)
+  const { grid } = await parseSpreadsheet(buffer, fileName, mime)
   return gridToTable(grid, headerRow)
 }
 

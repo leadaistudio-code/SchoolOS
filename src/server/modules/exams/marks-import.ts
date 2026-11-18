@@ -90,8 +90,8 @@ type ParsedImportRow = {
   className: string | null
 }
 
-function parseImportRows(buffer: Buffer, fileName: string, mimeType: string): ParsedImportRow[] {
-  const spreadsheet = parseSpreadsheet(buffer, fileName, mimeType)
+async function parseImportRows(buffer: Buffer, fileName: string, mimeType: string): Promise<ParsedImportRow[]> {
+  const spreadsheet = await parseSpreadsheet(buffer, fileName, mimeType)
   if (spreadsheet.grid.length === 0) throw badRequest('The spreadsheet is empty')
   const headerRowIndex = pickHeaderRow(spreadsheet.grid)
   const table = gridToTable(spreadsheet.grid, headerRowIndex)
@@ -161,7 +161,7 @@ export async function importPaperMarksFromSpreadsheet(
   file: { buffer: Buffer; fileName: string; mimeType: string },
 ): Promise<MarksImportResult> {
   ctx.require('exams.marks')
-  const parsed = parseImportRows(file.buffer, file.fileName, file.mimeType)
+  const parsed = await parseImportRows(file.buffer, file.fileName, file.mimeType)
   const roster = await marksRoster(ctx, examId, examSubjectId)
   const byAdmission = new Map<string, string>()
   const byRoll = new Map<string, string>()
@@ -240,7 +240,7 @@ export async function importExamMarksFromSpreadsheet(
   file: { buffer: Buffer; fileName: string; mimeType: string },
 ): Promise<MarksImportResult> {
   ctx.require('exams.marks')
-  const parsed = parseImportRows(file.buffer, file.fileName, file.mimeType)
+  const parsed = await parseImportRows(file.buffer, file.fileName, file.mimeType)
   const exam = await ctx.db.exam.findFirst({
     where: { id: examId },
     select: {

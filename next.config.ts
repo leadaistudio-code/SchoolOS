@@ -1,5 +1,22 @@
 import type { NextConfig } from 'next'
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  // Next.js and GA inline bootstraps still require unsafe-inline; tighten later with nonces.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://maps.googleapis.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https: wss:",
+  "media-src 'self' blob: https:",
+  "worker-src 'self' blob:",
+  'upgrade-insecure-requests',
+].join('; ')
+
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -17,6 +34,10 @@ const securityHeaders = [
   {
     key: 'Strict-Transport-Security',
     value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  {
+    key: 'Content-Security-Policy',
+    value: contentSecurityPolicy,
   },
 ]
 

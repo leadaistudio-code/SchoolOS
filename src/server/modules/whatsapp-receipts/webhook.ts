@@ -1,5 +1,5 @@
 import { prisma } from '@/server/db/prisma'
-import { decryptSecret, sha256, timingSafeEqual } from '@/server/crypto'
+import { decryptSecret, hmacSha256, sha256, timingSafeEqual } from '@/server/crypto'
 import { metaSignatureValid } from '@/server/messaging/meta-signature'
 import { audit } from '@/server/audit'
 import { consentIntent, maskNumber, nextOutboxStatus, parseAiSensyWebhook, parseMetaWebhook } from './pure'
@@ -29,7 +29,12 @@ export async function verifySubscription(key: string, params: URLSearchParams): 
   return params.get('hub.challenge')
 }
 
-export async function handleStatusWebhook(key: string, rawBody: string, signature: string | null): Promise<WebhookResult> {
+export async function handleStatusWebhook(
+  key: string,
+  rawBody: string,
+  signature: string | null,
+  webhookSignature: string | null = null,
+): Promise<WebhookResult> {
   const config = await configForKey(key)
   if (!config) return { http: 404 }
   const tenantId = config.tenantId
@@ -37,6 +42,16 @@ export async function handleStatusWebhook(key: string, rawBody: string, signatur
   if (config.provider === 'META_CLOUD') {
     const appSecret = config.appSecretEncrypted ? decryptSecret(config.appSecretEncrypted) : undefined
     if (!metaSignatureValid(rawBody, signature, appSecret)) return { http: 403 }
+  } else {
+    // AiSensy publishes no body signature; the URL secret remains the proof.
+    // Prefer Meta Cloud. If a school configures AiSensy to send
+    // `x-webhook-signature: hex(HMAC-SHA256(body, webhookKey))`, verify it.
+    const aisensySig = webhookSignature?.trim()
+    if (aisensySig) {
+      const webhookKey = config.webhookKeyEncrypted ? decryptSecret(config.webhookKeyEncrypted) : ''
+      const expected = webhookKey ? hmacSha256(rawBody, webhookKey) : ''
+      if (!webhookKey || !timingSafeEqual(aisensySig.replace(/^sha256=/i, ''), expected)) return { http: 403 }
+    }
   }
 
   let body: unknown = null

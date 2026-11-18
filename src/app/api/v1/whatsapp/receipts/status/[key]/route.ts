@@ -33,7 +33,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ key
   const raw = await req.text()
   if (raw.length > MAX_BODY_BYTES) return new NextResponse('Payload too large', { status: 413 })
   try {
-    const result = await handleStatusWebhook(key, raw, req.headers.get('x-hub-signature-256'))
+    const result = await handleStatusWebhook(
+      key,
+      raw,
+      req.headers.get('x-hub-signature-256'),
+      req.headers.get('x-webhook-signature'),
+    )
     if (result.http !== 200) return new NextResponse(result.http === 403 ? 'Forbidden' : 'Not found', { status: result.http })
     return NextResponse.json({ ok: true })
   } catch (error) {

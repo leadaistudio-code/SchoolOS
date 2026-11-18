@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { publicRoute } from '@/server/api/handler'
-import { ok, ApiException } from '@/server/api/response'
-import { env } from '@/lib/env'
+import { ok } from '@/server/api/response'
+import { assertCronSecret } from '@/server/api/cron-auth'
 import { runTapasyaJobs, type TapasyaJob } from '@/server/modules/tapasya/jobs'
 
 /**
@@ -13,10 +13,7 @@ import { runTapasyaJobs, type TapasyaJob } from '@/server/modules/tapasya/jobs'
 const VALID: TapasyaJob[] = ['reconcile', 'sweep', 'rebuild', 'snapshot', 'all']
 
 export const POST = publicRoute(async (req: NextRequest) => {
-  const secret = env().CRON_SECRET
-  if (!secret) throw new ApiException(503, 'CRON_DISABLED', 'Scheduled jobs are not configured (set CRON_SECRET).')
-  const provided = req.headers.get('x-cron-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
-  if (provided !== secret) throw new ApiException(401, 'UNAUTHORIZED', 'Invalid or missing cron secret.')
+  assertCronSecret(req)
   const param = (new URL(req.url).searchParams.get('job') ?? 'all') as TapasyaJob
   return ok(await runTapasyaJobs(VALID.includes(param) ? param : 'all'))
 })

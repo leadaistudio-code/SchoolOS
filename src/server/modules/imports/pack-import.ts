@@ -1,5 +1,5 @@
-import * as XLSX from 'xlsx'
 import type { Prisma } from '@prisma/client'
+import { gridsFromXlsx } from '@/lib/excel'
 import { splitPersonName } from '@/lib/person-name'
 import { gridToTable } from '@/lib/spreadsheet'
 import { attendanceDate } from '@/lib/dates'
@@ -66,15 +66,6 @@ export type PackCommitStats = {
   staffArchived?: number
 }
 
-function formatCell(value: string | number | boolean | Date | null | undefined): string {
-  if (value == null || value === '') return ''
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return ''
-    return value.toISOString().slice(0, 10)
-  }
-  return String(value).trim()
-}
-
 function detectHeaderRow(grid: string[][]): number {
   for (let i = 0; i < Math.min(grid.length, 10); i++) {
     const row = grid[i] ?? []
@@ -99,24 +90,17 @@ function sheetTable(name: string, grid: string[][]): PackSheetTable | null {
 }
 
 /** Parse every data sheet in an onboarding workbook. */
-export function parsePackWorkbook(buffer: Buffer): PackWorkbook {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false })
+export async function parsePackWorkbook(buffer: Buffer): Promise<PackWorkbook> {
+  const { sheetNames, sheets: grids } = await gridsFromXlsx(buffer)
   const sheets: Record<string, PackSheetTable> = {}
 
-  for (const name of workbook.SheetNames) {
+  for (const name of sheetNames) {
     if (SKIP_SHEETS.has(name.toLowerCase())) continue
-    const sheet = workbook.Sheets[name]!
-    const rows = XLSX.utils.sheet_to_json<(string | number | boolean | Date | null)[]>(sheet, {
-      header: 1,
-      defval: '',
-      raw: false,
-    })
-    const grid = rows.map((row) => row.map((cell) => formatCell(cell)))
-    const table = sheetTable(name, grid)
+    const table = sheetTable(name, grids[name] ?? [])
     if (table) sheets[name] = table
   }
 
-  return { sheetNames: workbook.SheetNames, sheets }
+  return { sheetNames, sheets }
 }
 
 function normalizeHeaderKey(key: string): string {

@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html'
 import { z } from 'zod'
 
 export const CERTIFICATE_TEMPLATE_KEYS = [
@@ -8,10 +9,37 @@ export const CERTIFICATE_TEMPLATE_KEYS = [
   'CUSTOM',
 ] as const
 
+const CERTIFICATE_HTML_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ['p', 'br', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'span', 'div', 'h1', 'h2', 'h3', 'h4'],
+  allowedAttributes: {
+    span: ['class'],
+    div: ['class'],
+    p: ['class'],
+    h1: ['class'],
+    h2: ['class'],
+    h3: ['class'],
+    h4: ['class'],
+  },
+  allowedSchemes: [],
+  allowProtocolRelative: false,
+  disallowedTagsMode: 'discard',
+}
+
+/** Strip scripts, event handlers, and unsafe markup from certificate templates. */
+export function sanitizeCertificateHtml(html: string): string {
+  return sanitizeHtml(html, CERTIFICATE_HTML_OPTIONS).trim()
+}
+
 export const certificateTemplateSchema = z.object({
   key: z.enum(CERTIFICATE_TEMPLATE_KEYS),
   name: z.string().trim().min(2).max(80),
-  bodyHtml: z.string().trim().min(20).max(20000),
+  bodyHtml: z
+    .string()
+    .trim()
+    .min(20)
+    .max(20000)
+    .transform((value) => sanitizeCertificateHtml(value))
+    .refine((value) => value.length >= 20, 'Certificate body is too short after cleaning unsafe HTML'),
   isActive: z.coerce.boolean().default(true),
 })
 
@@ -25,12 +53,34 @@ const VARIABLE_PATTERN = /\{\{\s*([a-z_]+)\s*\}\}/gi
 
 export type CertificateVariables = Record<string, string>
 
-/** Replace {{variable}} placeholders in template HTML. */
-export function renderCertificateBody(bodyHtml: string, variables: CertificateVariables): string {
-  return bodyHtml.replace(VARIABLE_PATTERN, (_, key: string) => variables[key.toLowerCase()] ?? '')
+/** Escape text that will be interpolated into certificate HTML. */
+export function escapeCertificateText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
-export const DEFAULT_CERTIFICATE_TEMPLATES: Array<z.infer<typeof certificateTemplateSchema>> = [
+/**
+ * Replace {{variable}} placeholders in template HTML.
+ * Template markup is sanitised; substituted values are always HTML-escaped.
+ */
+export function renderCertificateBody(bodyHtml: string, variables: CertificateVariables): string {
+  const safeTemplate = sanitizeCertificateHtml(bodyHtml)
+  return safeTemplate.replace(VARIABLE_PATTERN, (_, key: string) => {
+    const raw = variables[key.toLowerCase()] ?? ''
+    return escapeCertificateText(raw)
+  })
+}
+
+export const DEFAULT_CERTIFICATE_TEMPLATES: Array<{
+  key: (typeof CERTIFICATE_TEMPLATE_KEYS)[number]
+  name: string
+  bodyHtml: string
+  isActive: boolean
+}> = [
   {
     key: 'BONAFIDE',
     name: 'Bonafide certificate',

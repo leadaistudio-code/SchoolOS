@@ -1,16 +1,31 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/server/db/prisma'
 import { getRedis, redisConfigured } from '@/server/redis'
 import { env } from '@/lib/env'
+import { timingSafeEqual } from '@/server/crypto'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Lightweight metrics for scrapers (Prometheus text format).
- * Unauthenticated on purpose — expose only behind a private network or
- * edge ACL in production.
+ * Requires `Authorization: Bearer <METRICS_SECRET|CRON_SECRET>` or
+ * `x-metrics-secret` — never public on the internet edge.
  */
-export async function GET() {
+function metricsAuthorized(req: NextRequest): boolean {
+  const secret = env().METRICS_SECRET ?? env().CRON_SECRET
+  if (!secret) return false
+  const provided =
+    req.headers.get('x-metrics-secret') ??
+    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
+    ''
+  return Boolean(provided) && timingSafeEqual(provided, secret)
+}
+
+export async function GET(req: NextRequest) {
+  if (!metricsAuthorized(req)) {
+    return new NextResponse('Not found', { status: 404 })
+  }
+
   const lines: string[] = []
   const push = (name: string, value: number, labels: Record<string, string> = {}) => {
     const labelStr = Object.entries(labels)

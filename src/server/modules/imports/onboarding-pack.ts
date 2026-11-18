@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import { workbookFromAoA } from '@/lib/excel'
 import { IMPORT_FIELDS } from './fields'
 
 /**
@@ -482,15 +482,14 @@ export const ONBOARDING_PACK_FILENAME = 'mycampusview-onboarding-pack.xlsx'
 const SKIP_SHEETS = new Set(['Read me', 'Allowed values'])
 const STUDENT_SHEET_ALIASES = ['Students', 'Student', 'students']
 
-export function buildOnboardingWorkbook(): Buffer {
-  const workbook = XLSX.utils.book_new()
-  for (const sheet of ONBOARDING_SHEETS) {
-    const aoa = [sheet.headers, ...sheet.rows]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    ws['!cols'] = sheet.headers.map((h) => ({ wch: Math.min(36, Math.max(14, h.length + 2)) }))
-    XLSX.utils.book_append_sheet(workbook, ws, sheet.name)
-  }
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+export async function buildOnboardingWorkbook(): Promise<Buffer> {
+  return workbookFromAoA(
+    ONBOARDING_SHEETS.map((sheet) => ({
+      name: sheet.name,
+      rows: [sheet.headers, ...sheet.rows],
+      columnWidths: sheet.headers.map((h) => Math.min(36, Math.max(14, h.length + 2))),
+    })),
+  )
 }
 
 export function pickImportSheetName(sheetNames: string[]): string | undefined {

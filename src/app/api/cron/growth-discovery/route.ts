@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { publicRoute } from '@/server/api/handler'
-import { ok, ApiException } from '@/server/api/response'
-import { env } from '@/lib/env'
+import { ok } from '@/server/api/response'
+import { assertCronSecret } from '@/server/api/cron-auth'
 import { prisma } from '@/server/db/prisma'
 import { runSchoolLeadDiscovery } from '@/server/modules/platform/growth/discovery/runner'
 import type { PlatformContext } from '@/server/context'
@@ -13,22 +13,11 @@ import type { SessionUser } from '@/server/auth/session'
  *   POST /api/cron/growth-discovery
  *   Authorization: Bearer <CRON_SECRET>
  *
- * Prefer once daily (early morning). Uses first ACTIVE SUPER_ADMIN when
- * auto-creating CRM leads through existing Growth CRM services.
+ * Prefer once daily (early morning). Uses a least-privilege platform CRM
+ * identity — not a synthetic SUPER_ADMIN session — when auto-creating leads.
  */
 export const POST = publicRoute(async (req: NextRequest) => {
-  const secret = env().CRON_SECRET
-  if (!secret) {
-    throw new ApiException(503, 'CRON_DISABLED', 'Scheduled jobs are not configured (set CRON_SECRET).')
-  }
-
-  const provided =
-    req.headers.get('x-cron-secret') ??
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    ''
-  if (provided !== secret) {
-    throw new ApiException(401, 'UNAUTHORIZED', 'Invalid or missing cron secret.')
-  }
+  assertCronSecret(req)
 
   const operator = await prisma.user.findFirst({
     where: {
@@ -55,7 +44,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
       sessionId: 'cron-growth-discovery',
       userId: operator.id,
       tenantId: null,
-      isSuperAdmin: true,
+      isSuperAdmin: false,
       firstName: operator.firstName,
       lastName: operator.lastName,
       displayName: operator.displayName,
@@ -63,7 +52,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
       phone: operator.phone,
       avatarUrl: operator.avatarUrl,
       mustChangePassword: operator.mustChangePassword,
-      roleKeys: ['SUPER_ADMIN'],
+      roleKeys: ['PLATFORM_CRON'],
       permissions: new Set([
         'platform.crm',
         'platform.crm_create',

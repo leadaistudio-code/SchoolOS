@@ -86,7 +86,7 @@ describe('school pack validation', () => {
     const { buildOnboardingWorkbook } = await import('../src/server/modules/imports/onboarding-pack')
     const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
 
-    const workbook = parsePackWorkbook(buildOnboardingWorkbook())
+    const workbook = await parsePackWorkbook(await buildOnboardingWorkbook())
     const result = validatePack(workbook)
     expect(result.isPack).toBe(true)
     expect(result.projectedClasses.length).toBeGreaterThan(0)
@@ -95,121 +95,87 @@ describe('school pack validation', () => {
   })
 
   it('matches employee codes when Staff headers use different capitalisation', async () => {
-    const XLSX = await import('xlsx')
+    const { workbookFromAoA } = await import('../src/lib/excel')
     const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
 
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
-      'School',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Employee Code', 'Name'],
-        ['EMP-T01', 'Priya Iyer'],
-      ]),
-      'Staff',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Class', 'Section', 'Capacity', 'Class Teacher Employee Code'],
-        ['Class 1', 'A', '40', 'EMP-T01'],
-      ]),
-      'Sections',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
-      'Students',
-    )
-
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
-    const result = validatePack(parsePackWorkbook(buffer))
+    const buffer = await workbookFromAoA([
+      { name: 'School', rows: [['School code'], ['DEMO']] },
+      {
+        name: 'Staff',
+        rows: [
+          ['Employee Code', 'Name'],
+          ['EMP-T01', 'Priya Iyer'],
+        ],
+      },
+      {
+        name: 'Sections',
+        rows: [
+          ['Class', 'Section', 'Capacity', 'Class Teacher Employee Code'],
+          ['Class 1', 'A', '40', 'EMP-T01'],
+        ],
+      },
+      { name: 'Students', rows: [['Admission number', 'First name', 'Class', 'Section']] },
+    ])
+    const result = validatePack(await parsePackWorkbook(buffer))
     expect(result.packErrors.filter((e) => e.sheet === 'Sections')).toHaveLength(0)
   })
 
   it('allows Fee items when Fee structures sheet is blank', async () => {
-    const XLSX = await import('xlsx')
+    const { workbookFromAoA } = await import('../src/lib/excel')
     const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
 
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
-      'School',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
-      'Students',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Code', 'Name', 'Frequency', 'Is refundable', 'Is deposit'],
-        ['TUI', 'Tuition', 'ANNUAL', 'No', 'No'],
-      ]),
-      'Fee heads',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
-        ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
-      ]),
-      'Fee items',
-    )
-
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
-    const result = validatePack(parsePackWorkbook(buffer))
+    const buffer = await workbookFromAoA([
+      { name: 'School', rows: [['School code'], ['DEMO']] },
+      { name: 'Students', rows: [['Admission number', 'First name', 'Class', 'Section']] },
+      {
+        name: 'Fee heads',
+        rows: [
+          ['Code', 'Name', 'Frequency', 'Is refundable', 'Is deposit'],
+          ['TUI', 'Tuition', 'ANNUAL', 'No', 'No'],
+        ],
+      },
+      {
+        name: 'Fee items',
+        rows: [
+          ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
+          ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
+        ],
+      },
+    ])
+    const result = validatePack(await parsePackWorkbook(buffer))
     expect(result.packErrors.filter((e) => e.sheet === 'Fee items')).toHaveLength(0)
   })
 
   it('does not treat Session name as the fee structure name', async () => {
-    const XLSX = await import('xlsx')
+    const { workbookFromAoA } = await import('../src/lib/excel')
     const { parsePackWorkbook, validatePack } = await import('../src/server/modules/imports/pack-import')
 
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['School code'], ['DEMO']]),
-      'School',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Session name', 'Class', 'Numeric'],
-        ['2026-27', 'Class 1', '1'],
-      ]),
-      'Classes',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([['Admission number', 'First name', 'Class', 'Section']]),
-      'Students',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Session name', 'Structure name', 'Class', 'Description'],
-        ['2026-27', 'Class 1 annual', 'Class 1', 'Day scholar'],
-      ]),
-      'Fee structures',
-    )
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
-        ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
-      ]),
-      'Fee items',
-    )
-
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
-    const result = validatePack(parsePackWorkbook(buffer))
+    const buffer = await workbookFromAoA([
+      { name: 'School', rows: [['School code'], ['DEMO']] },
+      {
+        name: 'Classes',
+        rows: [
+          ['Session name', 'Class', 'Numeric'],
+          ['2026-27', 'Class 1', '1'],
+        ],
+      },
+      { name: 'Students', rows: [['Admission number', 'First name', 'Class', 'Section']] },
+      {
+        name: 'Fee structures',
+        rows: [
+          ['Session name', 'Structure name', 'Class', 'Description'],
+          ['2026-27', 'Class 1 annual', 'Class 1', 'Day scholar'],
+        ],
+      },
+      {
+        name: 'Fee items',
+        rows: [
+          ['Structure name', 'Fee head code', 'Amount INR', 'Due on'],
+          ['Class 1 annual', 'TUI', '24000', '2026-04-15'],
+        ],
+      },
+    ])
+    const result = validatePack(await parsePackWorkbook(buffer))
     expect(result.packErrors.filter((e) => e.message.includes('Unknown structure'))).toHaveLength(0)
   })
 })
@@ -243,8 +209,8 @@ describe('spreadsheet grid', () => {
     const students = ONBOARDING_SHEETS.find((s) => s.name === 'Students')!
     expect(students.headers).toEqual(IMPORT_FIELDS.map((f) => f.label))
 
-    const parsed = parseSpreadsheet(
-      buildOnboardingWorkbook(),
+    const parsed = await parseSpreadsheet(
+      await buildOnboardingWorkbook(),
       'mycampusview-onboarding-pack.xlsx',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )

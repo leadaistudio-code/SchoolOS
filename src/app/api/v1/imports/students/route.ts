@@ -13,7 +13,7 @@ export const GET = route(
   async (req: NextRequest, ctx) => {
     const url = new URL(req.url)
     if (url.searchParams.get('sample') === 'pack') {
-      const body = sampleOnboardingPack()
+      const body = await sampleOnboardingPack()
       return new Response(new Uint8Array(body), {
         status: 200,
         headers: {

@@ -1264,7 +1264,7 @@ export async function exportStudentFeeLedger(
   }
 
   if (query.format === 'xlsx') {
-    const XLSX = await import('xlsx')
+    const { workbookFromAoA } = await import('@/lib/excel')
     const sheetRows = [
       [`${school} — Fee ledger`],
       [`Generated ${stamp}`, `Currency ${currency}`, `Students ${rows.length}`],
@@ -1272,21 +1272,13 @@ export async function exportStudentFeeLedger(
       [...LEDGER_EXPORT_HEADERS],
       ...ledgerExportMatrix(rows),
     ]
-    const sheet = XLSX.utils.aoa_to_sheet(sheetRows)
-    sheet['!cols'] = [
-      { wch: 28 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 12 },
-      { wch: 14 },
-      { wch: 12 },
-    ]
-    const book = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(book, sheet, 'Fee ledger')
-    const body = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+    const body = await workbookFromAoA([
+      {
+        name: 'Fee ledger',
+        rows: sheetRows,
+        columnWidths: [28, 16, 18, 10, 14, 16, 12, 14, 12],
+      },
+    ])
     return {
       filename: `${baseName}.xlsx`,
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

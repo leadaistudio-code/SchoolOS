@@ -1,5 +1,5 @@
-import * as XLSX from 'xlsx'
 import { parseCsv, type CsvTable } from '@/lib/csv'
+import { gridsFromXlsx } from '@/lib/excel'
 
 export type SpreadsheetGrid = {
   /** Every cell as a string, including title rows above the header. */
@@ -10,11 +10,11 @@ export type SpreadsheetGrid = {
 }
 
 /** Normalise any spreadsheet upload into a raw 2D string grid. */
-export function parseSpreadsheet(
+export async function parseSpreadsheet(
   buffer: Buffer,
   fileName: string,
   mimeType: string,
-): SpreadsheetGrid {
+): Promise<SpreadsheetGrid> {
   const lower = fileName.toLowerCase()
   const isExcel =
     lower.endsWith('.xlsx') ||
@@ -30,21 +30,13 @@ export function parseSpreadsheet(
   return { grid, fileKind: 'csv' }
 }
 
-function excelToGrid(buffer: Buffer): SpreadsheetGrid {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false })
-  const sheetNames = workbook.SheetNames
+async function excelToGrid(buffer: Buffer): Promise<SpreadsheetGrid> {
+  const { sheetNames, sheets } = await gridsFromXlsx(buffer)
   const sheetName = pickSheetName(sheetNames)
   if (!sheetName) return { grid: [], fileKind: 'xlsx', sheetNames, sheetName }
 
-  const sheet = workbook.Sheets[sheetName]!
-  const rows = XLSX.utils.sheet_to_json<(string | number | boolean | Date | null)[]>(sheet, {
-    header: 1,
-    defval: '',
-    raw: false,
-  })
-
   return {
-    grid: rows.map((row) => row.map((cell) => formatCell(cell))),
+    grid: sheets[sheetName] ?? [],
     fileKind: 'xlsx',
     sheetNames,
     sheetName,

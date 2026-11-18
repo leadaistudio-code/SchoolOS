@@ -112,7 +112,7 @@ export async function saveReceiptConfig(ctx: AppContext, input: z.infer<typeof r
   if (existing) {
     await ctx.db.whatsAppReceiptConfig.update({ where: { id: existing.id }, data })
   } else {
-    const key = randomToken(24)
+    const key = randomToken(32)
     await ctx.db.whatsAppReceiptConfig.create({
       data: { tenantId: ctx.tenant.id, ...data, webhookKeyHash: sha256(key), webhookKeyEncrypted: encryptSecret(key) },
     })
@@ -158,7 +158,7 @@ export async function rotateWebhookKey(ctx: AppContext) {
   ctx.require('settings.integrations')
   const existing = await ctx.db.whatsAppReceiptConfig.findFirst()
   if (!existing) throw notFound('WhatsApp receipt settings')
-  const key = randomToken(24)
+  const key = randomToken(32)
   await ctx.db.whatsAppReceiptConfig.update({
     where: { id: existing.id },
     data: { webhookKeyHash: sha256(key), webhookKeyEncrypted: encryptSecret(key), updatedById: ctx.user.userId },

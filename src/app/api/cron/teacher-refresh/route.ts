@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { publicRoute } from '@/server/api/handler'
-import { ok, ApiException } from '@/server/api/response'
-import { env } from '@/lib/env'
+import { ok } from '@/server/api/response'
+import { assertCronSecret } from '@/server/api/cron-auth'
 import { runTeacherRefreshJobs, type RefreshJobKind } from '@/server/modules/teacher-refresh/jobs'
 
 /**
@@ -18,18 +18,7 @@ import { runTeacherRefreshJobs, type RefreshJobKind } from '@/server/modules/tea
 const VALID_JOBS: RefreshJobKind[] = ['weekly', 'monthly', 'reminders', 'overdue', 'all']
 
 export const POST = publicRoute(async (req: NextRequest) => {
-  const secret = env().CRON_SECRET
-  if (!secret) {
-    throw new ApiException(503, 'CRON_DISABLED', 'Scheduled jobs are not configured (set CRON_SECRET).')
-  }
-
-  const provided =
-    req.headers.get('x-cron-secret') ??
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    ''
-  if (provided !== secret) {
-    throw new ApiException(401, 'UNAUTHORIZED', 'Invalid or missing cron secret.')
-  }
+  assertCronSecret(req)
 
   const jobParam = (new URL(req.url).searchParams.get('job') ?? 'all') as RefreshJobKind
   const job: RefreshJobKind = VALID_JOBS.includes(jobParam) ? jobParam : 'all'

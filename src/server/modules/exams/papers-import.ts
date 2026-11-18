@@ -126,8 +126,8 @@ type ScheduleRow = {
   roomName?: string
 }
 
-function parseScheduleTable(buffer: Buffer, fileName: string, mimeType: string) {
-  const spreadsheet = parseSpreadsheet(buffer, fileName, mimeType)
+async function parseScheduleTable(buffer: Buffer, fileName: string, mimeType: string) {
+  const spreadsheet = await parseSpreadsheet(buffer, fileName, mimeType)
   if (spreadsheet.grid.length === 0) throw badRequest('The spreadsheet is empty')
   const headerRowIndex = pickHeaderRow(spreadsheet.grid, [HEADER_ALIASES.className, HEADER_ALIASES.subject])
   const table = gridToTable(spreadsheet.grid, headerRowIndex)
@@ -259,7 +259,7 @@ export async function importExamPapersFromSpreadsheet(
   file: { buffer: Buffer; fileName: string; mimeType: string },
 ) {
   ctx.require('exams.manage')
-  const headers = parseScheduleTable(file.buffer, file.fileName, file.mimeType)
+  const headers = await parseScheduleTable(file.buffer, file.fileName, file.mimeType)
   const exam = await getExamDetail(ctx, examId)
   if (exam.status === 'PUBLISHED') throw conflict('Papers cannot be changed after publishing')
 
@@ -340,7 +340,7 @@ export async function createExamsFromSpreadsheet(
   file: { buffer: Buffer; fileName: string; mimeType: string },
 ) {
   ctx.require('exams.manage')
-  const headers = parseScheduleTable(file.buffer, file.fileName, file.mimeType)
+  const headers = await parseScheduleTable(file.buffer, file.fileName, file.mimeType)
   if (!headers.examNameHeader) {
     throw badRequest('The file needs an “Exam Name” column to create examinations')
   }
