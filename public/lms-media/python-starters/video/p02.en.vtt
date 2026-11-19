@@ -1,0 +1,57 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:02.855
+MyCampusView Academy.
+
+2
+00:00:02.905 --> 00:00:05.598
+Python Starters, video 2.
+
+3
+00:00:05.648 --> 00:00:09.110
+print: show something on screen.
+
+4
+00:00:10.250 --> 00:00:13.722
+print sends text and numbers to the output so you can see
+
+5
+00:00:13.772 --> 00:00:15.390
+what your program is doing.
+
+6
+00:00:16.750 --> 00:00:18.350
+Text needs quotes.
+
+7
+00:00:18.400 --> 00:00:20.734
+Numbers can be calculated.
+
+8
+00:00:20.784 --> 00:00:25.410
+You can mix a label and a calculation in one print.
+
+9
+00:00:26.750 --> 00:00:30.694
+print with quotes around school shows the word school.
+
+10
+00:00:30.744 --> 00:00:34.910
+Without quotes, Python looks for a variable named school.
+
+11
+00:00:36.400 --> 00:00:37.901
+Let us recap.
+
+12
+00:00:37.951 --> 00:00:40.167
+print shows output.
+
+13
+00:00:40.217 --> 00:00:42.553
+Strings need quotes.
+
+14
+00:00:42.603 --> 00:00:46.370
+Next: Variables: labelled boxes.

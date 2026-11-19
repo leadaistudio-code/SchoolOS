@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:03,315
+MyCampusView Academy.
+
+2
+00:00:03,365 --> 00:00:06,343
+Junior Makers, video 3.
+
+3
+00:00:06,393 --> 00:00:07,660
+Stay safe.
+
+4
+00:00:08,850 --> 00:00:12,900
+School kits use low voltage, but good habits still matter.
+
+5
+00:00:14,250 --> 00:00:17,474
+Never put kit wires in wall sockets.
+
+6
+00:00:17,524 --> 00:00:20,293
+Keep drinks away from circuits.
+
+7
+00:00:20,343 --> 00:00:24,477
+Ask an adult before connecting to mains power.
+
+8
+00:00:24,527 --> 00:00:28,660
+Stop and check if something smells hot or odd.
+
+9
+00:00:30,050 --> 00:00:35,872
+If a battery pack feels very hot, disconnect power and tell an adult.
+
+10
+00:00:35,922 --> 00:00:38,170
+Do not add another battery.
+
+11
+00:00:39,700 --> 00:00:40,987
+Let us recap.
+
+12
+00:00:41,037 --> 00:00:44,379
+Low-voltage kits still need care.
+
+13
+00:00:44,429 --> 00:00:48,492
+Stop and ask when something seems wrong.
+
+14
+00:00:48,542 --> 00:00:52,090
+Next: LEDs: light with a direction.

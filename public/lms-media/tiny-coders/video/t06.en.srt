@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:03,177
+MyCampusView Academy.
+
+2
+00:00:03,227 --> 00:00:05,803
+Tiny Coders, video 6.
+
+3
+00:00:05,853 --> 00:00:08,680
+Bugs: find the mistake.
+
+4
+00:00:09,850 --> 00:00:12,864
+A bug is a mistake in the instructions.
+
+5
+00:00:12,914 --> 00:00:15,850
+Finding it is a normal part of coding.
+
+6
+00:00:17,150 --> 00:00:19,347
+Look at this sandwich plan.
+
+7
+00:00:19,397 --> 00:00:24,090
+Eat first, then put the filling on, then open the packet.
+
+8
+00:00:24,140 --> 00:00:28,250
+Eating happens before making it — that is the bug.
+
+9
+00:00:29,550 --> 00:00:32,251
+To debug, read every step.
+
+10
+00:00:32,301 --> 00:00:36,377
+Ask what happens too early or too late.
+
+11
+00:00:36,427 --> 00:00:38,810
+Fix it, then try again.
+
+12
+00:00:40,300 --> 00:00:41,551
+Let us recap.
+
+13
+00:00:41,601 --> 00:00:44,954
+Bugs are mistakes in instructions.
+
+14
+00:00:45,004 --> 00:00:48,357
+Read steps carefully to find them.
+
+15
+00:00:48,407 --> 00:00:51,760
+Next: Guide a character on a grid.

@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:03,076
+MyCampusView Academy.
+
+2
+00:00:03,126 --> 00:00:05,844
+Junior Makers, video 2.
+
+3
+00:00:05,894 --> 00:00:08,370
+Power, path and load.
+
+4
+00:00:09,550 --> 00:00:13,820
+Every simple circuit has a power source, a path of wires, and
+
+5
+00:00:13,870 --> 00:00:16,440
+a load — the part that does the work.
+
+6
+00:00:17,750 --> 00:00:20,188
+The battery provides power.
+
+7
+00:00:20,238 --> 00:00:22,031
+Wires make the path.
+
+8
+00:00:22,081 --> 00:00:27,100
+An LED or buzzer is the load that does the useful work.
+
+9
+00:00:28,450 --> 00:00:31,257
+A closed path lets the load run.
+
+10
+00:00:31,307 --> 00:00:34,829
+An open path has a gap, so nothing runs.
+
+11
+00:00:34,879 --> 00:00:38,400
+An unplugged wire means an open circuit.
+
+12
+00:00:39,900 --> 00:00:41,345
+Let us recap.
+
+13
+00:00:41,395 --> 00:00:45,485
+Power, path and load make a circuit.
+
+14
+00:00:45,535 --> 00:00:48,360
+Open circuits do not run.
+
+15
+00:00:48,410 --> 00:00:50,200
+Next: Stay safe.

@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:02,879
+MyCampusView Academy.
+
+2
+00:00:02,929 --> 00:00:05,652
+Python Starters, video 8.
+
+3
+00:00:05,702 --> 00:00:09,090
+Project: quiz or score tracker.
+
+4
+00:00:10,250 --> 00:00:15,254
+Build a tiny Python program that uses variables, a decision, and a
+
+5
+00:00:15,304 --> 00:00:16,250
+loop or list.
+
+6
+00:00:17,550 --> 00:00:22,141
+Choose a three-question quiz with a final score, a chore list that
+
+7
+00:00:22,191 --> 00:00:26,500
+numbers each item, or a marks grader that prints Pass or Fail.
+
+8
+00:00:27,850 --> 00:00:28,907
+Start small.
+
+9
+00:00:28,957 --> 00:00:31,397
+Grow one feature at a time.
+
+10
+00:00:31,447 --> 00:00:36,470
+Submit your code and a short note on one bug you fixed.
+
+11
+00:00:38,000 --> 00:00:39,289
+Let us recap.
+
+12
+00:00:39,339 --> 00:00:43,307
+Projects combine the tools you learned.
+
+13
+00:00:43,357 --> 00:00:45,471
+Comments help humans.
+
+14
+00:00:45,521 --> 00:00:47,840
+Next: Make it readable.

@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:03,122
+MyCampusView Academy.
+
+2
+00:00:03,172 --> 00:00:05,816
+AI for Teens, video 5.
+
+3
+00:00:05,866 --> 00:00:09,000
+Metrics beyond “accuracy”.
+
+4
+00:00:10,150 --> 00:00:15,990
+When classes are imbalanced, ninety-five percent accuracy can hide a useless model.
+
+5
+00:00:17,350 --> 00:00:21,997
+A confusion matrix shows predicted versus actual labels.
+
+6
+00:00:22,047 --> 00:00:25,940
+It makes false alarms and missed cases visible.
+
+7
+00:00:27,250 --> 00:00:32,432
+Precision asks: of the alarms we raised, how many were real?
+
+8
+00:00:32,482 --> 00:00:37,140
+Recall asks: of the real cases, how many did we catch?
+
+9
+00:00:38,450 --> 00:00:43,335
+If ninety-eight of one hundred transactions are normal, a model that always
+
+10
+00:00:43,385 --> 00:00:47,810
+says normal is ninety-eight percent accurate and catches zero fraud.
+
+11
+00:00:49,300 --> 00:00:50,610
+Let us recap.
+
+12
+00:00:50,660 --> 00:00:54,794
+Accuracy can mislead on imbalanced data.
+
+13
+00:00:54,844 --> 00:00:58,665
+Choose metrics from real-world costs.
+
+14
+00:00:58,715 --> 00:01:02,640
+Next: Bias: find it, fix what you can.

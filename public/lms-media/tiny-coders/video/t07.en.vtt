@@ -1,0 +1,61 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:02.986
+MyCampusView Academy.
+
+2
+00:00:03.036 --> 00:00:05.422
+Tiny Coders, video 7.
+
+3
+00:00:05.472 --> 00:00:08.670
+Guide a character on a grid.
+
+4
+00:00:09.850 --> 00:00:14.246
+Coders often move a character on a grid using forward and turn
+
+5
+00:00:14.296 --> 00:00:16.900
+— the same idea as many coding games.
+
+6
+00:00:18.250 --> 00:00:21.618
+Forward moves one square the way you face.
+
+7
+00:00:21.668 --> 00:00:25.849
+Turn left or right changes direction without moving.
+
+8
+00:00:25.899 --> 00:00:30.080
+The goal is to reach the star without hitting walls.
+
+9
+00:00:31.450 --> 00:00:32.675
+Try it on paper.
+
+10
+00:00:32.725 --> 00:00:36.661
+Draw a four by four grid, mark a start and a star,
+
+11
+00:00:36.711 --> 00:00:39.530
+and write the fewest moves you need.
+
+12
+00:00:41.000 --> 00:00:42.271
+Let us recap.
+
+13
+00:00:42.321 --> 00:00:45.522
+Grid moves are forward and turn.
+
+14
+00:00:45.572 --> 00:00:48.774
+Shorter plans are often clearer.
+
+15
+00:00:48.824 --> 00:00:52.940
+Next: Project: invent a 5-step robot job.

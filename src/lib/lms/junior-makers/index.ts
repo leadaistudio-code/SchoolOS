@@ -1,4 +1,5 @@
 import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+import { JUNIOR_MAKERS_VIDEOS } from './videos'
 
 export const JUNIOR_MAKERS_TITLE = 'Junior Makers: Light, sound and sensors'
 
@@ -7,6 +8,7 @@ export const JUNIOR_MAKERS = catalogueCurriculum({
   key: 'junior-makers',
   courseTitle: JUNIOR_MAKERS_TITLE,
   mediaBase: '/lms-media/junior-makers',
+  videos: JUNIOR_MAKERS_VIDEOS,
   notesHint: 'Sketch your circuit or write what each part does.',
   course: {
     subtitle: 'Discover how lights, buzzers and sensors make things react',

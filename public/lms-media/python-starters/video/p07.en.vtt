@@ -1,0 +1,57 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:02.976
+MyCampusView Academy.
+
+2
+00:00:03.026 --> 00:00:05.863
+Python Starters, video 7.
+
+3
+00:00:05.913 --> 00:00:08.520
+Reading error messages.
+
+4
+00:00:09.650 --> 00:00:10.995
+Errors are clues.
+
+5
+00:00:11.045 --> 00:00:16.330
+The last lines usually name the file, line number and error type.
+
+6
+00:00:17.650 --> 00:00:21.905
+NameError often means you used a name before creating it.
+
+7
+00:00:21.955 --> 00:00:27.720
+SyntaxError means the line cannot be parsed — maybe a missing quote or colon.
+
+8
+00:00:29.050 --> 00:00:32.717
+Read the error from the bottom up.
+
+9
+00:00:32.767 --> 00:00:34.247
+Fix one issue.
+
+10
+00:00:34.297 --> 00:00:35.340
+Run again.
+
+11
+00:00:36.800 --> 00:00:38.230
+Let us recap.
+
+12
+00:00:38.280 --> 00:00:42.101
+Errors point to a line and a type.
+
+13
+00:00:42.151 --> 00:00:44.378
+Fix, re-run, repeat.
+
+14
+00:00:44.428 --> 00:00:48.590
+Next: Project: quiz or score tracker.

@@ -1,7 +1,8 @@
 import { lessonResources, type Badge, type CourseRow, type Curriculum, type LessonDef, type ModuleDef, type Resource } from '@/lib/lms/curriculum'
 import type { Quiz, QuizQuestion } from '@/lib/lms/options'
 import type { RichContentInput } from '@/lib/lms/rich'
-import type { VideoDef } from '@/lib/lms/video/engine'
+import { type VideoDef } from '@/lib/lms/video/engine'
+import type { NarrationTiming, VideoSeries } from '@/lib/lms/video/narration'
 
 /** A short multiple-choice question for catalogue curricula. */
 export function q(
@@ -70,23 +71,54 @@ export function module(key: string, title: string, summary: string, lessons: Les
   return { key, title, summary, lessons }
 }
 
+/** Shared MyCampusView Academy pronunciation + empty timing until narration runs. */
+export function academySeries(name: string, extraSay: [RegExp, string][] = [], timing?: NarrationTiming): VideoSeries {
+  return {
+    name,
+    say: [
+      [/\bMyCampusView\b/g, 'My Campus View'],
+      [/\bAI\b/g, 'A I'],
+      [/\bLED\b/g, 'L E D'],
+      [/\bLEDs\b/g, 'L E Ds'],
+      [/\bPython\b/g, 'Python'],
+      ...extraSay,
+    ],
+    timing: timing ?? { voice: null, videos: {} },
+    pronounce: 'MyCampusView (My Campus View), AI (A-I), LED (L-E-D)',
+  }
+}
+
+export function withSeries(series: VideoSeries, raw: Omit<VideoDef, 'series'>[]): VideoDef[] {
+  return raw.map((v) => ({ ...v, series }))
+}
+
 export function catalogueCurriculum(opts: {
   key: string
   courseTitle: string
   course: CourseRow
   modules: ModuleDef[]
   mediaBase: string
+  videos?: VideoDef[]
   badges?: Badge[]
   notesHint?: string
 }): Curriculum {
   const resources: Resource[] = []
+  const videos = opts.videos ?? []
+  const bySlug = new Map(videos.map((v) => [v.lessonSlug, v.id]))
+  const modules = opts.modules.map((m) => ({
+    ...m,
+    lessons: m.lessons.map((l) => {
+      const videoId = bySlug.get(l.slug)
+      return videoId ? { ...l, videoId } : l
+    }),
+  }))
   return {
     key: opts.key,
     courseTitle: opts.courseTitle,
     course: opts.course,
-    modules: opts.modules,
-    videos: [] as VideoDef[],
-    videoById: () => undefined,
+    modules,
+    videos,
+    videoById: (id) => (id ? videos.find((v) => v.id === id) : undefined),
     mediaBase: opts.mediaBase,
     resources,
     resourcesFor: lessonResources(opts.mediaBase, resources, {}),

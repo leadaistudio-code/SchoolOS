@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:03,146
+MyCampusView Academy.
+
+2
+00:00:03,196 --> 00:00:05,865
+AI for Teens, video 6.
+
+3
+00:00:05,915 --> 00:00:09,820
+Bias: find it, fix what you can.
+
+4
+00:00:10,950 --> 00:00:15,420
+Bias often enters through who appears in the data — and who does not.
+
+5
+00:00:16,750 --> 00:00:21,800
+A face dataset from one city and age group will fail elsewhere.
+
+6
+00:00:21,850 --> 00:00:27,062
+A resume screener trained only on past hires from one college can
+
+7
+00:00:27,112 --> 00:00:28,600
+automate past bias.
+
+8
+00:00:29,950 --> 00:00:35,918
+Safer directions include handwriting samples across many schools and scripts, and plant
+
+9
+00:00:35,968 --> 00:00:39,100
+disease photos in several lighting conditions.
+
+10
+00:00:40,450 --> 00:00:46,288
+Collect more varied data, measure errors by group, involve affected users, and
+
+11
+00:00:46,338 --> 00:00:49,610
+sometimes decide not to automate a decision.
+
+12
+00:00:51,100 --> 00:00:52,397
+Let us recap.
+
+13
+00:00:52,447 --> 00:00:56,129
+Missing groups create biased models.
+
+14
+00:00:56,179 --> 00:01:00,274
+Measurement by group makes harm visible.
+
+15
+00:01:00,324 --> 00:01:04,420
+Next: Generative AI: useful, not oracle.

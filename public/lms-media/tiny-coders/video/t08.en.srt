@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:03,010
+MyCampusView Academy.
+
+2
+00:00:03,060 --> 00:00:05,470
+Tiny Coders, video 8.
+
+3
+00:00:05,520 --> 00:00:09,570
+Project: invent a 5-step robot job.
+
+4
+00:00:10,750 --> 00:00:15,420
+Invent a helpful robot job and write exactly five clear steps.
+
+5
+00:00:16,750 --> 00:00:22,139
+Pick a job: water a plant, tidy toys, or deliver a note.
+
+6
+00:00:22,189 --> 00:00:24,567
+Write five ordered steps.
+
+7
+00:00:24,617 --> 00:00:28,160
+Include either a loop, or an if then.
+
+8
+00:00:29,550 --> 00:00:34,027
+Before you hand in: name the job, write five ordered steps, use
+
+9
+00:00:34,077 --> 00:00:37,548
+a loop or an if then, and check that a friend can
+
+10
+00:00:37,598 --> 00:00:38,770
+follow your plan.
+
+11
+00:00:40,300 --> 00:00:41,555
+Let us recap.
+
+12
+00:00:41,605 --> 00:00:45,571
+A project turns ideas into a clear plan.
+
+13
+00:00:45,621 --> 00:00:49,587
+Loops and conditions make plans smarter.
+
+14
+00:00:49,637 --> 00:00:52,900
+Next: Explain your plan out loud.

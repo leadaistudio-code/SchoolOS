@@ -1,4 +1,5 @@
 import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+import { TINY_CODERS_VIDEOS } from './videos'
 
 export const TINY_CODERS_TITLE = 'Tiny Coders: Think in steps'
 
@@ -10,6 +11,7 @@ export const TINY_CODERS = catalogueCurriculum({
   key: 'tiny-coders',
   courseTitle: TINY_CODERS_TITLE,
   mediaBase: '/lms-media/tiny-coders',
+  videos: TINY_CODERS_VIDEOS,
   notesHint: 'Draw or write one step you would tell a robot.',
   course: {
     subtitle: 'Learn to give clear instructions — the first skill every coder needs',

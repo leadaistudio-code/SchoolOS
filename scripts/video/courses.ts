@@ -7,6 +7,10 @@ const ROOT = path.resolve(__dirname, '../..')
 const TIMING_FILES: Record<string, string> = {
   'robotics-101': 'src/lib/lms/robotics101/narration-timing.json',
   'ai-young-builders': 'src/lib/lms/ai101/narration-timing.json',
+  'tiny-coders': 'src/lib/lms/tiny-coders/narration-timing.json',
+  'junior-makers': 'src/lib/lms/junior-makers/narration-timing.json',
+  'python-starters': 'src/lib/lms/python-starters/narration-timing.json',
+  'ai-for-teens': 'src/lib/lms/ai-for-teens/narration-timing.json',
 }
 
 /** `--course <key>` (default robotics-101) and the paths that course's media lives in. */

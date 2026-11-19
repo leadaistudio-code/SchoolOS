@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:02,909
+MyCampusView Academy.
+
+2
+00:00:02,959 --> 00:00:05,494
+Junior Makers, video 1.
+
+3
+00:00:05,544 --> 00:00:10,100
+Welcome: makers change how things behave.
+
+4
+00:00:11,250 --> 00:00:15,399
+Welcome to Junior Makers from MyCampusView Academy!
+
+5
+00:00:15,449 --> 00:00:20,422
+Makers build small systems that sense the world and react — a
+
+6
+00:00:20,472 --> 00:00:25,280
+light that turns on, a buzzer that warns, a fan that cools.
+
+7
+00:00:26,650 --> 00:00:31,307
+A torch, a doorbell, a night lamp and a washing-machine beep all
+
+8
+00:00:31,357 --> 00:00:35,720
+use circuits: paths that electricity can follow to do a job.
+
+9
+00:00:37,050 --> 00:00:39,800
+An LED lamp needs electricity.
+
+10
+00:00:39,850 --> 00:00:42,133
+A wooden pencil does not.
+
+11
+00:00:42,183 --> 00:00:47,640
+Your phone’s vibration uses a tiny motor and battery power.
+
+12
+00:00:49,100 --> 00:00:50,431
+Let us recap.
+
+13
+00:00:50,481 --> 00:00:54,361
+Maker projects use circuits to react.
+
+14
+00:00:54,411 --> 00:00:57,972
+Electricity needs a complete path.
+
+15
+00:00:58,022 --> 00:01:00,840
+Next: Power, path and load.

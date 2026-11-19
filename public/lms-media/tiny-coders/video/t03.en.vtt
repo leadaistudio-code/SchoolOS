@@ -1,0 +1,65 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:02.978
+MyCampusView Academy.
+
+2
+00:00:03.028 --> 00:00:05.405
+Tiny Coders, video 3.
+
+3
+00:00:05.455 --> 00:00:08.180
+Patterns you can repeat.
+
+4
+00:00:09.350 --> 00:00:14.700
+Patterns help you predict what comes next — and later, write shorter programs.
+
+5
+00:00:16.050 --> 00:00:20.458
+Red, blue, red, blue — what comes next?
+
+6
+00:00:20.508 --> 00:00:21.029
+Blue.
+
+7
+00:00:21.079 --> 00:00:26.058
+Clap, stomp, clap, stomp — the pair repeats.
+
+8
+00:00:26.108 --> 00:00:31.430
+Three, six, nine, twelve — add three each time.
+
+9
+00:00:32.750 --> 00:00:35.296
+Some lists have a repeating rule.
+
+10
+00:00:35.346 --> 00:00:37.105
+Others are just random.
+
+11
+00:00:37.155 --> 00:00:41.746
+Coders look for the piece that repeats so they do not write
+
+12
+00:00:41.796 --> 00:00:43.240
+it again and again.
+
+13
+00:00:44.700 --> 00:00:46.019
+Let us recap.
+
+14
+00:00:46.069 --> 00:00:49.179
+A pattern repeats with a rule.
+
+15
+00:00:49.229 --> 00:00:53.077
+Finding the rule helps you plan code.
+
+16
+00:00:53.127 --> 00:00:55.710
+Next: Loops: do it again.

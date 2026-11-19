@@ -1,0 +1,67 @@
+1
+00:00:00,600 --> 00:00:03,060
+MyCampusView Academy.
+
+2
+00:00:03,110 --> 00:00:05,690
+AI for Teens, video 4.
+
+3
+00:00:05,740 --> 00:00:08,080
+Train / test splits.
+
+4
+00:00:09,250 --> 00:00:13,259
+If you test on the same examples you trained on, your score
+
+5
+00:00:13,309 --> 00:00:14,910
+is flattering and false.
+
+6
+00:00:16,250 --> 00:00:20,012
+Hold out a test set you will not train on.
+
+7
+00:00:20,062 --> 00:00:21,645
+Train on the rest.
+
+8
+00:00:21,695 --> 00:00:24,912
+Score only on the held-out test set.
+
+9
+00:00:24,962 --> 00:00:29,450
+The test set is the exam paper you must not study.
+
+10
+00:00:30,750 --> 00:00:33,956
+Collect and clean labelled data.
+
+11
+00:00:34,006 --> 00:00:35,992
+Hold out a test set.
+
+12
+00:00:36,042 --> 00:00:38,332
+Train on the remainder.
+
+13
+00:00:38,382 --> 00:00:41,080
+Score only on the test set.
+
+14
+00:00:42,600 --> 00:00:43,822
+Let us recap.
+
+15
+00:00:43,872 --> 00:00:48,323
+Never grade yourself on the training homework.
+
+16
+00:00:48,373 --> 00:00:52,335
+Held-out tests estimate real performance.
+
+17
+00:00:52,385 --> 00:00:55,270
+Next: Metrics beyond accuracy.

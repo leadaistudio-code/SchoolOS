@@ -1,0 +1,51 @@
+1
+00:00:00,600 --> 00:00:02,943
+MyCampusView Academy.
+
+2
+00:00:02,993 --> 00:00:05,564
+Junior Makers, video 8.
+
+3
+00:00:05,614 --> 00:00:09,210
+Project: sense-and-react gadget.
+
+4
+00:00:10,350 --> 00:00:15,622
+Build, or carefully simulate on paper, a gadget that senses something and
+
+5
+00:00:15,672 --> 00:00:17,590
+reacts with light or sound.
+
+6
+00:00:18,950 --> 00:00:23,956
+Choose a night light, a cupboard alarm, or a bag-packed reminder.
+
+7
+00:00:24,006 --> 00:00:29,090
+Use your school kit if you have one, or submit a labelled diagram.
+
+8
+00:00:30,450 --> 00:00:35,193
+Teachers look for clear labels — power, switch or sensor, and load
+
+9
+00:00:35,243 --> 00:00:37,590
+— plus what you would test first.
+
+10
+00:00:39,100 --> 00:00:40,395
+Let us recap.
+
+11
+00:00:40,445 --> 00:00:43,084
+Prototypes prove the idea.
+
+12
+00:00:43,134 --> 00:00:47,118
+Labels show you understand the circuit.
+
+13
+00:00:47,168 --> 00:00:49,600
+Next: Test like a maker.

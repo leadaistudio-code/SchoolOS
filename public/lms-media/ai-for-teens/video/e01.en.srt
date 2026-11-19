@@ -1,0 +1,75 @@
+1
+00:00:00,600 --> 00:00:02,982
+MyCampusView Academy.
+
+2
+00:00:03,032 --> 00:00:05,529
+AI for Teens, video 1.
+
+3
+00:00:05,579 --> 00:00:09,350
+Welcome: from demos to decisions.
+
+4
+00:00:10,450 --> 00:00:14,390
+Welcome to AI for Teens from MyCampusView Academy.
+
+5
+00:00:14,440 --> 00:00:17,503
+Teen builders do more than click Train.
+
+6
+00:00:17,553 --> 00:00:22,052
+You will ask whether a problem should use AI at all, what
+
+7
+00:00:22,102 --> 00:00:26,361
+data is fair, and how you will know the system is good
+
+8
+00:00:26,411 --> 00:00:26,920
+enough.
+
+9
+00:00:28,250 --> 00:00:30,929
+Three questions before you build.
+
+10
+00:00:30,979 --> 00:00:32,914
+Who is helped or harmed?
+
+11
+00:00:32,964 --> 00:00:36,471
+What data do you have, and what is missing?
+
+12
+00:00:36,521 --> 00:00:41,020
+How will you measure success beyond a happy screenshot?
+
+13
+00:00:42,350 --> 00:00:48,238
+Think of multilingual classrooms, uneven device access, and public services.
+
+14
+00:00:48,288 --> 00:00:52,926
+An AI that only works on high-end phones in English may fail
+
+15
+00:00:52,976 --> 00:00:55,270
+the students who need it most.
+
+16
+00:00:56,800 --> 00:00:58,151
+Let us recap.
+
+17
+00:00:58,201 --> 00:01:02,248
+Responsible AI starts before training.
+
+18
+00:01:02,298 --> 00:01:06,021
+Users, data and metrics come first.
+
+19
+00:01:06,071 --> 00:01:09,470
+Next: Write a problem statement.

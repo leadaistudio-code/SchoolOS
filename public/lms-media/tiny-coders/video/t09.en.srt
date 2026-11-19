@@ -1,0 +1,51 @@
+1
+00:00:00,600 --> 00:00:02,991
+MyCampusView Academy.
+
+2
+00:00:03,041 --> 00:00:05,432
+Tiny Coders, video 9.
+
+3
+00:00:05,482 --> 00:00:08,570
+Explain your plan out loud.
+
+4
+00:00:09,750 --> 00:00:12,786
+Great coders can explain their thinking.
+
+5
+00:00:12,836 --> 00:00:16,490
+Practise saying your steps to a friend or adult.
+
+6
+00:00:17,850 --> 00:00:21,490
+Read your five steps without showing the paper.
+
+7
+00:00:21,540 --> 00:00:25,650
+If your listener gets lost, rewrite the unclear step.
+
+8
+00:00:26,950 --> 00:00:31,088
+Explaining out loud makes confusing steps obvious.
+
+9
+00:00:31,138 --> 00:00:34,270
+It is how teams debug faster together.
+
+10
+00:00:35,800 --> 00:00:37,197
+Let us recap.
+
+11
+00:00:37,247 --> 00:00:40,871
+Clear speech finds unclear steps.
+
+12
+00:00:40,921 --> 00:00:43,988
+Feedback makes plans better.
+
+13
+00:00:44,038 --> 00:00:46,660
+Next: Tiny Coders check.

@@ -1,0 +1,43 @@
+1
+00:00:00,600 --> 00:00:02,895
+MyCampusView Academy.
+
+2
+00:00:02,945 --> 00:00:05,686
+Python Starters, video 5.
+
+3
+00:00:05,736 --> 00:00:09,370
+for-loops: repeat with a counter.
+
+4
+00:00:10,550 --> 00:00:14,210
+Loops stop you from copying the same line again and again.
+
+5
+00:00:15,550 --> 00:00:18,932
+for n in range one to six prints Step with n.
+
+6
+00:00:18,982 --> 00:00:23,660
+range one to six gives one through five — it stops before six.
+
+7
+00:00:25,050 --> 00:00:30,350
+range three runs the loop body three times with values zero, one and two.
+
+8
+00:00:31,800 --> 00:00:33,231
+Let us recap.
+
+9
+00:00:33,281 --> 00:00:36,079
+for-loops repeat a block.
+
+10
+00:00:36,129 --> 00:00:39,497
+range controls how many times.
+
+11
+00:00:39,547 --> 00:00:43,370
+Next: Lists: many values in order.

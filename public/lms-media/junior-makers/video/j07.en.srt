@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:03,008
+MyCampusView Academy.
+
+2
+00:00:03,058 --> 00:00:05,701
+Junior Makers, video 7.
+
+3
+00:00:05,751 --> 00:00:08,510
+Plan: who does it help?.
+
+4
+00:00:09,650 --> 00:00:13,130
+Start with a person and a problem, then pick parts.
+
+5
+00:00:14,450 --> 00:00:18,839
+Example goals: a desk lamp that reminds you to pack your bag,
+
+6
+00:00:18,889 --> 00:00:22,768
+a buzzer when a cupboard opens, or a night light for a
+
+7
+00:00:22,818 --> 00:00:23,350
+hallway.
+
+8
+00:00:24,650 --> 00:00:26,429
+Name who it helps.
+
+9
+00:00:26,479 --> 00:00:29,070
+Choose a sensor or switch.
+
+10
+00:00:29,120 --> 00:00:32,220
+Choose a light or sound output.
+
+11
+00:00:32,270 --> 00:00:34,760
+Sketch the path on paper.
+
+12
+00:00:36,300 --> 00:00:37,599
+Let us recap.
+
+13
+00:00:37,649 --> 00:00:40,506
+Purpose first, parts second.
+
+14
+00:00:40,556 --> 00:00:44,346
+A sketch catches missing wires early.
+
+15
+00:00:44,396 --> 00:00:48,290
+Next: Project: sense-and-react gadget.

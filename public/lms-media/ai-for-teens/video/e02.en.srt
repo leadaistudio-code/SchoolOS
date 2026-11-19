@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:02,985
+MyCampusView Academy.
+
+2
+00:00:03,035 --> 00:00:05,536
+AI for Teens, video 2.
+
+3
+00:00:05,586 --> 00:00:08,550
+Write a problem statement.
+
+4
+00:00:09,650 --> 00:00:13,673
+A good statement names the user, the job to be done, and
+
+5
+00:00:13,723 --> 00:00:15,200
+what good looks like.
+
+6
+00:00:16,550 --> 00:00:22,631
+Helping Class ten students practise quadratic equations with hints is sharp.
+
+7
+00:00:22,681 --> 00:00:25,294
+Use AI to fix education is vague.
+
+8
+00:00:25,344 --> 00:00:29,650
+Flagging duplicate fee receipts for accounts is sharp.
+
+9
+00:00:30,950 --> 00:00:35,213
+Reject pitches with no user, no task and no metric.
+
+10
+00:00:35,263 --> 00:00:38,850
+Technique without purpose is not a project.
+
+11
+00:00:40,400 --> 00:00:41,676
+Let us recap.
+
+12
+00:00:41,726 --> 00:00:45,655
+Sharp problems name users and outcomes.
+
+13
+00:00:45,705 --> 00:00:49,124
+Vague pitches waste training time.
+
+14
+00:00:49,174 --> 00:00:51,470
+Next: Data inventories.

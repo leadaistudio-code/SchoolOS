@@ -1,0 +1,53 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.090
+MyCampusView Academy.
+
+2
+00:00:03.140 --> 00:00:06.115
+Python Starters, video 3.
+
+3
+00:00:06.165 --> 00:00:09.260
+Variables: labelled boxes.
+
+4
+00:00:10.450 --> 00:00:14.140
+A variable remembers a value under a name you choose.
+
+5
+00:00:15.450 --> 00:00:18.661
+Names go on the left, values on the right.
+
+6
+00:00:18.711 --> 00:00:23.320
+You can update score, then print the name and the new score.
+
+7
+00:00:24.650 --> 00:00:26.246
+Prefer score over x.
+
+8
+00:00:26.296 --> 00:00:29.208
+Clear names are part of good coding.
+
+9
+00:00:29.258 --> 00:00:32.170
+Spell names the same way every time.
+
+10
+00:00:33.700 --> 00:00:35.100
+Let us recap.
+
+11
+00:00:35.150 --> 00:00:37.664
+Variables store values.
+
+12
+00:00:37.714 --> 00:00:40.563
+You can change them later.
+
+13
+00:00:40.613 --> 00:00:44.020
+Next: if / else: choose a path.

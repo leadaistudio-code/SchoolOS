@@ -1,0 +1,53 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:02.907
+MyCampusView Academy.
+
+2
+00:00:02.957 --> 00:00:05.714
+Python Starters, video 4.
+
+3
+00:00:05.764 --> 00:00:08.520
+if / else: choose a path.
+
+4
+00:00:09.650 --> 00:00:13.930
+Conditions let your program react differently to different values.
+
+5
+00:00:15.250 --> 00:00:18.774
+If marks are at least forty, print Pass.
+
+6
+00:00:18.824 --> 00:00:20.651
+Else print Try again.
+
+7
+00:00:20.701 --> 00:00:24.940
+Indent the lines that belong inside each branch.
+
+8
+00:00:26.250 --> 00:00:29.136
+Python uses indentation to group code.
+
+9
+00:00:29.186 --> 00:00:35.470
+Keep four spaces consistently in this course, or you will see an IndentationError.
+
+10
+00:00:37.000 --> 00:00:38.247
+Let us recap.
+
+11
+00:00:38.297 --> 00:00:41.240
+if/else chooses between paths.
+
+12
+00:00:41.290 --> 00:00:45.829
+Indentation marks which lines belong together.
+
+13
+00:00:45.879 --> 00:00:49.720
+Next: for-loops: repeat with a counter.

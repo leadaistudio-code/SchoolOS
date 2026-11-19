@@ -1,0 +1,53 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.033
+MyCampusView Academy.
+
+2
+00:00:03.083 --> 00:00:05.989
+Python Starters, video 6.
+
+3
+00:00:06.039 --> 00:00:09.300
+Lists: many values in order.
+
+4
+00:00:10.450 --> 00:00:15.190
+A list holds an ordered collection — names, scores or tasks.
+
+5
+00:00:16.550 --> 00:00:18.841
+Square brackets create a list.
+
+6
+00:00:18.891 --> 00:00:23.290
+Loop through each subject, then print the count with len.
+
+7
+00:00:24.650 --> 00:00:27.596
+Square brackets create a list.
+
+8
+00:00:27.646 --> 00:00:30.093
+for item in list repeats.
+
+9
+00:00:30.143 --> 00:00:32.190
+len counts the items.
+
+10
+00:00:33.700 --> 00:00:35.056
+Let us recap.
+
+11
+00:00:35.106 --> 00:00:37.869
+Lists store ordered items.
+
+12
+00:00:37.919 --> 00:00:40.682
+You can loop through them.
+
+13
+00:00:40.732 --> 00:00:43.820
+Next: Reading error messages.

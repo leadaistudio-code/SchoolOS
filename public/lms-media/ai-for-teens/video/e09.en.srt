@@ -1,0 +1,47 @@
+1
+00:00:00,600 --> 00:00:03,039
+MyCampusView Academy.
+
+2
+00:00:03,089 --> 00:00:05,646
+AI for Teens, video 9.
+
+3
+00:00:05,696 --> 00:00:08,490
+Write a mini model card.
+
+4
+00:00:09,650 --> 00:00:13,270
+A model card is a short nutrition label for your system.
+
+5
+00:00:14,650 --> 00:00:19,937
+Cover intended use, data sources and gaps, metrics and which split you
+
+6
+00:00:19,987 --> 00:00:22,910
+used, plus risks and out-of-scope uses.
+
+7
+00:00:24,250 --> 00:00:29,590
+Model cards make claims checkable, make misuse harder, and help you remember
+
+8
+00:00:29,640 --> 00:00:31,150
+your own limits later.
+
+9
+00:00:32,600 --> 00:00:33,958
+Let us recap.
+
+10
+00:00:34,008 --> 00:00:37,639
+Model cards make claims checkable.
+
+11
+00:00:37,689 --> 00:00:41,213
+Out-of-scope uses prevent misuse.
+
+12
+00:00:41,263 --> 00:00:43,920
+Next: AI for Teens check.

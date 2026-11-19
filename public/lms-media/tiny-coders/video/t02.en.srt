@@ -1,0 +1,59 @@
+1
+00:00:00,600 --> 00:00:03,224
+MyCampusView Academy.
+
+2
+00:00:03,274 --> 00:00:05,898
+Tiny Coders, video 2.
+
+3
+00:00:05,948 --> 00:00:07,680
+Order matters.
+
+4
+00:00:08,850 --> 00:00:12,571
+If the steps are in the wrong order, the result is wrong
+
+5
+00:00:12,621 --> 00:00:15,400
+— even when every step is good on its own.
+
+6
+00:00:16,750 --> 00:00:19,103
+Think about brushing teeth.
+
+7
+00:00:19,153 --> 00:00:23,730
+Wet the brush, put toothpaste on, brush, then rinse.
+
+8
+00:00:23,780 --> 00:00:28,090
+Swap the first and last steps and the plan fails.
+
+9
+00:00:29,450 --> 00:00:31,958
+The same idea shows up in code.
+
+10
+00:00:32,008 --> 00:00:36,908
+A robot that drives before the motors are on will sit still.
+
+11
+00:00:36,958 --> 00:00:39,630
+Order is part of the instruction.
+
+12
+00:00:41,100 --> 00:00:42,361
+Let us recap.
+
+13
+00:00:42,411 --> 00:00:45,285
+A sequence is steps in order.
+
+14
+00:00:45,335 --> 00:00:48,815
+Wrong order means the wrong result.
+
+15
+00:00:48,865 --> 00:00:51,840
+Next: Patterns you can repeat.

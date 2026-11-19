@@ -1,0 +1,57 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.225
+MyCampusView Academy.
+
+2
+00:00:03.275 --> 00:00:05.900
+Tiny Coders, video 5.
+
+3
+00:00:05.950 --> 00:00:08.320
+If this, then that.
+
+4
+00:00:09.450 --> 00:00:13.988
+Sometimes the next step depends on what is true right now.
+
+5
+00:00:14.038 --> 00:00:15.570
+That is a condition.
+
+6
+00:00:16.950 --> 00:00:20.449
+If it is raining, then take an umbrella.
+
+7
+00:00:20.499 --> 00:00:23.200
+If the light is red, then stop.
+
+8
+00:00:23.250 --> 00:00:28.790
+Robots do this too: if the sensor sees a line, then go forward.
+
+9
+00:00:30.150 --> 00:00:32.722
+Conditions keep programs flexible.
+
+10
+00:00:32.772 --> 00:00:37.350
+One plan can take different paths depending on what is true.
+
+11
+00:00:38.800 --> 00:00:40.149
+Let us recap.
+
+12
+00:00:40.199 --> 00:00:43.807
+Conditions choose which steps run.
+
+13
+00:00:43.857 --> 00:00:47.250
+If…then keeps programs flexible.
+
+14
+00:00:47.300 --> 00:00:50.370
+Next: Bugs: find the mistake.

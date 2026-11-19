@@ -1,0 +1,51 @@
+1
+00:00:00,600 --> 00:00:03,027
+MyCampusView Academy.
+
+2
+00:00:03,077 --> 00:00:05,740
+Junior Makers, video 6.
+
+3
+00:00:05,790 --> 00:00:10,340
+Sensors: notice light, touch, distance.
+
+4
+00:00:11,450 --> 00:00:16,030
+Sensors turn something in the world into a signal a circuit can use.
+
+5
+00:00:17,350 --> 00:00:21,555
+A light sensor can turn on a night lamp in the dark.
+
+6
+00:00:21,605 --> 00:00:24,582
+A button can start a doorbell buzzer.
+
+7
+00:00:24,632 --> 00:00:29,000
+A distance sensor can help a robot slow before a wall.
+
+8
+00:00:30,350 --> 00:00:37,383
+In Robotics 101 you will wire infrared sensors and motors on a real line-follower.
+
+9
+00:00:37,433 --> 00:00:42,480
+This course builds the vocabulary first: sense, think, act.
+
+10
+00:00:44,000 --> 00:00:45,388
+Let us recap.
+
+11
+00:00:45,438 --> 00:00:48,708
+Sensors notice; actuators act.
+
+12
+00:00:48,758 --> 00:00:52,691
+Pair a sensor with a clear reaction.
+
+13
+00:00:52,741 --> 00:00:55,900
+Next: Plan: who does it help?

@@ -1,4 +1,5 @@
 import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+import { AI_FOR_TEENS_VIDEOS } from './videos'
 
 export const AI_FOR_TEENS_TITLE = 'AI for Teens: Build, judge, ship'
 
@@ -7,6 +8,7 @@ export const AI_FOR_TEENS = catalogueCurriculum({
   key: 'ai-for-teens',
   courseTitle: AI_FOR_TEENS_TITLE,
   mediaBase: '/lms-media/ai-for-teens',
+  videos: AI_FOR_TEENS_VIDEOS,
   notesHint: 'Note one claim you verified, and how you verified it.',
   course: {
     subtitle: 'Train models, stress-test them, and ship AI projects responsibly',

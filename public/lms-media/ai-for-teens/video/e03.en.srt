@@ -1,0 +1,67 @@
+1
+00:00:00,600 --> 00:00:03,168
+MyCampusView Academy.
+
+2
+00:00:03,218 --> 00:00:05,911
+AI for Teens, video 3.
+
+3
+00:00:05,961 --> 00:00:08,030
+Data inventories.
+
+4
+00:00:09,150 --> 00:00:13,950
+List what you have, what you lack, and what would be unethical to collect.
+
+5
+00:00:15,250 --> 00:00:19,805
+Each example has features you can measure and a label you want
+
+6
+00:00:19,855 --> 00:00:21,216
+the model to learn.
+
+7
+00:00:21,266 --> 00:00:22,330
+Inventory both.
+
+8
+00:00:23,650 --> 00:00:26,977
+How many labelled examples do you have?
+
+9
+00:00:27,027 --> 00:00:31,048
+Which groups, languages or devices are missing?
+
+10
+00:00:31,098 --> 00:00:33,386
+Which fields are sensitive?
+
+11
+00:00:33,436 --> 00:00:36,590
+Do you have consent for this purpose?
+
+12
+00:00:37,950 --> 00:00:41,489
+Do not collect personal fields just in case.
+
+13
+00:00:41,539 --> 00:00:45,730
+Extra data creates risk without improving the model.
+
+14
+00:00:47,200 --> 00:00:48,477
+Let us recap.
+
+15
+00:00:48,527 --> 00:00:53,070
+Data inventories reveal gaps and risks early.
+
+16
+00:00:53,120 --> 00:00:56,336
+Minimum necessary data is safer.
+
+17
+00:00:56,386 --> 00:00:58,990
+Next: Train / test splits.

@@ -1,4 +1,5 @@
 import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+import { PYTHON_STARTERS_VIDEOS } from './videos'
 
 export const PYTHON_STARTERS_TITLE = 'Python Starters: Make things happen'
 
@@ -7,6 +8,7 @@ export const PYTHON_STARTERS = catalogueCurriculum({
   key: 'python-starters',
   courseTitle: PYTHON_STARTERS_TITLE,
   mediaBase: '/lms-media/python-starters',
+  videos: PYTHON_STARTERS_VIDEOS,
   notesHint: 'Paste a short snippet you tried, or note an error message you fixed.',
   course: {
     subtitle: 'Your first real programs — variables, loops, decisions and tiny projects',

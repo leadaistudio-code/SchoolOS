@@ -1,0 +1,57 @@
+WEBVTT
+
+1
+00:00:00.600 --> 00:00:03.122
+MyCampusView Academy.
+
+2
+00:00:03.172 --> 00:00:05.938
+Junior Makers, video 4.
+
+3
+00:00:05.988 --> 00:00:09.490
+LEDs: light with a direction.
+
+4
+00:00:10.650 --> 00:00:14.817
+An LED lights when current flows the correct way.
+
+5
+00:00:14.867 --> 00:00:16.280
+Polarity matters.
+
+6
+00:00:17.650 --> 00:00:21.980
+Many LED kits use the longer leg for the positive side.
+
+7
+00:00:22.030 --> 00:00:26.042
+If it is the wrong way around, it stays dark — that
+
+8
+00:00:26.092 --> 00:00:28.590
+is a useful clue when debugging.
+
+9
+00:00:29.950 --> 00:00:34.207
+A resistor limits current so the LED does not burn out.
+
+10
+00:00:34.257 --> 00:00:38.200
+Your teacher’s kit diagram will show where it goes.
+
+11
+00:00:39.700 --> 00:00:41.141
+Let us recap.
+
+12
+00:00:41.191 --> 00:00:44.924
+LEDs turn electricity into light.
+
+13
+00:00:44.974 --> 00:00:48.594
+Direction, or polarity, matters.
+
+14
+00:00:48.644 --> 00:00:53.180
+Next: Switches: open and close the path.

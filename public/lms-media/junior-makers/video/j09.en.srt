@@ -1,0 +1,55 @@
+1
+00:00:00,600 --> 00:00:03,097
+MyCampusView Academy.
+
+2
+00:00:03,147 --> 00:00:05,887
+Junior Makers, video 9.
+
+3
+00:00:05,937 --> 00:00:08,070
+Test like a maker.
+
+4
+00:00:09,250 --> 00:00:13,310
+Testing means changing one thing at a time and watching what happens.
+
+5
+00:00:14,650 --> 00:00:17,419
+Predict what should happen.
+
+6
+00:00:17,469 --> 00:00:19,820
+Try exactly one change.
+
+7
+00:00:19,870 --> 00:00:20,655
+Observe.
+
+8
+00:00:20,705 --> 00:00:25,980
+If it fails, check power, polarity and loose wires.
+
+9
+00:00:27,350 --> 00:00:30,898
+One change at a time finds causes faster.
+
+10
+00:00:30,948 --> 00:00:33,180
+Write down what you tried.
+
+11
+00:00:34,700 --> 00:00:36,041
+Let us recap.
+
+12
+00:00:36,091 --> 00:00:40,215
+One change at a time finds bugs faster.
+
+13
+00:00:40,265 --> 00:00:42,998
+Write down what you tried.
+
+14
+00:00:43,048 --> 00:00:45,780
+Next: Junior Makers check.
