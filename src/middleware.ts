@@ -177,7 +177,33 @@ function canonicalRedirect(request: NextRequest, host: string): NextResponse | n
     return null
   }
   const url = new URL(request.nextUrl.pathname + request.nextUrl.search, canonical.origin)
+
+  // Provider hostnames are not a Search Console property we can verify (they
+  // sit under railway.app). A 301 keeps the URL "alive" for Google's outdated-
+  // content tool and blocks Removals on the brand property ("URL not in the
+  // property"). 410 Gone drops them from the index and lets anyone request
+  // removal without owning the Railway hostname.
+  if (isRailwayAppHost(host)) {
+    return railwayGone(url)
+  }
+
   return withNoIndex(NextResponse.redirect(url, 301))
+}
+
+/** Google site-verification HTML files must answer 200 on the Railway host. */
+function isGoogleSiteVerification(pathname: string): boolean {
+  return /^\/google[a-z0-9]+\.html$/i.test(pathname)
+}
+
+function railwayGone(canonical: URL): NextResponse {
+  const href = canonical.toString()
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gone</title><meta name="robots" content="noindex,nofollow"></head><body><p>This address is not a public site. Continue at <a href="${href}">${href}</a>.</p></body></html>`
+  return withNoIndex(
+    new NextResponse(html, {
+      status: 410,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }),
+  )
 }
 
 /**
@@ -189,6 +215,7 @@ function railwayAppRedirect(request: NextRequest, host: string): NextResponse | 
   if (!isRailwayAppHost(host)) return null
   if (request.nextUrl.pathname.startsWith('/api/health')) return null
   if (request.nextUrl.pathname === '/robots.txt') return railwayRobotsTxt()
+  if (isGoogleSiteVerification(request.nextUrl.pathname)) return null
   return canonicalRedirect(request, host)
 }
 
@@ -228,7 +255,10 @@ export function middleware(request: NextRequest) {
   // host. Anything belonging to it goes to the website's front page rather than
   // rendering a sign-in form on a hostname that should only ever serve pages.
   if (deployment === 'marketing' && !internal) {
-    if (!pathname.startsWith('/api/health')) {
+    if (
+      !pathname.startsWith('/api/health') &&
+      !isGoogleSiteVerification(pathname)
+    ) {
       const redirect = canonicalRedirect(request, host)
       if (redirect) return redirect
     }

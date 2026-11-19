@@ -58,13 +58,21 @@ describe('a marketing-only service', () => {
     expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
   })
 
-  it('redirects the railway hostname to APP_URL with noindex', () => {
+  it('returns 410 Gone on the railway hostname so Google can drop it', () => {
     setup('marketing')
     process.env.APP_URL = 'https://www.mycampusview.com'
     const res = middleware(request('website-production-026e.up.railway.app', '/customer-stories'))
-    expect(res.status).toBe(301)
-    expect(res.headers.get('location')).toBe('https://www.mycampusview.com/customer-stories')
+    expect(res.status).toBe(410)
     expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+    delete process.env.APP_URL
+  })
+
+  it('still 301s the apex onto www', () => {
+    setup('marketing')
+    process.env.APP_URL = 'https://www.mycampusview.com'
+    const res = middleware(request('mycampusview.com', '/blog'))
+    expect(res.status).toBe(301)
+    expect(res.headers.get('location')).toBe('https://www.mycampusview.com/blog')
     delete process.env.APP_URL
   })
 
@@ -117,12 +125,11 @@ describe('an application-only service', () => {
     expect(middleware(request(`stjohns.${ROOT}`, '/site/product')).status).toBe(404)
   })
 
-  it('redirects the railway hostname to APP_URL with noindex', () => {
+  it('returns 410 Gone on the railway hostname so Google can drop it', () => {
     setup('app')
     process.env.APP_URL = 'https://app.mycampusview.com'
     const res = middleware(request('schoolos-production-b013.up.railway.app', '/login'))
-    expect(res.status).toBe(301)
-    expect(res.headers.get('location')).toBe('https://app.mycampusview.com/login')
+    expect(res.status).toBe(410)
     expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
     delete process.env.APP_URL
   })
