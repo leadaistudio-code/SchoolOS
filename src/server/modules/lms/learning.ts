@@ -5,6 +5,12 @@ import { FEATURE, assertWithinLimit } from '@/server/entitlements'
 import { gradeQuiz, publicQuiz, type Quiz, type QuizResult } from '@/lib/lms/options'
 import { assertLms } from './access'
 import { issueCertificateFor } from './certificates'
+import { isAcademy } from './academy-tenant'
+import {
+  ACADEMY_FREE_LESSON_COUNT,
+  assertAcademyLessonAccess,
+  hasPaidAcademyCourse,
+} from './academy-access'
 
 /**
  * The student's side: which courses are open to them, the lesson player, and
@@ -144,7 +150,31 @@ export async function courseForLearner(ctx: AppContext, courseId: string) {
   })
   const lessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id))
   const completed = new Set(progress.filter((p) => p.completedAt).map((p) => p.lessonId))
-  const next = lessonIds.find((id) => !completed.has(id)) ?? lessonIds[0] ?? null
+  const freemium =
+    isAcademy(ctx.tenant) && (course.academyPriceMinor ?? 0) > 0
+      ? {
+          paid: await hasPaidAcademyCourse(ctx.tenant.id, learner.id, course.id),
+          freeCount: ACADEMY_FREE_LESSON_COUNT,
+          priceMinor: course.academyPriceMinor ?? 0,
+        }
+      : { paid: true, freeCount: 0, priceMinor: 0 }
+  const lockedLessonIds = new Set(
+    freemium.paid
+      ? []
+      : lessonIds.filter((_, i) => i >= freemium.freeCount),
+  )
+  const next =
+    lessonIds.find((id) => !completed.has(id) && !lockedLessonIds.has(id)) ??
+    lessonIds.find((id) => !lockedLessonIds.has(id)) ??
+    lessonIds[0] ??
+    null
+  const resume =
+    enrollment.lastLessonId &&
+    lessonIds.includes(enrollment.lastLessonId) &&
+    !completed.has(enrollment.lastLessonId) &&
+    !lockedLessonIds.has(enrollment.lastLessonId)
+      ? enrollment.lastLessonId
+      : next
   return {
     learner,
     course,
@@ -152,9 +182,12 @@ export async function courseForLearner(ctx: AppContext, courseId: string) {
     completed,
     scores: new Map(progress.map((p) => [p.lessonId, p.bestScorePercent])),
     percent: lessonIds.length ? Math.round((lessonIds.filter((id) => completed.has(id)).length / lessonIds.length) * 100) : 0,
-    resumeLessonId: enrollment.lastLessonId && lessonIds.includes(enrollment.lastLessonId) && !completed.has(enrollment.lastLessonId)
-      ? enrollment.lastLessonId
-      : next,
+    resumeLessonId: resume,
+    freemium: {
+      ...freemium,
+      unlocked: freemium.paid || freemium.priceMinor <= 0,
+      lockedLessonIds,
+    },
   }
 }
 
@@ -163,6 +196,21 @@ export async function lessonForLearner(ctx: AppContext, courseId: string, lesson
   const outline = await courseForLearner(ctx, courseId)
   const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null } })
   if (!lesson) throw notFound('Lesson')
+  const access = await assertAcademyLessonAccess(
+    ctx.tenant,
+    outline.learner.id,
+    {
+      id: outline.course.id,
+      academyPriceMinor: outline.course.academyPriceMinor,
+      modules: outline.course.modules,
+    },
+    lessonId,
+  )
+  if (!access.unlocked) {
+    throw forbidden(
+      `The first ${ACADEMY_FREE_LESSON_COUNT} lessons are free. Unlock the full course to open this lesson.`,
+    )
+  }
   await ctx.db.lmsEnrollment.update({
     where: { id: outline.enrollment.id },
     data: { lastLessonId: lessonId, lastActivityAt: new Date() },
@@ -188,6 +236,22 @@ export async function lessonForLearner(ctx: AppContext, courseId: string, lesson
   }
 }
 
+async function assertCanWorkOnLesson(ctx: AppContext, learner: Learner, courseId: string, lessonId: string) {
+  const { course } = await openCourse(ctx, learner, courseId)
+  const access = await assertAcademyLessonAccess(
+    ctx.tenant,
+    learner.id,
+    { id: course.id, academyPriceMinor: course.academyPriceMinor, modules: course.modules },
+    lessonId,
+  )
+  if (!access.unlocked) {
+    throw forbidden(
+      `The first ${ACADEMY_FREE_LESSON_COUNT} lessons are free. Unlock the full course to continue.`,
+    )
+  }
+  return { course }
+}
+
 /** Sets or clears the course's completion. `byLearner` false: a teacher's action, not student activity. */
 export async function finishIfDone(ctx: AppContext, enrollmentId: string, courseId: string, byLearner = true) {
   const [total, done, enrollment] = await Promise.all([
@@ -209,6 +273,7 @@ export async function finishIfDone(ctx: AppContext, enrollmentId: string, course
 
 export async function completeLesson(ctx: AppContext, courseId: string, lessonId: string) {
   const learner = await requireLearner(ctx)
+  await assertCanWorkOnLesson(ctx, learner, courseId, lessonId)
   const { enrollment } = await openCourse(ctx, learner, courseId)
   const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { id: true, kind: true, quiz: true } })
   if (!lesson) throw notFound('Lesson')
@@ -243,6 +308,7 @@ export async function saveLessonState(
   input: { patch?: unknown; videoSeconds?: number | null },
 ) {
   const learner = await requireLearner(ctx)
+  await assertCanWorkOnLesson(ctx, learner, courseId, lessonId)
   const { enrollment } = await openCourse(ctx, learner, courseId)
   const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null }, select: { id: true } })
   if (!lesson) throw notFound('Lesson')
@@ -284,6 +350,7 @@ export async function submitQuiz(
   rawAnswers: unknown,
 ): Promise<QuizResult & { courseComplete: boolean }> {
   const learner = await requireLearner(ctx)
+  await assertCanWorkOnLesson(ctx, learner, courseId, lessonId)
   const { enrollment } = await openCourse(ctx, learner, courseId)
   const lesson = await ctx.db.lmsLesson.findFirst({ where: { id: lessonId, courseId, archivedAt: null } })
   if (!lesson || (lesson.kind !== 'QUIZ' && lesson.kind !== 'INTERACTIVE') || !hasQuestions(lesson.quiz)) throw notFound('Quiz')

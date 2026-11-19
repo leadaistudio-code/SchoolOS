@@ -2,14 +2,17 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
 import { confirmPurchaseAction, confirmSimulatedPurchaseAction, startPurchaseAction } from './actions'
 
 type RazorpayResponse = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }
-type RazorpayInstance = { open: () => void; on: (event: string, cb: (r: { error?: { description?: string } }) => void) => void }
+type RazorpayInstance = {
+  open: () => void
+  on: (event: string, cb: (r: { error?: { description?: string } }) => void) => void
+}
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance
@@ -34,11 +37,14 @@ export function BuyButton({
   label,
   simulated,
   className,
+  intent = 'unlock',
 }: {
   courseId: string
   label: string
   simulated: boolean
   className?: string
+  /** `preview` starts the free lessons; `unlock` opens Razorpay for the rest. */
+  intent?: 'preview' | 'unlock'
 }) {
   const router = useRouter()
   const { push } = useToast()
@@ -53,19 +59,31 @@ export function BuyButton({
 
   async function buy() {
     setPending(true)
-    const start = await startPurchaseAction(courseId)
+    const start = await startPurchaseAction(courseId, intent)
     if (!start.ok) {
       push({ tone: 'error', title: start.message })
       setPending(false)
       return
     }
-    if (start.kind === 'owned' || start.kind === 'enrolled') {
-      push({ tone: 'success', title: start.kind === 'owned' ? 'You already have this course.' : 'You are enrolled. Enjoy the course!' })
+    if (start.kind === 'owned' || start.kind === 'enrolled' || start.kind === 'preview') {
+      push({
+        tone: 'success',
+        title:
+          start.kind === 'owned'
+            ? 'You already have full access.'
+            : start.kind === 'preview'
+              ? 'Your free lessons are ready. Unlock anytime for the rest.'
+              : 'You are enrolled. Enjoy the course!',
+      })
       router.push(`/my/learning/${start.courseId}`)
       return
     }
     if (start.kind === 'simulated') {
-      setTestOrder({ orderId: start.orderId, amount: `₹${(start.amountMinor / 100).toLocaleString('en-IN')}`, title: start.courseTitle })
+      setTestOrder({
+        orderId: start.orderId,
+        amount: `₹${(start.amountMinor / 100).toLocaleString('en-IN')}`,
+        title: start.courseTitle,
+      })
       setPending(false)
       return
     }
@@ -82,7 +100,9 @@ export function BuyButton({
       name: 'MyCampusView Academy',
       description: start.courseTitle,
       prefill: start.prefill,
-      theme: { color: getComputedStyle(document.documentElement).getPropertyValue('--brand-500').trim() || undefined },
+      theme: {
+        color: getComputedStyle(document.documentElement).getPropertyValue('--brand-500').trim() || undefined,
+      },
       handler: async (response: RazorpayResponse) => {
         done(
           await confirmPurchaseAction({
@@ -104,9 +124,11 @@ export function BuyButton({
   return (
     <>
       <Button block size="lg" loading={pending} onClick={buy} className={className}>
-        <ShoppingCart /> {label}
+        {intent === 'preview' ? <Sparkles /> : <ShoppingCart />} {label}
       </Button>
-      {simulated ? <p className="text-xs text-warning">Test mode: payments are simulated on this server.</p> : null}
+      {simulated && intent === 'unlock' ? (
+        <p className="text-xs text-warning">Test mode: payments are simulated on this server.</p>
+      ) : null}
       <Dialog
         open={!!testOrder}
         onClose={() => setTestOrder(null)}
@@ -114,7 +136,9 @@ export function BuyButton({
         description="Razorpay keys are not set on this server, so no real money moves. This only works outside production."
         footer={
           <>
-            <Button variant="secondary" onClick={() => setTestOrder(null)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setTestOrder(null)}>
+              Cancel
+            </Button>
             <Button
               loading={pending}
               onClick={async () => {

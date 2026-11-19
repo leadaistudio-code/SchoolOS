@@ -40,10 +40,13 @@ export async function signUpAction(input: unknown): Promise<SignupResult> {
   }
 }
 
-export async function startPurchaseAction(courseId: string): Promise<({ ok: true } & CheckoutStart) | Fail> {
+export async function startPurchaseAction(
+  courseId: string,
+  intent: 'preview' | 'unlock' = 'unlock',
+): Promise<({ ok: true } & CheckoutStart) | Fail> {
   try {
-    const result = await startPurchase(await learnerContext(), courseId)
-    if (result.kind === 'enrolled') revalidatePath('/academy', 'layout')
+    const result = await startPurchase(await learnerContext(), courseId, intent)
+    if (result.kind === 'enrolled' || result.kind === 'preview') revalidatePath('/academy', 'layout')
     return { ok: true, ...result }
   } catch (err) {
     return lmsFail(err, 'The payment could not be started') as Fail

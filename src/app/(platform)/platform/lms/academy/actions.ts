@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { requirePlatformContext } from '@/server/context'
 import { lmsFail } from '@/server/modules/lms/authoring'
-import { formatRupees, setAcademyPrice, setupAcademy } from '@/server/modules/lms/academy'
+import {
+  ensureAcademyFreemiumPricing,
+  formatRupees,
+  setAcademyPrice,
+  setupAcademy,
+} from '@/server/modules/lms/academy'
 import type { LmsResult } from '@/components/lms/types'
 
 export async function setupAcademyAction(input: unknown): Promise<LmsResult> {
@@ -32,5 +37,28 @@ export async function setAcademyPriceAction(courseId: string, price: string): Pr
     }
   } catch (err) {
     return lmsFail(err, 'The price could not be saved')
+  }
+}
+
+/** First 3 lessons free, unlock the rest for ₹499 on every published Academy course. */
+export async function applyAcademyFreemiumAction(): Promise<LmsResult> {
+  const ctx = await requirePlatformContext('platform.lms')
+  try {
+    const r = await ensureAcademyFreemiumPricing({
+      userId: ctx.user.userId,
+      firstName: ctx.user.firstName,
+      lastName: ctx.user.lastName,
+    })
+    revalidatePath('/platform/lms/academy')
+    revalidatePath('/academy', 'layout')
+    return {
+      ok: true,
+      message:
+        r.updated === 0
+          ? `All courses already at ${formatRupees(r.priceMinor)} freemium.`
+          : `Updated ${r.updated} course${r.updated === 1 ? '' : 's'}: first ${r.freeLessons} lessons free, unlock ${formatRupees(r.priceMinor)}.`,
+    }
+  } catch (err) {
+    return lmsFail(err, 'Freemium pricing could not be applied')
   }
 }

@@ -19,6 +19,11 @@ import { provisionSchool } from '@/server/modules/platform/provision'
 import { requireLearner } from './learning'
 import { academySlug, isAcademy } from './academy-tenant'
 import {
+  ACADEMY_FREE_LESSON_COUNT,
+  ACADEMY_UNLOCK_PRICE_MINOR,
+  hasPaidAcademyCourse,
+} from './academy-access'
+import {
   captureRazorpayPayment,
   checkoutSignatureValid,
   createRazorpayOrder,
@@ -66,6 +71,8 @@ export function paymentMode(): 'razorpay' | 'simulated' | 'off' {
 export function formatRupees(minor: number) {
   return `₹${(minor / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
+
+export { ACADEMY_FREE_LESSON_COUNT, ACADEMY_UNLOCK_PRICE_MINOR, hasPaidAcademyCourse } from './academy-access'
 
 /* ------------------------------------------------------------- catalogue */
 
@@ -138,13 +145,22 @@ export async function academyVisitor(tenant: ResolvedTenant) {
     where: { tenantId: tenant.id, userId: user.userId, deletedAt: null },
     select: { id: true },
   })
-  const owned = student
+  const enrolled = student
     ? await prisma.lmsEnrollment.findMany({ where: { tenantId: tenant.id, studentId: student.id }, select: { courseId: true } })
+    : []
+  const paid = student
+    ? await prisma.lmsAcademyOrder.findMany({
+        where: { tenantId: tenant.id, studentId: student.id, status: 'PAID' },
+        select: { courseId: true },
+      })
     : []
   return {
     firstName: user.firstName,
     isLearner: !!student,
-    owned: new Set(owned.map((o) => o.courseId)),
+    /** Enrolled (may be preview-only on freemium courses). */
+    owned: new Set(enrolled.map((o) => o.courseId)),
+    /** Fully unlocked after payment (or free courses). */
+    unlocked: new Set(paid.map((o) => o.courseId)),
   }
 }
 
@@ -246,6 +262,7 @@ function learnerNumber() {
 export type CheckoutStart =
   | { kind: 'owned'; courseId: string }
   | { kind: 'enrolled'; courseId: string }
+  | { kind: 'preview'; courseId: string }
   | {
       kind: 'razorpay'
       orderId: string
@@ -258,12 +275,23 @@ export type CheckoutStart =
     }
   | { kind: 'simulated'; orderId: string; amountMinor: number; courseTitle: string }
 
+export type PurchaseIntent = 'preview' | 'unlock'
+
 async function academyLearner(ctx: AppContext) {
   if (!isAcademy(ctx.tenant)) throw forbidden('Courses are bought on the Academy')
   return requireLearner(ctx)
 }
 
-export async function startPurchase(ctx: AppContext, courseId: string): Promise<CheckoutStart> {
+/**
+ * Freemium checkout:
+ * - `preview`: enrol so the first free lessons open (no charge)
+ * - `unlock`: Razorpay payment for the full course (₹499 by default)
+ */
+export async function startPurchase(
+  ctx: AppContext,
+  courseId: string,
+  intent: PurchaseIntent = 'unlock',
+): Promise<CheckoutStart> {
   const learner = await academyLearner(ctx)
   const course = await prisma.lmsCourse.findFirst({
     where: { id: courseId, ...listedWhere(ctx.tenant.id) },
@@ -271,24 +299,32 @@ export async function startPurchase(ctx: AppContext, courseId: string): Promise<
   })
   if (!course) throw notFound('Course')
 
-  const enrolled = await ctx.db.lmsEnrollment.findFirst({ where: { courseId, studentId: learner.id }, select: { id: true } })
-  if (enrolled) return { kind: 'owned', courseId }
-
   const price = course.academyPriceMinor ?? 0
-  if (price === 0) {
+  const paid = await hasPaidAcademyCourse(ctx.tenant.id, learner.id, courseId)
+  if (paid || (price === 0 && (await ctx.db.lmsEnrollment.findFirst({ where: { courseId, studentId: learner.id }, select: { id: true } })))) {
+    return { kind: 'owned', courseId }
+  }
+
+  if (price === 0 || intent === 'preview') {
     await enrol(ctx.tenant.id, courseId, learner.id)
     await audit({
       tenantId: ctx.tenant.id,
       actorId: ctx.user.userId,
       actorLabel: `${learner.firstName} ${learner.lastName}`.trim(),
-      action: 'academy.enrol_free',
+      action: price === 0 ? 'academy.enrol_free' : 'academy.enrol_preview',
       module: 'lms',
       entityType: 'LmsCourse',
       entityId: courseId,
-      summary: `Joined the free course ${course.title}`,
+      summary:
+        price === 0
+          ? `Joined the free course ${course.title}`
+          : `Started free preview of ${course.title} (first ${ACADEMY_FREE_LESSON_COUNT} lessons)`,
     })
-    return { kind: 'enrolled', courseId }
+    return { kind: price === 0 ? 'enrolled' : 'preview', courseId }
   }
+
+  // Unlock path: enrol for preview access, then take payment for the rest.
+  await enrol(ctx.tenant.id, courseId, learner.id)
 
   const mode = paymentMode()
   if (mode === 'off') throw badRequest('Online payments are not switched on yet. Please try again later.')
@@ -340,6 +376,41 @@ export async function startPurchase(ctx: AppContext, courseId: string): Promise<
     })
     throw badRequest('The payment could not be started. Please try again in a minute.')
   }
+}
+
+/** Price every published Academy catalogue course at the freemium unlock amount. */
+export async function ensureAcademyFreemiumPricing(actor?: { userId: string; firstName: string; lastName: string }) {
+  const academy = await academyTenant()
+  const courses = await prisma.lmsCourse.findMany({
+    where: {
+      deletedAt: null,
+      status: 'PUBLISHED',
+      OR: [{ tenantId: null }, ...(academy ? [{ tenantId: academy.id }] : [])],
+    },
+    select: { id: true, title: true, academyPriceMinor: true },
+  })
+  let updated = 0
+  for (const course of courses) {
+    if (course.academyPriceMinor === ACADEMY_UNLOCK_PRICE_MINOR) continue
+    await prisma.lmsCourse.update({
+      where: { id: course.id },
+      data: { academyPriceMinor: ACADEMY_UNLOCK_PRICE_MINOR },
+    })
+    updated++
+    if (academy && actor) {
+      await audit({
+        tenantId: academy.id,
+        actorId: actor.userId,
+        actorLabel: `${actor.firstName} ${actor.lastName}`.trim(),
+        action: 'academy.price',
+        module: 'lms',
+        entityType: 'LmsCourse',
+        entityId: course.id,
+        summary: `Set freemium price for ${course.title}: first ${ACADEMY_FREE_LESSON_COUNT} lessons free, unlock ${formatRupees(ACADEMY_UNLOCK_PRICE_MINOR)}`,
+      })
+    }
+  }
+  return { updated, priceMinor: ACADEMY_UNLOCK_PRICE_MINOR, freeLessons: ACADEMY_FREE_LESSON_COUNT }
 }
 
 async function ownOrder(ctx: AppContext, orderId: string) {
@@ -640,6 +711,8 @@ const ABANDONED_AFTER_MS = 60 * 60_000
 
 export async function academyOverview() {
   const academy = await academyTenant()
+  // Keep published catalogue courses on the freemium ₹499 unlock price.
+  if (academy) await ensureAcademyFreemiumPricing()
   const courses = await prisma.lmsCourse.findMany({
     where: {
       deletedAt: null,

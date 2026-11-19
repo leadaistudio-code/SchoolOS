@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ApiException } from '@/server/api/response'
 import { requireLms } from '@/server/modules/lms/access'
 import { lessonForLearner } from '@/server/modules/lms/learning'
@@ -26,16 +26,19 @@ export default async function LearnerLessonPage({ params }: { params: Promise<{ 
   const ctx = await requireLms('lms.learn')
   const { courseId, lessonId } = await params
   const data = await lessonForLearner(ctx, courseId, lessonId).catch((err) => {
-    if (err instanceof ApiException && (err.status === 404 || err.status === 403)) return null
+    if (err instanceof ApiException && err.status === 403) redirect(`/my/learning/${courseId}#unlock`)
+    if (err instanceof ApiException && err.status === 404) return null
     throw err
   })
   if (!data) notFound()
-  const { course, lesson, completed, scores, percent, nextLessonId, saved } = data
+  const { course, lesson, completed, scores, percent, nextLessonId, saved, freemium } = data
   const project = lesson.kind === 'PROJECT' ? await mySubmission(ctx, course.id, lesson.id) : null
   const order = course.modules.flatMap((m) => m.lessons.map((l) => l.id))
   const at = order.indexOf(lesson.id)
   const { content } = readRichContent(lesson.content)
-  const nextHref = nextLessonId ? `/my/learning/${course.id}/${nextLessonId}` : null
+  const nextUnlocked =
+    nextLessonId && !freemium.lockedLessonIds.has(nextLessonId) ? nextLessonId : null
+  const nextHref = nextUnlocked ? `/my/learning/${course.id}/${nextUnlocked}` : null
   const finishHref = `/my/learning/${course.id}`
 
   const outline = (
@@ -44,7 +47,16 @@ export default async function LearnerLessonPage({ params }: { params: Promise<{ 
         <Progress value={percent} tone={percent >= 100 ? 'success' : 'brand'} />
         <span className="text-xs font-semibold tnum">{percent}%</span>
       </div>
-      <CourseOutline compact modules={course.modules} completed={completed} currentLessonId={lesson.id} lessonHref={(l) => `/my/learning/${course.id}/${l}`} />
+      <CourseOutline
+        compact
+        modules={course.modules}
+        completed={completed}
+        scores={scores}
+        currentLessonId={lesson.id}
+        lockedLessonIds={freemium.lockedLessonIds}
+        lockedHref={`/my/learning/${course.id}#unlock`}
+        lessonHref={(l) => `/my/learning/${course.id}/${l}`}
+      />
     </div>
   )
 

@@ -66,7 +66,7 @@ export const AI_101: Curriculum = {
       'Explain how chatbots predict the next word, and write clear, safe prompts',
       'Spot bias in data and use AI responsibly',
     ],
-    academyPriceMinor: 0,
+    academyPriceMinor: 49_900,
   },
   modules: [MODULE_1, MODULE_2, MODULE_3, MODULE_4],
   videos: AI_VIDEOS,

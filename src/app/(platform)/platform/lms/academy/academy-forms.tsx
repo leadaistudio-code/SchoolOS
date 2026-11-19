@@ -6,7 +6,7 @@ import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
-import { setAcademyPriceAction, setupAcademyAction } from './actions'
+import { applyAcademyFreemiumAction, setAcademyPriceAction, setupAcademyAction } from './actions'
 
 export function SetupAcademyForm({ plans }: { plans: { id: string; name: string }[] }) {
   const router = useRouter()
@@ -82,6 +82,28 @@ export function PriceInput({ courseId, priceMinor, title }: { courseId: string; 
         Save
       </Button>
     </form>
+  )
+}
+
+export function ApplyFreemiumButton() {
+  const router = useRouter()
+  const { push } = useToast()
+  const [pending, startTransition] = React.useTransition()
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      loading={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const r = await applyAcademyFreemiumAction()
+          push({ tone: r.ok ? 'success' : 'error', title: r.message })
+          if (r.ok) router.refresh()
+        })
+      }
+    >
+      Apply freemium (3 free + ₹499)
+    </Button>
   )
 }
 

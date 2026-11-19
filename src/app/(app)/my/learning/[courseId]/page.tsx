@@ -15,6 +15,9 @@ import { LessonText } from '@/components/lms/lesson-text'
 import { BadgeShelf } from '@/components/lms/robotics/badge-shelf'
 import { gradeRange, lmsCategory, lmsLevelLabel } from '@/lib/lms/options'
 import { curriculumFor } from '@/lib/lms/curricula'
+import { formatRupees, paymentMode } from '@/server/modules/lms/academy'
+import { isAcademy } from '@/server/modules/lms/academy-tenant'
+import { BuyButton } from '@/app/academy/buy-button'
 
 export const metadata = { title: 'Course' }
 
@@ -26,8 +29,9 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
     throw err
   })
   if (!data) notFound()
-  const { course, completed, scores, percent, resumeLessonId, enrollment } = data
+  const { course, completed, scores, percent, resumeLessonId, enrollment, freemium } = data
   const lessons = course.modules.flatMap((m) => m.lessons)
+  const showUnlock = isAcademy(ctx.tenant) && freemium && !freemium.unlocked
   const minutes = lessons.reduce((s, l) => s + (l.durationMinutes ?? 0), 0)
   const category = lmsCategory(course.category)
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
@@ -66,6 +70,8 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
             modules={course.modules}
             completed={completed}
             scores={scores}
+            lockedLessonIds={freemium.lockedLessonIds}
+            lockedHref={`/my/learning/${course.id}#unlock`}
             lessonHref={(lessonId) => `/my/learning/${course.id}/${lessonId}`}
           />
         </div>
@@ -73,6 +79,25 @@ export default async function LearnerCoursePage({ params }: { params: Promise<{ 
         <aside className="min-w-0 order-1 lg:order-2 lg:sticky lg:top-4 self-start">
           <Card variant="elevated">
             <CardContent className="space-y-3">
+              {showUnlock ? (
+                <div id="unlock" className="space-y-2 rounded-lg border border-line bg-surface-2 p-3">
+                  <p className="text-sm font-medium text-ink">Unlock the full course</p>
+                  <p className="text-xs text-ink-muted">
+                    First {freemium.freeCount} lessons are free. Pay {formatRupees(freemium.priceMinor)} to open the rest.
+                  </p>
+                  {paymentMode() === 'off' ? (
+                    <Notice tone="warning">Online payments open soon.</Notice>
+                  ) : (
+                    <BuyButton
+                      courseId={course.id}
+                      intent="unlock"
+                      label={`Unlock · ${formatRupees(freemium.priceMinor)}`}
+                      simulated={paymentMode() === 'simulated'}
+                      className="h-10 rounded-lg text-sm"
+                    />
+                  )}
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <Progress value={percent} tone={enrollment.completedAt ? 'success' : 'brand'} />
                 <span className="text-sm font-semibold tnum">{percent}%</span>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import {
+  ACADEMY_FREE_LESSON_COUNT,
   academyCourse,
   academyVisitor,
   formatRupees,
@@ -36,11 +37,14 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
   const minutes = lessons.reduce((s, l) => s + (l.durationMinutes ?? 0), 0)
   const category = lmsCategory(course.category)
   const grades = gradeRange(course.gradeFrom, course.gradeTo)
-  const owned = visitor?.owned.has(course.id) ?? false
+  const enrolled = visitor?.owned.has(course.id) ?? false
+  const unlocked = course.priceMinor === 0 || (visitor?.unlocked.has(course.id) ?? false)
+  const freemium = course.priceMinor > 0
   const free = course.priceMinor === 0
   const here = `/academy/courses/${course.id}`
   const art = courseArt(course.category)
   const kinds = new Set(lessons.map((l) => l.kind))
+  let lessonOrdinal = 0
 
   const facts = [
     { label: 'Lessons', value: `${lessons.length} in ${course.modules.length} part${course.modules.length === 1 ? '' : 's'}` },
@@ -147,16 +151,26 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
                       {m.title}
                     </h3>
                     <ul className="mt-3 border-b border-[var(--rule)]">
-                      {m.lessons.map((l) => (
-                        <li key={l.id} className="flex items-center gap-4 border-t border-[var(--rule)] py-3.5 text-[15.5px]">
-                          <KindIcon kind={l.kind} className="text-[var(--text-subtle)]" />
-                          <span className="min-w-0 flex-1 text-[var(--ed-ink)]">{l.title}</span>
-                          <span className="whitespace-nowrap text-[13.5px] text-[var(--text-subtle)]">
-                            {lessonKind(l.kind).label}
-                            {l.durationMinutes ? ` · ${l.durationMinutes} min` : ''}
-                          </span>
-                        </li>
-                      ))}
+                      {m.lessons.map((l) => {
+                        const index = lessonOrdinal++
+                        const freeLesson = !freemium || unlocked || index < ACADEMY_FREE_LESSON_COUNT
+                        return (
+                          <li key={l.id} className="flex items-center gap-4 border-t border-[var(--rule)] py-3.5 text-[15.5px]">
+                            <KindIcon kind={l.kind} className="text-[var(--text-subtle)]" />
+                            <span className="min-w-0 flex-1 text-[var(--ed-ink)]">{l.title}</span>
+                            <span className="whitespace-nowrap text-[13.5px] text-[var(--text-subtle)]">
+                              {freemium ? (
+                                <span className={freeLesson ? 'text-[var(--ed-ink)]' : ''}>
+                                  {freeLesson ? 'Free' : 'Unlock'}
+                                  {' · '}
+                                </span>
+                              ) : null}
+                              {lessonKind(l.kind).label}
+                              {l.durationMinutes ? ` · ${l.durationMinutes} min` : ''}
+                            </span>
+                          </li>
+                        )
+                      })}
                     </ul>
                   </div>
                 ))}
@@ -166,10 +180,24 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
 
           <aside className="order-1 self-start lg:sticky lg:top-24 lg:order-2">
             <div className="rounded-2xl border border-[var(--rule)] bg-white p-7">
-              <p className="text-[13px] text-[var(--text-subtle)]">{owned ? 'In your account' : free ? 'Price' : 'One payment'}</p>
-              <p className="mt-1 text-[2.6rem] font-semibold leading-none tracking-[-0.03em] text-[var(--ed-ink)] tabular-nums">
-                {owned ? 'Enrolled' : free ? 'Free' : formatRupees(course.priceMinor)}
+              <p className="text-[13px] text-[var(--text-subtle)]">
+                {unlocked
+                  ? 'In your account'
+                  : freemium
+                    ? `First ${ACADEMY_FREE_LESSON_COUNT} lessons free`
+                    : free
+                      ? 'Price'
+                      : 'One payment'}
               </p>
+              <p className="mt-1 text-[2.6rem] font-semibold leading-none tracking-[-0.03em] text-[var(--ed-ink)] tabular-nums">
+                {unlocked ? 'Unlocked' : free ? 'Free' : formatRupees(course.priceMinor)}
+              </p>
+              {freemium && !unlocked ? (
+                <p className="mt-3 text-[14px] leading-[1.5] text-[var(--text-muted)]">
+                  Start the first {ACADEMY_FREE_LESSON_COUNT} lessons free. Unlock the rest for{' '}
+                  {formatRupees(course.priceMinor)}.
+                </p>
+              ) : null}
 
               <ul className="mt-7 space-y-2.5 border-t border-[var(--rule)] pt-6 text-[15px] text-[var(--text-muted)]">
                 {includes.map((item) => (
@@ -181,18 +209,51 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
               </ul>
 
               <div className="mt-8 space-y-3">
-                {owned ? (
+                {unlocked ? (
                   <Link href={`/my/learning/${course.id}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
                     Go to the course <ArrowRight className="size-4" aria-hidden />
                   </Link>
                 ) : visitor?.isLearner ? (
-                  paymentMode() === 'off' && !free ? (
-                    <Notice tone="warning">Online payments open soon. Please check back shortly.</Notice>
+                  paymentMode() === 'off' && freemium ? (
+                    <>
+                      <BuyButton
+                        courseId={course.id}
+                        intent="preview"
+                        label={`Start ${ACADEMY_FREE_LESSON_COUNT} free lessons`}
+                        simulated={false}
+                        className="h-12 rounded-full text-[15.5px]"
+                      />
+                      <Notice tone="warning">Full unlock payments open soon. You can still start the free lessons.</Notice>
+                    </>
+                  ) : freemium ? (
+                    <>
+                      {!enrolled ? (
+                        <BuyButton
+                          courseId={course.id}
+                          intent="preview"
+                          label={`Start ${ACADEMY_FREE_LESSON_COUNT} free lessons`}
+                          simulated={false}
+                          className="h-12 rounded-full text-[15.5px]"
+                        />
+                      ) : (
+                        <Link href={`/my/learning/${course.id}`} className={`${PILL} border border-[var(--rule-strong)] text-[var(--ed-ink)]`}>
+                          Continue free lessons
+                        </Link>
+                      )}
+                      <BuyButton
+                        courseId={course.id}
+                        intent="unlock"
+                        label={`Unlock full course · ${formatRupees(course.priceMinor)}`}
+                        simulated={paymentMode() === 'simulated'}
+                        className="h-12 rounded-full text-[15.5px]"
+                      />
+                    </>
                   ) : (
                     <BuyButton
                       courseId={course.id}
-                      label={free ? 'Enrol for free' : `Buy for ${formatRupees(course.priceMinor)}`}
-                      simulated={paymentMode() === 'simulated'}
+                      intent="preview"
+                      label="Enrol for free"
+                      simulated={false}
                       className="h-12 rounded-full text-[15.5px]"
                     />
                   )
@@ -201,7 +262,7 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
                 ) : (
                   <>
                     <Link href={`/academy/join?next=${encodeURIComponent(here)}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
-                      {free ? 'Join free to start' : 'Create an account to buy'}
+                      {freemium ? 'Join free to start' : free ? 'Join free to start' : 'Create an account to buy'}
                     </Link>
                     <Link
                       href={`/login?next=${encodeURIComponent(here)}`}
@@ -213,9 +274,9 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
                 )}
               </div>
 
-              {!free && !owned ? (
+              {freemium && !unlocked ? (
                 <p className="mt-5 text-[13px] leading-[1.55] text-[var(--text-subtle)]">
-                  Pay with UPI, card, net banking or a wallet. Changed your mind? See the{' '}
+                  Unlock with UPI, card, net banking or a wallet via Razorpay. See the{' '}
                   <Link href="/academy/terms" className="underline underline-offset-2 hover:text-[var(--ed-ink)]">
                     refund policy
                   </Link>

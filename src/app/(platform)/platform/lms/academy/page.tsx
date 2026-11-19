@@ -10,7 +10,7 @@ import { EmptyState, Notice } from '@/components/ui/states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { formatIst } from '@/lib/ist-clock'
-import { CopyText, PriceInput, SetupAcademyForm } from './academy-forms'
+import { ApplyFreemiumButton, CopyText, PriceInput, SetupAcademyForm } from './academy-forms'
 
 export const metadata = { title: 'Academy · Platform' }
 
@@ -57,9 +57,12 @@ export default async function PlatformAcademyPage() {
         description="Public course sales. Set a price to list a published course; leave it blank to keep it off the Academy."
         breadcrumbs={breadcrumbs}
         actions={
-          <a href={academyUrl('/academy')} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'secondary' })}>
-            <ExternalLink /> Open the Academy
-          </a>
+          <>
+            <ApplyFreemiumButton />
+            <a href={academyUrl('/academy')} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'secondary' })}>
+              <ExternalLink /> Open the Academy
+            </a>
+          </>
         }
       />
 
