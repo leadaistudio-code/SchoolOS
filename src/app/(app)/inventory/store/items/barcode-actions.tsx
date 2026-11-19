@@ -28,7 +28,7 @@ export function BulkBarcodeActions({
     if (res.ok) {
       router.refresh()
       if (res.message.includes('Generated')) {
-        window.open('/print/inventory/store/barcodes', '_blank', 'noopener,noreferrer')
+        window.open('/inventory/store/barcodes', '_blank', 'noopener,noreferrer')
       }
     }
   }
@@ -42,7 +42,7 @@ export function BulkBarcodeActions({
         </Button>
       ) : null}
       <a
-        href="/print/inventory/store/barcodes"
+        href="/inventory/store/barcodes"
         target="_blank"
         rel="noopener noreferrer"
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
@@ -57,7 +57,7 @@ export function ItemBarcodePrintButton({ itemId, hasBarcode }: { itemId: string;
   if (!hasBarcode) return null
   return (
     <a
-      href={`/print/inventory/store/barcodes?ids=${itemId}`}
+      href={`/inventory/store/barcodes?ids=${itemId}`}
       target="_blank"
       rel="noopener noreferrer"
       title="Print barcode label"

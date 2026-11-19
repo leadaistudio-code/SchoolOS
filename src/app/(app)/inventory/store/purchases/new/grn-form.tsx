@@ -141,7 +141,7 @@ export function GrnForm({
     setSaving(false)
     push({ tone: res.ok ? 'success' : 'error', title: res.message })
     if (res.ok && res.id) {
-      window.open(`/print/inventory/store/barcodes?purchaseId=${res.id}`, '_blank', 'noopener,noreferrer')
+      window.open(`/inventory/store/barcodes?purchaseId=${res.id}`, '_blank', 'noopener,noreferrer')
       router.push(`/inventory/store/purchases/${res.id}`)
     }
   }

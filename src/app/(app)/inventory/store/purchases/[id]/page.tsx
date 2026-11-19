@@ -27,7 +27,7 @@ export default async function StorePurchasePage({ params }: { params: Promise<{ 
           actions={
             <>
               <a
-                href={`/print/inventory/store/barcodes?purchaseId=${p.id}`}
+                href={`/inventory/store/barcodes?purchaseId=${p.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2"
