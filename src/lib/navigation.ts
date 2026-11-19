@@ -591,7 +591,7 @@ export const ACADEMY_LEARNER_NAVIGATION: NavItem[] = [
   { label: 'Live classes', href: '/my/learning/live', icon: 'Video', section: 'MAIN' as const, permission: 'lms.learn', mobile: true },
   { label: 'My certificates', href: '/my/learning/certificates', icon: 'Award', section: 'MAIN' as const, permission: 'lms.learn', mobile: true },
   { label: 'Purchases', href: '/my/learning/purchases', icon: 'ReceiptText', section: 'MAIN' as const, permission: 'lms.learn' },
-  { label: 'Browse courses', href: '/academy', icon: 'LibraryBig', section: 'MAIN' as const, mobile: true },
+  { label: 'Browse courses', href: '/', icon: 'LibraryBig', section: 'MAIN' as const, mobile: true },
 ]
 
 export type NavPredicate = {

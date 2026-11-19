@@ -160,13 +160,13 @@ export default async function LoginPage({
               <p className="mt-5 text-sm text-ink-muted">
                 New here?{' '}
                 <Link
-                  href={params.next ? `/academy/join?next=${encodeURIComponent(params.next)}` : '/academy/join'}
+                  href={params.next ? `/join?next=${encodeURIComponent(params.next)}` : '/join'}
                   className="font-medium text-[var(--brand-600)] hover:underline"
                 >
                   Create a free account
                 </Link>{' '}
                 or{' '}
-                <Link href="/academy" className="font-medium text-[var(--brand-600)] hover:underline">
+                <Link href="/" className="font-medium text-[var(--brand-600)] hover:underline">
                   browse courses
                 </Link>
                 .

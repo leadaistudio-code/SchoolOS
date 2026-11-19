@@ -75,6 +75,52 @@ function isMarketingHost(host: string): boolean {
   return bare === root || bare === `www.${root}`
 }
 
+function academySlugFromEnv() {
+  return (process.env.ACADEMY_SLUG ?? 'academy').toLowerCase()
+}
+
+/** academy.mycampusview.com (and academy.lvh.me in local). */
+function isAcademyHost(host: string): boolean {
+  const root = (process.env.APP_ROOT_DOMAIN ?? 'lvh.me:3000').split(':')[0]!.toLowerCase()
+  const bare = host.split(':')[0]!.toLowerCase()
+  const slug = academySlugFromEnv()
+  return bare === `${slug}.${root}` || bare === `${slug}.lvh.me` || bare === slug
+}
+
+/**
+ * On the Academy host, public pages live at `/`, `/courses/…`, `/join`, `/terms`.
+ * Internally they still render from `/academy/…`; old `/academy` URLs redirect.
+ */
+function academyHostRouting(request: NextRequest, pathname: string): NextResponse | null {
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? ''
+  if (!isAcademyHost(host)) return null
+
+  if (pathname === '/academy' || pathname.startsWith('/academy/')) {
+    const url = request.nextUrl.clone()
+    url.pathname = pathname.slice('/academy'.length) || '/'
+    return NextResponse.redirect(url, 308)
+  }
+
+  const publicAcademy =
+    pathname === '/' ||
+    pathname.startsWith('/courses/') ||
+    pathname === '/courses' ||
+    pathname === '/join' ||
+    pathname.startsWith('/join/') ||
+    pathname === '/terms' ||
+    pathname.startsWith('/terms/')
+
+  if (publicAcademy) {
+    const url = request.nextUrl.clone()
+    url.pathname = pathname === '/' ? '/academy' : `/academy${pathname}`
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-pathname', pathname)
+    return NextResponse.rewrite(url, { request: { headers: requestHeaders } })
+  }
+
+  return null
+}
+
 /**
  * The one public origin of a marketing-only deployment, from `APP_URL`.
  *
@@ -127,6 +173,12 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname === '/manifest.webmanifest'
+
+  // Academy subdomain: clean public URLs at the host root.
+  if (deployment !== 'marketing' && !internal) {
+    const academy = academyHostRouting(request, pathname)
+    if (academy) return academy
+  }
 
   // A marketing-only deployment: the application does not exist here, on any
   // host. Anything belonging to it goes to the website's front page rather than

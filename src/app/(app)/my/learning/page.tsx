@@ -29,7 +29,7 @@ export default async function MyLearningPage() {
       <PageHeader
         title="My courses"
         description={`Robotics & AI · ${courses.length} course${courses.length === 1 ? '' : 's'}${finished ? ` · ${finished} finished` : ''}`}
-        actions={academy ? <Link href="/academy" className={buttonVariants({ variant: 'secondary' })}>Browse courses</Link> : undefined}
+        actions={academy ? <Link href="/" className={buttonVariants({ variant: 'secondary' })}>Browse courses</Link> : undefined}
       />
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
@@ -111,7 +111,7 @@ export default async function MyLearningPage() {
             <EmptyState
               title="No courses yet"
               description="Courses you join or buy appear here."
-              action={<Link href="/academy" className={buttonVariants()}>Browse courses</Link>}
+              action={<Link href="/" className={buttonVariants()}>Browse courses</Link>}
             />
           ) : (
             <EmptyState title="No courses yet" description="When your school opens a Robotics & AI course to your class, it will appear here." />

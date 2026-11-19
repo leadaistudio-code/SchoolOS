@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
  */
 export function AcademyHeader({ signedIn, firstName }: { signedIn: boolean; firstName?: string }) {
   const pathname = usePathname()
-  const overFold = pathname === '/academy'
+  const overFold = pathname === '/'
   const [solid, setSolid] = React.useState(!overFold)
 
   React.useEffect(() => {
@@ -41,7 +41,7 @@ export function AcademyHeader({ signedIn, firstName }: { signedIn: boolean; firs
       )}
     >
       <div className="mx-auto flex h-16 max-w-[78rem] items-center gap-6 px-[var(--gutter)] sm:h-[4.5rem]">
-        <Link href="/academy" className="flex shrink-0 items-center gap-2.5" aria-label="MyCampusView Academy home">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="MyCampusView Academy home">
           <MyCampusViewLogo size="sm" onDark={dark} priority />
           <span aria-hidden className={cn('hidden h-4 w-px sm:block', dark ? 'bg-white/30' : 'bg-[var(--rule-strong)]')} />
           <span
@@ -56,7 +56,7 @@ export function AcademyHeader({ signedIn, firstName }: { signedIn: boolean; firs
 
         <nav className="ml-auto flex items-center gap-1 text-[14.5px]">
           <Link
-            href="/academy#courses"
+            href="/#courses"
             className={cn(
               'hidden rounded-full px-3.5 py-2 transition-colors sm:block',
               dark ? 'text-white/70 hover:text-white' : 'text-[var(--ed-ink-soft)] hover:text-[var(--ed-ink)]',
@@ -86,7 +86,7 @@ export function AcademyHeader({ signedIn, firstName }: { signedIn: boolean; firs
                 Sign in
               </Link>
               <Link
-                href="/academy/join"
+                href="/join"
                 className={cn(
                   'rounded-full px-4 py-2 font-medium transition-transform duration-300 hover:scale-[1.03]',
                   dark ? 'bg-white text-[var(--ed-black)]' : 'bg-[var(--ed-ink)] text-white',

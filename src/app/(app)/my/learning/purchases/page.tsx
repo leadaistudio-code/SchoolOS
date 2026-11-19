@@ -24,7 +24,7 @@ export default async function PurchasesPage() {
           <EmptyState
             title="No purchases yet"
             description="Courses you buy appear here."
-            action={<Link href="/academy" className={buttonVariants()}>Browse courses</Link>}
+            action={<Link href="/" className={buttonVariants()}>Browse courses</Link>}
           />
         ) : (
           <TableWrap>

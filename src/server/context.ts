@@ -79,7 +79,7 @@ export async function requireContext(permission?: string): Promise<AppContext> {
   }
 
   const ctx = await getContext()
-  if (!ctx) redirect(!user && isAcademy(tenant) ? '/academy' : '/login')
+  if (!ctx) redirect(!user && isAcademy(tenant) ? '/' : '/login')
   if (ctx.user.mustChangePassword) {
     const h = await headers()
     const path = h.get('x-pathname') ?? ''

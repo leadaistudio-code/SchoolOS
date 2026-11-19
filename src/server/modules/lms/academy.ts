@@ -47,7 +47,7 @@ export const ACADEMY_NAME = 'MyCampusView Academy'
 
 export { academySlug, isAcademy }
 
-export function academyUrl(path = '/academy') {
+export function academyUrl(path = '/') {
   return tenantUrl(academySlug(), path)
 }
 

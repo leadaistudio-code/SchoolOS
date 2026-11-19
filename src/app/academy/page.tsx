@@ -56,15 +56,15 @@ export default async function AcademyHomePage({ searchParams }: { searchParams: 
   const primary = visitor
     ? { href: '/my/learning', label: 'Go to my learning' }
     : free
-      ? { href: `/academy/courses/${free.id}`, label: 'Start the free course' }
-      : { href: '/academy/join', label: 'Create a free account' }
+      ? { href: `/courses/${free.id}`, label: 'Start the free course' }
+      : { href: '/join', label: 'Create a free account' }
 
   const filterHref = (value?: string) => {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (value) params.set('category', value)
     const s = params.toString()
-    return `${s ? `/academy?${s}` : '/academy'}#courses`
+    return `${s ? `/?${s}` : '/'}#courses`
   }
 
   return (
@@ -83,7 +83,7 @@ export default async function AcademyHomePage({ searchParams }: { searchParams: 
                 delay={400}
               />
             </div>
-            <form action="/academy#courses" className="relative w-full lg:w-80" role="search">
+            <form action="/" className="relative w-full lg:w-80" role="search">
               {category ? <input type="hidden" name="category" value={category} /> : null}
               <Search className="pointer-events-none absolute left-0 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" aria-hidden />
               <input
@@ -132,7 +132,7 @@ export default async function AcademyHomePage({ searchParams }: { searchParams: 
                     : 'Create a free account and they will be waiting in your list when they open.'}
                 </p>
                 {filtered ? (
-                  <Link href="/academy#courses" className="ed-link mt-6 text-[15px] text-[var(--ed-ink)]">
+                  <Link href="/#courses" className="ed-link mt-6 text-[15px] text-[var(--ed-ink)]">
                     Show every course
                     <ArrowUpRight className="size-[1em]" aria-hidden />
                   </Link>

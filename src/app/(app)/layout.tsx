@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ) {
       redirect('/suspended')
     }
-    redirect(isAcademy(tenant) && !user ? '/academy' : '/login')
+    redirect(isAcademy(tenant) && !user ? '/' : '/login')
   }
 
   const [entitlements, accountingFlags, groupOwner] = await Promise.all([

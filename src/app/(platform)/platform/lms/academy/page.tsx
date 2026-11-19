@@ -39,7 +39,7 @@ export default async function PlatformAcademyPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-ink-muted">
-              Creates a school called MyCampusView Academy at <strong>{academyUrl('/academy').replace(/^https?:\/\//, '')}</strong> with the
+              Creates a school called MyCampusView Academy at <strong>{academyUrl('/').replace(/^https?:\/\//, '')}</strong> with the
               Robotics &amp; AI add-on switched on. Public learners join it from its course pages; its administrator runs live classes and
               reviews projects there like any school.
             </p>
@@ -59,7 +59,7 @@ export default async function PlatformAcademyPage() {
         actions={
           <>
             <ApplyFreemiumButton />
-            <a href={academyUrl('/academy')} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'secondary' })}>
+            <a href={academyUrl('/')} target="_blank" rel="noreferrer" className={buttonVariants({ variant: 'secondary' })}>
               <ExternalLink /> Open the Academy
             </a>
           </>

@@ -66,16 +66,16 @@ export default async function AcademyLayout({ children }: { children: React.Reac
               </p>
             </div>
             <nav aria-label="Academy" className="flex flex-col gap-3 text-[15px]">
-              <Link href="/academy#courses" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Courses</Link>
+              <Link href="/#courses" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Courses</Link>
               {visitor ? (
                 <Link href="/my/learning" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">My learning</Link>
               ) : (
                 <>
-                  <Link href="/academy/join" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Create an account</Link>
+                  <Link href="/join" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Create an account</Link>
                   <Link href="/login?next=/my/learning" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Sign in</Link>
                 </>
               )}
-              <Link href="/academy/terms" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Terms and refunds</Link>
+              <Link href="/terms" className="w-fit text-[var(--text-muted)] hover:text-[var(--ed-ink)]">Terms and refunds</Link>
             </nav>
             <div>
               <h2 className="text-[15px] font-semibold">Running a school?</h2>

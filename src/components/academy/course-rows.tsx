@@ -38,7 +38,7 @@ export function CourseRows({ courses }: { courses: CourseRow[] }) {
         return (
           <li key={c.id} data-reveal className="border-t border-[var(--rule)]">
             <Link
-              href={`/academy/courses/${c.id}`}
+              href={`/courses/${c.id}`}
               className="group grid items-center gap-6 py-8 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:gap-10 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_auto] lg:py-10"
             >
               <div className="overflow-hidden rounded-xl border border-[var(--rule)] bg-[var(--page)]">

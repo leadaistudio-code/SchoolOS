@@ -41,7 +41,7 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
   const unlocked = course.priceMinor === 0 || (visitor?.unlocked.has(course.id) ?? false)
   const freemium = course.priceMinor > 0
   const free = course.priceMinor === 0
-  const here = `/academy/courses/${course.id}`
+  const here = `/courses/${course.id}`
   const art = courseArt(course.category)
   const kinds = new Set(lessons.map((l) => l.kind))
   let lessonOrdinal = 0
@@ -67,7 +67,7 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
       <section className="border-b border-[var(--rule)] bg-white px-[var(--gutter)] pb-16 pt-10 sm:pb-20 sm:pt-14">
         <div className="mx-auto max-w-[78rem]">
           <Link
-            href="/academy#courses"
+            href="/#courses"
             className="inline-flex items-center gap-1.5 text-[14px] text-[var(--text-muted)] transition-colors hover:text-[var(--ed-ink)]"
           >
             <ArrowLeft className="size-3.5" aria-hidden /> All courses
@@ -261,7 +261,7 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
                   <Notice tone="info">This account is not a learner account. Sign in with your Academy account to enrol.</Notice>
                 ) : (
                   <>
-                    <Link href={`/academy/join?next=${encodeURIComponent(here)}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
+                    <Link href={`/join?next=${encodeURIComponent(here)}`} className={`${PILL} bg-[var(--ed-ink)] text-white`}>
                       {freemium ? 'Join free to start' : free ? 'Join free to start' : 'Create an account to buy'}
                     </Link>
                     <Link
@@ -277,7 +277,7 @@ export default async function AcademyCoursePage({ params }: { params: Promise<{ 
               {freemium && !unlocked ? (
                 <p className="mt-5 text-[13px] leading-[1.55] text-[var(--text-subtle)]">
                   Unlock with UPI, card, net banking or a wallet via Razorpay. See the{' '}
-                  <Link href="/academy/terms" className="underline underline-offset-2 hover:text-[var(--ed-ink)]">
+                  <Link href="/terms" className="underline underline-offset-2 hover:text-[var(--ed-ink)]">
                     refund policy
                   </Link>
                   .

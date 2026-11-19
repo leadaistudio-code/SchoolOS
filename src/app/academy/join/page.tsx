@@ -11,7 +11,7 @@ export const metadata = { title: 'Create your account' }
 export default async function AcademyJoinPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const tenant = await requireAcademyHost()
   const { next } = await searchParams
-  const target = sanitizeLoginNext(next) ?? '/academy'
+  const target = sanitizeLoginNext(next) ?? '/'
   if (await academyVisitor(tenant)) redirect(target)
 
   return (

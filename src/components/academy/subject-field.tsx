@@ -79,7 +79,7 @@ export function SubjectField({ subjects }: { subjects: Subject[] }) {
         return s.count > 0 ? (
           <Link
             key={s.value}
-            href={`/academy?category=${s.value}#courses`}
+            href={`/?category=${s.value}#courses`}
             data-capsule
             className={cn(chip, 'transition-[filter] hover:brightness-110')}
           >

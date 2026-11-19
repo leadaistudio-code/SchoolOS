@@ -55,7 +55,7 @@ export function JoinForm({ next }: { next: string }) {
         Create account
       </Button>
       <p className="text-xs text-ink-subtle">
-        By joining you agree to the <a href="/academy/terms" className="underline">terms and refund policy</a>. Under 18? Ask a parent to create the account with you.
+        By joining you agree to the <a href="/terms" className="underline">terms and refund policy</a>. Under 18? Ask a parent to create the account with you.
       </p>
     </form>
   )
