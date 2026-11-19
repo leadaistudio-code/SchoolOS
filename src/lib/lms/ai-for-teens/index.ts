@@ -1,0 +1,300 @@
+import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+
+export const AI_FOR_TEENS_TITLE = 'AI for Teens: Build, judge, ship'
+
+/** Classes 9–12. Deeper, more critical AI than Young Builders. */
+export const AI_FOR_TEENS = catalogueCurriculum({
+  key: 'ai-for-teens',
+  courseTitle: AI_FOR_TEENS_TITLE,
+  mediaBase: '/lms-media/ai-for-teens',
+  notesHint: 'Note one claim you verified, and how you verified it.',
+  course: {
+    subtitle: 'Train models, stress-test them, and ship AI projects responsibly',
+    description:
+      'An intermediate AI course for Classes 9 to 12. Students go beyond demos: they define problem statements, examine datasets for bias, evaluate models with proper test splits, probe generative AI critically, and ship a small project with a model card. Ideal after AI for Young Builders, or for older beginners ready for sharper questions.',
+    category: 'AI',
+    level: 'INTERMEDIATE',
+    gradeFrom: 9,
+    gradeTo: 12,
+    outcomes: [
+      'Frame an AI problem with users, data and success metrics',
+      'Explain train/test splits and why accuracy alone misleads',
+      'Detect common dataset biases and propose fixes',
+      'Use generative AI with verification and citation habits',
+      'Publish a mini project with a short model card',
+    ],
+    academyPriceMinor: 49_900,
+  },
+  badges: [
+    { id: 'ait-frame', name: 'Problem Framer', description: 'Scoped a real AI problem', lessons: ['ait-01-welcome', 'ait-02-problem', 'ait-03-data'] },
+    { id: 'ait-eval', name: 'Model Critic', description: 'Evaluated fairly and found bias', lessons: ['ait-04-split', 'ait-05-metrics', 'ait-06-bias'] },
+    { id: 'ait-ship', name: 'Responsible Shipper', description: 'Shipped with a model card', lessons: ['ait-07-genai', 'ait-08-project', 'ait-09-card', 'ait-10-quiz'] },
+  ],
+  modules: [
+    module('m1', 'Frame the problem', 'Users, data, success.', [
+      lesson({
+        slug: 'ait-01-welcome',
+        title: 'Welcome: from demos to decisions',
+        minutes: 12,
+        intro: 'Teen builders do more than click “Train”. You will ask whether a problem should use AI at all, what data is fair, and how you will know the system is good enough.',
+        objectives: ['Contrast demo AI with production thinking', 'List three questions before building'],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'Three questions before you build',
+            body: '1. **Who** is helped or harmed?\n2. **What data** do you have — and what is missing?\n3. **How** will you measure success beyond a happy screenshot?',
+          },
+          {
+            type: 'callout',
+            tone: 'life',
+            title: 'India context',
+            body: 'Think of multilingual classrooms, uneven device access, and public services. An AI that only works on high-end phones in English may fail the students who need it most.',
+          },
+        ],
+        summary: ['Responsible AI starts before training.', 'Users, data and metrics come first.'],
+        next: 'Write a sharp problem statement.',
+        questions: [q('q1', 'Before training, you should clarify…', 'Who it helps, what data you have, how you measure success', ['Only the logo colour', 'The GPU brand'], 'Scope beats premature training.')],
+      }),
+      lesson({
+        slug: 'ait-02-problem',
+        title: 'Write a problem statement',
+        minutes: 14,
+        intro: 'A good statement names the user, the job to be done, and what “good” looks like.',
+        objectives: ['Draft a one-paragraph problem statement', 'Reject a vague “AI for education” pitch'],
+        blocks: [
+          {
+            type: 'sort',
+            id: 'sharp-vague',
+            title: 'Sharp or vague?',
+            prompt: 'Sort each pitch.',
+            bins: [
+              { id: 'sharp', label: 'Sharp enough to build' },
+              { id: 'vague', label: 'Too vague' },
+            ],
+            items: [
+              { id: 'a', text: 'Help Class 10 students practise quadratic equations with hints', bin: 'sharp', why: 'User, topic and interaction are clear.' },
+              { id: 'b', text: 'Use AI to fix education', bin: 'vague', why: 'No user, no task, no metric.' },
+              { id: 'c', text: 'Flag likely duplicate fee receipts for the accounts desk', bin: 'sharp', why: 'Concrete workflow and user.' },
+              { id: 'd', text: 'Make a cool neural network', bin: 'vague', why: 'Technique without purpose.' },
+            ],
+          },
+        ],
+        summary: ['Sharp problems name users and outcomes.', 'Vague pitches waste training time.'],
+        next: 'Look hard at your data.',
+        questions: [q('q1', 'A sharp AI problem statement includes…', 'User, task and success idea', ['Only the model name', 'Stock photos'], 'Users and outcomes first.')],
+      }),
+      lesson({
+        slug: 'ait-03-data',
+        title: 'Data inventories',
+        minutes: 14,
+        intro: 'List what you have, what you lack, and what would be unethical to collect.',
+        objectives: ['Inventory features and labels', 'Name one privacy risk'],
+        blocks: [
+          {
+            type: 'steps',
+            title: 'Inventory pass',
+            steps: [
+              { title: 'Examples', body: 'How many labelled examples do you have today?' },
+              { title: 'Gaps', body: 'Which groups, languages or devices are missing?' },
+              { title: 'Sensitive fields', body: 'Would this data embarrass or endanger someone if leaked?' },
+              { title: 'Consent', body: 'Do you have permission to use it for this purpose?' },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'safety',
+            title: 'Do not collect “just in case”',
+            body: 'Extra personal fields create risk without improving the model. Collect the minimum required for the stated purpose.',
+          },
+        ],
+        summary: ['Data inventories reveal gaps and risks early.', 'Minimum necessary data is safer.'],
+        next: 'Split data so tests mean something.',
+        questions: [q('q1', 'A data inventory should flag…', 'Gaps, sensitive fields and consent', ['Only file sizes', 'Favourite colours of engineers'], 'Gaps and privacy matter.')],
+      }),
+    ]),
+    module('m2', 'Evaluate honestly', 'Splits, metrics, bias.', [
+      lesson({
+        slug: 'ait-04-split',
+        title: 'Train / test splits',
+        minutes: 14,
+        intro: 'If you test on the same examples you trained on, your score is flattering and false.',
+        objectives: ['Explain why held-out test data matters', 'Describe a simple split'],
+        blocks: [
+          {
+            type: 'sequence',
+            id: 'split-order',
+            title: 'Honest evaluation order',
+            prompt: 'Put the steps in order.',
+            steps: [
+              { id: 's1', text: 'Collect and clean labelled data' },
+              { id: 's2', text: 'Hold out a test set you will not train on' },
+              { id: 's3', text: 'Train on the remaining data' },
+              { id: 's4', text: 'Score only on the held-out test set' },
+            ],
+            explanation: 'The test set is the exam paper you must not study.',
+          },
+          {
+            type: 'code',
+            language: 'python',
+            code: '# Pseudocode\ndata = shuffle(examples)\ntest = data[:20%]\ntrain = data[20%:]\nmodel.fit(train)\nprint(score(model, test))\n',
+            caption: 'Illustrative only — many libraries do this with one helper call.',
+          },
+        ],
+        summary: ['Never grade yourself on the training homework.', 'Held-out tests estimate real performance.'],
+        next: 'Pick metrics that match the harm.',
+        questions: [q('q1', 'Testing on training data usually…', 'Overstates how good the model is', ['Is required by law', 'Deletes the model'], 'Memorisation looks like skill.')],
+      }),
+      lesson({
+        slug: 'ait-05-metrics',
+        title: 'Metrics beyond “accuracy”',
+        minutes: 14,
+        intro: 'When classes are imbalanced, 95% accuracy can hide a useless model.',
+        objectives: ['Give an imbalance example', 'Name precision/recall in plain language'],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'The rare event trap',
+            body: 'If 98 of 100 transactions are normal, a model that always says “normal” is 98% accurate — and catches zero fraud. Ask: **what errors are costly?**',
+          },
+          {
+            type: 'match',
+            id: 'metric-words',
+            title: 'Plain-language metrics',
+            prompt: 'Match the idea.',
+            pairs: [
+              { id: 'p1', left: 'Precision', right: 'Of the alarms we raised, how many were real?' },
+              { id: 'p2', left: 'Recall', right: 'Of the real cases, how many did we catch?' },
+              { id: 'p3', left: 'Confusion matrix', right: 'Table of predicted vs actual labels' },
+            ],
+            explanation: 'Pick metrics from the cost of false alarms vs missed cases.',
+          },
+        ],
+        summary: ['Accuracy can mislead on imbalanced data.', 'Choose metrics from real-world costs.'],
+        next: 'Hunt for bias in the dataset.',
+        questions: [q('q1', 'Always predicting the majority class can yield…', 'High accuracy and useless performance', ['Perfect fairness automatically', 'Zero accuracy'], 'Imbalance fools accuracy.')],
+      }),
+      lesson({
+        slug: 'ait-06-bias',
+        title: 'Bias: find it, fix what you can',
+        minutes: 16,
+        intro: 'Bias often enters through who appears in the data — and who does not.',
+        objectives: ['Spot a representation gap', 'Propose one mitigation'],
+        blocks: [
+          {
+            type: 'sort',
+            id: 'bias-examples',
+            title: 'Likely bias risk?',
+            prompt: 'Sort each dataset plan.',
+            bins: [
+              { id: 'risk', label: 'High bias risk' },
+              { id: 'better', label: 'Safer direction' },
+            ],
+            items: [
+              { id: 'a', text: 'Face dataset from one city and age group only', bin: 'risk', why: 'Narrow demographics fail elsewhere.' },
+              { id: 'b', text: 'Handwriting samples across many schools and scripts', bin: 'better', why: 'Variety improves fairness.' },
+              { id: 'c', text: 'Resume screener trained only on past hires from one college', bin: 'risk', why: 'Past bias gets automated.' },
+              { id: 'd', text: 'Plant disease photos in several lighting conditions', bin: 'better', why: 'Variety matches real farms.' },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'tip',
+            title: 'Mitigations',
+            body: 'Collect more varied data, measure errors by group, involve affected users, and sometimes decide **not** to automate a decision.',
+          },
+        ],
+        summary: ['Missing groups create biased models.', 'Measurement by group makes harm visible.'],
+        next: 'Use generative AI with verification.',
+        questions: [q('q1', 'A common source of AI bias is…', 'Unrepresentative training data', ['Using too many comments', 'Printing output'], 'Who is missing from data matters.')],
+      }),
+    ]),
+    module('m3', 'Generate and ship', 'GenAI habits, project, model card.', [
+      lesson({
+        slug: 'ait-07-genai',
+        title: 'Generative AI: useful, not oracle',
+        minutes: 14,
+        intro: 'Chat models predict likely text. They can be fluent and wrong in the same paragraph.',
+        objectives: ['Describe a verification habit', 'Avoid pasting secrets into prompts'],
+        blocks: [
+          {
+            type: 'checklist',
+            id: 'genai-habits',
+            title: 'Before you trust an answer',
+            items: [
+              { id: 'a', text: 'I checked facts against a textbook, teacher or trusted site' },
+              { id: 'b', text: 'I did not paste passwords, IDs or private chats' },
+              { id: 'c', text: 'I said when AI helped with my schoolwork' },
+              { id: 'd', text: 'I rewrote the answer in my own words' },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'safety',
+            title: 'Prompt injection & strangers',
+            body: 'Do not follow instructions from random web pages that say “ignore previous rules”. Treat unexpected requests for personal data as hostile.',
+          },
+        ],
+        summary: ['Fluency ≠ truth.', 'Verify, protect privacy, disclose AI help.'],
+        next: 'Ship your teen AI project.',
+        questions: [q('q1', 'A chat model’s confident tone means…', 'Nothing by itself — verify important claims', ['It must be correct', 'It has feelings'], 'Confidence is not evidence.')],
+      }),
+      lesson({
+        slug: 'ait-08-project',
+        title: 'Project: scoped AI prototype',
+        minutes: 24,
+        kind: 'PROJECT',
+        intro: 'Build a small prototype with a clear user, dataset plan, metric and limitation list.',
+        objectives: ['Deliver a working or rigorously paper-prototyped system', 'Document failures honestly'],
+        body: 'Pick one lane:\n1) Image or text classifier for a school-relevant task.\n2) A generative study helper with mandatory citation/check steps.\n3) An evaluation report on an existing public model (no training) with group error analysis.\nSubmit: problem statement, data notes, metric, demo/screenshots, and top 3 limitations.',
+        blocks: [
+          {
+            type: 'callout',
+            tone: 'teacher',
+            title: 'Assessment focus',
+            body: 'Reward honesty about limits more than flashy accuracy claims.',
+          },
+        ],
+        summary: ['Shipping includes documentation.', 'Limits are features of trustworthy work.'],
+        next: 'Write the model card.',
+      }),
+      lesson({
+        slug: 'ait-09-card',
+        title: 'Write a mini model card',
+        minutes: 12,
+        intro: 'A model card is a short nutrition label for your system.',
+        objectives: ['Fill intended use, data, metrics and risks', 'State out-of-scope uses'],
+        blocks: [
+          {
+            type: 'steps',
+            title: 'Model card sections',
+            steps: [
+              { title: 'Intended use', body: 'Who it is for and what job it supports.' },
+              { title: 'Data', body: 'Sources, size, known gaps.' },
+              { title: 'Metrics', body: 'What you measured and on which split.' },
+              { title: 'Risks & out-of-scope', body: 'Where it must not be used.' },
+            ],
+          },
+        ],
+        summary: ['Model cards make claims checkable.', 'Out-of-scope uses prevent misuse.'],
+        next: 'Final check quiz.',
+        questions: [q('q1', 'A model card should include…', 'Intended use, data, metrics and risks', ['Only marketing quotes', 'Passwords'], 'Cards document use and limits.')],
+      }),
+      lesson({
+        slug: 'ait-10-quiz',
+        title: 'AI for Teens check',
+        minutes: 12,
+        kind: 'QUIZ',
+        intro: 'Check framing, evaluation, bias and generative habits.',
+        objectives: ['Show what you remember'],
+        blocks: [{ type: 'text', heading: 'Ready?', body: 'This quiz rewards careful reading more than memorised jargon.' }],
+        summary: ['You can judge AI systems, not only run them.', 'Keep practising with real school problems.'],
+        next: 'You finished AI for Teens. Mentor younger learners on AI for Young Builders if you like.',
+        questions: [
+          q('q1', 'Held-out test data is for…', 'Honest evaluation after training', ['Training only', 'Decorating slides'], 'Test sets estimate real performance.'),
+          q('q2', 'High accuracy with rare events can still be…', 'Useless if it misses the rare class', ['Proof of fairness', 'Illegal'], 'Imbalance hides failure modes.'),
+          q('q3', 'Paste personal IDs into a public chatbot?', 'No', ['Yes, always', 'Only on Mondays'], 'Protect private data.'),
+        ],
+      }),
+    ]),
+  ],
+})

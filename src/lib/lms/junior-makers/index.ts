@@ -1,0 +1,300 @@
+import { catalogueCurriculum, lesson, module, q } from '@/lib/lms/catalogue/build'
+
+export const JUNIOR_MAKERS_TITLE = 'Junior Makers: Light, sound and sensors'
+
+/** Classes 3–5. Safe circuit ideas before full Robotics 101. */
+export const JUNIOR_MAKERS = catalogueCurriculum({
+  key: 'junior-makers',
+  courseTitle: JUNIOR_MAKERS_TITLE,
+  mediaBase: '/lms-media/junior-makers',
+  notesHint: 'Sketch your circuit or write what each part does.',
+  course: {
+    subtitle: 'Discover how lights, buzzers and sensors make things react',
+    description:
+      'An electronics starter for Classes 3 to 5. Learners meet circuits, switches, LEDs, buzzers and simple sensors through diagrams, safety rules and hands-on challenges they can try with a school kit or classroom demos. Builds confidence before Robotics 101.',
+    category: 'ELECTRONICS',
+    level: 'BEGINNER',
+    gradeFrom: 3,
+    gradeTo: 5,
+    outcomes: [
+      'Describe a simple circuit (power, path, load)',
+      'Explain what a switch, LED and sensor do',
+      'Follow basic electricity safety',
+      'Plan a small maker project with a clear purpose',
+    ],
+    academyPriceMinor: 49_900,
+  },
+  badges: [
+    { id: 'jm-circuit', name: 'Circuit Starter', description: 'Understood power, path and load', lessons: ['jm-01-welcome', 'jm-02-circuit', 'jm-03-safety'] },
+    { id: 'jm-sense', name: 'Sensor Scout', description: 'Met lights, sound and sensors', lessons: ['jm-04-led', 'jm-05-switch', 'jm-06-sensors'] },
+    { id: 'jm-maker', name: 'Junior Maker', description: 'Finished the maker project', lessons: ['jm-07-plan', 'jm-08-project', 'jm-09-test', 'jm-10-quiz'] },
+  ],
+  modules: [
+    module('m1', 'How circuits work', 'Power, path, load and safety.', [
+      lesson({
+        slug: 'jm-01-welcome',
+        title: 'Welcome: makers change how things behave',
+        minutes: 10,
+        intro: 'Makers build small systems that sense the world and react — a light that turns on, a buzzer that warns, a fan that cools.',
+        objectives: ['Say what a maker project is', 'Name three everyday electronic helpers'],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'Electronics around you',
+            body: 'A torch, a doorbell, a night lamp and a washing-machine beep all use **circuits**: paths that electricity can follow to do a job.',
+          },
+          {
+            type: 'sort',
+            id: 'electronic-or-not',
+            title: 'Uses electricity?',
+            prompt: 'Sort each item.',
+            bins: [
+              { id: 'yes', label: 'Needs electricity' },
+              { id: 'no', label: 'No electricity' },
+            ],
+            items: [
+              { id: 'a', text: 'LED desk lamp', bin: 'yes', why: 'LEDs need a power source.' },
+              { id: 'b', text: 'Wooden pencil', bin: 'no', why: 'No circuit inside.' },
+              { id: 'c', text: 'Phone vibration', bin: 'yes', why: 'A tiny motor uses battery power.' },
+              { id: 'd', text: 'Paper kite', bin: 'no', why: 'Wind does the work.' },
+            ],
+          },
+        ],
+        summary: ['Maker projects use circuits to react.', 'Electricity needs a complete path.'],
+        next: 'Next, build the idea of a circuit.',
+        questions: [q('q1', 'A circuit is…', 'A path electricity can follow', ['A type of glue', 'Only a battery'], 'Circuits are complete paths.')],
+      }),
+      lesson({
+        slug: 'jm-02-circuit',
+        title: 'Power, path and load',
+        minutes: 14,
+        intro: 'Every simple circuit has a power source, a path (wires) and a load (the part that does work).',
+        objectives: ['Name power, path and load', 'Spot an open vs closed circuit'],
+        blocks: [
+          {
+            type: 'match',
+            id: 'parts',
+            title: 'Match the part',
+            prompt: 'What job does each part do?',
+            pairs: [
+              { id: 'p1', left: 'Battery', right: 'Provides power' },
+              { id: 'p2', left: 'Wires', right: 'Make the path' },
+              { id: 'p3', left: 'LED or buzzer', right: 'Does the useful work (load)' },
+            ],
+            explanation: 'Power → path → load. Break the path and the load stops.',
+          },
+          {
+            type: 'check',
+            id: 'open-closed',
+            prompt: 'The LED is off because a wire is unplugged. The circuit is…',
+            options: [
+              { id: 'a', text: 'Open (incomplete)', correct: true, feedback: 'Yes — the path is broken.' },
+              { id: 'b', text: 'Closed and working', correct: false, feedback: 'A working circuit needs a complete path.' },
+              { id: 'c', text: 'Too powerful', correct: false, feedback: 'Unplugged wires stop flow; they do not add power.' },
+            ],
+            explanation: 'Open = gap. Closed = complete loop.',
+          },
+        ],
+        summary: ['Power, path and load make a circuit.', 'Open circuits do not run.'],
+        next: 'Next, stay safe around electricity.',
+        questions: [q('q1', 'The “load” in a circuit is…', 'The part that does the job', ['Only the switch', 'The table'], 'Loads use energy to work.')],
+      }),
+      lesson({
+        slug: 'jm-03-safety',
+        title: 'Stay safe',
+        minutes: 12,
+        intro: 'School kits use low voltage, but good habits still matter.',
+        objectives: ['List three safety rules', 'Know when to ask an adult'],
+        blocks: [
+          {
+            type: 'callout',
+            tone: 'safety',
+            title: 'Maker safety',
+            body: '1. Never put wires in wall sockets.\n2. Keep drinks away from circuits.\n3. Ask an adult before connecting to mains power.\n4. Stop and check if something smells hot or odd.',
+          },
+          {
+            type: 'check',
+            id: 'safe-1',
+            prompt: 'Your kit battery pack feels very hot. What should you do?',
+            options: [
+              { id: 'a', text: 'Disconnect power and tell an adult', correct: true, feedback: 'Right — heat means stop.' },
+              { id: 'b', text: 'Cover it with a cloth and continue', correct: false, feedback: 'Heat is a warning. Stop first.' },
+              { id: 'c', text: 'Add another battery', correct: false, feedback: 'More power can make it worse.' },
+            ],
+            explanation: 'Heat, smoke or strange smells → power off, tell an adult.',
+          },
+        ],
+        summary: ['Low-voltage kits still need care.', 'Stop and ask when something seems wrong.'],
+        next: 'Next, meet the LED.',
+        questions: [q('q1', 'Wall sockets are…', 'Not for school kit wires', ['Fine for any wire', 'Only for LEDs'], 'Never put kit wires in mains sockets.')],
+      }),
+    ]),
+    module('m2', 'Parts that react', 'LEDs, switches and sensors.', [
+      lesson({
+        slug: 'jm-04-led',
+        title: 'LEDs: light with a direction',
+        minutes: 12,
+        intro: 'An LED lights when current flows the correct way. Polarity matters.',
+        objectives: ['Explain what an LED does', 'Know LEDs have a direction'],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'Long leg, short leg',
+            body: 'Many LED kits use the **longer leg** for the positive side. If it is the wrong way around, it stays dark — that is a useful clue when debugging.',
+          },
+          {
+            type: 'callout',
+            tone: 'tip',
+            title: 'Resistors',
+            body: 'A resistor limits current so the LED does not burn out. Your teacher’s kit diagram will show where it goes.',
+          },
+        ],
+        summary: ['LEDs turn electricity into light.', 'Direction (polarity) matters.'],
+        next: 'Next, control the path with a switch.',
+        questions: [q('q1', 'If an LED is reversed it usually…', 'Stays off', ['Explodes loudly', 'Changes colour forever'], 'Wrong polarity → no light.')],
+      }),
+      lesson({
+        slug: 'jm-05-switch',
+        title: 'Switches: open and close the path',
+        minutes: 12,
+        intro: 'A switch is a controllable gap in the circuit.',
+        objectives: ['Describe open vs closed with a switch', 'Give one real-world example'],
+        blocks: [
+          {
+            type: 'sequence',
+            id: 'switch-flow',
+            title: 'Torch sequence',
+            prompt: 'Order the events when you turn a torch on.',
+            steps: [
+              { id: 's1', text: 'Press the switch' },
+              { id: 's2', text: 'The path becomes complete' },
+              { id: 's3', text: 'Current reaches the LED' },
+              { id: 's4', text: 'Light appears' },
+            ],
+            explanation: 'The switch closes the path so the load can run.',
+          },
+        ],
+        summary: ['Switches control whether the path is complete.', 'On = closed path for many simple lamps.'],
+        next: 'Next, sensors that notice the world.',
+        questions: [q('q1', 'A switch mainly…', 'Opens or closes the path', ['Stores music', 'Measures temperature only'], 'Switches control the path.')],
+      }),
+      lesson({
+        slug: 'jm-06-sensors',
+        title: 'Sensors: notice light, touch, distance',
+        minutes: 14,
+        intro: 'Sensors turn something in the world into a signal a circuit or microcontroller can use.',
+        objectives: ['Name three sensor types', 'Link a sensor to a useful reaction'],
+        blocks: [
+          {
+            type: 'match',
+            id: 'sensor-jobs',
+            title: 'Sensor → job',
+            prompt: 'Match each sensor idea to a use.',
+            pairs: [
+              { id: 'p1', left: 'Light sensor', right: 'Night lamp turns on in the dark' },
+              { id: 'p2', left: 'Touch / button', right: 'Doorbell starts the buzzer' },
+              { id: 'p3', left: 'Distance sensor', right: 'Robot slows before a wall' },
+            ],
+            explanation: 'Sense → decide → act is the heart of robotics.',
+          },
+          {
+            type: 'callout',
+            tone: 'life',
+            title: 'Later course',
+            body: 'In **Robotics 101** you will wire IR sensors and motors on a real line-follower. This course builds the vocabulary first.',
+          },
+        ],
+        summary: ['Sensors notice; actuators act.', 'Good projects pair a sensor with a clear reaction.'],
+        next: 'Next, plan your own mini project.',
+        questions: [q('q1', 'A sensor’s job is to…', 'Notice something in the world', ['Only make noise', 'Replace the battery'], 'Sensors detect; other parts act.')],
+      }),
+    ]),
+    module('m3', 'Build a mini project', 'Plan, make, test.', [
+      lesson({
+        slug: 'jm-07-plan',
+        title: 'Plan: who does it help?',
+        minutes: 12,
+        intro: 'Start with a person and a problem, then pick parts.',
+        objectives: ['Write a one-sentence project goal', 'List the parts you need'],
+        blocks: [
+          {
+            type: 'text',
+            heading: 'Example goals',
+            body: '- A desk lamp that reminds me to pack my bag.\n- A buzzer that warns when a cupboard door opens.\n- A night light for a hallway.',
+          },
+          {
+            type: 'checklist',
+            id: 'plan',
+            title: 'Planning checklist',
+            items: [
+              { id: 'a', text: 'I named who the project helps' },
+              { id: 'b', text: 'I chose a sensor or switch' },
+              { id: 'c', text: 'I chose a light or sound output' },
+              { id: 'd', text: 'I sketched the path on paper' },
+            ],
+          },
+        ],
+        summary: ['Purpose first, parts second.', 'A sketch catches missing wires early.'],
+        next: 'Build and document your project.',
+        questions: [q('q1', 'A good project plan starts with…', 'Who it helps and what problem it solves', ['Buying every sensor', 'Skipping the sketch'], 'Purpose guides part choices.')],
+      }),
+      lesson({
+        slug: 'jm-08-project',
+        title: 'Project: sense-and-react gadget',
+        minutes: 20,
+        kind: 'PROJECT',
+        intro: 'Build (or carefully simulate on paper) a gadget that senses something and reacts with light or sound.',
+        objectives: ['Complete a working or paper prototype', 'Record what each part does'],
+        body: 'Choose one: night light, cupboard alarm, or “bag packed” reminder. Build with your school kit if available, or submit a labelled diagram and parts list. Say what you would test first.',
+        blocks: [
+          {
+            type: 'callout',
+            tone: 'teacher',
+            title: 'Teachers',
+            body: 'Paper prototypes are valid where kits are limited. Look for clear labels: power, switch/sensor, load.',
+          },
+        ],
+        summary: ['Prototypes prove the idea.', 'Labels show you understand the circuit.'],
+        next: 'Test and improve.',
+      }),
+      lesson({
+        slug: 'jm-09-test',
+        title: 'Test like a maker',
+        minutes: 12,
+        intro: 'Testing means changing one thing at a time and watching what happens.',
+        objectives: ['Describe one test you ran', 'Suggest one improvement'],
+        blocks: [
+          {
+            type: 'steps',
+            title: 'A simple test loop',
+            steps: [
+              { title: 'Predict', body: 'What should happen when you press the switch or cover the sensor?' },
+              { title: 'Try', body: 'Do exactly one change.' },
+              { title: 'Observe', body: 'Did the light or buzzer behave as expected?' },
+              { title: 'Fix', body: 'If not, check power, polarity and loose wires.' },
+            ],
+          },
+        ],
+        summary: ['One change at a time finds bugs faster.', 'Write down what you tried.'],
+        next: 'Finish with a short quiz.',
+        questions: [q('q1', 'When testing, change…', 'One thing at a time', ['Everything at once', 'Nothing ever'], 'Single changes reveal causes.')],
+      }),
+      lesson({
+        slug: 'jm-10-quiz',
+        title: 'Junior Makers check',
+        minutes: 12,
+        kind: 'QUIZ',
+        intro: 'Check circuits, safety and sensors.',
+        objectives: ['Show what you remember'],
+        blocks: [{ type: 'text', heading: 'Take your time', body: 'Revisit earlier lessons if you need a hint.' }],
+        summary: ['You are ready for richer kits and Robotics 101.', 'Keep practising safe habits.'],
+        next: 'Try Robotics 101: Build a line-follower next.',
+        questions: [
+          q('q1', 'Power, path and load describe…', 'A simple circuit', ['Only software', 'Only batteries'], 'Those three make a basic circuit.'),
+          q('q2', 'A sensor…', 'Notices something in the world', ['Is only a battery', 'Replaces wires'], 'Sensors detect.'),
+          q('q3', 'Kit wires in a wall socket are…', 'Never allowed', ['Recommended', 'Only for LEDs'], 'Mains power is unsafe for kit wires.'),
+        ],
+      }),
+    ]),
+  ],
+})
