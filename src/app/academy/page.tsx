@@ -142,7 +142,10 @@ export default async function AcademyHomePage({ searchParams }: { searchParams: 
               <CourseRows
                 courses={courses.map((c) => ({
                   ...c,
-                  price: c.priceMinor === 0 ? 'Free' : formatRupees(c.priceMinor),
+                  price:
+                    c.priceMinor === 0
+                      ? 'Free'
+                      : `3 free · ${formatRupees(c.priceMinor)}`,
                   owned: visitor?.owned.has(c.id) ?? false,
                 }))}
               />
