@@ -27,6 +27,8 @@ export const credentialSchema = z.object({
   accountId: z.string().trim().max(200).optional(),
   apiKey: z.string().max(400).optional(),
   apiSecret: z.string().max(400).optional(),
+  /** Razorpay webhook signing secret (payment kind only). */
+  webhookSecret: z.string().max(400).optional(),
   senderId: z.string().trim().max(60).optional(),
   enabled: z.coerce.boolean().default(false),
 })
@@ -37,6 +39,7 @@ type StoredCredential = {
   senderId: string | null
   apiKeyEncrypted: string | null
   apiSecretEncrypted: string | null
+  webhookSecretEncrypted?: string | null
   updatedAt: string
 }
 
@@ -48,6 +51,7 @@ export type CredentialView = {
   senderId: string | null
   hasApiKey: boolean
   hasApiSecret: boolean
+  hasWebhookSecret: boolean
   updatedAt: string | null
 }
 
@@ -70,6 +74,7 @@ function emptyView(kind: IntegrationKind): CredentialView {
     senderId: null,
     hasApiKey: false,
     hasApiSecret: false,
+    hasWebhookSecret: false,
     updatedAt: null,
   }
 }
@@ -90,6 +95,7 @@ export async function listCredentials(ctx: AppContext): Promise<CredentialView[]
       senderId: stored.senderId,
       hasApiKey: !!stored.apiKeyEncrypted,
       hasApiSecret: !!stored.apiSecretEncrypted,
+      hasWebhookSecret: !!stored.webhookSecretEncrypted,
       updatedAt: stored.updatedAt,
     }
   })
@@ -113,6 +119,9 @@ export async function saveCredential(ctx: AppContext, input: z.infer<typeof cred
     apiSecretEncrypted: input.apiSecret
       ? encryptSecret(input.apiSecret)
       : (existing?.apiSecretEncrypted ?? null),
+    webhookSecretEncrypted: input.webhookSecret
+      ? encryptSecret(input.webhookSecret)
+      : (existing?.webhookSecretEncrypted ?? null),
     updatedAt: new Date().toISOString(),
   }
 
@@ -228,14 +237,23 @@ export async function providerStatus(ctx: AppContext): Promise<ProviderStatus[]>
     {
       key: 'payment',
       label: 'Payment gateway',
-      driver: e.PAYMENT_DRIVER,
-      live: e.PAYMENT_DRIVER !== 'mock' && !!e.PAYMENT_KEY_ID,
-      detail:
-        e.PAYMENT_DRIVER === 'mock'
-          ? 'Online payments are simulated — nothing is charged'
-          : e.PAYMENT_KEY_ID
-            ? `Live through ${e.PAYMENT_DRIVER}`
-            : `${e.PAYMENT_DRIVER} selected but no key is configured`,
+      driver: 'razorpay',
+      live: await (async () => {
+        const { feePaymentsLive } = await import('@/server/modules/finance/razorpay-fees')
+        return feePaymentsLive(ctx.tenant.id)
+      })(),
+      detail: await (async () => {
+        const { feeRazorpayKeys } = await import('@/server/modules/finance/razorpay-fees')
+        const keys = await feeRazorpayKeys(ctx.tenant.id)
+        if (keys?.source === 'tenant') {
+          return keys.merchantId
+            ? `Live via this school’s Razorpay account (${keys.merchantId})`
+            : 'Live via this school’s Razorpay Key ID / secret'
+        }
+        if (keys?.source === 'env') return 'Live via deployment Razorpay keys'
+        return 'Save Key ID and Key secret below and turn on “Use this account” so parents can pay fees online'
+      })(),
+      href: '/settings/integrations',
     },
     {
       key: 'storage',

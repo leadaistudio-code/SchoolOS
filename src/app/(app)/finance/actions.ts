@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
   bounceCheque,
@@ -429,6 +429,37 @@ export async function startPaymentAction(
     }
   } catch (err) {
     return fail(err, 'The payment could not be started')
+  }
+}
+
+export async function confirmOnlinePaymentAction(
+  payload: unknown,
+): Promise<ActionResult<{ paymentId: string; receiptNumber?: string }>> {
+  const ctx = await requireContext('fees.view')
+  try {
+    const input = z
+      .object({
+        paymentId: z.string().min(1),
+        providerOrderId: z.string().min(1),
+        providerPaymentId: z.string().min(1),
+        signature: z.string().min(1),
+      })
+      .parse(payload)
+    const { confirmOnlineRazorpayPayment } = await import('@/server/modules/finance/payments')
+    const result = await confirmOnlineRazorpayPayment(ctx, input)
+    if (result.status !== 'SUCCESS' && result.status !== 'IGNORED') {
+      return { ok: false, message: result.reason ?? 'The payment could not be completed' }
+    }
+    revalidatePath('/finance', 'layout')
+    return {
+      ok: true,
+      message: result.receiptNumber
+        ? `Payment received. Receipt ${result.receiptNumber}.`
+        : 'Payment received. Thank you.',
+      data: { paymentId: result.paymentId, receiptNumber: result.receiptNumber },
+    }
+  } catch (err) {
+    return fail(err, 'The payment could not be confirmed')
   }
 }
 

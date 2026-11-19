@@ -9,7 +9,19 @@ import { CredentialForm } from './credential-form'
 
 export const metadata = { title: 'Integrations' }
 
-const COPY: Record<string, { title: string; blurb: string; keyLabel: string; secretLabel: string; accountLabel: string; senderLabel?: string }> = {
+const COPY: Record<
+  string,
+  {
+    title: string
+    blurb: string
+    keyLabel: string
+    secretLabel: string
+    accountLabel: string
+    senderLabel?: string
+    webhookLabel?: string
+    webhookHint?: string
+  }
+> = {
   sms: {
     title: 'SMS',
     blurb: 'The account this school holds with its SMS vendor. Used for fee reminders and absence alerts.',
@@ -27,11 +39,14 @@ const COPY: Record<string, { title: string; blurb: string; keyLabel: string; sec
     senderLabel: 'Sending number',
   },
   payment: {
-    title: 'Payment gateway',
-    blurb: 'Collects online fee payments into this school’s own settlement account.',
-    accountLabel: 'Merchant or account ID',
-    keyLabel: 'Key ID',
+    title: 'Razorpay (school fees)',
+    blurb:
+      'Parents pay outstanding fees online into this school’s Razorpay account. In the Razorpay Dashboard go to Account & Settings → API Keys for Key ID and Key Secret. Merchant ID is under Account & Settings → Profile (Account ID). For webhooks: Account & Settings → Webhooks → add https://YOUR-SCHOOL.mycampusview.com/api/v1/webhooks/payment for payment.captured, payment.failed and order.paid, then paste the webhook secret here.',
+    accountLabel: 'Merchant / Account ID (optional)',
+    keyLabel: 'Key ID (rzp_live_… or rzp_test_…)',
     secretLabel: 'Key secret',
+    webhookLabel: 'Webhook secret',
+    webhookHint: 'From Razorpay → Account & Settings → Webhooks',
   },
 }
 

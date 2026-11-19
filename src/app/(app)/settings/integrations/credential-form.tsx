@@ -14,6 +14,8 @@ type Copy = {
   keyLabel: string
   secretLabel: string
   senderLabel?: string
+  webhookLabel?: string
+  webhookHint?: string
 }
 
 /**
@@ -39,6 +41,7 @@ export function CredentialForm({
   const [senderId, setSenderId] = React.useState(credential.senderId ?? '')
   const [apiKey, setApiKey] = React.useState('')
   const [apiSecret, setApiSecret] = React.useState('')
+  const [webhookSecret, setWebhookSecret] = React.useState('')
 
   const submit = () =>
     startTransition(async () => {
@@ -49,6 +52,7 @@ export function CredentialForm({
         senderId: senderId.trim() || undefined,
         apiKey: apiKey || undefined,
         apiSecret: apiSecret || undefined,
+        webhookSecret: webhookSecret || undefined,
       })
       if (!result.ok) {
         toast.push({ tone: 'error', title: 'Could not save', description: result.message })
@@ -57,6 +61,7 @@ export function CredentialForm({
       toast.push({ tone: 'success', title: `${copy.title} saved`, description: result.message })
       setApiKey('')
       setApiSecret('')
+      setWebhookSecret('')
     })
 
   return (
@@ -120,6 +125,28 @@ export function CredentialForm({
             onChange={(e) => setApiSecret(e.target.value)}
           />
         </Field>
+
+        {copy.webhookLabel ? (
+          <Field
+            label={copy.webhookLabel}
+            htmlFor={`${credential.kind}-webhook`}
+            className="sm:col-span-2"
+            hint={
+              credential.hasWebhookSecret
+                ? 'On file — type to replace it'
+                : (copy.webhookHint ?? 'Optional, but recommended so payments settle if the parent closes the tab')
+            }
+          >
+            <Input
+              id={`${credential.kind}-webhook`}
+              type="password"
+              autoComplete="off"
+              value={webhookSecret}
+              placeholder={credential.hasWebhookSecret ? '••••••••' : ''}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+            />
+          </Field>
+        ) : null}
       </div>
 
       <div className="mt-3 flex items-center gap-3">

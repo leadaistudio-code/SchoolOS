@@ -5,12 +5,21 @@ import type { AppContext } from '@/server/context'
 import { prisma } from '@/server/db/prisma'
 import type { TenantClient } from '@/server/db/tenant-client'
 import { audit } from '@/server/audit'
-import { ApiException, conflict, notFound } from '@/server/api/response'
+import { ApiException, badRequest, conflict, notFound } from '@/server/api/response'
 import { attendanceDate, toDateInput } from '@/lib/dates'
 import { presetRange } from '@/lib/periods'
 import { accessibleStudentIds, isPortalOnlyRole } from '@/server/scope'
 import { nextDocumentNumber, financialYearLabel } from '@/server/numbering'
 import { paymentProvider } from '@/server/providers'
+import {
+  captureFeeRazorpayPayment,
+  createFeeRazorpayOrder,
+  feeCheckoutSignatureValid,
+  feePaymentsLive,
+  feeRazorpayKeys,
+  feeWebhookSignatureValid,
+  fetchFeeRazorpayPayment,
+} from '@/server/modules/finance/razorpay-fees'
 import { notify } from '@/server/notifications'
 import { ROLE } from '@/lib/rbac/roles'
 import { billBookNoTaken, issueBillBookNo } from './counter'
@@ -810,6 +819,14 @@ export async function startOnlinePayment(
     )
   }
 
+  const razorpay = await feeRazorpayKeys(ctx.tenant.id)
+  const providerName = razorpay ? 'razorpay' : paymentProvider().name
+  if (!razorpay && envIsProduction()) {
+    throw badRequest(
+      'Online fee payments are not set up for this school yet. Ask the office to add Razorpay under Settings → Integrations.',
+    )
+  }
+
   const payment = await ctx.db.feePayment.create({
     data: {
       tenantId: ctx.tenant.id,
@@ -818,12 +835,50 @@ export async function startOnlinePayment(
       currency: ctx.tenant.currency,
       mode: 'ONLINE',
       status: 'INITIATED',
-      provider: paymentProvider().name,
+      provider: providerName,
       notes: input.invoiceIds?.length ? `invoices:${input.invoiceIds.join(',')}` : null,
     },
   })
 
   const guardian = student.guardians[0]?.parent
+
+  if (razorpay) {
+    const order = await createFeeRazorpayOrder(razorpay, {
+      amountMinor: input.amount,
+      currency: ctx.tenant.currency,
+      receipt: payment.id,
+      notes: {
+        paymentId: payment.id,
+        tenantId: ctx.tenant.id,
+        studentId: input.studentId,
+      },
+    })
+    await ctx.db.feePayment.update({
+      where: { id: payment.id },
+      data: {
+        providerOrderId: order.id,
+        providerResponse: { order, keyId: razorpay.keyId } as never,
+      },
+    })
+    await audit({
+      tenantId: ctx.tenant.id,
+      actorId: ctx.user.userId,
+      actorLabel: `${ctx.user.firstName} ${ctx.user.lastName}`,
+      action: 'fee_payment.initiate',
+      module: 'fees',
+      entityType: 'FeePayment',
+      entityId: payment.id,
+      summary: `Started an online payment of ₹${input.amount / 100} for ${student.firstName} ${student.lastName}`,
+    })
+    return {
+      paymentId: payment.id,
+      providerOrderId: order.id,
+      checkoutUrl: `/finance/pay/${payment.id}`,
+      amountMinor: input.amount,
+      keyId: razorpay.keyId,
+    }
+  }
+
   const order = await paymentProvider().createOrder({
     tenantId: ctx.tenant.id,
     amountMinor: input.amount,
@@ -859,6 +914,87 @@ export async function startOnlinePayment(
     checkoutUrl: order.checkoutUrl,
     amountMinor: input.amount,
   }
+}
+
+function envIsProduction() {
+  return process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production'
+}
+
+/**
+ * Confirms a Razorpay Checkout return for school fees.
+ * Signature is checked with the school's Key secret, then the payment is
+ * re-fetched from Razorpay before settling.
+ */
+export async function confirmOnlineRazorpayPayment(
+  ctx: AppContext,
+  input: { paymentId: string; providerOrderId: string; providerPaymentId: string; signature: string },
+) {
+  ctx.require('fees.view')
+  const payment = await ctx.db.feePayment.findFirst({
+    where: { id: input.paymentId },
+    select: {
+      id: true,
+      tenantId: true,
+      studentId: true,
+      amountMinor: true,
+      status: true,
+      provider: true,
+      providerOrderId: true,
+    },
+  })
+  if (!payment) throw notFound('Payment')
+  if (payment.provider !== 'razorpay') throw badRequest('This payment is not a Razorpay payment')
+  if (payment.providerOrderId !== input.providerOrderId) throw badRequest('The payment does not match the order')
+
+  const allowed = await accessibleStudentIds(ctx)
+  if (allowed !== null && !allowed.includes(payment.studentId)) {
+    throw new ApiException(403, 'FORBIDDEN', 'You cannot pay for this student')
+  }
+
+  if (payment.status === 'SUCCESS') {
+    return { status: 'SUCCESS' as const, paymentId: payment.id, reason: 'Already settled' }
+  }
+
+  const keys = await feeRazorpayKeys(payment.tenantId)
+  if (!keys) throw badRequest('Razorpay is not configured for this school')
+  if (!feeCheckoutSignatureValid(keys, input.providerOrderId, input.providerPaymentId, input.signature)) {
+    return { status: 'FAILED' as const, paymentId: payment.id, reason: 'The payment could not be verified' }
+  }
+
+  let remote = await fetchFeeRazorpayPayment(keys, input.providerPaymentId)
+  if (remote.order_id !== payment.providerOrderId) {
+    return { status: 'FAILED' as const, paymentId: payment.id, reason: 'The payment belongs to a different order' }
+  }
+  if (remote.status === 'authorized') {
+    remote = await captureFeeRazorpayPayment(keys, input.providerPaymentId, remote.amount, remote.currency)
+  }
+  if (remote.status !== 'captured') {
+    await ctx.db.feePayment.updateMany({
+      where: { id: payment.id, status: { in: ['INITIATED', 'PENDING'] } },
+      data: {
+        status: 'FAILED',
+        failedAt: new Date(),
+        failureReason: remote.error_description ?? `Payment is ${remote.status}`,
+        providerPaymentId: remote.id,
+        providerResponse: remote as never,
+      },
+    })
+    return { status: 'FAILED' as const, paymentId: payment.id, reason: `The payment is ${remote.status}` }
+  }
+
+  const outcome = await settleOnlinePayment({
+    paymentId: payment.id,
+    providerPaymentId: remote.id,
+    verifiedAmountMinor: remote.amount,
+    raw: remote,
+  })
+  if (outcome.status === 'SUCCESS') afterPaymentChange(payment.tenantId, payment.id, { tally: true })
+  return { status: outcome.status, paymentId: payment.id, reason: outcome.reason, receiptNumber: outcome.receiptNumber }
+}
+
+/** Whether parents can use Pay now with a live gateway for this school. */
+export async function onlinePaymentsAvailable(ctx: AppContext) {
+  return feePaymentsLive(ctx.tenant.id)
 }
 
 export type SettlementOutcome = {
@@ -1053,10 +1189,15 @@ export async function handleWebhook(
   rawBody: string,
   signature: string | null,
 ): Promise<{ handled: boolean; reason: string }> {
+  const body = safeJson(rawBody)
+  // Native Razorpay webhooks use payload.payment.entity; the mock driver uses a flat body.
+  if (body?.payload && typeof body.payload === 'object') {
+    return handleRazorpayFeeWebhook(rawBody, signature, body)
+  }
+
   const provider = paymentProvider()
   const verification = await provider.verifyWebhook(rawBody, signature)
 
-  const body = safeJson(rawBody)
   const externalId = String(body?.eventId ?? body?.paymentId ?? '')
 
   // A fully processed event is final. An event left with processedAt=null is
@@ -1129,6 +1270,95 @@ export async function handleWebhook(
   }
 
   return { handled: outcome.status === 'SUCCESS', reason: outcome.reason ?? outcome.status }
+}
+
+async function handleRazorpayFeeWebhook(
+  rawBody: string,
+  signature: string | null,
+  body: Record<string, unknown>,
+): Promise<{ handled: boolean; reason: string }> {
+  const payload = body.payload as {
+    payment?: { entity?: { id?: string; order_id?: string | null; amount?: number; status?: string; error_description?: string } }
+  } | undefined
+  const entity = payload?.payment?.entity
+  const eventName = String(body.event ?? 'payment.update')
+  const externalId = entity?.id ? `${eventName}:${entity.id}` : String(body.id ?? '')
+
+  const feePayment = entity?.order_id
+    ? await prisma.feePayment.findFirst({
+        where: { provider: 'razorpay', providerOrderId: entity.order_id },
+        select: { id: true, tenantId: true, status: true, amountMinor: true },
+      })
+    : null
+
+  const existing = externalId
+    ? await prisma.paymentEvent.findUnique({
+        where: { provider_externalId: { provider: 'razorpay', externalId } },
+      })
+    : null
+  if (existing?.processedAt) return { handled: false, reason: 'Duplicate event' }
+
+  const keys = feePayment ? await feeRazorpayKeys(feePayment.tenantId) : null
+  const signatureValid = keys ? feeWebhookSignatureValid(keys, rawBody, signature) : false
+
+  const event =
+    existing ??
+    (await prisma.paymentEvent.create({
+      data: {
+        tenantId: feePayment?.tenantId ?? null,
+        paymentId: feePayment?.id ?? null,
+        provider: 'razorpay',
+        eventType: eventName,
+        externalId: externalId || null,
+        signatureValid,
+        payload: body as never,
+        processedAt: null,
+      },
+    }))
+
+  const finish = async (handled: boolean, reason: string) => {
+    await prisma.paymentEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } })
+    return { handled, reason }
+  }
+
+  if (!signatureValid) {
+    console.warn('[payments] rejected a Razorpay fee webhook with an invalid signature', { externalId })
+    return finish(false, 'Invalid signature')
+  }
+  if (!feePayment || !entity?.id || !keys) return finish(false, 'Unknown payment reference')
+
+  if (eventName === 'payment.failed') {
+    await prisma.feePayment.updateMany({
+      where: { id: feePayment.id, status: { in: ['INITIATED', 'PENDING'] } },
+      data: {
+        status: 'FAILED',
+        failedAt: new Date(),
+        failureReason: entity.error_description ?? 'Gateway reported failure',
+        providerPaymentId: entity.id,
+        providerResponse: entity as never,
+      },
+    })
+    return finish(true, 'Recorded a failed payment')
+  }
+
+  if (eventName !== 'payment.captured' && eventName !== 'order.paid') {
+    return finish(false, 'Ignored event')
+  }
+
+  let remote = await fetchFeeRazorpayPayment(keys, entity.id)
+  if (remote.status === 'authorized') {
+    remote = await captureFeeRazorpayPayment(keys, entity.id, remote.amount, remote.currency)
+  }
+  if (remote.status !== 'captured') return finish(false, `Payment is ${remote.status}`)
+
+  const outcome = await settleOnlinePayment({
+    paymentId: feePayment.id,
+    providerPaymentId: remote.id,
+    verifiedAmountMinor: remote.amount,
+    raw: remote,
+  })
+  if (outcome.status === 'SUCCESS') afterPaymentChange(feePayment.tenantId, feePayment.id, { tally: true })
+  return finish(outcome.status === 'SUCCESS' || outcome.status === 'IGNORED', outcome.reason ?? outcome.status)
 }
 
 function safeJson(raw: string): Record<string, unknown> | null {

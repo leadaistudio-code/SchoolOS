@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { Metric } from '@/components/ui/metric'
 import { formatMoney } from '@/lib/utils'
+import { onlinePaymentsAvailable } from '@/server/modules/finance/payments'
 import { PayNow } from './pay-now'
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -29,6 +30,7 @@ export async function ParentFinance() {
   const children = await scopedStudents(ctx)
   const currency = ctx.tenant.currency
   const today = attendanceDate(new Date())
+  const canPayOnline = await onlinePaymentsAvailable(ctx)
 
   if (children.length === 0) {
     return (
@@ -114,16 +116,22 @@ export async function ParentFinance() {
               </div>
             ) : null}
 
-            <PayNow
-              students={children.map((c) => ({
-                id: c.id,
-                name: `${c.firstName} ${c.lastName}`,
-                dueMinor: invoices
-                  .filter((i) => i.studentId === c.id)
-                  .reduce((sum, i) => sum + i.balanceMinor, 0),
-              }))}
-              currency={currency}
-            />
+            {canPayOnline ? (
+              <PayNow
+                students={children.map((c) => ({
+                  id: c.id,
+                  name: `${c.firstName} ${c.lastName}`,
+                  dueMinor: invoices
+                    .filter((i) => i.studentId === c.id)
+                    .reduce((sum, i) => sum + i.balanceMinor, 0),
+                }))}
+                currency={currency}
+              />
+            ) : (
+              <p className="max-w-xs text-xs text-ink-subtle">
+                Online payment is not set up yet. Please pay at the school office.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}
