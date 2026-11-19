@@ -119,11 +119,23 @@ export function ReportFilters({
         value={params.get('risk') ?? ''}
         aria-label="Filter by attendance risk"
         className="w-40"
-        onChange={(e) => set('risk', e.target.value)}
+        onChange={(e) => update({ risk: e.target.value, focus: '' })}
       >
         <option value="">All students</option>
         <option value="below_85">Below 85%</option>
         <option value="below_75">Below 75% (at risk)</option>
+      </Select>
+
+      <Select
+        value={params.get('focus') ?? ''}
+        aria-label="Drill-down focus"
+        className="w-44"
+        onChange={(e) => update({ focus: e.target.value, risk: '' })}
+      >
+        <option value="">Any attendance</option>
+        <option value="absent">Has absences</option>
+        <option value="late">Has late arrivals</option>
+        <option value="leave">Has leave days</option>
       </Select>
 
       <AttendanceExportMenu from={resolvedFrom} to={resolvedTo} />

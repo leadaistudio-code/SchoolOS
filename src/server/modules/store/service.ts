@@ -178,7 +178,13 @@ export async function lockItems(tx: Prisma.TransactionClient, tenantId: string, 
   return map
 }
 
-/** Allocate `quantity` unique per-piece barcodes and insert IN_STOCK unit rows. */
+/**
+ * Allocate `quantity` unique per-piece barcodes and insert IN_STOCK unit rows.
+ *
+ * Codes are reserved in memory before `createMany` — otherwise every call to
+ * `uniqueUnitBarcode` would see the same DB count and mint the same value,
+ * which trips the (tenantId, barcode) unique constraint.
+ */
 async function createStockUnits(
   tx: Prisma.TransactionClient,
   tenantId: string,
@@ -187,16 +193,15 @@ async function createStockUnits(
   opts: { purchaseId?: string } = {},
 ) {
   if (quantity <= 0) return
-  const rows: { tenantId: string; itemId: string; barcode: string; purchaseId?: string }[] = []
-  for (let i = 0; i < quantity; i++) {
-    rows.push({
+  const barcodes = await allocateUnitBarcodes(tx, tenantId, item.category, quantity)
+  await tx.storeItemUnit.createMany({
+    data: barcodes.map((barcode) => ({
       tenantId,
       itemId: item.id,
-      barcode: await uniqueUnitBarcode(tx, tenantId, item.category),
+      barcode,
       ...(opts.purchaseId ? { purchaseId: opts.purchaseId } : {}),
-    })
-  }
-  await tx.storeItemUnit.createMany({ data: rows })
+    })),
+  })
 }
 
 export async function receiveUnits(
@@ -312,24 +317,58 @@ async function uniqueBarcode(ctx: AppContext, category: StoreCategory, excludeId
   return `${prefix}${Date.now().toString(36).toUpperCase()}`
 }
 
+/** Highest numeric suffix already used for a category prefix (catalog + units). */
+async function nextBarcodeSequence(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  prefix: string,
+) {
+  const [itemCodes, unitCodes] = await Promise.all([
+    tx.storeItem.findMany({
+      where: { tenantId, barcode: { startsWith: prefix } },
+      select: { barcode: true },
+      take: 20_000,
+    }),
+    tx.storeItemUnit.findMany({
+      where: { tenantId, barcode: { startsWith: prefix } },
+      select: { barcode: true },
+      take: 50_000,
+    }),
+  ])
+  let max = 0
+  for (const row of [...itemCodes, ...unitCodes]) {
+    const raw = row.barcode?.slice(prefix.length) ?? ''
+    if (/^\d+$/.test(raw)) max = Math.max(max, Number(raw))
+  }
+  return max + 1
+}
+
+/** Mint `quantity` distinct unit barcodes in one pass (safe for createMany). */
+async function allocateUnitBarcodes(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  category: StoreCategory,
+  quantity: number,
+) {
+  const prefix = storeCategory(category).prefix
+  let n = await nextBarcodeSequence(tx, tenantId, prefix)
+  const out: string[] = []
+  while (out.length < quantity) {
+    const barcode = `${prefix}${String(n).padStart(6, '0')}`
+    n += 1
+    out.push(barcode)
+  }
+  return out
+}
+
 /** Per-piece unit barcode — never reuses a catalog or unit code. */
 async function uniqueUnitBarcode(
   tx: Prisma.TransactionClient,
   tenantId: string,
   category: StoreCategory,
 ) {
-  const prefix = storeCategory(category).prefix
-  const count =
-    (await tx.storeItem.count({ where: { tenantId } })) +
-    (await tx.storeItemUnit.count({ where: { tenantId } }))
-  for (let n = count + 1; n < count + 20_000; n++) {
-    const barcode = `${prefix}${String(n).padStart(6, '0')}`
-    const onItem = await tx.storeItem.findFirst({ where: { tenantId, barcode }, select: { id: true } })
-    if (onItem) continue
-    const onUnit = await tx.storeItemUnit.findFirst({ where: { tenantId, barcode }, select: { id: true } })
-    if (!onUnit) return barcode
-  }
-  return `${prefix}${Date.now().toString(36).toUpperCase()}`
+  const [code] = await allocateUnitBarcodes(tx, tenantId, category, 1)
+  return code ?? `${storeCategory(category).prefix}${Date.now().toString(36).toUpperCase()}`
 }
 
 async function assertBarcodeFree(ctx: AppContext, barcode: string, excludeId?: string) {

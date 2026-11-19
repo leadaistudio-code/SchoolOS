@@ -65,39 +65,89 @@ export default async function AttendanceReportsPage({
     rows = rows.filter((r) => r.percent !== null && r.percent < 85)
   }
 
+  if (params.focus === 'absent') {
+    rows = rows.filter((r) => r.absent > 0)
+  } else if (params.focus === 'late') {
+    rows = rows.filter((r) => r.late > 0)
+  } else if (params.focus === 'leave') {
+    rows = rows.filter((r) => r.leave > 0)
+  }
+
   const totalMarked =
     (totals.PRESENT ?? 0) + (totals.ABSENT ?? 0) + (totals.LATE ?? 0) + (totals.HALF_DAY ?? 0)
   const attended = (totals.PRESENT ?? 0) + (totals.LATE ?? 0) + (totals.HALF_DAY ?? 0)
   const overall = totalMarked > 0 ? Math.round((attended / totalMarked) * 1000) / 10 : null
 
   const atRisk = allRows.filter((r) => r.percent !== null && r.percent < 75)
+  const withAbsences = allRows.filter((r) => r.absent > 0)
+  const withLeave = allRows.filter((r) => r.leave > 0)
+
+  const drillQs = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams()
+    const base: Record<string, string | undefined> = {
+      preset: params.preset,
+      from: params.from,
+      to: params.to,
+      classLevelId: params.classLevelId,
+      sectionId: params.sectionId,
+      q: params.q,
+      risk: params.risk,
+      focus: params.focus,
+    }
+    for (const [key, value] of Object.entries({ ...base, ...patch })) {
+      if (value) next.set(key, value)
+    }
+    const qs = next.toString()
+    return qs ? `/attendance/reports?${qs}` : '/attendance/reports'
+  }
+
+  const focusLabel =
+    params.focus === 'absent'
+      ? 'students with absences'
+      : params.focus === 'late'
+        ? 'students with late arrivals'
+        : params.focus === 'leave'
+          ? 'students with leave'
+          : params.risk === 'below_75'
+            ? 'students below 75%'
+            : params.risk === 'below_85'
+              ? 'students below 85%'
+              : 'students shown'
 
   return (
     <div>
       <PageHeader
         title="Attendance reports"
-        description={`${from} to ${to} · ${rows.length} student${rows.length === 1 ? '' : 's'} shown`}
+        description={`${from} to ${to} · ${rows.length} ${focusLabel}`}
       />
 
       <MetricRow className="mb-4">
         <Metric
           label="Overall attendance"
           value={overall === null ? 'No data' : `${overall}%`}
-          sub={`${totalMarked} day-records in range`}
+          sub={`${totalMarked} day-records · tap to show all`}
           emphasis={overall !== null && overall < 85 ? 'warning' : undefined}
+          href={drillQs({ risk: null, focus: null })}
         />
         <Metric
           label="Below 75%"
           value={String(atRisk.length)}
-          sub="At risk of exam ineligibility"
+          sub="At risk of exam ineligibility · tap to list"
           emphasis={atRisk.length > 0 ? 'danger' : undefined}
+          href={drillQs({ risk: 'below_75', focus: null })}
         />
         <Metric
           label="Absences"
           value={String(totals.ABSENT ?? 0)}
-          sub={`${totals.LATE ?? 0} late arrivals`}
+          sub={`${withAbsences.length} students · ${totals.LATE ?? 0} late · tap to list`}
+          href={drillQs({ focus: 'absent', risk: null })}
         />
-        <Metric label="Approved leave" value={String(totals.LEAVE ?? 0)} sub="Days recorded as leave" />
+        <Metric
+          label="Approved leave"
+          value={String(totals.LEAVE ?? 0)}
+          sub={`${withLeave.length} students · tap to list`}
+          href={drillQs({ focus: 'leave', risk: null })}
+        />
       </MetricRow>
 
       <Card className="overflow-hidden">
