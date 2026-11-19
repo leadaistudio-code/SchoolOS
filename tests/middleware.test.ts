@@ -25,6 +25,7 @@ function setup(role: string | undefined) {
 
 afterEach(() => {
   delete process.env.APP_ROLE
+  delete process.env.APP_URL
 })
 
 describe('one service for both halves (default)', () => {
@@ -51,18 +52,40 @@ describe('one service for both halves (default)', () => {
 describe('a marketing-only service', () => {
   it('serves the website on any hostname, including a railway one', () => {
     setup('marketing')
+    delete process.env.APP_URL
     const res = middleware(request('web-production-1234.up.railway.app', '/modules'))
     expect(res.headers.get('x-middleware-rewrite')).toContain('/site/modules')
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+  })
+
+  it('redirects the railway hostname to APP_URL with noindex', () => {
+    setup('marketing')
+    process.env.APP_URL = 'https://www.mycampusview.com'
+    const res = middleware(request('website-production-026e.up.railway.app', '/customer-stories'))
+    expect(res.status).toBe(301)
+    expect(res.headers.get('location')).toBe('https://www.mycampusview.com/customer-stories')
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+    delete process.env.APP_URL
+  })
+
+  it('refuses robots.txt on the railway hostname', () => {
+    setup('marketing')
+    delete process.env.APP_URL
+    const res = middleware(request('web-production-1234.up.railway.app', '/robots.txt'))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
   })
 
   it('refuses the platform sign-in rather than rendering it', () => {
     // Without the role this is the actual leak: a non-apex hostname on the
     // marketing service would serve the application's login page.
     setup('marketing')
+    delete process.env.APP_URL
     for (const path of ['/login', '/platform', '/403']) {
       const res = middleware(request('web-production-1234.up.railway.app', path))
       expect(res.status, path).toBe(307)
       expect(res.headers.get('location'), path).toMatch(/\/$/)
+      expect(res.headers.get('x-robots-tag'), path).toBe('noindex, nofollow')
     }
   })
 
@@ -92,5 +115,24 @@ describe('an application-only service', () => {
   it('refuses the website internal path so pages do not answer twice', () => {
     setup('app')
     expect(middleware(request(`stjohns.${ROOT}`, '/site/product')).status).toBe(404)
+  })
+
+  it('redirects the railway hostname to APP_URL with noindex', () => {
+    setup('app')
+    process.env.APP_URL = 'https://app.mycampusview.com'
+    const res = middleware(request('schoolos-production-b013.up.railway.app', '/login'))
+    expect(res.status).toBe(301)
+    expect(res.headers.get('location')).toBe('https://app.mycampusview.com/login')
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+    delete process.env.APP_URL
+  })
+
+  it('keeps tenant hosts reachable', () => {
+    setup('app')
+    process.env.APP_URL = 'https://app.mycampusview.com'
+    const res = middleware(request(`stjohns.${ROOT}`, '/students'))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('location')).toBeNull()
+    delete process.env.APP_URL
   })
 })

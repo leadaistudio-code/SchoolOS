@@ -121,13 +121,39 @@ function academyHostRouting(request: NextRequest, pathname: string): NextRespons
   return null
 }
 
+/** Provider default hostnames — never the brand Google should index. */
+function isRailwayAppHost(host: string): boolean {
+  const bare = host.split(':')[0]!.toLowerCase()
+  return bare.endsWith('.up.railway.app')
+}
+
+function withNoIndex(response: NextResponse): NextResponse {
+  response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  return response
+}
+
+/**
+ * Tell crawlers the provider hostname is not a public site.
+ * Used when we still have to answer on `*.up.railway.app` (health checks)
+ * or when `APP_URL` is unset in local tests.
+ */
+function railwayRobotsTxt(): NextResponse {
+  return withNoIndex(
+    new NextResponse('User-agent: *\nDisallow: /\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    }),
+  )
+}
+
 /**
  * The one public origin of a marketing-only deployment, from `APP_URL`.
  *
  * Every other hostname that reaches the service (the apex, the provider's own
  * `*.up.railway.app` address) answers with a permanent redirect to it. A copy
  * of the site on a second domain, with tags pointing between them, is what
- * Google Ads reads as a compromised site.
+ * Google Ads reads as a compromised site — and what makes Google show the
+ * host brand ("Railway") next to our pages in search.
  */
 function canonicalRedirect(request: NextRequest, host: string): NextResponse | null {
   const target = process.env.APP_URL
@@ -151,7 +177,19 @@ function canonicalRedirect(request: NextRequest, host: string): NextResponse | n
     return null
   }
   const url = new URL(request.nextUrl.pathname + request.nextUrl.search, canonical.origin)
-  return NextResponse.redirect(url, 301)
+  return withNoIndex(NextResponse.redirect(url, 301))
+}
+
+/**
+ * Application deployments must keep tenant and custom domains reachable, so
+ * only the provider hostname is folded onto `APP_URL` — not every non-canonical
+ * host the way the marketing service does.
+ */
+function railwayAppRedirect(request: NextRequest, host: string): NextResponse | null {
+  if (!isRailwayAppHost(host)) return null
+  if (request.nextUrl.pathname.startsWith('/api/health')) return null
+  if (request.nextUrl.pathname === '/robots.txt') return railwayRobotsTxt()
+  return canonicalRedirect(request, host)
 }
 
 function withPathname(request: NextRequest, pathname: string) {
@@ -173,6 +211,12 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname === '/manifest.webmanifest'
+
+  // Provider host with no canonical redirect yet (local / missing APP_URL):
+  // still refuse indexing so Google never treats Railway as the site.
+  if (isRailwayAppHost(host) && pathname === '/robots.txt') {
+    return railwayRobotsTxt()
+  }
 
   // Academy subdomain: clean public URLs at the host root.
   if (deployment !== 'marketing' && !internal) {
@@ -199,26 +243,33 @@ export function middleware(request: NextRequest) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       url.search = ''
-      return NextResponse.redirect(url)
+      return withNoIndex(NextResponse.redirect(url))
     }
   }
 
   // An application-only deployment: `/site/*` is the website's internal path and
   // must not be reachable here, or the same pages answer on two hostnames.
+  // The provider hostname also redirects to APP_URL so Google never indexes it.
   if (deployment === 'app') {
+    const railway = railwayAppRedirect(request, host)
+    if (railway) return railway
     if (pathname === '/site' || pathname.startsWith('/site/')) {
       return new NextResponse('Not found', { status: 404 })
     }
-    return withPathname(request, pathname)
+    const response = withPathname(request, pathname)
+    if (isRailwayAppHost(host)) return withNoIndex(response)
+    return response
   }
 
   const servesMarketing = deployment === 'marketing' || isMarketingHost(host)
   if (!servesMarketing) {
-    return withPathname(request, pathname)
+    const response = withPathname(request, pathname)
+    return isRailwayAppHost(host) ? withNoIndex(response) : response
   }
 
   if (PASSTHROUGH.some((prefix) => pathname.startsWith(prefix))) {
-    return withPathname(request, pathname)
+    const response = withPathname(request, pathname)
+    return isRailwayAppHost(host) ? withNoIndex(response) : response
   }
 
   // Already rewritten, or someone typed the internal path: send them to the
@@ -226,12 +277,14 @@ export function middleware(request: NextRequest) {
   if (pathname === '/site' || pathname.startsWith('/site/')) {
     const url = request.nextUrl.clone()
     url.pathname = pathname.replace(/^\/site/, '') || '/'
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    return isRailwayAppHost(host) ? withNoIndex(redirect) : redirect
   }
 
   const url = request.nextUrl.clone()
   url.pathname = `/site${pathname === '/' ? '' : pathname}`
-  return NextResponse.rewrite(url)
+  const rewrite = NextResponse.rewrite(url)
+  return isRailwayAppHost(host) ? withNoIndex(rewrite) : rewrite
 }
 
 export const config = {

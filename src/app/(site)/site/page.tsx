@@ -12,7 +12,7 @@ import { Labs } from '@/components/site/home/labs'
 import { Parents } from '@/components/site/home/parents'
 import { Integrations } from '@/components/site/home/integrations'
 import { Journey } from '@/components/site/home/journey'
-import { organisationJsonLd, softwareJsonLd } from '@/components/site/seo'
+import { organisationJsonLd, softwareJsonLd, websiteJsonLd } from '@/components/site/seo'
 
 export const metadata: Metadata = {
   title: 'MyCampusView — school management software, SIS and admission CRM on one platform',
@@ -67,6 +67,7 @@ const MARKS = [
 export default function HomePage() {
   return (
     <>
+      {websiteJsonLd()}
       {organisationJsonLd()}
       {softwareJsonLd()}
 

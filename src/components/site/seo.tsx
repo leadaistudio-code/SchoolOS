@@ -36,7 +36,9 @@ export function organisationJsonLd() {
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name: 'MyCampusView',
+        alternateName: ['My Campus View', 'MCV'],
         url: origin(),
+        logo: `${origin()}/brand/mycampusview-mark.png`,
         description:
           'MyCampusView is school management software combining a student information system, an admission CRM and school ERP on one platform.',
         areaServed: ['IN', 'AE', 'SG'],
@@ -46,6 +48,33 @@ export function organisationJsonLd() {
           'School ERP',
           'Admission CRM for schools',
         ],
+      }}
+    />
+  )
+}
+
+/**
+ * Explicit site name for Google's sitelinks / result chrome.
+ *
+ * Without this, Google sometimes inherits the host brand from a prior crawl of
+ * the provider hostname (`*.up.railway.app`) and shows "Railway" next to our
+ * own domain in search results.
+ */
+export function websiteJsonLd() {
+  return (
+    <JsonLd
+      data={{
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'MyCampusView',
+        alternateName: 'My Campus View',
+        url: origin(),
+        inLanguage: 'en-IN',
+        publisher: {
+          '@type': 'Organization',
+          name: 'MyCampusView',
+          url: origin(),
+        },
       }}
     />
   )

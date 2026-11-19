@@ -23,6 +23,7 @@ const DESCRIPTION =
 
 export const metadata: Metadata = {
   metadataBase: new URL(env().APP_URL),
+  applicationName: 'MyCampusView',
   title: {
     default: 'MyCampusView — one system to run your school',
     template: '%s · MyCampusView',
@@ -34,7 +35,15 @@ export const metadata: Metadata = {
     title: 'MyCampusView — one system to run your school',
     description: DESCRIPTION,
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'MyCampusView — one system to run your school',
+    description: DESCRIPTION,
+  },
   robots: { index: true, follow: true },
+  other: {
+    'application-name': 'MyCampusView',
+  },
 }
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
