@@ -145,13 +145,17 @@ function ItemFields({ form, set, editing }: { form: Form; set: (k: keyof Form, v
           <Field label="SKU / item code" htmlFor="si-sku" hint="Leave blank to auto-generate">
             <Input id="si-sku" value={form.sku} onChange={(e) => set('sku', e.target.value)} />
           </Field>
-          <Field label="Barcode" htmlFor="si-barcode" hint="Scan into this box">
-            <Input id="si-barcode" value={form.barcode} onChange={(e) => set('barcode', e.target.value)} />
+          <Field
+            label="Barcode"
+            htmlFor="si-barcode"
+            hint={editing ? 'Leave blank to keep or auto-generate if missing. Scan a manufacturer barcode if you have one.' : 'Leave blank to auto-generate a scannable Code 128 barcode'}
+          >
+            <Input id="si-barcode" value={form.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder="Auto if blank" />
           </Field>
         </>
       ) : (
         <p className="sm:col-span-2 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-muted">
-          {sizes.length} items will be created ({sizes.join(', ')}) with auto-generated SKUs. Add barcodes per size later from Edit.
+          {sizes.length} items will be created ({sizes.join(', ')}) with auto-generated SKUs and barcodes for each size.
         </p>
       )}
       <Field label="HSN code" htmlFor="si-hsn" hint="For GST bills (optional)">

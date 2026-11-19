@@ -2,17 +2,19 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2 } from 'lucide-react'
+import { Camera, Plus, Trash2 } from 'lucide-react'
 import { createStorePurchaseAction } from '../../actions'
 import { STORE_PAYMENT_MODES, itemLabel } from '@/lib/store/options'
 import { Button } from '@/components/ui/button'
-import { Field, Input, Select, Textarea } from '@/components/ui/input'
+import { Field, Input, SearchInput, Select, Textarea } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
+import { BarcodeCameraScanner } from '@/components/exams/barcode-camera-scanner'
 import { formatMoney } from '@/lib/utils'
 
 export type GrnItem = {
   id: string
   sku: string
+  barcode: string | null
   name: string
   variant: string | null
   unit: string
@@ -58,6 +60,9 @@ export function GrnForm({
   const [paymentMode, setPaymentMode] = React.useState('BANK_TRANSFER')
   const [notes, setNotes] = React.useState('')
   const [saving, setSaving] = React.useState(false)
+  const [scanQuery, setScanQuery] = React.useState('')
+  const [cameraOpen, setCameraOpen] = React.useState(false)
+  const scanRef = React.useRef<HTMLInputElement>(null)
 
   const update = (key: number, patch: Partial<Line>) =>
     setLines((ls) =>
@@ -74,6 +79,48 @@ export function GrnForm({
 
   const total = lines.reduce((s, l) => s + Math.round((Number(l.quantity) || 0) * (Number(l.unitCost) || 0) * 100), 0)
   const used = new Set(lines.map((l) => l.itemId))
+
+  const addScannedItem = (raw: string) => {
+    const code = raw.trim().toLowerCase()
+    if (!code) return
+    const hit = items.find(
+      (i) => i.barcode?.toLowerCase() === code || i.sku.toLowerCase() === code,
+    )
+    if (!hit) {
+      push({ tone: 'error', title: 'No item matches that barcode' })
+      return
+    }
+    setLines((ls) => {
+      const existing = ls.find((l) => l.itemId === hit.id)
+      if (existing) {
+        const qty = Math.max(1, (Number(existing.quantity) || 0) + 1)
+        return ls.map((l) => (l.key === existing.key ? { ...l, quantity: String(qty) } : l))
+      }
+      const empty = ls.find((l) => !l.itemId)
+      if (empty) {
+        return ls.map((l) => {
+          if (l.key !== empty.key) return l
+          return {
+            ...l,
+            itemId: hit.id,
+            quantity: l.quantity || '1',
+            unitCost: l.unitCost || (hit.avgCostMinor ? String(hit.avgCostMinor / 100) : ''),
+          }
+        })
+      }
+      return [
+        ...ls,
+        {
+          key: nextKey.current++,
+          itemId: hit.id,
+          quantity: '1',
+          unitCost: hit.avgCostMinor ? String(hit.avgCostMinor / 100) : '',
+        },
+      ]
+    })
+    setScanQuery('')
+    push({ tone: 'success', title: `Added ${itemLabel(hit)}` })
+  }
 
   const save = async () => {
     const filled = lines.filter((l) => l.itemId)
@@ -93,11 +140,45 @@ export function GrnForm({
     })
     setSaving(false)
     push({ tone: res.ok ? 'success' : 'error', title: res.message })
-    if (res.ok && res.id) router.push(`/inventory/store/purchases/${res.id}`)
+    if (res.ok && res.id) {
+      window.open(`/print/inventory/store/barcodes?purchaseId=${res.id}`, '_blank', 'noopener,noreferrer')
+      router.push(`/inventory/store/purchases/${res.id}`)
+    }
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3">
+        <div className="relative min-w-[220px] flex-1">
+          <SearchInput
+            ref={scanRef}
+            value={scanQuery}
+            onChange={(e) => setScanQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              addScannedItem(scanQuery)
+            }}
+            placeholder="Scan barcode to add a line (USB/Bluetooth scanner)"
+            aria-label="Scan item barcode"
+          />
+        </div>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setCameraOpen(true)}>
+          <Camera aria-hidden /> Scan with camera
+        </Button>
+      </div>
+      <BarcodeCameraScanner
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        title="Scan product barcode"
+        description="Point the camera at the product barcode to add it to this stock receipt."
+        onDetected={(value) => {
+          setCameraOpen(false)
+          addScannedItem(value)
+          scanRef.current?.focus()
+        }}
+      />
+
       <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field
           label="Vendor / supplier"

@@ -5,6 +5,7 @@ import { ZodError } from 'zod'
 import { requireContext } from '@/server/context'
 import {
   adjustStock,
+  bulkGenerateStoreBarcodes,
   createStoreItem,
   createStorePurchase,
   createStoreSale,
@@ -33,9 +34,30 @@ export async function createStoreItemAction(payload: unknown): Promise<StoreActi
   try {
     const item = await createStoreItem(ctx, payload as never)
     revalidateStore()
-    return { ok: true, id: item.id, message: `${item.name} added (${item.sku}).` }
+    return {
+      ok: true,
+      id: item.id,
+      message: `${item.name} added (${item.sku}${item.barcode ? ` · barcode ${item.barcode}` : ''}).`,
+    }
   } catch (err) {
     return fail(err, 'The item could not be added')
+  }
+}
+
+export async function bulkGenerateStoreBarcodesAction(itemIds?: string[]): Promise<StoreActionResult> {
+  const ctx = await requireContext('store.manage')
+  try {
+    const result = await bulkGenerateStoreBarcodes(ctx, itemIds)
+    revalidateStore()
+    if (result.generated === 0) {
+      return { ok: true, message: 'Every item already has a barcode.' }
+    }
+    return {
+      ok: true,
+      message: `Generated ${result.generated} barcode${result.generated === 1 ? '' : 's'}. Ready to print.`,
+    }
+  } catch (err) {
+    return fail(err, 'Barcodes could not be generated')
   }
 }
 

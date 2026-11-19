@@ -152,6 +152,8 @@ type LockedItem = {
   id: string
   name: string
   variant: string | null
+  category: StoreCategory
+  barcode: string | null
   quantity: number
   avgCostMinor: number
   sellingPriceMinor: number
@@ -163,7 +165,7 @@ type LockedItem = {
 export async function lockItems(tx: Prisma.TransactionClient, tenantId: string, ids: string[]) {
   const unique = [...new Set(ids)].sort()
   const rows = await tx.$queryRawUnsafe<LockedItem[]>(
-    `SELECT id, name, variant, quantity, "avgCostMinor", "sellingPriceMinor", "taxPercent", "isActive"
+    `SELECT id, name, variant, category, barcode, quantity, "avgCostMinor", "sellingPriceMinor", "taxPercent", "isActive"
        FROM "StoreItem"
       WHERE "tenantId" = $1 AND id = ANY($2::text[])
       ORDER BY id
@@ -230,6 +232,40 @@ async function uniqueSku(ctx: AppContext, category: StoreCategory) {
     if (!taken) return sku
   }
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`
+}
+
+/** Code 128–friendly store barcode, unique per tenant (e.g. UN000042). */
+async function uniqueBarcode(ctx: AppContext, category: StoreCategory, excludeId?: string) {
+  const prefix = storeCategory(category).prefix
+  const count = await ctx.db.storeItem.count()
+  for (let n = count + 1; n < count + 2000; n++) {
+    const barcode = `${prefix}${String(n).padStart(6, '0')}`
+    const taken = await ctx.db.storeItem.findFirst({
+      where: { barcode, ...(excludeId ? { NOT: { id: excludeId } } : {}) },
+      select: { id: true },
+    })
+    if (!taken) return barcode
+  }
+  return `${prefix}${Date.now().toString(36).toUpperCase()}`
+}
+
+async function assertBarcodeFree(ctx: AppContext, barcode: string, excludeId?: string) {
+  const taken = await ctx.db.storeItem.findFirst({
+    where: { barcode, ...(excludeId ? { NOT: { id: excludeId } } : {}) },
+    select: { id: true, name: true, variant: true },
+  })
+  if (taken) throw conflict(`Barcode ${barcode} is already used by ${itemLabel(taken)}`)
+}
+
+/** Assign a barcode when missing; returns the barcode string. */
+export async function ensureStoreItemBarcode(
+  ctx: AppContext,
+  item: { id: string; category: StoreCategory; barcode: string | null },
+) {
+  if (item.barcode) return item.barcode
+  const barcode = await uniqueBarcode(ctx, item.category, item.id)
+  await ctx.db.storeItem.update({ where: { id: item.id }, data: { barcode } })
+  return barcode
 }
 
 type LedgerHook = 'sale' | 'purchase' | 'movement'
@@ -335,6 +371,8 @@ export async function createStoreItem(ctx: AppContext, raw: z.input<typeof store
   const sku = input.sku ?? (await uniqueSku(ctx, input.category))
   const clash = await ctx.db.storeItem.findFirst({ where: { sku }, select: { id: true } })
   if (clash) throw conflict(`SKU ${sku} is already used by another item`)
+  const barcode = input.barcode ?? (await uniqueBarcode(ctx, input.category))
+  if (input.barcode) await assertBarcodeFree(ctx, barcode)
   if (input.openingQuantity > 0 && input.openingUnitCost <= 0) {
     throw badRequest('Enter the purchase cost of the opening stock so stock value is right')
   }
@@ -349,7 +387,7 @@ export async function createStoreItem(ctx: AppContext, raw: z.input<typeof store
         category: input.category,
         variant: input.variant,
         unit: input.unit,
-        barcode: input.barcode,
+        barcode,
         hsnCode: input.hsnCode,
         taxPercent: input.taxPercent,
         sellingPriceMinor: input.sellingPrice,
@@ -400,6 +438,12 @@ export async function updateStoreItem(ctx: AppContext, raw: z.input<typeof store
     const clash = await ctx.db.storeItem.findFirst({ where: { sku, NOT: { id: before.id } }, select: { id: true } })
     if (clash) throw conflict(`SKU ${sku} is already used by another item`)
   }
+  let barcode = input.barcode
+  if (barcode === null || barcode === undefined) {
+    barcode = before.barcode ?? (await uniqueBarcode(ctx, input.category, before.id))
+  } else if (barcode !== before.barcode) {
+    await assertBarcodeFree(ctx, barcode, before.id)
+  }
   const updated = await ctx.db.storeItem.update({
     where: { id: before.id },
     data: {
@@ -408,7 +452,7 @@ export async function updateStoreItem(ctx: AppContext, raw: z.input<typeof store
       category: input.category,
       variant: input.variant,
       unit: input.unit,
-      barcode: input.barcode,
+      barcode,
       hsnCode: input.hsnCode,
       taxPercent: input.taxPercent,
       sellingPriceMinor: input.sellingPrice,
@@ -431,6 +475,75 @@ export async function updateStoreItem(ctx: AppContext, raw: z.input<typeof store
   })
   if (input.stockCount !== undefined) await setStockCount(ctx, updated.id, input.stockCount)
   return updated
+}
+
+/** Generate barcodes for every active item that still has none (or a selected subset). */
+export async function bulkGenerateStoreBarcodes(ctx: AppContext, itemIds?: string[]) {
+  ctx.require('store.manage')
+  const where: Prisma.StoreItemWhereInput = {
+    deletedAt: null,
+    OR: [{ barcode: null }, { barcode: '' }],
+  }
+  if (itemIds?.length) where.id = { in: itemIds }
+  const missing = await ctx.db.storeItem.findMany({
+    where,
+    select: { id: true, category: true, barcode: true, name: true, variant: true },
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    take: 5000,
+  })
+  let generated = 0
+  for (const item of missing) {
+    await ensureStoreItemBarcode(ctx, {
+      id: item.id,
+      category: item.category,
+      barcode: item.barcode?.trim() ? item.barcode : null,
+    })
+    generated++
+  }
+  await audit({
+    tenantId: ctx.tenant.id,
+    actorId: ctx.user.userId,
+    actorLabel: actorLabel(ctx),
+    action: 'store.barcode_bulk_generate',
+    module: 'store',
+    entityType: 'StoreItem',
+    summary: `Generated barcodes for ${generated} store item${generated === 1 ? '' : 's'}`,
+  })
+  return { generated, itemIds: missing.map((i) => i.id) }
+}
+
+/** Items for the printable barcode label sheet. */
+export async function listStoreItemsForBarcodes(
+  ctx: AppContext,
+  opts: { ids?: string[]; missingOnly?: boolean; purchaseId?: string } = {},
+) {
+  ctx.require('store.view')
+  if (opts.purchaseId) {
+    const purchase = await ctx.db.storePurchase.findFirst({
+      where: { id: opts.purchaseId },
+      select: { lines: { select: { itemId: true } } },
+    })
+    if (!purchase) throw notFound('Stock receipt')
+    opts.ids = purchase.lines.map((l) => l.itemId)
+  }
+  const where: Prisma.StoreItemWhereInput = { deletedAt: null, isActive: true }
+  if (opts.ids?.length) where.id = { in: opts.ids }
+  if (opts.missingOnly) where.OR = [{ barcode: null }, { barcode: '' }]
+  return ctx.db.storeItem.findMany({
+    where,
+    orderBy: [{ category: 'asc' }, { name: 'asc' }, { variant: 'asc' }],
+    select: {
+      id: true,
+      sku: true,
+      barcode: true,
+      name: true,
+      variant: true,
+      category: true,
+      sellingPriceMinor: true,
+      unit: true,
+    },
+    take: 2000,
+  })
 }
 
 /** Sets stock to a counted quantity, booking the difference as an adjustment. */
@@ -650,6 +763,11 @@ export async function createStorePurchase(ctx: AppContext, raw: StorePurchaseInp
     })
     for (const line of input.lines) {
       const item = items.get(line.itemId)!
+      if (!item.barcode?.trim()) {
+        const barcode = await uniqueBarcode(ctx, item.category, item.id)
+        await tx.storeItem.update({ where: { id: item.id }, data: { barcode } })
+        item.barcode = barcode
+      }
       const balance = await receiveUnits(tx, ctx.tenant.id, item, line.quantity, line.unitCost)
       await movement(tx, ctx, {
         itemId: item.id,

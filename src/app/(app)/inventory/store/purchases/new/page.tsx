@@ -39,7 +39,16 @@ export default async function NewStorePurchasePage({
         preselectVendorId={vendorId}
         canBuyOnCredit={flags.module}
         vendors={vendors}
-        items={items.map((i) => ({ id: i.id, sku: i.sku, name: i.name, variant: i.variant, unit: i.unit, quantity: i.quantity, avgCostMinor: i.avgCostMinor }))}
+        items={items.map((i) => ({
+          id: i.id,
+          sku: i.sku,
+          barcode: i.barcode,
+          name: i.name,
+          variant: i.variant,
+          unit: i.unit,
+          quantity: i.quantity,
+          avgCostMinor: i.avgCostMinor,
+        }))}
       />
     </div>
   )

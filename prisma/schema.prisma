@@ -4123,6 +4123,7 @@ model StoreItem {
   returnLines   StoreReturnLine[]
 
   @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
   @@index([tenantId, category])
   @@index([tenantId, name])
 }

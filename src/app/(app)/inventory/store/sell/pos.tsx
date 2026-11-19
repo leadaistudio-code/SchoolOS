@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus, ScanBarcode, ShoppingCart, Trash2, User, UserX, X } from 'lucide-react'
+import { Camera, Minus, Plus, ScanBarcode, ShoppingCart, Trash2, User, UserX, X } from 'lucide-react'
 import { createStoreSaleAction } from '../actions'
 import {
   STORE_CATEGORIES,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Field, Input, SearchInput } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
+import { BarcodeCameraScanner } from '@/components/exams/barcode-camera-scanner'
 import { cn, formatMoney } from '@/lib/utils'
 
 export type PosItem = {
@@ -75,6 +76,7 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
     { mode: 'UPI', amount: '', ref: '' },
   ])
   const [saving, setSaving] = React.useState(false)
+  const [cameraOpen, setCameraOpen] = React.useState(false)
   const searchRef = React.useRef<HTMLInputElement>(null)
 
   const visible = React.useMemo(() => {
@@ -123,17 +125,34 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
     )
   }
 
+  const addByCode = (raw: string) => {
+    const code = raw.trim().toLowerCase()
+    if (!code) return false
+    const exact = items.find((i) => i.barcode?.toLowerCase() === code || i.sku.toLowerCase() === code)
+    if (exact) {
+      add(exact)
+      setQuery('')
+      return true
+    }
+    const filtered = items.filter(
+      (i) =>
+        i.name.toLowerCase().includes(code) ||
+        i.sku.toLowerCase().includes(code) ||
+        (i.variant ?? '').toLowerCase().includes(code),
+    )
+    if (filtered.length === 1) {
+      add(filtered[0]!)
+      setQuery('')
+      return true
+    }
+    push({ tone: 'error', title: 'No item matches that barcode' })
+    return false
+  }
+
   const onScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return
     e.preventDefault()
-    const code = query.trim().toLowerCase()
-    if (!code) return
-    const exact = items.find((i) => i.barcode?.toLowerCase() === code || i.sku.toLowerCase() === code)
-    const pick = exact ?? (visible.length === 1 ? visible[0] : undefined)
-    if (pick) {
-      add(pick)
-      setQuery('')
-    }
+    addByCode(query)
   }
 
   React.useEffect(() => {
@@ -257,12 +276,32 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onScan}
-              placeholder="Search item, SKU or scan barcode, then press Enter"
+              placeholder="Search item, SKU or scan barcode (USB/Bluetooth scanner works here)"
               aria-label="Search items"
             />
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => setCameraOpen(true)}
+            title="Scan with phone or webcam"
+          >
+            <Camera aria-hidden /> Scan
+          </Button>
           <ScanBarcode className="size-5 text-ink-subtle" aria-hidden />
         </div>
+        <BarcodeCameraScanner
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          title="Scan product barcode"
+          description="Point the camera at the Code 128 barcode on the product label. USB scanners can type into the search box instead."
+          onDetected={(value) => {
+            setCameraOpen(false)
+            addByCode(value)
+            searchRef.current?.focus()
+          }}
+        />
         <div className="flex flex-wrap gap-1.5">
           <CategoryChip active={!category} colour="#475569" onClick={() => setCategory('')}>
             All

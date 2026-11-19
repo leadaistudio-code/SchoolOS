@@ -15,6 +15,7 @@ import { formatMoney, formatNumber } from '@/lib/utils'
 import { StoreTabs } from '../store-tabs'
 import { StoreFilters } from '../store-filters'
 import { AdjustStockButton, DeleteItemButton, ItemDialogButton, ToggleActiveButton } from './item-dialogs'
+import { BulkBarcodeActions, ItemBarcodePrintButton } from './barcode-actions'
 
 export const metadata = { title: 'Store items & stock' }
 
@@ -35,6 +36,7 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
   const units = items.reduce((s, i) => s + Math.max(i.quantity, 0), 0)
   const out = items.filter((i) => i.quantity <= 0).length
   const low = items.filter((i) => i.quantity > 0 && i.quantity <= i.reorderLevel).length
+  const missingBarcodes = items.filter((i) => !i.barcode?.trim()).length
   const exportQs = new URLSearchParams(
     Object.entries(params).filter((e): e is [string, string] => !!e[1]),
   ).toString()
@@ -43,9 +45,10 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
     <div className="space-y-4">
       <PageHeader
         title="Items & stock"
-        description="Every product the school sells, with live stock, reorder alerts and value at cost."
+        description="Every product the school sells, with live stock, reorder alerts and value at cost. Barcodes print with the item name for shelf and POS scanning."
         actions={
           <>
+            <BulkBarcodeActions missingCount={missingBarcodes} canManage={canManage} />
             <a href={`/api/v1/store/items/export${exportQs ? `?${exportQs}` : ''}`} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               Stock report CSV
             </a>
@@ -164,6 +167,7 @@ export default async function StoreItemsPage({ searchParams }: { searchParams: P
                           >
                             <History className="size-3.5" aria-label="Stock history" />
                           </Link>
+                          <ItemBarcodePrintButton itemId={i.id} hasBarcode={!!i.barcode?.trim()} />
                           {canManage ? (
                             <>
                               <AdjustStockButton item={i} />

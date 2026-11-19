@@ -26,6 +26,14 @@ export default async function StorePurchasePage({ params }: { params: Promise<{ 
           description={`Goods received from ${p.vendorName} on ${formatDay(p.purchaseDate, 'd MMMM yyyy')}`}
           actions={
             <>
+              <a
+                href={`/print/inventory/store/barcodes?purchaseId=${p.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink hover:bg-surface-2"
+              >
+                Print barcodes
+              </a>
               <PrintButton />
               <BackButton fallbackHref="/inventory/store/purchases" />
             </>
