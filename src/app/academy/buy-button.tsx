@@ -23,10 +23,22 @@ const CHECKOUT_JS = 'https://checkout.razorpay.com/v1/checkout.js'
 
 function loadCheckout(): Promise<boolean> {
   if (window.Razorpay) return Promise.resolve(true)
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${CHECKOUT_JS}"]`)
+  if (existing) {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true)
+        return
+      }
+      existing.addEventListener('load', () => resolve(!!window.Razorpay), { once: true })
+      existing.addEventListener('error', () => resolve(false), { once: true })
+    })
+  }
   return new Promise((resolve) => {
     const script = document.createElement('script')
     script.src = CHECKOUT_JS
-    script.onload = () => resolve(true)
+    script.async = true
+    script.onload = () => resolve(!!window.Razorpay)
     script.onerror = () => resolve(false)
     document.body.appendChild(script)
   })
