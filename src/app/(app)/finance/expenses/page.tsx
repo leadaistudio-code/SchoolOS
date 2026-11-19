@@ -6,6 +6,7 @@ import {
   expenseFilterSchema,
   expenseOverview,
   expenseRecorderOptions,
+  expenseSpentByOptions,
   listExpenses,
 } from '@/server/modules/finance/expenses'
 import { getViewSession, withSessionPeriod } from '@/server/view-session'
@@ -31,7 +32,20 @@ import { ExpenseChart } from './expense-chart'
 
 export const metadata = { title: 'Expenses' }
 
-const FILTER_KEYS = ['q', 'headId', 'nature', 'paymentMode', 'recordedById', 'preset', 'from', 'to', 'category', 'source'] as const
+const FILTER_KEYS = [
+  'q',
+  'headId',
+  'nature',
+  'paymentMode',
+  'recordedById',
+  'spentBy',
+  'title',
+  'preset',
+  'from',
+  'to',
+  'category',
+  'source',
+] as const
 
 export default async function ExpensesPage({
   searchParams,
@@ -46,11 +60,12 @@ export default async function ExpensesPage({
   const fyStart = session ? Number(financialYearRange(session.startsOn).from.slice(0, 4)) : undefined
 
   const heads = await expenseHeadOptions(ctx)
-  const [list, overview, flags, recorders] = await Promise.all([
+  const [list, overview, flags, recorders, spentByNames] = await Promise.all([
     listExpenses(ctx, query, filter),
     expenseOverview(ctx, fyStart),
     getAccountingFlags(ctx.db),
     expenseRecorderOptions(ctx),
+    expenseSpentByOptions(ctx),
   ])
   const approvals = flags.approvals
   const optional = approvalMode(flags, accountingEnvSwitches().approvals) === 'optional'
@@ -190,7 +205,12 @@ export default async function ExpensesPage({
 
       <Card className="overflow-hidden">
         <SearchBar placeholder="Search title, vendor, bill number, person or notes">
-          <ExpenseFilters heads={heads} recorders={recorders} sessionName={session?.name ?? null} />
+          <ExpenseFilters
+            heads={heads}
+            recorders={recorders}
+            spentByNames={spentByNames}
+            sessionName={session?.name ?? null}
+          />
         </SearchBar>
 
         {items.length === 0 ? (
@@ -211,7 +231,9 @@ export default async function ExpensesPage({
                   <tr>
                     <TH>Date</TH>
                     <TH>Expense</TH>
-                    <TH>Head</TH>
+                    <TH>Head / item</TH>
+                    <TH>Expense by</TH>
+                    <TH>Created by</TH>
                     <TH>Type</TH>
                     <TH>Paid by</TH>
                     <TH align="right">Amount</TH>
@@ -230,12 +252,12 @@ export default async function ExpensesPage({
                               Payment to {v.vendor.name}
                             </Link>
                             <p className="text-xs text-ink-subtle">
-                              {[v.number, v.reference, v.narration, v.createdByLabel ? `by ${v.createdByLabel}` : null]
-                                .filter(Boolean)
-                                .join(' · ')}
+                              {[v.number, v.reference, v.narration].filter(Boolean).join(' · ')}
                             </p>
                           </TD>
                           <TD className="text-sm text-ink-muted">Vendor payment</TD>
+                          <TD className="text-sm text-ink-muted">—</TD>
+                          <TD className="text-sm text-ink-muted">{v.createdByLabel ?? '—'}</TD>
                           <TD>
                             <Badge tone="neutral">Vendor</Badge>
                           </TD>
@@ -262,17 +284,12 @@ export default async function ExpensesPage({
                             ) : null}
                           </p>
                           <p className="text-xs text-ink-subtle">
-                            {[
-                              row.spentBy ? `Expense by ${row.spentBy}` : null,
-                              row.vendor,
-                              row.referenceNo,
-                              row.recordedByLabel && row.recordedByLabel !== row.spentBy ? `recorded by ${row.recordedByLabel}` : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
+                            {[row.vendor, row.referenceNo].filter(Boolean).join(' · ') || '—'}
                           </p>
                         </TD>
                         <TD className="text-sm text-ink-muted">{row.headName}</TD>
+                        <TD className="text-sm text-ink-muted">{row.spentBy ?? '—'}</TD>
+                        <TD className="text-sm text-ink-muted">{row.recordedByLabel ?? '—'}</TD>
                         <TD>
                           <Badge tone={row.nature === 'DIRECT' ? 'brand' : 'warning'}>{natureLabel(row.nature)}</Badge>
                         </TD>

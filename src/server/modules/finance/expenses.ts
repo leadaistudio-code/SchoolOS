@@ -75,6 +75,10 @@ export const expenseFilterSchema = z.object({
   nature: optional(z.enum(['DIRECT', 'INDIRECT'])),
   paymentMode: optional(paymentModeEnum),
   recordedById: optional(z.string()),
+  /** Free-text person who incurred the spend ("Expense by"). */
+  spentBy: optional(z.string()),
+  /** Match expense title / item description. */
+  title: optional(z.string()),
   preset: optional(z.string()),
   from: optional(isoDate),
   to: optional(isoDate),
@@ -100,6 +104,19 @@ export async function expenseRecorderOptions(ctx: AppContext) {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** Distinct "Expense by" names for the person filter. */
+export async function expenseSpentByOptions(ctx: AppContext) {
+  ctx.require('expenses.view')
+  const grouped = await ctx.db.schoolExpense.groupBy({
+    by: ['spentBy'],
+    where: { deletedAt: null, spentBy: { not: null } },
+  })
+  return grouped
+    .map((g) => g.spentBy?.trim())
+    .filter((name): name is string => Boolean(name))
+    .sort((a, b) => a.localeCompare(b))
+}
+
 export const EXPENSE_SORT_FIELDS = ['expenseDate', 'amountMinor', 'createdAt', 'title'] as const
 
 function filterRange(filter: ExpenseFilter) {
@@ -109,7 +126,14 @@ function filterRange(filter: ExpenseFilter) {
 
 /** Vendor payments carry no expense head, so a head or type filter leaves them out. */
 function includesVendorPayments(filter: ExpenseFilter) {
-  return filter.source !== 'expenses' && !filter.headId && !filter.category && !filter.nature
+  return (
+    filter.source !== 'expenses' &&
+    !filter.headId &&
+    !filter.category &&
+    !filter.nature &&
+    !filter.spentBy &&
+    !filter.title
+  )
 }
 
 function vendorPaymentWhere(filter: ExpenseFilter): Prisma.VendorPaymentWhereInput {
@@ -155,6 +179,8 @@ const vendorPaymentSelect = {
 
 function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
   const { from, to } = filterRange(filter)
+  const spentBy = filter.spentBy?.trim()
+  const title = filter.title?.trim()
   return {
     ...(filter.source === 'vendors' ? { id: { in: [] } } : {}),
     deletedAt: null,
@@ -163,6 +189,8 @@ function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
     ...(filter.nature ? { nature: filter.nature } : {}),
     ...(filter.paymentMode ? { paymentMode: filter.paymentMode } : {}),
     ...(filter.recordedById ? { recordedById: filter.recordedById } : {}),
+    ...(spentBy ? { spentBy: { equals: spentBy, mode: 'insensitive' as const } } : {}),
+    ...(title ? { title: { contains: title, mode: 'insensitive' as const } } : {}),
     ...(from || to
       ? {
           expenseDate: {
@@ -179,6 +207,7 @@ function expenseWhere(filter: ExpenseFilter): Prisma.SchoolExpenseWhereInput {
             { referenceNo: { contains: filter.q, mode: 'insensitive' as const } },
             { notes: { contains: filter.q, mode: 'insensitive' as const } },
             { spentBy: { contains: filter.q, mode: 'insensitive' as const } },
+            { recordedByLabel: { contains: filter.q, mode: 'insensitive' as const } },
           ],
         }
       : {}),

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Check, Clock, Lock, Save, UserX } from 'lucide-react'
 import { saveAttendanceAction } from './actions'
 import type { Register } from '@/server/modules/attendance/service'
@@ -32,8 +33,23 @@ const TONE: Record<string, string> = {
  */
 export function AttendanceRegister({ register }: { register: Register }) {
   const toast = useToast()
+  const searchParams = useSearchParams()
   const [pending, startTransition] = React.useTransition()
   const selection = useBulkSelection(register.rows.map((row) => row.studentId))
+
+  const visibleRows = React.useMemo(() => {
+    const q = searchParams.get('q')?.trim().toLowerCase() ?? ''
+    const status = searchParams.get('status') ?? ''
+    return register.rows.filter((row) => {
+      if (q) {
+        const hay = `${row.firstName} ${row.lastName} ${row.admissionNo} ${row.rollNumber ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      if (status === 'unmarked') return !row.status
+      if (status) return (row.status ?? '') === status
+      return true
+    })
+  }, [register.rows, searchParams])
 
   const initial = React.useMemo<Draft>(() => {
     const d: Draft = {}
@@ -255,7 +271,12 @@ export function AttendanceRegister({ register }: { register: Register }) {
       ) : null}
 
       <ul className="divide-y divide-[var(--border)]">
-        {register.rows.map((row) => {
+        {visibleRows.length === 0 ? (
+          <li className="px-3 py-8">
+            <EmptyState title="No students match" description="Clear the search or status filter to see the full register." />
+          </li>
+        ) : null}
+        {visibleRows.map((row) => {
           const current = draft[row.studentId]?.status ?? 'PRESENT'
           return (
             <li

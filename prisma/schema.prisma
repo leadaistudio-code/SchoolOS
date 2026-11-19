@@ -4089,6 +4089,12 @@ enum StoreSaleStatus {
   VOIDED
 }
 
+enum StoreItemUnitStatus {
+  IN_STOCK
+  SOLD
+  WRITTEN_OFF
+}
+
 /// Quantity is a cache of the movement ledger and only changes with a StockMovement.
 model StoreItem {
   id                String        @id @default(cuid())
@@ -4100,6 +4106,7 @@ model StoreItem {
   variant           String?
   unit              String        @default("pcs")
   hsnCode           String?
+  /// Optional catalog / manufacturer code for the SKU (not the per-piece unit barcode).
   barcode           String?
   /// GST included in the selling price.
   taxPercent        Float         @default(0)
@@ -4121,11 +4128,32 @@ model StoreItem {
   saleLines     StoreSaleLine[]
   purchaseLines StorePurchaseLine[]
   returnLines   StoreReturnLine[]
+  units         StoreItemUnit[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
   @@index([tenantId, category])
   @@index([tenantId, name])
+}
+
+/// One physical piece in stock, each with its own scannable barcode.
+model StoreItemUnit {
+  id         String              @id @default(cuid())
+  tenantId   String
+  itemId     String
+  barcode    String
+  status     StoreItemUnitStatus @default(IN_STOCK)
+  purchaseId String?
+  saleId     String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  item StoreItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, barcode])
+  @@index([tenantId, itemId, status])
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, saleId])
 }
 
 model StockMovement {

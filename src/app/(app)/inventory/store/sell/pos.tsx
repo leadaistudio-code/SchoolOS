@@ -22,6 +22,8 @@ export type PosItem = {
   id: string
   sku: string
   barcode: string | null
+  /** Per-piece barcodes currently in stock (unique for each unit). */
+  unitBarcodes?: string[]
   name: string
   variant: string | null
   category: string
@@ -128,6 +130,12 @@ export function PointOfSale({ items, currency }: { items: PosItem[]; currency: s
   const addByCode = (raw: string) => {
     const code = raw.trim().toLowerCase()
     if (!code) return false
+    const byUnit = items.find((i) => i.unitBarcodes?.some((b) => b.toLowerCase() === code))
+    if (byUnit) {
+      add(byUnit)
+      setQuery('')
+      return true
+    }
     const exact = items.find((i) => i.barcode?.toLowerCase() === code || i.sku.toLowerCase() === code)
     if (exact) {
       add(exact)

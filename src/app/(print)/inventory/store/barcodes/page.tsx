@@ -32,8 +32,8 @@ export default async function StoreBarcodeLabelsPage({
       <div className="no-print mb-4 space-y-1">
         <h1 className="text-lg font-semibold text-neutral-900">Barcode labels</h1>
         <p className="text-sm text-neutral-600">
-          {items.length} label{items.length === 1 ? '' : 's'} for {school}. Use a laser or thermal printer;
-          stick each label on the product so the counter can scan it.
+          {items.length} unique label{items.length === 1 ? '' : 's'} for {school} — one barcode per
+          individual piece. Stick each label on its item so the counter can scan it.
         </p>
       </div>
 

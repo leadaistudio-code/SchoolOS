@@ -54,7 +54,7 @@ export async function bulkGenerateStoreBarcodesAction(itemIds?: string[]): Promi
     }
     return {
       ok: true,
-      message: `Generated ${result.generated} barcode${result.generated === 1 ? '' : 's'}. Ready to print.`,
+      message: `Generated ${result.generated} unique piece barcode${result.generated === 1 ? '' : 's'}. Ready to print.`,
     }
   } catch (err) {
     return fail(err, 'Barcodes could not be generated')

@@ -3,16 +3,19 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { EXPENSE_NATURES, EXPENSE_PAYMENT_MODES } from '@/lib/finance/expense-options'
 import { PERIOD_PRESETS } from '@/lib/periods'
-import { Field, Select, Input } from '@/components/ui/input'
+import { Select, Input } from '@/components/ui/input'
 import type { HeadOption } from './expense-forms'
 
 export function ExpenseFilters({
   heads,
   recorders = [],
+  spentByNames = [],
   sessionName = null,
 }: {
   heads: HeadOption[]
   recorders?: { id: string; name: string }[]
+  /** Distinct "Expense by" person names. */
+  spentByNames?: string[]
   sessionName?: string | null
 }) {
   const router = useRouter()
@@ -31,93 +34,131 @@ export function ExpenseFilters({
   const nature = searchParams.get('nature') ?? ''
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <Field label="Show" htmlFor="exp-source">
-        <Select id="exp-source" value={searchParams.get('source') ?? ''} onChange={(e) => setParams({ source: e.target.value })}>
-          <option value="">Expenses + vendor payments</option>
-          <option value="expenses">Expenses only</option>
-          <option value="vendors">Vendor payments only</option>
-        </Select>
-      </Field>
-      <Field label="Type" htmlFor="exp-nature">
-        <Select id="exp-nature" value={nature} onChange={(e) => setParams({ nature: e.target.value, headId: '' })}>
-          <option value="">Direct + indirect</option>
-          {EXPENSE_NATURES.map((n) => (
-            <option key={n.value} value={n.value}>
-              {n.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Head" htmlFor="exp-head">
-        <Select id="exp-head" value={searchParams.get('headId') ?? ''} onChange={(e) => setParams({ headId: e.target.value })}>
-          <option value="">All heads</option>
-          {heads
-            .filter((h) => !nature || h.nature === nature)
-            .map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name}
-              </option>
-            ))}
-        </Select>
-      </Field>
-      <Field label="Paid by" htmlFor="exp-mode">
-        <Select id="exp-mode" value={searchParams.get('paymentMode') ?? ''} onChange={(e) => setParams({ paymentMode: e.target.value })}>
-          <option value="">Any mode</option>
-          {EXPENSE_PAYMENT_MODES.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      {recorders.length > 0 ? (
-        <Field label="Recorded by" htmlFor="exp-recorder">
-          <Select
-            id="exp-recorder"
-            value={searchParams.get('recordedById') ?? ''}
-            onChange={(e) => setParams({ recordedById: e.target.value })}
-          >
-            <option value="">Any accountant</option>
-            {recorders.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+    <>
+      <Select
+        value={searchParams.get('preset') ?? (searchParams.get('from') || searchParams.get('to') ? 'custom' : '')}
+        aria-label="Period"
+        className="w-40"
+        onChange={(e) =>
+          e.target.value === 'custom'
+            ? setParams({ preset: '' })
+            : setParams({ preset: e.target.value, from: '', to: '' })
+        }
+      >
+        <option value="">{sessionName ? `Session ${sessionName}` : 'Any time'}</option>
+        {sessionName ? <option value="all">All dates</option> : null}
+        {PERIOD_PRESETS.map((p) => (
+          <option key={p.key} value={p.key}>
+            {p.label}
+          </option>
+        ))}
+        <option value="custom">Custom range</option>
+      </Select>
+      {!searchParams.get('preset') ? (
+        <>
+          <Input
+            type="date"
+            aria-label="From date"
+            className="w-36"
+            value={searchParams.get('from') ?? ''}
+            onChange={(e) => setParams({ from: e.target.value, preset: '' })}
+          />
+          <Input
+            type="date"
+            aria-label="To date"
+            className="w-36"
+            value={searchParams.get('to') ?? ''}
+            onChange={(e) => setParams({ to: e.target.value, preset: '' })}
+          />
+        </>
       ) : null}
-      <Field label="Period" htmlFor="exp-preset">
+
+      <Select
+        value={searchParams.get('source') ?? ''}
+        aria-label="Show"
+        className="w-44"
+        onChange={(e) => setParams({ source: e.target.value })}
+      >
+        <option value="">Expenses + vendors</option>
+        <option value="expenses">Expenses only</option>
+        <option value="vendors">Vendor payments only</option>
+      </Select>
+
+      <Select
+        value={nature}
+        aria-label="Type"
+        className="w-36"
+        onChange={(e) => setParams({ nature: e.target.value, headId: '' })}
+      >
+        <option value="">Direct + indirect</option>
+        {EXPENSE_NATURES.map((n) => (
+          <option key={n.value} value={n.value}>
+            {n.label}
+          </option>
+        ))}
+      </Select>
+
+      <Select
+        value={searchParams.get('headId') ?? ''}
+        aria-label="Expense head / item"
+        className="w-44"
+        onChange={(e) => setParams({ headId: e.target.value })}
+      >
+        <option value="">All heads / items</option>
+        {heads
+          .filter((h) => !nature || h.nature === nature)
+          .map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.name}
+            </option>
+          ))}
+      </Select>
+
+      <Select
+        value={searchParams.get('paymentMode') ?? ''}
+        aria-label="Paid by"
+        className="w-36"
+        onChange={(e) => setParams({ paymentMode: e.target.value })}
+      >
+        <option value="">Any mode</option>
+        {EXPENSE_PAYMENT_MODES.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </Select>
+
+      {recorders.length > 0 ? (
         <Select
-          id="exp-preset"
-          value={searchParams.get('preset') ?? ''}
-          onChange={(e) => setParams({ preset: e.target.value, from: '', to: '' })}
+          value={searchParams.get('recordedById') ?? ''}
+          aria-label="Recorded by"
+          className="w-44"
+          onChange={(e) => setParams({ recordedById: e.target.value })}
         >
-          <option value="">{sessionName ? `Session ${sessionName}` : 'Any time'}</option>
-          {sessionName ? <option value="all">All dates</option> : null}
-          {PERIOD_PRESETS.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.label}
+          <option value="">Created by: anyone</option>
+          {recorders.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
             </option>
           ))}
         </Select>
-      </Field>
-      <Field label="From" htmlFor="exp-from">
-        <Input
-          id="exp-from"
-          type="date"
-          value={searchParams.get('from') ?? ''}
-          onChange={(e) => setParams({ from: e.target.value, preset: '' })}
-        />
-      </Field>
-      <Field label="To" htmlFor="exp-to">
-        <Input
-          id="exp-to"
-          type="date"
-          value={searchParams.get('to') ?? ''}
-          onChange={(e) => setParams({ to: e.target.value, preset: '' })}
-        />
-      </Field>
-    </div>
+      ) : null}
+
+      {spentByNames.length > 0 ? (
+        <Select
+          value={searchParams.get('spentBy') ?? ''}
+          aria-label="Expense by person"
+          className="w-44"
+          onChange={(e) => setParams({ spentBy: e.target.value })}
+        >
+          <option value="">Expense by: anyone</option>
+          {spentByNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </>
   )
 }

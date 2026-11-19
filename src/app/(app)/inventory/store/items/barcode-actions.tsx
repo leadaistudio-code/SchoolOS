@@ -38,7 +38,9 @@ export function BulkBarcodeActions({
       {canManage && missingCount > 0 ? (
         <Button size="sm" variant="secondary" disabled={busy} onClick={generate}>
           <Barcode aria-hidden />
-          {busy ? 'Generating…' : `Generate ${missingCount} barcode${missingCount === 1 ? '' : 's'}`}
+          {busy
+            ? 'Generating…'
+            : `Generate unique barcodes (${missingCount} piece${missingCount === 1 ? '' : 's'})`}
         </Button>
       ) : null}
       <a
@@ -53,17 +55,26 @@ export function BulkBarcodeActions({
   )
 }
 
-export function ItemBarcodePrintButton({ itemId, hasBarcode }: { itemId: string; hasBarcode: boolean }) {
-  if (!hasBarcode) return null
+export function ItemBarcodePrintButton({
+  itemId,
+  hasBarcode,
+  unitCount = 0,
+}: {
+  itemId: string
+  hasBarcode: boolean
+  /** In-stock pieces with unique barcodes — print one label each. */
+  unitCount?: number
+}) {
+  if (!hasBarcode && unitCount <= 0) return null
   return (
     <a
       href={`/inventory/store/barcodes?ids=${itemId}`}
       target="_blank"
       rel="noopener noreferrer"
-      title="Print barcode label"
+      title={unitCount > 0 ? `Print ${unitCount} unique barcode label${unitCount === 1 ? '' : 's'}` : 'Print barcode label'}
       className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-ink-muted hover:bg-surface-2 hover:text-ink"
     >
-      <Barcode className="size-3.5" aria-label="Print barcode label" />
+      <Barcode className="size-3.5" aria-label="Print barcode labels" />
     </a>
   )
 }

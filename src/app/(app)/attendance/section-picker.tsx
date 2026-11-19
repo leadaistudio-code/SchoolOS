@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Input, Select } from '@/components/ui/input'
-import { TableToolbar } from '@/components/ui/table'
+import { SearchBar } from '@/components/search-bar'
 
 export type SectionOption = {
   id: string
@@ -12,8 +12,8 @@ export type SectionOption = {
 }
 
 /**
- * Section and date selection. Both live in the URL so a teacher can bookmark
- * their class register and the back button behaves.
+ * Fees-style filter row for the day register: search, section, date, status.
+ * Values live in the URL so a teacher can bookmark their class register.
  */
 export function SectionPicker({
   sections,
@@ -30,19 +30,22 @@ export function SectionPicker({
   const pathname = usePathname()
   const params = useSearchParams()
 
-  const push = (mutate: (n: URLSearchParams) => void) => {
+  const update = (changes: Record<string, string>) => {
     const next = new URLSearchParams(params.toString())
-    mutate(next)
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
     router.push(`${pathname}?${next.toString()}`)
   }
 
   return (
-    <TableToolbar>
+    <SearchBar placeholder="Search student name, roll or admission no.">
       <Select
         value={sectionId ?? ''}
         aria-label="Select section"
         className="w-56"
-        onChange={(e) => push((n) => n.set('sectionId', e.target.value))}
+        onChange={(e) => update({ sectionId: e.target.value })}
       >
         <option value="">Select a class section</option>
         {sections.map((s) => (
@@ -57,9 +60,24 @@ export function SectionPicker({
         value={onDate}
         max={maxDate}
         aria-label="Attendance date"
-        className="w-44"
-        onChange={(e) => push((n) => n.set('onDate', e.target.value))}
+        className="w-40"
+        onChange={(e) => update({ onDate: e.target.value })}
       />
-    </TableToolbar>
+
+      <Select
+        value={params.get('status') ?? ''}
+        aria-label="Filter by status"
+        className="w-40"
+        onChange={(e) => update({ status: e.target.value })}
+      >
+        <option value="">All statuses</option>
+        <option value="unmarked">Unmarked only</option>
+        <option value="PRESENT">Present</option>
+        <option value="ABSENT">Absent</option>
+        <option value="LATE">Late</option>
+        <option value="HALF_DAY">Half day</option>
+        <option value="LEAVE">Leave</option>
+      </Select>
+    </SearchBar>
   )
 }

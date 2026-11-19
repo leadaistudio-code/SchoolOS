@@ -3,9 +3,12 @@ import { subDays } from 'date-fns'
 import { requireContext } from '@/server/context'
 import { attendanceReport } from '@/server/modules/attendance/service'
 import { getClassTree } from '@/server/modules/academics/service'
+import { getViewSession, withSessionPeriod } from '@/server/view-session'
+import { presetRange } from '@/lib/periods'
 import { toDateInput } from '@/lib/dates'
 import { PageHeader } from '@/components/page-header'
 import { Card } from '@/components/ui/card'
+import { SearchBar } from '@/components/search-bar'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/states'
 import { cn } from '@/lib/utils'
@@ -21,33 +24,59 @@ export default async function AttendanceReportsPage({
 }) {
   const ctx = await requireContext('attendance.view')
   const params = await searchParams
+  const session = await getViewSession(ctx)
 
-  const to = params.to ?? toDateInput(new Date())
-  const from = params.from ?? toDateInput(subDays(new Date(), 29))
+  const period = withSessionPeriod(
+    {
+      preset: params.preset,
+      from: params.from,
+      to: params.to,
+    },
+    session,
+  )
+  const range = period.preset ? presetRange(period.preset) : null
+  const to = period.to ?? range?.to ?? toDateInput(new Date())
+  const from =
+    period.from ?? range?.from ?? session?.range.from ?? toDateInput(subDays(new Date(), 29))
 
-  const [{ rows, totals }, classes] = await Promise.all([
+  const [{ rows: allRows, totals }, classes] = await Promise.all([
     attendanceReport(ctx, {
       from,
       to,
       classLevelId: params.classLevelId,
       sectionId: params.sectionId,
+      q: params.q,
     }),
     getClassTree(ctx),
   ])
+
+  const q = params.q?.trim().toLowerCase()
+  let rows = q
+    ? allRows.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.admissionNo.toLowerCase().includes(q),
+      )
+    : allRows
+
+  if (params.risk === 'below_75') {
+    rows = rows.filter((r) => r.percent !== null && r.percent < 75)
+  } else if (params.risk === 'below_85') {
+    rows = rows.filter((r) => r.percent !== null && r.percent < 85)
+  }
 
   const totalMarked =
     (totals.PRESENT ?? 0) + (totals.ABSENT ?? 0) + (totals.LATE ?? 0) + (totals.HALF_DAY ?? 0)
   const attended = (totals.PRESENT ?? 0) + (totals.LATE ?? 0) + (totals.HALF_DAY ?? 0)
   const overall = totalMarked > 0 ? Math.round((attended / totalMarked) * 1000) / 10 : null
 
-  // Below 75% is the threshold most boards use for exam eligibility.
-  const atRisk = rows.filter((r) => r.percent !== null && r.percent < 75)
+  const atRisk = allRows.filter((r) => r.percent !== null && r.percent < 75)
 
   return (
     <div>
       <PageHeader
         title="Attendance reports"
-        description={`${from} to ${to} · ${rows.length} students with recorded attendance`}
+        description={`${from} to ${to} · ${rows.length} student${rows.length === 1 ? '' : 's'} shown`}
       />
 
       <MetricRow className="mb-4">
@@ -72,12 +101,19 @@ export default async function AttendanceReportsPage({
       </MetricRow>
 
       <Card className="overflow-hidden">
-        <ReportFilters classes={classes} from={from} to={to} />
+        <SearchBar placeholder="Search student name or admission number">
+          <ReportFilters
+            classes={classes}
+            sessionName={session?.name ?? null}
+            resolvedFrom={from}
+            resolvedTo={to}
+          />
+        </SearchBar>
 
         {rows.length === 0 ? (
           <EmptyState
             title="No attendance in this range"
-            description="Try a wider date range, or mark attendance first."
+            description="Try a wider date range, clear filters, or mark attendance first."
           />
         ) : (
           <TableWrap>

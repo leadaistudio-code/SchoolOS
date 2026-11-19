@@ -58,6 +58,9 @@ export const attendanceReportQuerySchema = z.object({
   classLevelId: z.string().optional(),
   sectionId: z.string().optional(),
   studentId: z.string().optional(),
+  /** Student name or admission number (applied in the report page / export). */
+  q: z.string().optional(),
+  risk: z.enum(['below_75', 'below_85']).optional(),
 })
 
 export type AttendanceReportQuery = z.infer<typeof attendanceReportQuerySchema>
