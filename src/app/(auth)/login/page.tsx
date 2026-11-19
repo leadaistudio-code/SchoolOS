@@ -12,6 +12,7 @@ import {
 import { env } from '@/lib/env'
 import Link from 'next/link'
 import { isAcademy } from '@/server/modules/lms/academy-tenant'
+import { LoginVisualPanel } from '@/components/auth/login-visual-panel'
 
 export const metadata = { title: 'Sign in' }
 
@@ -187,42 +188,50 @@ export default async function LoginPage({
         </div>
       </div>
 
-      {/* Right: school banner on desktop, or brand tint when none is set. */}
-      <div
-        className="hidden lg:flex flex-col justify-end p-12 text-white relative overflow-hidden min-h-[320px]"
-        style={
-          bannerUrl
-            ? undefined
-            : { background: 'var(--brand-700)' }
-        }
-      >
-        {bannerUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={bannerUrl}
-              alt=""
-              className="absolute inset-0 size-full object-cover"
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20"
-              aria-hidden
-            />
-          </>
-        ) : null}
-        <div className="relative max-w-md">
-          <p className="text-xl leading-snug">
-            {academy
-              ? 'Robotics, AI and coding: lessons at your pace, live classes and certificates.'
-              : 'Attendance, fees, homework, results and transport in one record system.'}
-          </p>
-          {tenant ? (
-            <p className="mt-3 text-base text-white/70">
-              {title} runs on {env().APP_NAME}
-            </p>
+      {/* Right: Academy gets the interactive glass panel; schools keep banner / brand tint. */}
+      {academy && !bannerUrl ? (
+        <LoginVisualPanel
+          title={title}
+          productName={env().APP_NAME}
+          tagline="Robotics, AI and coding: lessons at your pace, live classes and certificates."
+        />
+      ) : (
+        <div
+          className="hidden lg:flex flex-col justify-end p-12 text-white relative overflow-hidden min-h-[320px]"
+          style={
+            bannerUrl
+              ? undefined
+              : { background: 'var(--brand-700)' }
+          }
+        >
+          {bannerUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bannerUrl}
+                alt=""
+                className="absolute inset-0 size-full object-cover"
+              />
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20"
+                aria-hidden
+              />
+            </>
           ) : null}
+          <div className="relative max-w-md">
+            <p className="text-xl leading-snug">
+              {academy
+                ? 'Robotics, AI and coding: lessons at your pace, live classes and certificates.'
+                : 'Attendance, fees, homework, results and transport in one record system.'}
+            </p>
+            {tenant ? (
+              <p className="mt-3 text-base text-white/70">
+                {title} runs on {env().APP_NAME}
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -725,3 +725,24 @@ h6 {
     animation: none;
   }
 }
+
+/* Academy sign-in right column: soft chip drift over the glass solids. */
+.login-visual-chip {
+  animation: login-visual-float 7.5s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes login-visual-float {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, -14px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-visual-chip {
+    animation: none;
+  }
+}

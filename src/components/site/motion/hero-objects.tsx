@@ -79,7 +79,20 @@ const ACADEMY_PIECES: Piece[] = [
   { geometry: 'sphere', position: [-4.8, -0.6, -2.4], rotation: [0, 0, 0], scale: 0.26, color: 0xef5ba8, depth: 0.22, spin: 0.13, bob: 0.5 },
 ]
 
-const ARRANGEMENTS = { hero: PIECES, closing: CLOSING_PIECES, academy: ACADEMY_PIECES }
+/*
+ * Sign-in panel: half-width column, so the parts sit closer to centre than the
+ * full-bleed Academy hero. The copy lives at the bottom; the solids fill the
+ * open middle without covering the tagline.
+ */
+const LOGIN_PIECES: Piece[] = [
+  { geometry: 'gear', position: [-1.55, 1.35, -0.4], rotation: [0.4, 0.55, 0.15], scale: 0.72, color: 0xf0a63c, depth: 0.55, spin: 0.18, bob: 0.65 },
+  { geometry: 'wheel', position: [1.7, 1.15, -1.1], rotation: [0.25, 1.05, 0.35], scale: 0.58, color: 0x4ea3f5, depth: 0.4, spin: 0.16, bob: 0.85 },
+  { geometry: 'board', position: [1.35, -1.15, 0.1], rotation: [0.35, -0.4, -0.2], scale: 0.48, color: 0x7fd6bd, depth: 0.7, spin: 0.14, bob: 1.05 },
+  { geometry: 'gear', position: [-1.4, -1.25, 0.35], rotation: [0.75, 0.15, 0.45], scale: 0.42, color: 0xb57ff0, depth: 0.8, spin: -0.26, bob: 1.2 },
+  { geometry: 'sphere', position: [0.15, 0.15, -1.8], rotation: [0, 0, 0], scale: 0.3, color: 0xef5ba8, depth: 0.28, spin: 0.12, bob: 0.55 },
+]
+
+const ARRANGEMENTS = { hero: PIECES, closing: CLOSING_PIECES, academy: ACADEMY_PIECES, login: LOGIN_PIECES }
 
 /** A spur gear: teeth on a disc, a bore through the middle, extruded and bevelled. */
 function gearGeometry(): THREE.BufferGeometry {
