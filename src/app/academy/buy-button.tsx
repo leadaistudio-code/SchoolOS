@@ -112,9 +112,9 @@ export function BuyButton({
       name: 'MyCampusView Academy',
       description: start.courseTitle,
       prefill: start.prefill,
-      // Razorpay's left panel uses this colour. Keep it on the Academy ink, not
-      // the tenant brand red used elsewhere in the signed-in app shell.
-      theme: { color: '#0b0b0d' },
+      // Razorpay's left panel uses this colour. Navy reads cleaner than the
+      // tenant brand red used elsewhere in the signed-in app shell.
+      theme: { color: '#0f2744' },
       handler: async (response: RazorpayResponse) => {
         done(
           await confirmPurchaseAction({
