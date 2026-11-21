@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
-import Script from 'next/script'
 import '@/styles/globals.css'
 import { resolveTenant } from '@/server/tenant'
 import { BrandStyle } from '@/components/brand-provider'
 import { ThemeScript } from '@/components/theme-toggle'
+import { GoogleTags } from '@/components/site/google-tags'
 import { env } from '@/lib/env'
 
 /**
@@ -63,16 +63,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         {children}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-4V3MCWL024" strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-
-            gtag('config', 'G-4V3MCWL024');
-          `}
-        </Script>
+        <GoogleTags
+          gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? 'G-4V3MCWL024'}
+          adsId={process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? null}
+        />
       </body>
     </html>
   )

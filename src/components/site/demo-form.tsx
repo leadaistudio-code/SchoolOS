@@ -105,6 +105,7 @@ export function DemoForm() {
       // matches the number in the queue.
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('mycampusview:demo-requested'))
+        void import('@/components/site/google-tags').then((m) => m.trackDemoRequested())
       }
     } catch (error) {
       setStatus('failed')
